@@ -1,0 +1,178 @@
+<?php
+use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\HomeController;
+use App\Http\Controllers\Auth\CustomAuthController;
+
+Route::get('/', [HomeController::class, 'index'])->name('home');
+Route::get('/', [HomeController::class, 'index'])->name('dashboard');
+
+
+Route::get('login', [CustomAuthController::class, 'showLoginForm'])->name('login');
+Route::post('login', [CustomAuthController::class, 'login']);
+Route::post('logout', [CustomAuthController::class, 'logout'])->name('logout');
+
+ 
+
+
+// Middleware group for authentication
+Route::middleware(['auth'])->group(function () {
+    // Members
+    
+    Route::get('/profile/password', [HomeController::class, 'showChangeSelfPasswordForm'])->name('profile.password');
+    Route::post('/profile/password', [HomeController::class, 'updateSelfPassword'])->name('profile.updatePassword');
+
+    Route::get('/members/list', [HomeController::class, 'membersList'])->name('members.list')->middleware('check_user_rights:list_sacco_member');
+    Route::get('/members/add', [HomeController::class, 'addNewMember'])->name('members.add')->middleware('check_user_rights:add_new_sacco_member');
+ 
+ 
+    Route::post('/members/store', [HomeController::class, 'storeNewMember'])->name('members.store')->middleware('check_user_rights:add_new_sacco_member');
+    Route::get('/members/active/{status}', [HomeController::class, 'membersActive'])->name('members.active')->middleware('check_user_rights:list_sacco_member');
+
+    Route::get('/members/edit/{id}', [HomeController::class, 'editMember'])->name('members.edit')->middleware('check_user_rights:edit_member'); 
+    Route::post('/members/update/{id}', [HomeController::class, 'updateMember'])->name('members.update')->middleware('check_user_rights:edit_member'); 
+    Route::get('/members/next-of-kin/{id}', [HomeController::class, 'editNextOfKin'])->name('members.nextOfKin')->middleware('check_user_rights:add_next_of_kin'); 
+    Route::post('/members/next-of-kin/update/{id}', [HomeController::class, 'updateNextOfKin'])->name('members.updateNextOfKin')->middleware('check_user_rights:add_next_of_kin'); 
+    Route::get('/members/delete-next-of-kin/{member_id}/{kin_id}', [HomeController::class, 'deleteNextOfKin'])->name('members.deleteNextOfKin')->middleware('check_user_rights:add_next_of_kin'); 
+    
+    Route::get('/members/status/{id}', [HomeController::class, 'memberStatus'])->name('members.status')->middleware('check_user_rights:rpt_loans_issued'); 
+
+    Route::delete('/members/{member_id}/guarantors/{guarantor_id}', [HomeController::class, 'deleteGuarantor'])->name('deleteGuarantor')->middleware('check_user_rights:loan_guarantors_change');
+    
+    Route::delete('/guarantor/{member_id}/{guarantor_id}', [HomeController::class, 'deleteGuarantor'])->name('deleteGuarantor')->middleware('check_user_rights:loan_guarantors_change');
+    Route::get('/changeGuarantors/{member_id}/{guarantor_id}', [HomeController::class, 'changeGuarantors'])->name('changeGuarantors')->middleware('check_user_rights:loan_guarantors_change');
+
+    Route::post('/updateGuarantors/{member_id}/{guarantor_id}', [HomeController::class, 'updateGuarantors'])->name('updateGuarantors')->middleware('check_user_rights:loan_guarantors_change');
+
+    Route::get('/ajax-get-members', [HomeController::class, 'ajaxGetMembers'])->name('ajaxGetMembers')->middleware('check_user_rights:list_sacco_member');
+
+    Route::get('/members/statement/{id}', [HomeController::class, 'viewStatement'])->name('members.statement')->middleware('check_user_rights:rpt_loans_issued'); 
+    Route::match(['get', 'post'], '/members/contributions/{id}', [HomeController::class, 'viewContributions'])->name('members.contributions')->middleware('check_user_rights:edit_member_share_contribution');
+   
+    Route::get('/members/change-password/{id}', [HomeController::class, 'changePassword'])->name('members.changePassword')->middleware('check_user_rights:edit_password');
+    Route::post('/members/change-password/{id}', [HomeController::class, 'updatePassword'])->name('members.updatePassword')->middleware('check_user_rights:edit_password');
+
+    // Institutions
+    Route::get('/institutions/add', [HomeController::class, 'addInstitution'])->name('institutions.add')->middleware('check_user_rights:add_company');
+    Route::post('/institutions/store', [HomeController::class, 'storeInstitution'])->name('institutions.store')->middleware('check_user_rights:add_company');
+    Route::get('/institutions/list', [HomeController::class, 'listInstitutions'])->name('institutions.list')->middleware('check_user_rights:edit_company');
+
+   // Member share deposits
+   
+   Route::get('/modify/member/shares', [HomeController::class, 'modifyShares'])->name('modify.member.shares')->middleware('check_user_rights:modify_member_shares_journal');
+   Route::post('/modify/member/shares', [HomeController::class, 'modifyShares'])->middleware('check_user_rights:modify_member_shares_journal');
+   Route::get('/search/members', [HomeController::class, 'searchMembers'])->name('search.members')->middleware('check_user_rights:modify_member_shares_journal');
+   Route::get('/search/accounts', [HomeController::class, 'searchAccounts'])->name('search.accounts')->middleware('check_user_rights:modify_member_shares_journal');
+
+   Route::match(['get', 'post'], '/transfer/member/shares', [HomeController::class, 'transferShares'])->name('transfer.member.shares')->middleware('check_user_rights:transfer_member_shares');
+   
+   Route::match(['get', 'post'], '/proc/end/month/shares', [HomeController::class, 'processEndMonthShares'])->name('proc.end.month.shares')->middleware('check_user_rights:end_month_processing_shares');
+
+   Route::match(['get', 'post'], '/modify/member/share/capital', [HomeController::class, 'modifyShareCapital'])->name('modify.member.share.capital')->middleware('check_user_rights:transfer_member_shares');
+   Route::match(['get', 'post'], '/transfer/member/capital/shares', [HomeController::class, 'transferCapitalShares'])->name('transfer.member.capital.shares')->middleware('check_user_rights:transfer_member_shares');
+   Route::match(['get', 'post'], '/transfer/share/to/capital/shares', [HomeController::class, 'transferShareToCapitalShares'])->name('transfer.share.to.capital.shares')->middleware('check_user_rights:transfer_member_shares');
+ 
+    // Member share CAPITAL
+
+    
+    Route::match(['get', 'post'], '/modify/member/share/capital', [HomeController::class, 'modifyShareCapital'])->name('modify.member.share.capital')->middleware('check_user_rights:modify_member_shares_capital');
+
+    Route::get('/transfer/member/capital/shares', [HomeController::class, 'transferCapitalShares'])->name('transfer.member.capital.shares')->middleware('check_user_rights:modify_member_shares_capital');
+
+    // FOSA
+     
+    Route::match(['get', 'post'], '/modify/member/fosas', [HomeController::class, 'modifyFosas'])->name('modify.member.fosas')->middleware('check_user_rights:modify_member_shares_journal');
+    Route::match(['get', 'post'], '/transfer/member/fosa', [HomeController::class, 'transferFosa'])->name('transfer.member.fosa')->middleware('check_user_rights:modify_member_shares_journal');
+
+    Route::get('/proc/end/month/fosa', [HomeController::class, 'endMonthFosa'])->name('proc.end.month.fosa')->middleware('check_user_rights:modify_member_shares_journal');
+
+    // End month processing
+    Route::get('/list/contribution', [HomeController::class, 'listContribution'])->name('list.contribution')->middleware('check_user_rights:list_sacco_member_contributions');
+    Route::get('/proc/end/month/loans', [HomeController::class, 'endMonthLoans'])->name('proc.end.month.loans');
+
+
+        Route::get('/loans/apply', [HomeController::class, 'loansApply'])->name('loans.apply');
+    Route::post('/loans/apply', [HomeController::class, 'submitLoanApplication'])->name('loans.application.submit');
+    Route::get('/loans/approval', [HomeController::class, 'listLoansForApproval'])->name('loans.approval');
+    Route::get('/loans/approve/{loanId}', [HomeController::class, 'approveLoan'])->name('loans.approve');
+    Route::get('/loans/delete/{loanId}', [HomeController::class, 'deleteLoan'])->name('loans.delete');
+
+    Route::post('/loans/application-submit', [HomeController::class, 'loansApplicationSubmit'])->name('loans.application.submit');
+
+
+    // Loans
+    Route::get('/loans/issued', [HomeController::class, 'loansIssued'])->name('loans.issued');
+    Route::get('/loans/batch', [HomeController::class, 'loansBatch'])->name('loans.batch');
+    Route::get('/loans/apply', [HomeController::class, 'loansApply'])->name('loans.apply');
+    Route::get('/loans/end-month', [HomeController::class, 'loansEndMonth'])->name('loans.end-month');
+    Route::get('/loans/un-finished', [HomeController::class, 'loansUnFinished'])->name('loans.un-finished');
+    Route::get('/loans/shares-to-loans', [HomeController::class, 'loansSharesToLoans'])->name('loans.shares-to-loans');
+    Route::get('/loans/types', [HomeController::class, 'loansTypes'])->name('loans.types');
+    Route::get('/loans/categories', [HomeController::class, 'loansCategories'])->name('loans.categories');
+    Route::get('/loans/calculator', [HomeController::class, 'loansCalculator'])->name('loans.calculator');
+
+    // Guarantors
+    Route::get('/guarantors/deduction', [HomeController::class, 'guarantorsDeduction'])->name('guarantors.deduction');
+    Route::get('/guarantors/reset', [HomeController::class, 'guarantorsReset'])->name('guarantors.reset');
+
+    // Reports
+       
+    Route::get('/reports/members/status', [HomeController::class, 'reportsMembersStatus'])->name('reports.members.status');
+    Route::get('/reports/members/status/data', [HomeController::class, 'reportsMembersStatusData'])->name('reports.members.status.data');
+    Route::get('/reports/members/status/download', [HomeController::class, 'downloadMembersStatus'])->name('reports.members.status.download');
+
+
+    Route::get('/reports/shares/contribution', [HomeController::class, 'reportsSharesContribution'])->name('reports.shares.contribution');
+    Route::get('/reports/shares/capital', [HomeController::class, 'reportsSharesCapital'])->name('reports.shares.capital');
+    Route::get('/reports/fosa/contribution', [HomeController::class, 'reportsFosaContribution'])->name('reports.fosa.contribution');
+    Route::get('/reports/loans/balances', [HomeController::class, 'reportsLoansBalances'])->name('reports.loans.balances');
+    Route::get('/reports/shares/period', [HomeController::class, 'reportsSharesPeriod'])->name('reports.shares.period');
+
+    Route::get('/reports/loans/issued', [HomeController::class, 'reportsLoansIssued'])->name('reports.loans.issued');
+    Route::get('/reports/loans/member', [HomeController::class, 'reportsLoansMember'])->name('reports.loans.member');
+    Route::get('/reports/guarantors', [HomeController::class, 'reportsGuarantors'])->name('reports.guarantors');
+    Route::get('/reports/contributions', [HomeController::class, 'reportsContributions'])->name('reports.contributions');
+    Route::get('/reports/contributions/principal', [HomeController::class, 'reportsContributionsPrincipal'])->name('reports.contributions.principal');
+    Route::get('/reports/loans/repayments', [HomeController::class, 'reportsLoansRepayments'])->name('reports.loans.repayments');
+    Route::get('/reports/loans/balances/period', [HomeController::class, 'reportsLoansBalancesPeriod'])->name('reports.loans.balances.period');
+
+    Route::get('/reports/accounts/ledger', [HomeController::class, 'reportsAccountsLedger'])->name('reports.accounts.ledger')->middleware('check_user_rights:rpt_acc_trans');
+    Route::get('/reports/accounts/trial-balance', [HomeController::class, 'reportsAccountsTrialBalance'])->name('reports.accounts.trial-balance');
+    Route::get('/reports/accounts/profit-loss', [HomeController::class, 'reportsAccountsProfitLoss'])->name('reports.accounts.profit-loss');
+    Route::get('/reports/accounts/balance-sheet', [HomeController::class, 'reportsAccountsBalanceSheet'])->name('reports.accounts.balance-sheet');
+
+    // Interest & Dividends
+    Route::get('/interest/shares', [HomeController::class, 'interestShares'])->name('interest.shares');
+    Route::get('/dividends/shares', [HomeController::class, 'dividendsShares'])->name('dividends.shares');
+    Route::get('/interest/fosa', [HomeController::class, 'interestFosa'])->name('interest.fosa');
+
+    // Journal Accounts
+    Route::get('/accounts/main', [HomeController::class, 'accountsMain'])->name('accounts.main');
+    Route::get('/accounts/sub', [HomeController::class, 'accountsSub'])->name('accounts.sub');
+    Route::get('/accounts/transfer', [HomeController::class, 'accountsTransfer'])->name('accounts.transfer');
+
+    // Downloads
+    Route::get('/downloads/view', [HomeController::class, 'downloadsView'])->name('downloads.view');
+    Route::get('/downloads/add-type', [HomeController::class, 'downloadsAddType'])->name('downloads.add-type');
+
+    // Sacco Admin
+    Route::get('/admin/users', [HomeController::class, 'adminUsers'])->name('admin.users');
+    Route::get('/admin/user-types', [HomeController::class, 'adminUserTypes'])->name('admin.user-types');
+    Route::get('/admin/access-rights', [HomeController::class, 'adminAccessRights'])->name('admin.access-rights');
+    Route::get('/admin/modules', [HomeController::class, 'adminModules'])->name('admin.modules');
+    Route::get('/admin/defaults', [HomeController::class, 'adminDefaults'])->name('admin.defaults');
+    Route::get('/admin/defaults/add', [HomeController::class, 'adminDefaultsAdd'])->name('admin.defaults.add');
+    Route::get('/admin/default-accounts/add', [HomeController::class, 'adminDefaultAccountsAdd'])->name('admin.default-accounts.add');
+    Route::get('/admin/budget', [HomeController::class, 'adminBudget'])->name('admin.budget');
+    Route::get('/admin/year-end', [HomeController::class, 'adminYearEnd'])->name('admin.year-end');
+
+    Route::get('/admin/periods', [HomeController::class, 'adminPeriods'])->name('admin.periods')->middleware('check_user_rights:add_period');
+    Route::get('/admin/periods/create', [HomeController::class, 'adminPeriodsCreate'])->name('admin.periods.create')->middleware('check_user_rights:add_period');
+    Route::post('/admin/periods/store', [HomeController::class, 'adminPeriodsStore'])->name('admin.periods.store')->middleware('check_user_rights:add_period');
+    Route::get('/admin/periods/activate/{id}', [HomeController::class, 'adminPeriodsActivate'])->name('admin.periods.activate')->middleware('check_user_rights:add_period');
+
+
+     
+
+
+});
+
