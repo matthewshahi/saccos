@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta http-equiv="X-UA-Compatible" content="ie=edge" />
-    <title>Datatables | Gull Bootstrap 5 Admin Template</title>
+    <title>iSacco | v<?php echo(date('Y')) ?></title>
     <link rel="stylesheet" href="{{ asset('dist-assets/css/themes/lite-purple.css') }}" />
     <link rel="stylesheet" href="{{ asset('dist-assets/css/plugins/perfect-scrollbar.css') }}" />
     <link rel="stylesheet" href="{{ asset('dist-assets/css/plugins/fontawesome-5.css') }}" />
