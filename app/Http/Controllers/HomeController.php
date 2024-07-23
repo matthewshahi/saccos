@@ -1402,8 +1402,8 @@ public function updatePassword(Request $request, $id)
                         ->where('default_name', 'default_share_account')
                         ->value('default_value');
 
-                    $this->updateSaccoAccountsTrans($default_share_account, 0, $amount, $share_doc_no, $share_description, $share_date_paid, $currentPeriod->period_name);
-                    $this->updateSaccoAccountsTrans($laccount, $amount, 0, $share_doc_no, $share_description, $share_date_paid, $currentPeriod->period_name);
+                    $this->updateSaccoAccountsTrans($default_share_account, 0, $amount, $share_doc_no, $share_description, $share_date_paid, $currentPeriod->period_name,'Modify Shares');
+                    $this->updateSaccoAccountsTrans($laccount, $amount, 0, $share_doc_no, $share_description, $share_date_paid, $currentPeriod->period_name,'Modify Shares');
                 }
             }
         }
@@ -1681,8 +1681,8 @@ public function modifyShareCapital(Request $request)
                         ->where('default_name', 'default_share_capital_account')
                         ->value('default_value');
 
-                    $this->updateSaccoAccountsTrans($default_share_capital_account, 0, $amount, $share_doc_no, $share_description, $share_date_paid, $currentPeriod->period_name);
-                    $this->updateSaccoAccountsTrans($laccount, $amount, 0, $share_doc_no, $share_description, $share_date_paid, $currentPeriod->period_name);
+                    $this->updateSaccoAccountsTrans($default_share_capital_account, 0, $amount, $share_doc_no, $share_description, $share_date_paid, $currentPeriod->period_name,'Modify Capital');
+                    $this->updateSaccoAccountsTrans($laccount, $amount, 0, $share_doc_no, $share_description, $share_date_paid, $currentPeriod->period_name,'Modify Capital');
                 }
             }
         }
@@ -1834,8 +1834,8 @@ public function modifyFosas(Request $request)
                         ->where('default_name', 'default_fosa_account')
                         ->value('default_value');
 
-                    $this->updateSaccoAccountsTrans($default_fosa_account, 0, $amount, $fosa_doc_no, $fosa_description, $fosa_date_paid, $currentPeriod->period_name);
-                    $this->updateSaccoAccountsTrans($laccount, $amount, 0, $fosa_doc_no, $fosa_description, $fosa_date_paid, $currentPeriod->period_name);
+                    $this->updateSaccoAccountsTrans($default_fosa_account, 0, $amount, $fosa_doc_no, $fosa_description, $fosa_date_paid, $currentPeriod->period_name,'Modify Fosa');
+                    $this->updateSaccoAccountsTrans($laccount, $amount, 0, $fosa_doc_no, $fosa_description, $fosa_date_paid, $currentPeriod->period_name,'Modify Fosa');
                 }
             }
         }
@@ -1996,8 +1996,8 @@ public function transferShares(Request $request)
                         ->where('default_name', 'default_share_account')
                         ->value('default_value');
 
-                    $this->updateSaccoAccountsTrans($default_share_account, $amount, 0, $share_doc_no, $share_description1x, $share_date_paid, $currentPeriod->period_name);
-                    $this->updateSaccoAccountsTrans($default_share_account, 0, $amount, $share_doc_no, $share_description2x, $share_date_paid, $currentPeriod->period_name);
+                    $this->updateSaccoAccountsTrans($default_share_account, $amount, 0, $share_doc_no, $share_description1x, $share_date_paid, $currentPeriod->period_name,'Transfer Shares');
+                    $this->updateSaccoAccountsTrans($default_share_account, 0, $amount, $share_doc_no, $share_description2x, $share_date_paid, $currentPeriod->period_name,'Transfer Shares');
                 }
             }
         }
@@ -2159,8 +2159,8 @@ public function transferCapitalShares(Request $request)
                     ->where('default_name', 'default_share_capital_account')
                     ->value('default_value');
 
-                $this->updateSaccoAccountsTrans($default_share_capital_account, $amount, 0, $share_doc_no, $share_description1, $share_date_paid, $currentPeriod->period_name);
-                $this->updateSaccoAccountsTrans($default_share_capital_account, 0, $amount, $share_doc_no, $share_description2, $share_date_paid, $currentPeriod->period_name);
+                $this->updateSaccoAccountsTrans($default_share_capital_account, $amount, 0, $share_doc_no, $share_description1, $share_date_paid, $currentPeriod->period_name,"Capital");
+                $this->updateSaccoAccountsTrans($default_share_capital_account, 0, $amount, $share_doc_no, $share_description2, $share_date_paid, $currentPeriod->period_name,"Capital");
             }
         }
 
@@ -2324,8 +2324,8 @@ public function transferFosa(Request $request)
                         ->where('default_name', 'default_fosa_account')
                         ->value('default_value');
 
-                    $this->updateSaccoAccountsTrans($default_fosa_account, $amount, 0, $fosa_doc_no, $fosa_description1x, $fosa_date_paid, $currentPeriod->period_name);
-                    $this->updateSaccoAccountsTrans($default_fosa_account, 0, $amount, $fosa_doc_no, $fosa_description2x, $fosa_date_paid, $currentPeriod->period_name);
+                    $this->updateSaccoAccountsTrans($default_fosa_account, $amount, 0, $fosa_doc_no, $fosa_description1x, $fosa_date_paid, $currentPeriod->period_name,"FOSA");
+                    $this->updateSaccoAccountsTrans($default_fosa_account, 0, $amount, $fosa_doc_no, $fosa_description2x, $fosa_date_paid, $currentPeriod->period_name,"FOSA");
                 }
             }
         }
@@ -2792,145 +2792,6 @@ private function updateMemberTotalShares($memberId, $amount)
     DB::table('sacco_members')->where('member_id', $memberId)->increment('member_total_share', $amount);
 }
 
-public function loansApply()
-{
-    $loanTypes = DB::table('sacco_loan_types')
-        ->where('loan_type_deleted', '<>', 'Y')
-        ->orderBy('loan_type_name')
-        ->get();
-
-    $loanCategories = DB::table('sacco_loan_category')
-        ->where('loan_category_deleted', '<>', 'Y')
-        ->orderBy('loan_category_name')
-        ->get();
-
-    $maximumNoOfGuarantors = DB::table('sacco_defaults')
-        ->where('default_name', 'maximum_no_of_guarantors')
-        ->value('default_value');
-
-    return view('loans.apply', compact('loanTypes', 'loanCategories', 'maximumNoOfGuarantors'));
-}
-
-public function loansApplicationSubmit(Request $request)
-{
-    $request->validate([
-        'batch_trans_member_name' => 'required',
-        'batch_trans_loan_amount' => 'required|numeric',
-        'batch_trans_loan_type' => 'required',
-        'batch_trans_loan_category' => 'required',
-        'batch_trans_loan_duration' => 'required|numeric',
-        'batch_trans_description' => 'required|string|max:100',
-    ]);
-
-    // Add further processing logic as required
-    return redirect()->route('loans.apply')->with('success', 'Loan application submitted successfully.');
-}
-
-
-public function submitLoanApplication(Request $request)
-{
-    $request->validate([
-        'batch_trans_loan_amount' => 'required|numeric',
-        'batch_trans_loan_type' => 'required',
-        'batch_trans_loan_category' => 'required',
-        'batch_trans_loan_duration' => 'required',
-        'batch_trans_description' => 'required',
-        'guarantors_guarantor_name' => 'array',
-        'guarantors_amount_guaranteed' => 'array',
-        'batch_trans_pay1' => 'file|mimes:pdf,jpg,png',
-        'batch_trans_pay2' => 'file|mimes:pdf,jpg,png',
-    ]);
-
-    $loanData = $request->only([
-        'batch_trans_loan_amount',
-        'batch_trans_loan_type',
-        'batch_trans_loan_category',
-        'batch_trans_loan_duration',
-        'batch_trans_description'
-    ]);
-
-    $loanData['batch_trans_member_id'] = Auth::id();
-    $loanData['batch_trans_doc_no'] = 'N/A';
-    $loanData['batch_trans_commission'] = 0;
-    $loanData['batch_trans_loan_to_top_up'] = $request->batch_trans_loan_to_top_up;
-
-    DB::transaction(function() use ($loanData, $request) {
-        $loanId = DB::table('sacco_loan_batch_trans_members')->insertGetId($loanData);
-
-        if ($request->hasFile('batch_trans_pay1')) {
-            $path1 = $request->file('batch_trans_pay1')->store('payslips');
-            DB::table('sacco_loan_batch_trans_files')->insert([
-                'batch_trans_id' => $loanId,
-                'file_path' => $path1,
-                'file_type' => 'payslip1'
-            ]);
-        }
-
-        if ($request->hasFile('batch_trans_pay2')) {
-            $path2 = $request->file('batch_trans_pay2')->store('payslips');
-            DB::table('sacco_loan_batch_trans_files')->insert([
-                'batch_trans_id' => $loanId,
-                'file_path' => $path2,
-                'file_type' => 'payslip2'
-            ]);
-        }
-
-        foreach ($request->guarantors_guarantor_name as $index => $guarantorName) {
-            if (!empty($guarantorName)) {
-                DB::table('sacco_loan_batch_guarantors_members')->insert([
-                    'guarantors_loan_batch_trans_id' => $loanId,
-                    'guarantors_guarantor_name' => $guarantorName,
-                    'guarantors_amount_guaranteed' => $request->guarantors_amount_guaranteed[$index]
-                ]);
-            }
-        }
-    });
-
-    return redirect()->route('loans.apply')->with('success', 'Loan application submitted successfully.');
-}
-
-public function listLoansForApproval()
-{
-    $loans = DB::table('sacco_loan_batch_trans_members as loans')
-        ->join('sacco_members as members', 'loans.batch_trans_member_id', '=', 'members.member_id')
-        ->join('sacco_loan_types as types', 'loans.batch_trans_loan_type', '=', 'types.loan_type_id')
-        ->join('sacco_loan_category as categories', 'loans.batch_trans_loan_category', '=', 'categories.loan_category_id')
-        ->select('loans.*', 'members.member_name', 'members.member_sacco_id', 'types.loan_type_name', 'categories.loan_category_name')
-        ->where('loans.batch_trans_updated', '<>', 'Y')
-        ->where('loans.batch_trans_deleted', '<>', 'Y')
-        ->get();
-
-    return view('loans.approval', compact('loans'));
-}
-
-public function approveLoan($loanId)
-{
-    $loan = DB::table('sacco_loan_batch_trans_members')->where('batch_trans_id', $loanId)->first();
-
-    if ($loan) {
-        DB::transaction(function() use ($loanId) {
-            DB::table('sacco_loan_batch_trans_members')->where('batch_trans_id', $loanId)->update([
-                'batch_trans_updated' => 'Y'
-            ]);
-            // Add any additional logic for approving a loan
-        });
-        return redirect()->route('loans.approval')->with('success', 'Loan approved successfully.');
-    }
-
-    return redirect()->route('loans.approval')->with('error', 'Loan not found.');
-}
-
-public function deleteLoan($loanId)
-{
-    DB::transaction(function() use ($loanId) {
-        DB::table('sacco_loan_batch_trans_members')->where('batch_trans_id', $loanId)->update([
-            'batch_trans_deleted' => 'Y'
-        ]);
-        // Add any additional logic for deleting a loan
-    });
-    return redirect()->route('loans.approval')->with('success', 'Loan deleted successfully.');
-}
-
 public function reportsMembersStatus(Request $request)
 {
     return view('reports.members.status');
@@ -3006,6 +2867,666 @@ public function reportsMembersStatusData(Request $request)
         'members' => $membersData,
         'loanTypes' => $loanTypes
     ]);
+}
+
+ 
+public function loansApply()
+{
+    $loanTypes = DB::table('sacco_loan_types')
+        ->where('loan_type_deleted', '<>', 'Y')
+        ->orderBy('loan_type_name')
+        ->get();
+
+    $loanCategories = DB::table('sacco_loan_category')
+        ->where('loan_category_deleted', '<>', 'Y')
+        ->orderBy('loan_category_name')
+        ->get();
+
+    $maximumNoOfGuarantors = DB::table('sacco_defaults')
+        ->where('default_name', 'maximum_no_of_guarantors')
+        ->value('default_value');
+
+    $memberLoans = DB::table('sacco_loans')
+        ->join('sacco_loan_types', 'sacco_loans.loan_loan_type', '=', 'sacco_loan_types.loan_type_id')
+        ->select('sacco_loans.*', 'sacco_loan_types.loan_type_name', DB::raw('(sacco_loans.loan_amount - sacco_loans.loan_loan_paid) as loan_balance'))
+        ->where('sacco_loans.loan_member', auth()->user()->id)
+        ->where('sacco_loans.loan_amount', '>', DB::raw('sacco_loans.loan_loan_paid'))
+        ->where('sacco_loans.loan_stoped', 'N')
+        ->get();
+
+    return view('loans.apply', compact('loanTypes', 'loanCategories', 'maximumNoOfGuarantors', 'memberLoans'));
+}
+
+
+
+// public function submitLoanApplication(Request $request)
+// {
+//     // Define validation rules
+//     $request->validate([
+//         'batch_trans_member_id' => 'required|exists:sacco_members,member_id',
+//         'batch_trans_member_name' => 'required|string',
+//         'batch_trans_loan_amount' => 'required|numeric|min:1',
+//         'batch_trans_loan_type' => 'required|exists:sacco_loan_types,loan_type_id',
+//         'batch_trans_loan_category' => 'required|exists:sacco_loan_category,loan_category_id',
+//         'batch_trans_loan_duration' => 'required|integer|min:1|max:100',
+//         'batch_trans_description' => 'required|string|max:50',
+//         'batch_trans_commission' => 'nullable|numeric',
+//         'batch_trans_loan_to_top_up' => 'nullable|string',
+//         'batch_trans_pay1' => 'nullable|file|mimes:jpg,jpeg,png,gif|max:200',
+//         'batch_trans_pay2' => 'nullable|file|mimes:jpg,jpeg,png,gif|max:200',
+//     ], [
+//         'batch_trans_pay1.mimes' => 'File must be of type jpg, jpeg, png, gif.',
+//         'batch_trans_pay1.max' => 'File must be less than 200KB.',
+//         'batch_trans_pay2.mimes' => 'File must be of type jpg, jpeg, png, gif.',
+//         'batch_trans_pay2.max' => 'File must be less than 200KB.',
+//     ]);
+
+//     $data = $request->all();
+//     $nmsg = '';
+
+//     // Loan Category and Type validation
+//     $loanCategory = DB::table('sacco_loan_category')
+//         ->where('loan_category_id', $data['batch_trans_loan_category'])
+//         ->first();
+
+//     if (!$loanCategory) {
+//         $nmsg .= "Error, invalid loan category. ";
+//     }
+
+//     $loanType = DB::table('sacco_loan_types')
+//         ->where('loan_type_id', $data['batch_trans_loan_type'])
+//         ->first();
+
+//     if (!$loanType) {
+//         $nmsg .= "Error, invalid loan type selected. ";
+//     }
+
+//     // Member validation
+//     $member = DB::table('sacco_members')
+//         ->where('member_id', $data['batch_trans_member_id'])
+//         ->where('member_active', 'Y')
+//         ->where('member_deleted', '<>', 'Y')
+//         ->first();
+
+//     if (!$member) {
+//         $nmsg .= "Error, invalid member taking loan, not found in the database. ";
+//     } elseif (strtotime($member->member_date_joined) > strtotime("-{$loanType->loan_type_qualification_period} months")) {
+//         $nmsg .= "Error, this member must be {$loanType->loan_type_qualification_period} months old in the sacco before taking this type of loan. ";
+//     }
+
+//     // Loan Amount validation
+//     $loanAmount = floatval($data['batch_trans_loan_amount']);
+//     if ($loanAmount < 1 || !is_numeric($loanAmount)) {
+//         $nmsg .= "Error, invalid loan amount entered. ";
+//     } elseif ($loanAmount > $loanType->loan_type_max_amount) {
+//         $nmsg .= "Error, loan taken cannot exceed {$loanType->loan_type_max_amount}. ";
+//     }
+
+//     // Commission validation
+//     $commission = !empty($data['batch_trans_commission']) ? floatval($data['batch_trans_commission']) : 0;
+//     if (!is_numeric($commission)) {
+//         $nmsg .= "Error, invalid loan commission amount entered. ";
+//     }
+
+//     // Check if member has exceeded maximum allowable loans
+//     $member_cumm_loan_temp = $member->member_total_loan ?? 0;
+//     $loan_individualize = DB::table('sacco_defaults')
+//         ->where('default_name', 'loan_individualize')
+//         ->value('default_value') ?? 'N';
+
+//     if ($loan_individualize == "Y") {
+//         $member_cumm_loan_temp = DB::table('sacco_loans')
+//             ->where('loan_member', $member->member_id)
+//             ->where('loan_loan_type', $data['batch_trans_loan_type'])
+//             ->sum(DB::raw('loan_amount - loan_loan_paid')) ?? 0;
+//     }
+
+//     if (($loanType->loan_type_share_factor * ($member->member_total_share + $member->member_total_share_capital) - $member_cumm_loan_temp) < $loanAmount && $loanType->loan_type_share_factor > 0) {
+//         if (empty($data['batch_trans_loan_to_top_up'])) {
+//             $nmsg .= "Error, member has exceeded his/her loan amount limit. ";
+//         } else {
+//             $topup = explode(" - (", $data['batch_trans_loan_to_top_up']);
+//             $topupLoanType = trim($topup[0]);
+//             $topupLoanId = trim(explode(")", $topup[1])[0]);
+
+//             $topupLoan = DB::table('sacco_loans')
+//                 ->join('sacco_loan_types', 'sacco_loans.loan_loan_type', '=', 'sacco_loan_types.loan_type_id')
+//                 ->where('loan_member', $member->member_id)
+//                 ->where('loan_type_name', $topupLoanType)
+//                 ->where('loan_id', $topupLoanId)
+//                 ->first();
+
+//             if (!$topupLoan) {
+//                 $nmsg .= "Error, invalid TOP-UP loan. ";
+//             } else {
+//                 $member_cumm_loan_temp = DB::table('sacco_loans')
+//                     ->where('loan_member', $member->member_id)
+//                     ->where('loan_loan_type', $data['batch_trans_loan_type'])
+//                     ->sum(DB::raw('loan_amount - loan_loan_paid')) ?? 0;
+
+//                 if (($loanType->loan_type_share_factor * ($member->member_total_share + $member->member_total_share_capital) - $member_cumm_loan_temp) < $loanAmount) {
+//                     $nmsg .= "Error, member has exceeded loan amount limit. ";
+//                 }
+
+//                 if (($topupLoan->loan_amount - $topupLoan->loan_loan_paid) > $loanAmount) {
+//                     $nmsg .= "Error, the amount in the new loan must be more than the loan balance. ";
+//                 }
+//             }
+//         }
+//     }
+
+//     // Guarantor validation
+//     $maximumNoOfGuarantors = DB::table('sacco_defaults')
+//         ->where('default_name', 'maximum_no_of_guarantors')
+//         ->value('default_value');
+
+//     $totalGuaranteed = 0;
+//     $max_guarantor_factor = DB::table('sacco_defaults')
+//         ->where('default_name', 'max_guarantor_factor')
+//         ->value('default_value') ?? 1;
+
+//     for ($i = 0; $i < $maximumNoOfGuarantors; $i++) {
+//         $guarantorName = $data["guarantors_guarantor_name"][$i] ?? null;
+//         $guarantorAmount = !empty($data["guarantors_amount_guaranteed"][$i]) ? floatval($data["guarantors_amount_guaranteed"][$i]) : 0;
+
+//         if (!empty($guarantorName)) {
+//             $guarantor = DB::table('sacco_members')
+//                 ->where('member_name', explode(" - (", $guarantorName)[0])
+//                 ->where('member_sacco_id', trim(explode(" - (", $guarantorName)[1], ")"))
+//                 ->where('member_active', 'Y')
+//                 ->where('member_deleted', '<>', 'Y')
+//                 ->first();
+
+//             if (!$guarantor) {
+//                 $nmsg .= "Error, guarantor {$guarantorName} has no file. ";
+//             } elseif ($data['batch_trans_member_id'] != $guarantor->member_id) {
+//                 $totalGuarantorAmount = DB::table('sacco_loan_batch_guarantors_members')
+//                     ->where('guarantors_guarantor_id', $guarantor->member_id)
+//                     ->where('guarantors_approved', '<>', 'Y')
+//                     ->where('guarantors_deleted', '<>', 'Y')
+//                     ->sum('guarantors_amount_guaranteed') ?? 0;
+
+//                 if (($guarantor->member_total_share * $max_guarantor_factor - $guarantor->member_tied_shares) < ($guarantorAmount + $totalGuarantorAmount)) {
+//                     $nmsg .= "Error, guarantor {$guarantorName}, in row " . ($i + 1) . " has over guaranteed. ";
+//                 }
+//             } else {
+//                 if (($guarantor->member_total_share * $max_guarantor_factor - $guarantor->member_tied_shares_self) < $guarantorAmount) {
+//                     $nmsg .= "Error, {$guarantorName} has over guaranteed themselves. ";
+//                 }
+//             }
+//             $totalGuaranteed += $guarantorAmount;
+//         }
+//     }
+
+//     // Under-guarantee check
+//     $batch_trans_loan_guaranteed = $loanAmount * $loanType->loan_type_guaranteable_percent / 100;
+
+//     if ($loanType->loan_type_guaranteable_percent > 0) {
+//         if ($batch_trans_loan_guaranteed > $totalGuaranteed) {
+//             $nmsg .= "Error, this member has been under guaranteed. ";
+//         } else {
+//             $g_factor = $batch_trans_loan_guaranteed / $totalGuaranteed;
+//         }
+//     }
+
+//     if (empty($nmsg) && $loanType->loan_type_duration < $data['batch_trans_loan_duration']) {
+//         $nmsg .= "Error, invalid loan repayment period. ";
+//     }
+
+//     // Final validation before saving
+//     if (!empty($nmsg)) {
+//         return redirect()->back()->withErrors($nmsg)->withInput();
+//     }
+
+//     // Handle file uploads and get file paths
+//     $payslip1Path = null;
+//     if ($request->hasFile('batch_trans_pay1')) {
+//         $file = $request->file('batch_trans_pay1');
+//         $payslip1Path = $file->storeAs('uploads/payslips', Auth::user()->name . '_' . time() . '_1.' . $file->getClientOriginalExtension());
+//     }
+
+//     $payslip2Path = null;
+//     if ($request->hasFile('batch_trans_pay2')) {
+//         $file = $request->file('batch_trans_pay2');
+//         $payslip2Path = $file->storeAs('uploads/payslips', Auth::user()->name . '_' . time() . '_2.' . $file->getClientOriginalExtension());
+//     }
+
+//     // Select the correct insurance calculation function based on the sacco_defaults value
+//     $loan_interest_insurance = DB::table('sacco_defaults')
+//         ->where('default_name', 'loan_interest_insurance')
+//         ->value('default_value');
+
+//     if (empty($loan_interest_insurance)) {
+//         $loan_interest_insurance = "calc_loan_interest_insurance";
+//     }
+
+//     $insuranceValues = $this->$loan_interest_insurance($data['batch_trans_loan_type'], $loanAmount, $data['batch_trans_loan_duration']);
+
+//     // Save the loan application after all validations are done
+//     $loanId = DB::table('sacco_loan_batch_trans_members')->insertGetId([
+//         'batch_trans_batch_id' => Auth::user()->id, // Assuming batch ID, modify accordingly
+//         'batch_trans_loan_type' => $data['batch_trans_loan_type'],
+//         'batch_trans_loan_category' => $data['batch_trans_loan_category'],
+//         'batch_trans_loan_amount' => $loanAmount,
+//         'batch_trans_member_id' => $data['batch_trans_member_id'],
+//         'batch_trans_loan_duration' => $data['batch_trans_loan_duration'],
+//         'batch_trans_monthly_payment' => $insuranceValues[1], // EMI
+//         'batch_trans_monthly_payment_principal' => $insuranceValues[3], // Monthly principal
+//         'batch_trans_doc_no' => 'N/A',
+//         'batch_trans_description' => $data['batch_trans_description'],
+//         'batch_trans_commission' => $commission,
+//         'batch_trans_loan_to_top_up' => $data['batch_trans_loan_to_top_up'] ?? 0,
+//         'batch_trans_insurance' => $insuranceValues[4], // Insurance
+//         'batch_trans_expected_interest' => $insuranceValues[2], // Expected interest
+//         'batch_trans_loan_guaranteed' => $batch_trans_loan_guaranteed,
+//         'batch_trans_by' => Auth::user()->id,
+//         'batch_trans_ip' => $request->ip(),
+//         'batch_trans_payslip1' => $payslip1Path,
+//         'batch_trans_payslip2' => $payslip2Path,
+//     ]);
+
+//     // Save guarantors
+//     for ($i = 0; $i < $maximumNoOfGuarantors; $i++) {
+//         if (!empty($data["guarantors_guarantor_name"][$i])) {
+//             $guarantorId = DB::table('sacco_members')
+//                 ->where('member_name', explode(" - (", $data["guarantors_guarantor_name"][$i])[0])
+//                 ->where('member_sacco_id', trim(explode(" - (", $data["guarantors_guarantor_name"][$i])[1], ")"))
+//                 ->where('member_active', 'Y')
+//                 ->where('member_deleted', '<>', 'Y')
+//                 ->value('member_id');
+
+//             DB::table('sacco_loan_batch_guarantors_members')->insert([
+//                 'guarantors_loan_batch_trans_id' => $loanId,
+//                 'guarantors_guarantor_id' => $guarantorId,
+//                 'guarantors_amount_guaranteed' => floatval($data["guarantors_amount_guaranteed"][$i]),
+//                 'guarantors_by' => Auth::user()->id,
+//                 'guarantors_ip' => $request->ip(),
+//             ]);
+//         }
+//     }
+
+//     return redirect()->route('loans.apply')->with('success', 'Loan application submitted successfully.');
+// }
+
+
+public function submitLoanApplication(Request $request)
+{
+    // Define validation rules
+    $request->validate([
+        'batch_trans_member_id' => 'required|exists:sacco_members,member_id',
+        'batch_trans_member_name' => 'required|string',
+        'batch_trans_loan_amount' => 'required|numeric|min:1',
+        'batch_trans_loan_type' => 'required|exists:sacco_loan_types,loan_type_id',
+        'batch_trans_loan_category' => 'required|exists:sacco_loan_category,loan_category_id',
+        'batch_trans_loan_duration' => 'required|integer|min:1|max:100',
+        'batch_trans_description' => 'required|string|max:50',
+        'batch_trans_commission' => 'nullable|numeric',
+        'batch_trans_loan_to_top_up' => 'nullable|string',
+        'batch_trans_pay1' => 'nullable|file|mimes:jpg,jpeg,png,gif|max:200',
+        'batch_trans_pay2' => 'nullable|file|mimes:jpg,jpeg,png,gif|max:200',
+    ], [
+        'batch_trans_pay1.mimes' => 'File must be of type jpg, jpeg, png, gif.',
+        'batch_trans_pay1.max' => 'File must be less than 200KB.',
+        'batch_trans_pay2.mimes' => 'File must be of type jpg, jpeg, png, gif.',
+        'batch_trans_pay2.max' => 'File must be less than 200KB.',
+    ]);
+
+    $data = $request->all();
+    $nmsg = '';
+
+    // Loan Category and Type validation
+    $loanCategory = DB::table('sacco_loan_category')
+        ->where('loan_category_id', $data['batch_trans_loan_category'])
+        ->first();
+
+    if (!$loanCategory) {
+        $nmsg .= "Error, invalid loan category. ";
+    }
+
+    $loanType = DB::table('sacco_loan_types')
+        ->where('loan_type_id', $data['batch_trans_loan_type'])
+        ->first();
+
+    if (!$loanType) {
+        $nmsg .= "Error, invalid loan type selected. ";
+    }
+
+    // Member validation
+    $member = DB::table('sacco_members')
+        ->where('member_id', $data['batch_trans_member_id'])
+        ->where('member_active', 'Y')
+        ->where('member_deleted', '<>', 'Y')
+        ->first();
+
+    if (!$member) {
+        $nmsg .= "Error, invalid member taking loan, not found in the database. ";
+    } elseif (strtotime($member->member_date_joined) > strtotime("-{$loanType->loan_type_qualification_period} months")) {
+        $nmsg .= "Error, this member must be {$loanType->loan_type_qualification_period} months old in the sacco before taking this type of loan. ";
+    }
+
+    // Loan Amount validation
+    $loanAmount = floatval($data['batch_trans_loan_amount']);
+    if ($loanAmount < 1 || !is_numeric($loanAmount)) {
+        $nmsg .= "Error, invalid loan amount entered. ";
+    } elseif ($loanAmount > $loanType->loan_type_max_amount) {
+        $nmsg .= "Error, loan taken cannot exceed {$loanType->loan_type_max_amount}. ";
+    }
+
+    // Commission validation
+    $commission = !empty($data['batch_trans_commission']) ? floatval($data['batch_trans_commission']) : 0;
+    if (!is_numeric($commission)) {
+        $nmsg .= "Error, invalid loan commission amount entered. ";
+    }
+
+    // Check if member has exceeded maximum allowable loans
+    $member_cumm_loan_temp = $member->member_total_loan ?? 0;
+    $loan_individualize = DB::table('sacco_defaults')
+        ->where('default_name', 'loan_individualize')
+        ->value('default_value') ?? 'N';
+
+    if ($loan_individualize == "Y") {
+        $member_cumm_loan_temp = DB::table('sacco_loans')
+            ->where('loan_member', $member->member_id)
+            ->where('loan_loan_type', $data['batch_trans_loan_type'])
+            ->sum(DB::raw('loan_amount - loan_loan_paid')) ?? 0;
+    }
+
+    if (($loanType->loan_type_share_factor * ($member->member_total_share + $member->member_total_share_capital) - $member_cumm_loan_temp) < $loanAmount && $loanType->loan_type_share_factor > 0) {
+        if (empty($data['batch_trans_loan_to_top_up'])) {
+            $nmsg .= "Error, member has exceeded his/her loan amount limit. ";
+        } else {
+            $topup = explode(" - (", $data['batch_trans_loan_to_top_up']);
+            $topupLoanType = trim($topup[0]);
+            $topupLoanId = trim(explode(")", $topup[1])[0]);
+
+            $topupLoan = DB::table('sacco_loans')
+                ->join('sacco_loan_types', 'sacco_loans.loan_loan_type', '=', 'sacco_loan_types.loan_type_id')
+                ->where('loan_member', $member->member_id)
+                ->where('loan_type_name', $topupLoanType)
+                ->where('loan_id', $topupLoanId)
+                ->first();
+
+            if (!$topupLoan) {
+                $nmsg .= "Error, invalid TOP-UP loan. ";
+            } else {
+                $member_cumm_loan_temp = DB::table('sacco_loans')
+                    ->where('loan_member', $member->member_id)
+                    ->where('loan_loan_type', $data['batch_trans_loan_type'])
+                    ->sum(DB::raw('loan_amount - loan_loan_paid')) ?? 0;
+
+                if (($loanType->loan_type_share_factor * ($member->member_total_share + $member->member_total_share_capital) - $member_cumm_loan_temp) < $loanAmount) {
+                    $nmsg .= "Error, member has exceeded loan amount limit. ";
+                }
+
+                if (($topupLoan->loan_amount - $topupLoan->loan_loan_paid) > $loanAmount) {
+                    $nmsg .= "Error, the amount in the new loan must be more than the loan balance. ";
+                }
+            }
+        }
+    }
+
+    // Guarantor validation
+    $maximumNoOfGuarantors = DB::table('sacco_defaults')
+        ->where('default_name', 'maximum_no_of_guarantors')
+        ->value('default_value');
+
+    $totalGuaranteed = 0;
+    $max_guarantor_factor = DB::table('sacco_defaults')
+        ->where('default_name', 'max_guarantor_factor')
+        ->value('default_value') ?? 1;
+
+    for ($i = 0; $i < $maximumNoOfGuarantors; $i++) {
+        $guarantorName = $data["guarantors_guarantor_name"][$i] ?? null;
+        $guarantorAmount = !empty($data["guarantors_amount_guaranteed"][$i]) ? floatval($data["guarantors_amount_guaranteed"][$i]) : 0;
+
+        if (!empty($guarantorName)) {
+            $guarantor = DB::table('sacco_members')
+                ->where('member_name', explode(" - (", $guarantorName)[0])
+                ->where('member_sacco_id', trim(explode(" - (", $guarantorName)[1], ")"))
+                ->where('member_active', 'Y')
+                ->where('member_deleted', '<>', 'Y')
+                ->first();
+
+            if (!$guarantor) {
+                $nmsg .= "Error, guarantor {$guarantorName} has no file. ";
+            } elseif ($data['batch_trans_member_id'] != $guarantor->member_id) {
+                $totalGuarantorAmount = DB::table('sacco_loan_batch_guarantors_members')
+                    ->where('guarantors_guarantor_id', $guarantor->member_id)
+                    ->where('guarantors_approved', '<>', 'Y')
+                    ->where('guarantors_deleted', '<>', 'Y')
+                    ->sum('guarantors_amount_guaranteed') ?? 0;
+
+                if (($guarantor->member_total_share * $max_guarantor_factor - $guarantor->member_tied_shares) < ($guarantorAmount + $totalGuarantorAmount)) {
+                    $nmsg .= "Error, guarantor {$guarantorName}, in row " . ($i + 1) . " has over guaranteed. ";
+                }
+            } else {
+                if (($guarantor->member_total_share * $max_guarantor_factor - $guarantor->member_tied_shares_self) < $guarantorAmount) {
+                    $nmsg .= "Error, {$guarantorName} has over guaranteed themselves. ";
+                }
+            }
+            $totalGuaranteed += $guarantorAmount;
+        }
+    }
+
+    // Under-guarantee check
+    $batch_trans_loan_guaranteed = $loanAmount * $loanType->loan_type_guaranteable_percent / 100;
+
+    if ($loanType->loan_type_guaranteable_percent > 0) {
+        if ($batch_trans_loan_guaranteed > $totalGuaranteed) {
+            $nmsg .= "Error, this member has been under guaranteed. ";
+        } else {
+            $g_factor = $batch_trans_loan_guaranteed / $totalGuaranteed;
+        }
+    }
+
+    if (empty($nmsg) && $loanType->loan_type_duration < $data['batch_trans_loan_duration']) {
+        $nmsg .= "Error, invalid loan repayment period. ";
+    }
+
+    // Final validation before saving
+    if (!empty($nmsg)) {
+        return redirect()->back()->withErrors($nmsg)->withInput();
+    }
+
+    // Handle file uploads and get file paths
+    $payslip1Path = null;
+    if ($request->hasFile('batch_trans_pay1')) {
+        $file = $request->file('batch_trans_pay1');
+        $payslip1Path = $file->storeAs('uploads/payslips', Auth::user()->name . '_' . time() . '_1.' . $file->getClientOriginalExtension());
+    }
+
+    $payslip2Path = null;
+    if ($request->hasFile('batch_trans_pay2')) {
+        $file = $request->file('batch_trans_pay2');
+        $payslip2Path = $file->storeAs('uploads/payslips', Auth::user()->name . '_' . time() . '_2.' . $file->getClientOriginalExtension());
+    }
+
+    // Select the correct insurance calculation function based on the sacco_defaults value
+    $loan_interest_insurance = DB::table('sacco_defaults')
+        ->where('default_name', 'loan_interest_insurance')
+        ->value('default_value');
+
+    if (empty($loan_interest_insurance)) {
+        $loan_interest_insurance = "calc_loan_interest_insurance";
+    }
+
+    $insuranceValues = $this->$loan_interest_insurance($data['batch_trans_loan_type'], $loanAmount, $data['batch_trans_loan_duration']);
+
+    // Save the loan application after all validations are done
+    $loanId = DB::table('sacco_loan_batch_trans_members')->insertGetId([
+        'batch_trans_batch_id' => Auth::user()->id, // Assuming batch ID, modify accordingly
+        'batch_trans_loan_type' => $data['batch_trans_loan_type'],
+        'batch_trans_loan_category' => $data['batch_trans_loan_category'],
+        'batch_trans_loan_amount' => $loanAmount,
+        'batch_trans_member_id' => $data['batch_trans_member_id'],
+        'batch_trans_loan_duration' => $data['batch_trans_loan_duration'],
+        'batch_trans_monthly_payment' => $insuranceValues[1], // EMI
+        'batch_trans_monthly_payment_principal' => $insuranceValues[3], // Monthly principal
+        'batch_trans_doc_no' => 'N/A',
+        'batch_trans_description' => $data['batch_trans_description'],
+        'batch_trans_commission' => $commission,
+        'batch_trans_loan_to_top_up' => $data['batch_trans_loan_to_top_up'] ?? 0,
+        'batch_trans_insurance' => $insuranceValues[4], // Insurance
+        'batch_trans_expected_interest' => $insuranceValues[2], // Expected interest
+        'batch_trans_loan_guaranteed' => $batch_trans_loan_guaranteed,
+        'batch_trans_by' => Auth::user()->id,
+        'batch_trans_ip' => $request->ip(),
+        'batch_trans_payslip1' => $payslip1Path,
+        'batch_trans_payslip2' => $payslip2Path,
+    ]);
+
+    // Save guarantors with prorated amounts
+    for ($i = 0; $i < $maximumNoOfGuarantors; $i++) {
+        if (!empty($data["guarantors_guarantor_name"][$i])) {
+            $guarantorId = DB::table('sacco_members')
+                ->where('member_name', explode(" - (", $data["guarantors_guarantor_name"][$i])[0])
+                ->where('member_sacco_id', trim(explode(" - (", $data["guarantors_guarantor_name"][$i])[1], ")"))
+                ->where('member_active', 'Y')
+                ->where('member_deleted', '<>', 'Y')
+                ->value('member_id');
+
+            $proratedAmount = $data["guarantors_amount_guaranteed"][$i] * $g_factor;
+
+            DB::table('sacco_loan_batch_guarantors_members')->insert([
+                'guarantors_loan_batch_trans_id' => $loanId,
+                'guarantors_guarantor_id' => $guarantorId,
+                'guarantors_amount_guaranteed' => $proratedAmount,
+                'guarantors_by' => Auth::user()->id,
+                'guarantors_ip' => $request->ip(),
+            ]);
+        }
+    }
+
+    return redirect()->route('loans.apply')->with('success', 'Loan application submitted successfully.');
+}
+
+
+// Define the insurance calculation functions here
+private function calc_loan_interest_insurance($loan_type_Id_f, $loan_amount_f, $repayment_period_f)
+{
+    $insu = $loan_amount_f * 0.5 / 100;
+
+    $loanType = DB::table('sacco_loan_types')
+        ->where('loan_type_id', $loan_type_Id_f)
+        ->first();
+
+    if ($loanType->loan_type_insurable != "Y") {
+        $insu = 0;
+    }
+
+    if ($loanType->loan_type_interest_type == "FIXED INTEREST") {
+        $interest_amount_payable_f = round(($loan_amount_f + $insu) * $loanType->loan_type_interest / 100, 0);
+        $emi = ceil(($loan_amount_f + $interest_amount_payable_f + $insu) / $repayment_period_f);
+        $monthly_repayment_principal_f = ($loan_amount_f + $insu) / $repayment_period_f;
+    } else {
+        $loan_amount_f1 = $loan_amount_f + $insu;
+        $interest_percent_f = $loanType->loan_type_interest / 12 / 100;
+
+        $emi = ($loan_amount_f1 * $interest_percent_f) * pow(1 + $interest_percent_f, $repayment_period_f) / (pow(1 + $interest_percent_f, $repayment_period_f) - 1);
+        $interest_amount_payable_f = ($emi * $repayment_period_f) - $loan_amount_f1;
+        $monthly_repayment_principal_f = $emi - ($loan_amount_f1 * $interest_percent_f);
+        $emi = ceil($emi);
+        $monthly_repayment_principal_f = ceil($monthly_repayment_principal_f);
+    }
+
+    return ["", $emi, $interest_amount_payable_f, $monthly_repayment_principal_f, $insu];
+}
+
+private function calc_loan_interest_insurance_dhl($loan_type_Id_f, $loan_amount_f, $repayment_period_f)
+{
+    // Implement the DHL calculation logic here
+    // Return an array with calculated values as required
+    $insu = 0;
+
+    $loanType = DB::table('sacco_loan_types')
+        ->where('loan_type_id', $loan_type_Id_f)
+        ->first();
+
+    if ($loanType->loan_type_insurable != "Y") {
+        $insu = 0;
+    }
+
+    if ($loanType->loan_type_interest_type == "FIXED INTEREST") {
+        $interest_amount_payable_f = round(($loan_amount_f + $insu) * $loanType->loan_type_interest / 100, 0);
+        $emi = ceil(($loan_amount_f + $interest_amount_payable_f + $insu) / $repayment_period_f);
+        $monthly_repayment_principal_f = ($loan_amount_f + $insu) / $repayment_period_f;
+    } else {
+        $loan_amount_f1 = $loan_amount_f + $insu;
+        $interest_percent_f = $loanType->loan_type_interest / 12 / 100;
+
+        $emi = ($loan_amount_f1 / $repayment_period_f) + ($loan_amount_f1 * $interest_percent_f);
+        $EMI = ceil($emi);
+        $interest_amount_payable_f = $loan_amount_f1 * $interest_percent_f;
+        $monthly_repayment_principal_f = $EMI - ($loan_amount_f1 * $interest_percent_f);
+        $emi = $EMI;
+        $monthly_repayment_principal_f = ceil($monthly_repayment_principal_f);
+    }
+
+    return ["", $emi, $interest_amount_payable_f, $monthly_repayment_principal_f, $insu];
+}
+
+private function calc_loan_interest_insurance_isave($loan_type_Id_f, $loan_amount_f, $repayment_period_f)
+{
+    // Implement the ISAVE calculation logic here
+    // Return an array with calculated values as required
+    $insu = $loan_amount_f * 1 / 100;
+
+    $loanType = DB::table('sacco_loan_types')
+        ->where('loan_type_id', $loan_type_Id_f)
+        ->first();
+
+    if ($loanType->loan_type_insurable != "Y") {
+        $insu = 0;
+    }
+
+    if ($loanType->loan_type_interest_type == "FIXED INTEREST") {
+        $interest_amount_payable_f = round(($loan_amount_f + $insu) * $loanType->loan_type_interest / 100, 0);
+        $emi = ceil(($loan_amount_f + $interest_amount_payable_f + $insu) / $repayment_period_f);
+        $monthly_repayment_principal_f = ($loan_amount_f + $insu) / $repayment_period_f;
+    } else {
+        $loan_amount_f1 = $loan_amount_f + $insu;
+        $interest_percent_f = $loanType->loan_type_interest / 12 / 100;
+
+        $emi = ($loan_amount_f1 * $interest_percent_f) * pow(1 + $interest_percent_f, $repayment_period_f) / (pow(1 + $interest_percent_f, $repayment_period_f) - 1);
+        $interest_amount_payable_f = ($emi * $repayment_period_f) - $loan_amount_f1;
+        $monthly_repayment_principal_f = $emi - ($loan_amount_f1 * $interest_percent_f);
+        $emi = ceil($emi);
+        $monthly_repayment_principal_f = ceil($monthly_repayment_principal_f);
+    }
+
+    return ["", $emi, $interest_amount_payable_f, $monthly_repayment_principal_f, $insu];
+}
+
+private function calc_loan_interest_insurance_plan($loan_type_Id_f, $loan_amount_f, $repayment_period_f)
+{
+    // Implement the PLAN calculation logic here
+    // Return an array with calculated values as required
+    $insu = $loan_amount_f * 2 / 100;
+
+    $loanType = DB::table('sacco_loan_types')
+        ->where('loan_type_id', $loan_type_Id_f)
+        ->first();
+
+    if ($loanType->loan_type_insurable != "Y") {
+        $insu = 0;
+    }
+
+    if ($loanType->loan_type_interest_type == "FIXED INTEREST") {
+        $interest_amount_payable_f = round(($loan_amount_f + $insu) * $loanType->loan_type_interest / 100, 0);
+        $emi = ceil(($loan_amount_f + $interest_amount_payable_f + $insu) / $repayment_period_f);
+        $monthly_repayment_principal_f = ($loan_amount_f + $insu) / $repayment_period_f;
+    } else {
+        $loan_amount_f1 = $loan_amount_f + $insu;
+        $interest_percent_f = $loanType->loan_type_interest / 12 / 100;
+
+        $emi = ($loan_amount_f1 * $interest_percent_f) * pow(1 + $interest_percent_f, $repayment_period_f) / (pow(1 + $interest_percent_f, $repayment_period_f) - 1);
+        $interest_amount_payable_f = ($emi * $repayment_period_f) - $loan_amount_f1;
+        $monthly_repayment_principal_f = $emi - ($loan_amount_f1 * $interest_percent_f);
+        $emi = ceil($emi);
+        $monthly_repayment_principal_f = ceil($monthly_repayment_principal_f);
+    }
+
+    return ["", $emi, $interest_amount_payable_f, $monthly_repayment_principal_f, $insu];
 }
 
 

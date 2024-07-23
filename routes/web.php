@@ -90,19 +90,18 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/proc/end/month/loans', [HomeController::class, 'endMonthLoans'])->name('proc.end.month.loans');
 
 
-        Route::get('/loans/apply', [HomeController::class, 'loansApply'])->name('loans.apply');
+    Route::get('/loans/apply', [HomeController::class, 'loansApply'])->name('loans.apply');
     Route::post('/loans/apply', [HomeController::class, 'submitLoanApplication'])->name('loans.application.submit');
     Route::get('/loans/approval', [HomeController::class, 'listLoansForApproval'])->name('loans.approval');
     Route::get('/loans/approve/{loanId}', [HomeController::class, 'approveLoan'])->name('loans.approve');
     Route::get('/loans/delete/{loanId}', [HomeController::class, 'deleteLoan'])->name('loans.delete');
 
-    Route::post('/loans/application-submit', [HomeController::class, 'loansApplicationSubmit'])->name('loans.application.submit');
 
 
     // Loans
     Route::get('/loans/issued', [HomeController::class, 'loansIssued'])->name('loans.issued');
     Route::get('/loans/batch', [HomeController::class, 'loansBatch'])->name('loans.batch');
-    Route::get('/loans/apply', [HomeController::class, 'loansApply'])->name('loans.apply');
+  
     Route::get('/loans/end-month', [HomeController::class, 'loansEndMonth'])->name('loans.end-month');
     Route::get('/loans/un-finished', [HomeController::class, 'loansUnFinished'])->name('loans.un-finished');
     Route::get('/loans/shares-to-loans', [HomeController::class, 'loansSharesToLoans'])->name('loans.shares-to-loans');

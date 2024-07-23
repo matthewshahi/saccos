@@ -46,7 +46,7 @@
                             <label for="batch_trans_loan_type">Loan Type*</label>
                             <select class="form-control" id="batch_trans_loan_type" name="batch_trans_loan_type">
                                 @foreach($loanTypes as $type)
-                                    <option value="{{ $type->loan_type_id }}">{{ $type->loan_type_name }}</option>
+                                    <option value="{{ $type->loan_type_id }}" {{ old('batch_trans_loan_type') == $type->loan_type_id ? 'selected' : '' }}>{{ $type->loan_type_name }}</option>
                                 @endforeach
                             </select>
                         </div>
@@ -54,7 +54,7 @@
                             <label for="batch_trans_loan_category">Loan Category*</label>
                             <select class="form-control" id="batch_trans_loan_category" name="batch_trans_loan_category">
                                 @foreach($loanCategories as $category)
-                                    <option value="{{ $category->loan_category_id }}">{{ $category->loan_category_name }}</option>
+                                    <option value="{{ $category->loan_category_id }}" {{ old('batch_trans_loan_category') == $category->loan_category_id ? 'selected' : '' }}>{{ $category->loan_category_name }}</option>
                                 @endforeach
                             </select>
                         </div>
@@ -62,23 +62,29 @@
                             <label for="batch_trans_loan_duration">Repayment Period*</label>
                             <select class="form-control" id="batch_trans_loan_duration" name="batch_trans_loan_duration">
                                 @for($i=1; $i<=100; $i++)
-                                    <option value="{{ $i }}">{{ $i }} months</option>
+                                    <option value="{{ $i }}" {{ old('batch_trans_loan_duration') == $i ? 'selected' : '' }}>{{ $i }} months</option>
                                 @endfor
                             </select>
                         </div>
                         <div class="col-md-6 form-group mb-3">
-                            <label for="batch_trans_description">Reason(s)*</label>
-                            <input class="form-control" id="batch_trans_description" name="batch_trans_description" type="text" value="{{ old('batch_trans_description') }}">
+                            <label for="batch_trans_description">Reason(s)* (max 50 characters)</label>
+                            <input class="form-control" id="batch_trans_description" name="batch_trans_description" type="text" value="{{ old('batch_trans_description') }}" maxlength="50">
                         </div>
                         <div class="col-md-6 form-group mb-3">
                             <label for="batch_trans_loan_to_top_up">Loan to Top Up***</label>
-                            <input class="form-control" id="batch_trans_loan_to_top_up" name="batch_trans_loan_to_top_up" type="text" value="{{ old('batch_trans_loan_to_top_up') }}">
+                            <select class="form-control" id="batch_trans_loan_to_top_up" name="batch_trans_loan_to_top_up">
+                                <option value="">Select Loan</option>
+                                @foreach($memberLoans as $loan)
+                                    <option value="{{ $loan->loan_id }}" {{ old('batch_trans_loan_to_top_up') == $loan->loan_id ? 'selected' : '' }}>{{ $loan->loan_type_name }} - {{ number_format($loan->loan_balance, 2) }} ({{ $loan->loan_id }})</option>
+                                @endforeach
+                            </select>
                         </div>
                         <div class="col-md-6 form-group mb-3">
-                            <label for="batch_trans_pay1">Attach your latest 2 payslips</label>
+                            <label for="batch_trans_pay1">Attach your latest 2 payslips (jpg/jpeg/png/gif, max 200KB)</label>
                             <input type="file" class="form-control" id="batch_trans_pay1" name="batch_trans_pay1">
                         </div>
                         <div class="col-md-6 form-group mb-3">
+                            <label for="batch_trans_pay2">Attach payslip 2 (jpg/jpeg/png/gif, max 200KB)</label>
                             <input type="file" class="form-control" id="batch_trans_pay2" name="batch_trans_pay2">
                         </div>
                         <div class="col-md-12">
@@ -98,10 +104,10 @@
                                             <tr>
                                                 <td>{{ $i + 1 }}</td>
                                                 <td>
-                                                    <input type="text" id="guarantors_guarantor_name{{ $i }}" name="guarantors_guarantor_name[]" class="form-control" onkeyup="showHintMembers(this.value, 'guarantors_guarantor_name{{ $i }}', 'txtHintMembersG{{ $i }}')" autocomplete="off">
+                                                    <input type="text" id="guarantors_guarantor_name{{ $i }}" name="guarantors_guarantor_name[]" class="form-control" onkeyup="showHintMembers(this.value, 'guarantors_guarantor_name{{ $i }}', 'txtHintMembersG{{ $i }}')" autocomplete="off" value="{{ old('guarantors_guarantor_name.' . $i) }}">
                                                     <div id="txtHintMembersG{{ $i }}" class="suggestions-box"></div>
                                                 </td>
-                                                <td><input type="text" name="guarantors_amount_guaranteed[]" class="form-control" /></td>
+                                                <td><input type="text" name="guarantors_amount_guaranteed[]" class="form-control" value="{{ old('guarantors_amount_guaranteed.' . $i) }}" /></td>
                                                 <td><input type="text" name="free_shares[]" class="form-control" disabled /></td>
                                             </tr>
                                         @endfor
@@ -112,8 +118,15 @@
                         <div class="col-md-12">
                             <button class="btn btn-primary" type="submit">Submit</button>
                         </div>
+                        <input type="hidden" name="batch_trans_member_id" value="{{ Auth::user()->id }}">
+
                     </div>
                 </form>
+                <p>
+                    <strong>**Commission will not attract insurance, and is also not used when calculating interest. The final total loan taken will include insurance and commission.<br />
+                    ***Top up: If you are topping up, enter the full amount and full guarantors for the new loan where necessary. The amount must be greater than the loan you want to top up.<br />
+                    ****Free shares will not be displayed to protect other members' privacy.</strong>
+                </p>
             </div>
         </div>
     </div>
