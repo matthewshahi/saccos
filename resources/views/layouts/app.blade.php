@@ -29,9 +29,6 @@
         </div>
     </div>
    
-    <script src="{{ asset('dist-assets/js/bootstrap.bundle.min.js') }}"></script>
-    <script src="{{ asset('dist-assets/js/perfect-scrollbar.min.js') }}"></script>
-    <script src="{{ asset('dist-assets/js/metisMenu.min.js') }}"></script>
-    <script src="{{ asset('dist-assets/js/datatables.min.js') }}"></script>
+     
 </body>
 </html>

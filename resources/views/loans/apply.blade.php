@@ -3,6 +3,17 @@
 @section('content')
 <div class="breadcrumb d-flex justify-content-between align-items-center">
     <h1>Member Loan Application</h1>
+    <div class="header-part-right">
+        <ul>
+            @if(Auth::check())
+                <li>{{ Auth::user()->member_name }}</li>
+            @endif
+            @if(isset($currentPeriod))
+                <li><a href="{{ route('admin.periods') }}">{{ $currentPeriod->period_name }}</a></li>
+            @endif
+            <li><i class="i-Full-Screen header-icon d-none d-sm-inline-block" data-fullscreen=""></i></li>
+        </ul>
+    </div>
 </div>
 <div class="separator-breadcrumb border-top"></div>
 
@@ -26,6 +37,14 @@
             </ul>
         </div>
     @endif
+
+    <div class="col-md-12 mb-3 d-flex justify-content-center">
+        
+            <a href="{{ route('loans.guarantee.requests') }}">Guarantee requests</a>&nbsp;|| &nbsp;
+            <a href="{{ route('loans.pending.approval') }}">List loans pending approval</a> &nbsp;|| &nbsp;
+            <a href="{{ route('admin.loans.pending.approval') }}">[ADMIN] List all loans pending approval</a>
+        
+    </div>
 
     <div class="col-md-12">
         <div class="card mb-4">
@@ -131,9 +150,7 @@
         </div>
     </div>
 </div>
-@endsection
 
-@section('styles')
 <style>
     .suggestions-box {
         background-color: #fff;
@@ -158,9 +175,33 @@
         background-color: #f0f0f0;
     }
 </style>
-@endsection
+ 
 
-@section('scripts')
+<style>
+    .suggestions-box {
+        background-color: #fff;
+        max-height: 150px;
+        overflow-y: auto;
+        position: absolute;
+        z-index: 1000;
+        width: 300px;
+        box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+    }
+
+    .suggestion-item {
+        padding: 10px;
+        cursor: pointer;
+    }
+
+    .suggestion-item:last-child {
+        border-bottom: none;
+    }
+
+    .suggestion-item:hover {
+        background-color: #f0f0f0;
+    }
+</style>
+
 <script>
     function showHintMembers(str, inputName, suggestionsBox) {
         if (str.length == 0) {

@@ -18,8 +18,18 @@
 <script src="{{ asset('dist-assets/js/scripts/layout-sidebar-vertical.min.js') }}"></script>
 <script src="{{ asset('dist-assets/js/plugins/datatables.min.js') }}"></script>
 <script src="{{ asset('dist-assets/js/scripts/datatables.script.min.js') }}"></script>
+ 
+<script src="{{ asset('dist-assets/js/plugins/echarts.min.js') }}"></script>
+<!-- <script src="{{ asset('dist-assets/js/scripts/echarts.script.min.js') }}"></script> -->
+     
+    <script src="{{asset('dist-assets/js/scripts/echart.options.min.js') }}"></script>
+    
+    <script src="{{ asset('dist-assets/js/scripts/dashboard.v4.script.min.js') }}"></script>
+    <script src="{{ asset('dist-assets/js/scripts/widgets-statistics.min.js') }}"></script>
+    <script src="{{ asset('dist-assets/js/plugins/apexcharts.min.js') }}"></script>
+    <script src="{{ asset('dist-assets/js/scripts/apexSparklineChart.script.min.js') }}"></script>
 
-
+ 
  
 <script>
         $(document).ready(function() {

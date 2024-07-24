@@ -3,8 +3,9 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\Auth\CustomAuthController;
 
-Route::get('/', [HomeController::class, 'index'])->name('home');
-Route::get('/', [HomeController::class, 'index'])->name('dashboard');
+Route::get('/', [HomeController::class, 'redirectBasedOnAuth'])->name('home');
+
+Route::get('/dashboard', [HomeController::class, 'index'])->name('dashboard')->middleware('auth');
 
 
 Route::get('login', [CustomAuthController::class, 'showLoginForm'])->name('login');
@@ -96,7 +97,10 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/loans/approve/{loanId}', [HomeController::class, 'approveLoan'])->name('loans.approve');
     Route::get('/loans/delete/{loanId}', [HomeController::class, 'deleteLoan'])->name('loans.delete');
 
-
+    Route::get('/loans/guarantee/requests', [HomeController::class, 'listGuaranteeRequests'])->name('loans.guarantee.requests');
+    Route::get('/loans/pending/approval', [HomeController::class, 'listLoansPendingApproval'])->name('loans.pending.approval');
+    Route::get('/admin/loans/pending/approval', [HomeController::class, 'adminListLoansPendingApproval'])->name('admin.loans.pending.approval')->middleware('check_user_rights:update_loan_batch');
+    
 
     // Loans
     Route::get('/loans/issued', [HomeController::class, 'loansIssued'])->name('loans.issued');
