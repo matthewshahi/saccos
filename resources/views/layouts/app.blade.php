@@ -19,9 +19,10 @@
 
 <body class="text-start">
     <div class="app-admin-wrap layout-sidebar-vertical sidebar-full">
+    @include('partials.header')
         @include('partials.menu')
-        <div class="main-content-wrap mobile-menu-content bg-off-white m-0">
-            @include('partials.header')
+        <div class="main-content-wrap mobile-menu-content bg-off-white m-0" style="padding: 1px;">
+            
             <div class="main-content pt-4">
                 @yield('content')
             </div>

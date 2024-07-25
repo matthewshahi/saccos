@@ -4,6 +4,7 @@ use App\Http\Controllers\HomeController;
 use App\Http\Controllers\Auth\CustomAuthController;
 
 Route::get('/', [HomeController::class, 'redirectBasedOnAuth'])->name('home');
+Route::get('/home', [HomeController::class, 'redirectBasedOnAuth'])->name('home');
 
 Route::get('/dashboard', [HomeController::class, 'index'])->name('dashboard')->middleware('auth');
 
