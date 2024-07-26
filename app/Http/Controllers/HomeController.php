@@ -4210,8 +4210,6 @@ public function reportSasraProfitAndLoss(Request $request)
 
 
 
-
-
 public function reportSasraLoanPerformance(Request $request, $version = null)
 {
     $title = $version === 'insider_lending' ? 'SASRA - Insider Lending Report' : 'SASRA - Loan Performance Report';
@@ -4290,6 +4288,7 @@ private function getLoanData($PeriodNow, $IgnoreLoanBalanceBelow, $search = null
 
 private function categorizeLoan($loan, $PeriodNow)
 {
+    // Get the current year and month
     $periodNowYear = intval(substr($PeriodNow, 0, 4));
     $periodNowMonth = intval(substr($PeriodNow, 4, 2));
 
@@ -4300,21 +4299,19 @@ private function categorizeLoan($loan, $PeriodNow)
         $startPeriod = $loan->loan_taken_period;
     }
 
-    // Check if $loan->last_paid exists and is not empty, else use determined start period
-    $lastPaymentPeriod = $loan->last_paid ? $loan->last_paid : $startPeriod;
-    $loanStartYear = intval(substr($lastPaymentPeriod, 0, 4));
-    $loanStartMonth = intval(substr($lastPaymentPeriod, 4, 2));
-
+    // Extract year and month from the start period
     $loanTakenYear = intval(substr($startPeriod, 0, 4));
     $loanTakenMonth = intval(substr($startPeriod, 4, 2));
 
-    // If no payment exists and the loan was taken in the current period, categorize as "Current"
-    if (!$loan->last_paid && $loanTakenYear == $periodNowYear && $loanTakenMonth == $periodNowMonth) {
+    // If the loan was taken in the current period, categorize as "Current"
+    if ($loanTakenYear == $periodNowYear && $loanTakenMonth == $periodNowMonth) {
         return 'Current';
     }
 
-    $periodDifference = ($periodNowYear - $loanStartYear) * 12 + ($periodNowMonth - $loanStartMonth);
+    // Calculate the period difference in months
+    $periodDifference = ($periodNowYear - $loanTakenYear) * 12 + ($periodNowMonth - $loanTakenMonth);
 
+    // Categorize the loan based on the period difference
     if ($periodDifference < 2) {
         return 'Current';
     } elseif ($periodDifference < 4) {
@@ -4327,6 +4324,7 @@ private function categorizeLoan($loan, $PeriodNow)
         return 'Loss';
     }
 }
+
 
 
 
