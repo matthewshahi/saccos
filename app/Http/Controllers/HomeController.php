@@ -4294,7 +4294,7 @@ private function categorizeLoan($loan, $PeriodNow)
 
     // Determine the correct loan start period
     if (preg_match('/^\d{6}$/', $loan->loan_taken_start_period)) {
-        $startPeriod = $loan->loan_taken_start_period;
+        $startPeriod = $loan->loan_taken_period;
     } else {
         $startPeriod = $loan->loan_taken_period;
     }
@@ -4328,6 +4328,123 @@ private function categorizeLoan($loan, $PeriodNow)
 
 
 
+
+
+public function adminAccessRights(Request $request)
+    {
+        // Get all active members
+        $members = $this->user_rights_getActiveMembers();
+
+        // Get all modules
+        $modules = $this->user_rights_getModules();
+
+        // Get the selected member ID from the request, default to the first member if not provided
+        $selectedMemberId = $request->query('rights_user', $members->first()->member_id ?? null);
+
+        // Get details of the selected member
+        $selectedMember = $this->user_rights_getMemberById($selectedMemberId);
+
+        // Get the granted rights for the selected member
+        $grantedRights = $this->user_rights_getGrantedRights($selectedMemberId);
+
+        // Return the view with the relevant data
+        return view('admin.access-rights', compact('members', 'modules', 'selectedMemberId', 'selectedMember', 'grantedRights'));
+    }
+
+    /**
+     * Save the modified user access rights.
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\RedirectResponse
+     */
+    public function user_rights_save(Request $request)
+    {
+        $totalModules = $request->input('TotalModules');
+        $rightsUserId = $request->input('rights_user');
+
+        // Iterate through each module and update or insert the rights
+        for ($i = 0; $i < $totalModules; $i++) {
+            $rightsAccess = $request->input("rights_accessX$i", 'N');
+            $rightsApp = $request->input("rights_appX$i");
+
+            $this->user_rights_updateOrCreate($rightsUserId, $rightsApp, $rightsAccess);
+        }
+
+        // Redirect back to the admin access rights page with the selected user ID
+        return redirect()->route('admin.access-rights', ['rights_user' => $rightsUserId])->with('success', 'User rights updated successfully');
+    }
+
+    /**
+     * Get all active members.
+     *
+     * @return \Illuminate\Support\Collection
+     */
+    private function user_rights_getActiveMembers()
+    {
+        return DB::table('sacco_members')
+            ->where('member_active', 'Y')
+            ->where('member_deleted', '<>', 'Y')
+            ->orderBy('member_name')
+            ->get();
+    }
+
+    /**
+     * Get all modules.
+     *
+     * @return \Illuminate\Support\Collection
+     */
+    private function user_rights_getModules()
+    {
+        return DB::table('sacco_modules')
+            ->where('module_deleted', '<>', 'Y')
+            ->orderBy('module_description')
+            ->get();
+    }
+
+    /**
+     * Get the details of a member by their ID.
+     *
+     * @param int $memberId
+     * @return \Illuminate\Database\Eloquent\Model|\Illuminate\Database\Query\Builder|object|null
+     */
+    private function user_rights_getMemberById($memberId)
+    {
+        return DB::table('sacco_members')
+            ->where('member_id', $memberId)
+            ->first();
+    }
+
+    /**
+     * Get the granted rights for a member.
+     *
+     * @param int $memberId
+     * @return \Illuminate\Support\Collection
+     */
+    private function user_rights_getGrantedRights($memberId)
+    {
+        return DB::table('sacco_userrights')
+            ->where('rights_user', $memberId)
+            ->pluck('rights_access', 'rights_app');
+    }
+
+    /**
+     * Update or insert user rights.
+     *
+     * @param int $rightsUserId
+     * @param int $rightsApp
+     * @param string $rightsAccess
+     * @return void
+     */
+    private function user_rights_updateOrCreate($rightsUserId, $rightsApp, $rightsAccess)
+    {
+        DB::table('sacco_userrights')->updateOrInsert(
+            ['rights_user' => $rightsUserId, 'rights_app' => $rightsApp],
+            ['rights_access' => $rightsAccess, 'rights_userid' => auth()->user()->id, 'rights_ip' => request()->ip()]
+        );
+    }
+
+
+ 
 }
 
   

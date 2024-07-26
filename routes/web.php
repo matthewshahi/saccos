@@ -108,6 +108,10 @@ Route::middleware(['auth'])->group(function () {
             ->name('reports.sasra.share.data')
             ->middleware('check_user_rights:rpt_loans_issued');
 
+            
+        Route::get('/admin/access-rights', [HomeController::class, 'adminAccessRights'])->name('admin.access-rights');
+        Route::post('/admin/access-rights/save', [HomeController::class, 'user_rights_save'])->name('admin.access-rights.save');
+
 
         Route::match(['get', 'post'], '/reports/profit_and_loss', [HomeController::class, 'reportSasraProfitAndLoss'])
             ->name('reports.sasra.profitandloss')
@@ -229,7 +233,7 @@ Route::middleware(['auth'])->group(function () {
     // Sacco Admin
     Route::get('/admin/users', [HomeController::class, 'adminUsers'])->name('admin.users');
     Route::get('/admin/user-types', [HomeController::class, 'adminUserTypes'])->name('admin.user-types');
-    Route::get('/admin/access-rights', [HomeController::class, 'adminAccessRights'])->name('admin.access-rights');
+   
     Route::get('/admin/modules', [HomeController::class, 'adminModules'])->name('admin.modules');
     Route::get('/admin/defaults', [HomeController::class, 'adminDefaults'])->name('admin.defaults');
     Route::get('/admin/defaults/add', [HomeController::class, 'adminDefaultsAdd'])->name('admin.defaults.add');
