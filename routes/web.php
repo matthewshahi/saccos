@@ -87,6 +87,74 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/proc/end/month/fosa', [HomeController::class, 'endMonthFosa'])->name('proc.end.month.fosa')->middleware('check_user_rights:modify_member_shares_journal');
 
+    // SASRA Reports
+    Route::get('/reports/sasra/outstandingloans/{status}/{active?}', [HomeController::class, 'reportSasraLoans'])
+    ->name('reports.sasra.loans')
+    ->middleware('check_user_rights:rpt_loans_issued');
+
+    Route::post('/reports/sasra/outstandingloans/{status}/{active?}', [HomeController::class, 'reportSasraLoans'])
+        ->name('reports.sasra.loans.post')
+        ->middleware('check_user_rights:rpt_loans_issued');
+
+    Route::get('/reports/sasra/loans/data', [HomeController::class, 'fetchSasraLoansData'])
+        ->name('reports.sasra.loans.data')
+        ->middleware('check_user_rights:rpt_loans_issued');
+
+        Route::get('/reports/sasra/share', [HomeController::class, 'reportSasraShareBalances'])
+            ->name('reports.sasra.share.balances')
+            ->middleware('check_user_rights:rpt_loans_issued');
+
+        Route::get('/reports/sasra/share/data', [HomeController::class, 'fetchSasraShareData'])
+            ->name('reports.sasra.share.data')
+            ->middleware('check_user_rights:rpt_loans_issued');
+
+
+        Route::match(['get', 'post'], '/reports/profit_and_loss', [HomeController::class, 'reportSasraProfitAndLoss'])
+            ->name('reports.sasra.profitandloss')
+            ->middleware('check_user_rights:rpt_loans_issued');
+        
+        Route::get('/reports/profit_and_loss/data', [HomeController::class, 'fetchSasraProfitAndLossData'])
+            ->name('reports.sasra.profitandloss.data')
+            ->middleware('check_user_rights:rpt_loans_issued');
+        
+        
+
+        Route::get('/reports/sasra/finance_position_report', [HomeController::class, 'reportSasraFinancePositionReport'])
+        ->name('reports.sasra.financeposition')
+        ->middleware('check_user_rights:rpt_loans_issued');
+
+        Route::get('/reports/sasra/income_report', [HomeController::class, 'reportSasraIncomeReport'])
+        ->name('reports.sasra.income')
+        ->middleware('check_user_rights:rpt_loans_issued');
+ 
+
+        Route::get('/reports/sasra/loan_performance/data', [HomeController::class, 'fetchLoanPerformanceData'])
+        ->name('reports.sasra.loanperformance.data')
+        ->middleware('check_user_rights:rpt_loans_issued');
+        
+        Route::get('/reports/sasra/loan_performance/{version?}', [HomeController::class, 'reportSasraLoanPerformance'])
+        ->name('reports.sasra.loanperformance')
+        ->middleware('check_user_rights:rpt_loans_issued');
+
+
+
+
+        Route::get('/reports/sasra/insider_lending', [HomeController::class, 'reportSasraInsiderLending'])
+        ->name('reports.sasra.insiderlending')
+        ->middleware('check_user_rights:rpt_loans_issued');
+
+        Route::get('/reports/sasra/outstandingloans/y', [HomeController::class, 'reportSasraLoansAllOutstanding'])
+        ->name('reports.sasra.loans.alloutstanding')
+        ->middleware('check_user_rights:rpt_loans_issued');
+
+        Route::get('/reports/sasra/deposits', [HomeController::class, 'reportSasraCapitalBalances'])
+        ->name('reports.sasra.capitalbalances')
+        ->middleware('check_user_rights:rpt_loans_issued');
+
+        Route::get('/reports/sasra/return_on_investment_report', [HomeController::class, 'reportSasraReturnOnInvestmentReport'])
+        ->name('reports.sasra.returnoninvestment')
+        ->middleware('check_user_rights:rpt_loans_issued');
+
     // End month processing
     Route::get('/list/contribution', [HomeController::class, 'listContribution'])->name('list.contribution')->middleware('check_user_rights:list_sacco_member_contributions');
     Route::get('/proc/end/month/loans', [HomeController::class, 'endMonthLoans'])->name('proc.end.month.loans');

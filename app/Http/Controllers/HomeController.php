@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\Auth;
 
 use Illuminate\Support\Facades\Hash;
 use Carbon\Carbon;
+use DateTime;
+ 
 
 class HomeController extends Controller
 {
@@ -18,6 +20,7 @@ class HomeController extends Controller
     protected $minAge;
     protected $minimumLoanThreshold;
     protected $currentPeriod;
+    protected $IgnoreLoanBalanceBelow;
 
     public function __construct()
     {
@@ -29,7 +32,12 @@ class HomeController extends Controller
             ->where('period_active', 'Y')
             ->where('period_deleted', '<>', 'Y')
             ->first();
+
+        $this->IgnoreLoanBalanceBelow = DB::table('sacco_defaults')
+            ->where('default_name', 'min_loan_amount_bill_able')
+            ->value('default_value') ?? 0;
     }
+
 
     public function redirectBasedOnAuth()
     {
@@ -3983,8 +3991,342 @@ private function updateMemberLoanGuarantors($loan, $logged_in_user, $myIP, $new_
         }
     }
 }
+public function reportSasraLoans(Request $request, $status, $active = null)
+{
+    $reportType = $active === 'active' ? ($status == "y" ? 'Outstanding Active' : 'Outstanding Inactive') : 'Fully Paid';
+
+    $currentPeriod = now()->format('Ym');
+    $startPeriod = $request->input('start_period', $currentPeriod);
+    $endPeriod = $request->input('end_period', $currentPeriod);
+
+    return view('reports.sasra.loans', [
+        'status' => $status,
+        'active' => $active,
+        'reportType' => $reportType,
+        'currentPeriod' => $currentPeriod,
+        'startPeriod' => $startPeriod,
+        'endPeriod' => $endPeriod
+    ]);
+}
+
+public function fetchSasraLoansData(Request $request)
+{
+    $status = $request->get('status');
+    $active = $request->get('active');
+    $offset = $request->get('offset', 0);
+    $limit = $request->get('limit', 5);
+    $startPeriod = $request->get('start_period', now()->format('Ym'));
+    $endPeriod = $request->get('end_period', now()->format('Ym'));
+
+    $opt_qty = ($status == "y") ? ">1" : "<=0";
+    $opt = ($status == "y");
+
+    // Fetch the min_loan_amount_bill_able value from sacco_defaults
+    $minLoanAmountBillable = DB::table('sacco_defaults')
+        ->where('default_name', 'min_loan_amount_bill_able')
+        ->value('default_value');
+
+    // If min_loan_amount_bill_able is not found, default to 0
+    $minLoanAmountBillable = $minLoanAmountBillable ?? 0;
+
+    // Fetch latest payment for each loan
+    $latestPayments = DB::table('sacco_loan_payments')
+        ->select('loan_payments_loan_id', DB::raw('MAX(loan_payments_id) as max_id'))
+        ->groupBy('loan_payments_loan_id');
+
+    $loans = DB::table('sacco_loans')
+        ->join('sacco_members', 'loan_member', '=', 'member_id')
+        ->join('sacco_department', 'member_dept', '=', 'department_id')
+        ->join('sacco_company', 'department_company_id', '=', 'company_id')
+        ->join('sacco_loan_types', 'loan_loan_type', '=', 'loan_type_id')
+        ->join('sacco_loan_category', 'loan_loan_category', '=', 'loan_category_id')
+        ->leftJoinSub($latestPayments, 'latest_payments', function ($join) {
+            $join->on('loan_id', '=', 'latest_payments.loan_payments_loan_id');
+        })
+        ->leftJoin('sacco_loan_payments', 'sacco_loan_payments.loan_payments_id', '=', 'latest_payments.max_id')
+        ->whereBetween('loan_taken_period', [$startPeriod, $endPeriod]);
+
+    if ($opt) {
+        // Outstanding loans
+        $loans->whereRaw('loan_amount-loan_loan_paid > ?', [$minLoanAmountBillable]);
+    } else {
+        // Fully paid loans
+        $loans->whereRaw('loan_amount-loan_loan_paid <= ?', [$minLoanAmountBillable]);
+    }
+
+    if ($active === 'active') {
+        $loans->where('member_active', 'Y');
+    }
+
+    $loans = $loans->orderBy('loan_id', 'asc')->offset($offset)->limit($limit)->get();
+
+    foreach ($loans as $loan) {
+        $loan->effective_date = date('Y-m-d', strtotime($loan->loan_on . ' +' . $loan->loan_payment_period . ' months'));
+        $loan->effective_date = date('Y-m-d', strtotime($loan->effective_date . '-1 days'));
+        $loan->balance = $loan->loan_amount - $loan->loan_loan_paid;
+
+        if ($loan->balance <= $minLoanAmountBillable) {
+            $loan->arrears_months = 0; // No arrears if fully paid
+        } else if ($loan->loan_payments_period) {
+            $last_paid_date = substr($loan->loan_payments_period, 0, 4) . "-" . substr($loan->loan_payments_period, 4, 2) . "-28";
+            $now = new DateTime(date('Y-m-d'));
+            $ref = new DateTime($last_paid_date);
+            $diff = $now->diff($ref);
+            $loan->arrears_months = $diff->format('%y') * 12 + $diff->format('%m');
+        } else {
+            $loan->arrears_months = 0; // No arrears if no payments
+        }
+
+        // Concatenate loan_type_name with loan_id in parentheses
+        $loan->loan_type_display = "{$loan->loan_type_name} ({$loan->loan_id})";
+    }
+
+    return response()->json(['loans' => $loans]);
+}
+
+public function reportSasraShareBalances()
+{
+    return view('reports.sasra.share');
+}
+
+public function fetchSasraShareData(Request $request)
+{
+    $offset = $request->get('offset', 0);
+    $limit = $request->get('limit', 5);
+
+    $sacco_shares = DB::table('sacco_members')
+        ->join('sacco_department', 'member_dept', '=', 'department_id')
+        ->join('sacco_company', 'department_company_id', '=', 'company_id')
+        ->orderBy('member_name', 'asc')
+        ->offset($offset)
+        ->limit($limit)
+        ->get();
+
+    // Process the type field based on member_position and status based on member_active
+    foreach ($sacco_shares as $share) {
+        $share->type = $share->member_position == 1 ? 'Member' : ($share->member_position == 2 ? 'Official' : 'N/A');
+        $share->status = $share->member_active == 'Y' ? 'Active' : 'Inactive';
+    }
+
+    return response()->json(['sacco_shares' => $sacco_shares]);
+}
 
 
+
+
+
+// Function to fetch all main accounts and their corresponding sub-accounts
+private function report_sasra_getMainSubAccounts($a_type)
+{
+    return DB::table('sacco_sub_account')
+        ->join('sacco_main_account', 'sacco_sub_account.sub_account_main_account', '=', 'sacco_main_account.main_account_id')
+        ->where('sacco_sub_account.sub_account_deleted', '<>', 'Y')
+        ->where(function($query) use ($a_type) {
+            $query->where('sacco_main_account.main_account_type', 'like', $a_type . '%')
+                  ->orWhere('sacco_main_account.main_account_type', 'like', $a_type . 's%');  // Explicit plural form
+        })
+        ->orderBy('sacco_main_account.main_account_code')
+        ->orderBy('sacco_sub_account.sub_account_code')
+        ->orderBy('sacco_sub_account.sub_account_name')
+        ->select('sacco_main_account.main_account_code', 'sacco_sub_account.sub_account_code', 'sacco_sub_account.sub_account_name', 'sacco_sub_account.sub_account_id')
+        ->get();
+}
+
+// Function to fetch debit and credit totals for a sub-account within a period
+private function report_sasra_getTrialBalances($sub_account_id, $pfrom, $pto)
+{
+    return DB::table('sacco_accounts_trans')
+        ->select(DB::raw('SUM(accounts_trans_debit) AS sub_total_debit'), DB::raw('SUM(accounts_trans_credit) AS sub_total_credit'))
+        ->where('accounts_trans_sub_account', $sub_account_id)
+        ->whereBetween('accounts_trans_period', [$pfrom, $pto])
+        ->first();
+}
+
+// Main function to fetch trial balance data
+private function report_sasra_getTrialBalanceData($start, $end)
+{
+    $accountTypes = ['INCOME', 'EXPENSE'];  // Use only INCOME and EXPENSE for Profit and Loss
+
+    $accounts = [];
+    foreach ($accountTypes as $type) {
+        $mainSubAccounts = $this->report_sasra_getMainSubAccounts($type);
+        foreach ($mainSubAccounts as $account) {
+            $trialBalances = $this->report_sasra_getTrialBalances($account->sub_account_id, $start, $end);
+            $dval = $trialBalances->sub_total_debit;
+            $cval = $trialBalances->sub_total_credit;
+
+            if ($dval < 0 && $cval >= 0) {
+                $cval = ($dval * -1) + $cval;
+                $dval = 0;
+            }
+
+            if ($cval < 0 && $dval >= 0) {
+                $dval = $dval + ($cval * -1);
+                $cval = 0;
+            }
+
+            if ($cval < 0 && $dval < 0) {
+                $dval = $cval * -1;
+                $cval = $dval * -1;
+            }
+
+            if ($dval > $cval) {
+                $dval = $dval - $cval;
+                $cval = 0;
+            } else {
+                $cval = $cval - $dval;
+                $dval = 0;
+            }
+
+            $accounts[] = [
+                'main_account_code' => $account->main_account_code,
+                'sub_account_code' => $account->sub_account_code,
+                'sub_account_name' => $account->sub_account_name,
+                'adjusted_debit' => $dval,
+                'adjusted_credit' => $cval,
+                'main_account_type' => $type
+            ];
+        }
+    }
+
+    return collect($accounts);
+}
+
+// Function to display the report
+public function reportSasraProfitAndLoss(Request $request)
+{
+    $start = $request->input('startPeriod', now()->startOfMonth()->format('Ym'));
+    $end = $request->input('endPeriod', now()->format('Ym'));
+
+    $accounts = $this->report_sasra_getTrialBalanceData($start, $end);
+
+    return view('reports.sasra.profit_and_loss', [
+        'accounts' => $accounts,
+        'startPeriod' => $start,
+        'endPeriod' => $end
+    ]);
+}
+
+
+
+
+
+
+public function reportSasraLoanPerformance(Request $request, $version = null)
+{
+    $title = $version === 'insider_lending' ? 'SASRA - Insider Lending Report' : 'SASRA - Loan Performance Report';
+    return view('reports.sasra.loan_performance', ['version' => $version, 'title' => $title]);
+}
+
+public function fetchLoanPerformanceData(Request $request)
+{
+    $PeriodNow = $this->currentPeriod->period_code ?? date('Ym');
+    $IgnoreLoanBalanceBelow = $this->IgnoreLoanBalanceBelow;
+
+    $offset = $request->input('offset', 0);
+    $limit = $request->input('limit', 5);
+    $search = $request->input('search');
+    $version = $request->input('version');
+
+    $loans = $this->getLoanData($PeriodNow, $IgnoreLoanBalanceBelow, $search, $offset, $limit, $version);
+
+    foreach ($loans as $loan) {
+        $loan->category = $this->categorizeLoan($loan, $PeriodNow);
+    }
+
+    return response()->json(['loans' => $loans]);
+}
+
+private function getLoanData($PeriodNow, $IgnoreLoanBalanceBelow, $search = null, $offset = 0, $limit = 5, $version = null)
+{
+    // First, get the loans with balances above the threshold
+    $loansQuery = DB::table('sacco_loans')
+        ->join('sacco_loan_types', 'sacco_loans.loan_loan_type', '=', 'sacco_loan_types.loan_type_id')
+        ->join('sacco_members', 'sacco_loans.loan_member', '=', 'sacco_members.member_id')
+        ->select(
+            'sacco_loans.loan_id',
+            'sacco_members.member_name',
+            'sacco_members.member_national_id',
+            'sacco_loan_types.loan_type_name',
+            'sacco_loans.loan_taken_period',
+            'sacco_loans.loan_taken_start_period',
+            'sacco_loans.loan_amount',
+            'sacco_loans.loan_loan_paid',
+            DB::raw('(sacco_loans.loan_amount - sacco_loans.loan_loan_paid) as OutstandingAmount')
+        )
+        ->whereRaw('(sacco_loans.loan_amount - sacco_loans.loan_loan_paid) > ?', [$IgnoreLoanBalanceBelow])
+        ->orderBy('sacco_loans.loan_id', 'desc');
+
+    if ($version === 'insider_lending') {
+        $loansQuery->where('sacco_members.member_position', '=', 2);
+    }
+
+    if ($search) {
+        $loansQuery->where(function ($query) use ($search) {
+            $query->where('sacco_members.member_name', 'LIKE', '%' . $search . '%')
+                ->orWhere('sacco_members.member_national_id', 'LIKE', '%' . $search . '%')
+                ->orWhere('sacco_loan_types.loan_type_name', 'LIKE', '%' . $search . '%');
+        });
+    }
+
+    $loans = $loansQuery->distinct()->offset($offset)->limit($limit)->get();
+
+    // Get the latest payment information for the fetched loans using subquery
+    $loanIds = $loans->pluck('loan_id')->toArray();
+    $lastPayments = DB::table('sacco_loan_payments')
+        ->select('loan_payments_loan_id', 'loan_payments_period as last_paid')
+        ->whereIn('loan_payments_loan_id', $loanIds)
+        ->whereRaw('loan_payments_id IN (SELECT MAX(loan_payments_id) FROM sacco_loan_payments GROUP BY loan_payments_loan_id)')
+        ->get()
+        ->keyBy('loan_payments_loan_id');
+
+    // Attach the last payment information to the loans
+    foreach ($loans as $loan) {
+        $loan->last_paid = $lastPayments->get($loan->loan_id)->last_paid ?? null;
+    }
+
+    return $loans;
+}
+
+private function categorizeLoan($loan, $PeriodNow)
+{
+    $periodNowYear = intval(substr($PeriodNow, 0, 4));
+    $periodNowMonth = intval(substr($PeriodNow, 4, 2));
+
+    // Determine the correct loan start period
+    if (preg_match('/^\d{6}$/', $loan->loan_taken_start_period)) {
+        $startPeriod = $loan->loan_taken_start_period;
+    } else {
+        $startPeriod = $loan->loan_taken_period;
+    }
+
+    // Check if $loan->last_paid exists and is not empty, else use determined start period
+    $lastPaymentPeriod = $loan->last_paid ? $loan->last_paid : $startPeriod;
+    $loanStartYear = intval(substr($lastPaymentPeriod, 0, 4));
+    $loanStartMonth = intval(substr($lastPaymentPeriod, 4, 2));
+
+    $loanTakenYear = intval(substr($startPeriod, 0, 4));
+    $loanTakenMonth = intval(substr($startPeriod, 4, 2));
+
+    // If no payment exists and the loan was taken in the current period, categorize as "Current"
+    if (!$loan->last_paid && $loanTakenYear == $periodNowYear && $loanTakenMonth == $periodNowMonth) {
+        return 'Current';
+    }
+
+    $periodDifference = ($periodNowYear - $loanStartYear) * 12 + ($periodNowMonth - $loanStartMonth);
+
+    if ($periodDifference < 2) {
+        return 'Current';
+    } elseif ($periodDifference < 4) {
+        return 'Watch';
+    } elseif ($periodDifference < 6) {
+        return 'Substandard';
+    } elseif ($periodDifference < 12) {
+        return 'Doubtful';
+    } else {
+        return 'Loss';
+    }
+}
 
 
 

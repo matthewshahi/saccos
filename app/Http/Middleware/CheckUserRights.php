@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Http\Middleware;
 
 use Closure;
@@ -12,11 +11,19 @@ class CheckUserRights
     public function handle(Request $request, Closure $next, $moduleName)
     {
         $user = Auth::user();
-        
+
+        // Ensure the user is authenticated
         if (!$user) {
-            return redirect()->route('login'); // Ensure user is authenticated
+            return redirect()->route('login');
         }
 
+        // Check if user exists and has member_position = 2
+        $member = DB::table('sacco_members')->where('member_id', $user->member_id)->first();
+        if (!$member || $member->member_position != 2) {
+            return response('Access denied', 403);
+        }
+
+        // Check if the user has the granted rights for the specified module
         $grantedRights = $this->getGrantedRights($moduleName, $user->member_id);
 
         if (trim($grantedRights) !== 'Y') {

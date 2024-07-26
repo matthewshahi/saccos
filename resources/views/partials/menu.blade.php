@@ -1,10 +1,9 @@
 <div class="sidebar-panel bg-white">
     <div class="gull-brand pe-3 text-center mt-4 mb-2 d-flex justify-content-center align-items-center">
-    <a href="{{ url('/') }}" style="text-decoration: none;">
-    <span style="margin-left: 10px; font-size: 33px; color: rebeccapurple; font-weight: 900; font-family: 'Montserrat', sans-serif; background: linear-gradient(to right, rebeccapurple, indigo); -webkit-background-clip: text; color: transparent; text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);">iSacco</span>
-</a>
-
-<div class="sidebar-compact-switch ms-auto"><span></span></div>
+        <a href="{{ url('/') }}" style="text-decoration: none;">
+            <span style="margin-left: 10px; font-size: 33px; color: rebeccapurple; font-weight: 900; font-family: 'Montserrat', sans-serif; background: linear-gradient(to right, rebeccapurple, indigo); -webkit-background-clip: text; color: transparent; text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);">iSacco</span>
+        </a>
+        <div class="sidebar-compact-switch ms-auto"><span></span></div>
     </div>
     <div class="scroll-nav ps ps--active-y" data-perfect-scrollbar="data-perfect-scrollbar" data-suppress-scroll-x="true">
         <div class="side-nav">
@@ -49,107 +48,103 @@
                         </ul>
                     </li>
 
-
                     <li class="Ul_li--hover">
-    <a class="has-arrow" href="#">
-        <i class="i-Money-Bag text-20 me-2 text-muted"></i>
-        <span class="item-name text-15 text-muted">Shares/deposits</span>
-    </a>
-    <ul class="mm-collapse">
-        <li class="item-name">
-            <a href="{{ route('modify.member.shares') }}">
-                <span class="text-muted">Add/reduce</span>
-            </a>
-        </li>
-       
-        <li class="item-name">
-            <a href="{{ route('transfer.member.shares') }}">
-                <span class="text-muted">Transfer between members</span>
-            </a>
-        </li>
-    
-        <li class="item-name">
-            <a href="{{ route('proc.end.month.shares') }}">
-                <span class="text-muted">End month proc.</span>
-            </a>
-        </li>
-    </ul>
-</li>
-<li class="Ul_li--hover">
-    <a class="has-arrow" href="#">
-        <i class="i-Business-Mens text-20 me-2 text-muted"></i>
-        <span class="item-name text-15 text-muted">Capital</span>
-    </a>
-    <ul class="mm-collapse">
-        <li class="item-name">
-            <a href="{{ route('modify.member.share.capital') }}">
-                <span class="text-muted">Add/reduce </span>
-            </a>
-        </li>
-        <li class="item-name">
-            <a href="{{ route('transfer.member.capital.shares') }}">
-                <span class="text-muted">Transfer between members</span>
-            </a>
-        </li>
-        <li class="item-name">
-            <a href="{{ route('transfer.share.to.capital.shares') }}">
-                <span class="text-muted">Transfer from deposits capital</span>
-            </a>
-        </li>
-    </ul>
-</li>
-<li class="Ul_li--hover">
-    <a class="has-arrow" href="#">
-        <i class="i-Bank text-20 me-2 text-muted"></i>
-        <span class="item-name text-15 text-muted">FOSA</span>
-    </a>
-    <ul class="mm-collapse">
-        <li class="item-name">
-            <a href="{{ route('modify.member.fosas') }}">
-                <span class="text-muted">Add/reduce</span>
-            </a>
-        </li>
-        <!-- <li class="item-name">
-            <a href="{{ route('transfer.member.fosa') }}">
-                <span class="text-muted">Transfer between members</span>
-            </a>
-        </li> -->
-        <!-- <li class="item-name">
-            <a href="{{ route('proc.end.month.fosa') }}">
-                <span class="text-muted">End month proc.</span>
-            </a>
-        </li> -->
-    </ul>
-</li>
-<li class="Ul_li--hover">
-    <a class="has-arrow" href="#">
-        <i class="i-Calendar-4 text-20 me-2 text-muted"></i>
-        <span class="item-name text-15 text-muted">End month proc.</span>
-    </a>
-    <ul class="mm-collapse">
-        <li class="item-name">
-            <a href="{{ route('list.contribution') }}">
-                <span class="text-muted">Monthly contributions</span>
-            </a>
-        </li>
-        <li class="item-name">
-            <a href="{{ route('proc.end.month.shares') }}">
-                <span class="text-muted">End month processing - Shares</span>
-            </a>
-        </li>
-        <!-- <li class="item-name">
-            <a href="{{ route('proc.end.month.fosa') }}">
-                <span class="text-muted">End month processing - FOSA</span>
-            </a>
-        </li> -->
-        <!-- <li class="item-name">
-            <a href="{{ route('proc.end.month.loans') }}">
-                <span class="text-muted">End month processing - Loans</span>
-            </a>
-        </li> -->
-    </ul>
-</li>
-
+                        <a class="has-arrow" href="#">
+                            <i class="i-Money-Bag text-20 me-2 text-muted"></i>
+                            <span class="item-name text-15 text-muted">Shares/deposits</span>
+                        </a>
+                        <ul class="mm-collapse">
+                            <li class="item-name">
+                                <a href="{{ route('modify.member.shares') }}">
+                                    <span class="text-muted">Add/reduce</span>
+                                </a>
+                            </li>
+                            <li class="item-name">
+                                <a href="{{ route('transfer.member.shares') }}">
+                                    <span class="text-muted">Transfer between members</span>
+                                </a>
+                            </li>
+                            <li class="item-name">
+                                <a href="{{ route('proc.end.month.shares') }}">
+                                    <span class="text-muted">End month proc.</span>
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+                    <li class="Ul_li--hover">
+                        <a class="has-arrow" href="#">
+                            <i class="i-Business-Mens text-20 me-2 text-muted"></i>
+                            <span class="item-name text-15 text-muted">Capital</span>
+                        </a>
+                        <ul class="mm-collapse">
+                            <li class="item-name">
+                                <a href="{{ route('modify.member.share.capital') }}">
+                                    <span class="text-muted">Add/reduce </span>
+                                </a>
+                            </li>
+                            <li class="item-name">
+                                <a href="{{ route('transfer.member.capital.shares') }}">
+                                    <span class="text-muted">Transfer between members</span>
+                                </a>
+                            </li>
+                            <li class="item-name">
+                                <a href="{{ route('transfer.share.to.capital.shares') }}">
+                                    <span class="text-muted">Transfer from deposits capital</span>
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+                    <li class="Ul_li--hover">
+                        <a class="has-arrow" href="#">
+                            <i class="i-Bank text-20 me-2 text-muted"></i>
+                            <span class="item-name text-15 text-muted">FOSA</span>
+                        </a>
+                        <ul class="mm-collapse">
+                            <li class="item-name">
+                                <a href="{{ route('modify.member.fosas') }}">
+                                    <span class="text-muted">Add/reduce</span>
+                                </a>
+                            </li>
+                            <!-- <li class="item-name">
+                                <a href="{{ route('transfer.member.fosa') }}">
+                                    <span class="text-muted">Transfer between members</span>
+                                </a>
+                            </li> -->
+                            <!-- <li class="item-name">
+                                <a href="{{ route('proc.end.month.fosa') }}">
+                                    <span class="text-muted">End month proc.</span>
+                                </a>
+                            </li> -->
+                        </ul>
+                    </li>
+                    <li class="Ul_li--hover">
+                        <a class="has-arrow" href="#">
+                            <i class="i-Calendar-4 text-20 me-2 text-muted"></i>
+                            <span class="item-name text-15 text-muted">End month proc.</span>
+                        </a>
+                        <ul class="mm-collapse">
+                            <li class="item-name">
+                                <a href="{{ route('list.contribution') }}">
+                                    <span class="text-muted">Monthly contributions</span>
+                                </a>
+                            </li>
+                            <li class="item-name">
+                                <a href="{{ route('proc.end.month.shares') }}">
+                                    <span class="text-muted">End month processing - Shares</span>
+                                </a>
+                            </li>
+                            <!-- <li class="item-name">
+                                <a href="{{ route('proc.end.month.fosa') }}">
+                                    <span class="text-muted">End month processing - FOSA</span>
+                                </a>
+                            </li> -->
+                            <!-- <li class="item-name">
+                                <a href="{{ route('proc.end.month.loans') }}">
+                                    <span class="text-muted">End month processing - Loans</span>
+                                </a>
+                            </li> -->
+                        </ul>
+                    </li>
 
                     <li class="Ul_li--hover">
                         <a class="has-arrow" href="#">
@@ -190,8 +185,8 @@
                             <li class="item-name">
                                 <a href="{{ url('/loans/types') }}">
                                     <span class="text-muted">Loan types</span>
-</a>
-                                </li>
+                                </a>
+                            </li>
                             <li class="item-name">
                                 <a href="{{ url('/loans/categories') }}">
                                     <span class="text-muted">Loan categories</span>
@@ -227,13 +222,11 @@
                             <span class="item-name text-15 text-muted">Reports</span>
                         </a>
                         <ul class="mm-collapse">
-                        <li class="item-name">
-                                        <a href="{{ url('/reports/members/status') }}">
-                                            <span class="text-muted">Full Consolidated report</span>
-                                        </a>
-                                    </li>
-
-                             
+                            <li class="item-name">
+                                <a href="{{ url('/reports/members/status') }}">
+                                    <span class="text-muted">Full Consolidated report</span>
+                                </a>
+                            </li>
                             <!-- <li class="item-name has-arrow">
                                 <a href="#">
                                     <span class="text-muted">Shares/FOSA/Share capital</span>
@@ -335,6 +328,78 @@
                                     </li>
                                 </ul>
                             </li> -->
+                            <!-- SASRA Menu -->
+                            <li class="Ul_li--hover">
+                                <a class="has-arrow" href="#">
+                                    <i class="i-Bar-Chart text-20 me-2 text-muted"></i>
+                                    <span class="item-name text-15 text-muted">SASRA</span>
+                                </a>
+                                <ul class="mm-collapse">
+                                    <li class="item-name">
+                                        <a href="{{url('/reports/sasra/outstandingloans/n/active')}}">OutStanding Loans - Inactive Members</a>
+                                    </li>
+                                    <li class="item-name">
+                                        <a href="{{url('/reports/sasra/outstandingloans/y/active')}}">OutStanding Loans - Active Members</a>
+                                    </li>
+                                    <li class="item-name">
+                                        <a href="{{url('/reports/sasra/outstandingloans/n')}}">Fully Paid Loans</a>
+                                    </li>
+                                    <li class="item-name">
+                                        <a href="{{url('/reports/sasra/share')}}">Balances - Shares  </a>
+                                    </li>
+                                    <li class="item-name">
+                                        <a href="{{url('/reports/profit_and_loss')}}">ROI</a>
+                                    </li>
+                                    <!-- <li class="item-name">
+                                        <a href="{{url('/reports/sasra/finance_position_report')}}">Finance Position</a>
+                                    </li>
+                                    <li class="item-name">
+                                        <a href="{{url('/reports/sasra/income_report')}}">Income Report</a>
+                                    </li> -->
+                                    <li class="item-name">
+                                        <a href="{{url('/reports/sasra/loan_performance')}}">Loans Performance / RISK classifications</a>
+                                    </li>
+                                    <!-- <li class="item-name">
+                                        <a href="{{url('/reports/sasra/loan_performance/v2')}}">Loans Performance / RISK classifications - V2</a>
+                                    </li> -->
+                                    <li class="item-name">
+                                        <a href="{{url('/reports/sasra/loan_performance/insider_lending')}}">Insider Lending</a>
+                                    </li>
+                                    <!-- <li class="item-name">
+                                        <a href="{{url('/reports/sasra/outstandingloans/y')}}">Loans - All OutStanding</a>
+                                    </li>
+                                    <li class="item-name">
+                                        <a href="{{url('/reports/sasra/outstandingloans/y/active')}}">Loans - OutStanding & Active members only</a>
+                                    </li>
+                                    <li class="item-name">
+                                        <a href="{{url('/reports/sasra/outstandingloans/n')}}">Loans - Fully Paid</a>
+                                    </li>
+                                    <li class="item-name">
+                                        <a href="{{url('/reports/sasra/deposits')}}">Capital Balances</a>
+                                    </li>
+                                    <li class="item-name">
+                                        <a href="{{url('/reports/sasra/share')}}">Share Balances (beta)</a>
+                                    </li>
+                                    <li class="item-name">
+                                        <a href="{{url('/reports/sasra/return_on_investment_report')}}">Return on Investment Report</a>
+                                    </li>
+                                    <li class="item-name">
+                                        <a href="{{url('/reports/sasra/finance_position_report')}}">Finance Position Report</a>
+                                    </li>
+                                    <li class="item-name">
+                                        <a href="{{url('/reports/sasra/income_report')}}">Income Report</a>
+                                    </li>
+                                    <li class="item-name">
+                                        <a href="{{url('/reports/sasra/loan_performance')}}">Loans Performance / RISK classifications</a>
+                                    </li>
+                                    <li class="item-name">
+                                        <a href="{{url('/reports/sasra/loan_performance/true')}}">Loans Performance / RISK classifications - V2</a>
+                                    </li>
+                                    <li class="item-name">
+                                        <a href="{{url('/reports/sasra/insider_lending')}}">Insider Lending</a>
+                                    </li> -->
+                                </ul>
+                            </li>
                         </ul>
                     </li>
                     <!-- <li class="Ul_li--hover">
@@ -409,10 +474,9 @@
                         <ul class="mm-collapse">
                             <li class="item-name has-arrow">
                                 <a href="#">
-                                <span class="text-muted">Rights & Modules</span>
+                                    <span class="text-muted">Rights & Modules</span>
                                 </a>
                                 <ul class="mm-collapse">
-                                    
                                     <li class="item-name">
                                         <a href="{{ url('/admin/access-rights') }}">
                                             <span class="text-muted">Modify access rights</span>
@@ -477,31 +541,29 @@
                             <span class="item-name text-15 text-muted">User Profile</span>
                         </a>
                         <ul class="mm-collapse">
-                        <!-- <li class="item-name">
-                            <a href="{{ url('/profile') }}">
-                                <span class="text-muted">View Profile</span>
-                            </a>
-                        </li>
-                        <li class="item-name">
-                            <a href="{{ url('/profile/edit/' . Auth::id()) }}">
-                                <span class="text-muted">Edit Profile</span>
-                            </a>
-                        </li> -->
-                        <li class="item-name">
-                            <a href="{{ url('/profile/password') }}">
-                                <span class="text-muted">Change Password</span>
-                            </a>
-                        </li>
-                        <li class="item-name">
-                            <a href="{{ url('/logout') }}"
-                                onclick="event.preventDefault();
-                                document.getElementById('logout-form').submit();">
-                                <span class="text-muted">Logout</span>
-                            </a>
-                            <form id="logout-form" action="{{ url('/logout') }}" method="POST" style="display: none;">
-                                @csrf
-                            </form>
-                        </li>
+                            <!-- <li class="item-name">
+                                <a href="{{ url('/profile') }}">
+                                    <span class="text-muted">View Profile</span>
+                                </a>
+                            </li>
+                            <li class="item-name">
+                                <a href="{{ url('/profile/edit/' . Auth::id()) }}">
+                                    <span class="text-muted">Edit Profile</span>
+                                </a>
+                            </li> -->
+                            <li class="item-name">
+                                <a href="{{ url('/profile/password') }}">
+                                    <span class="text-muted">Change Password</span>
+                                </a>
+                            </li>
+                            <li class="item-name">
+                                <a href="{{ url('/logout') }}" onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
+                                    <span class="text-muted">Logout</span>
+                                </a>
+                                <form id="logout-form" action="{{ url('/logout') }}" method="POST" style="display: none;">
+                                    @csrf
+                                </form>
+                            </li>
                         </ul>
                     </li>
                 </ul>
@@ -509,5 +571,3 @@
         </div>
     </div>
 </div>
-
-
