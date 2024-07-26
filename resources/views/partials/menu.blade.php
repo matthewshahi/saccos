@@ -482,17 +482,17 @@
                                             <span class="text-muted">Modify access rights</span>
                                         </a>
                                     </li>
-                                    <li class="item-name">
+                                    <!-- <li class="item-name">
                                         <a href="{{ url('/admin/modules') }}">
                                             <span class="text-muted">Sacco system modules</span>
                                         </a>
-                                    </li>
+                                    </li> -->
                                 </ul>
                             </li>
                             <li class="item-name has-arrow">
-                                <a href="#">
+                                <!-- <a href="#">
                                     <span class="text-muted">Sacco defaults</span>
-                                </a>
+                                </a> -->
                                 <!-- <ul class="mm-collapse">
                                     <li class="item-name">
                                         <a href="{{ url('/admin/defaults') }}">
@@ -512,9 +512,9 @@
                                 </ul> -->
                             </li>
                             <li class="item-name has-arrow">
-                                <a href="#">
+                                <!-- <a href="#">
                                     <span class="text-muted">Budget and dividends</span>
-                                </a>
+                                </a> -->
                                 <!-- <ul class="mm-collapse">
                                     <li class="item-name">
                                         <a href="{{ url('/admin/budget') }}">
