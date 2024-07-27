@@ -135,6 +135,9 @@
     </style>
 
     <script>
+        const memberSearchUrl = "{{ route('ajaxGetMembers') }}";
+        const accountSearchUrl = "{{ route('ajaxGetAccounts') }}"; // Assume a route exists for account search
+
         function showHintMembers(str, inputName, suggestionsBox) {
             if (str.length == 0) {
                 document.getElementById(suggestionsBox).innerHTML = "";
@@ -151,12 +154,12 @@
                     let response = JSON.parse(xmlhttp.responseText);
                     let suggestions = '';
                     response.forEach(member => {
-                        suggestions += `<div class="suggestion-item" onclick="selectMember('${member.value}', '${inputName}', '${suggestionsBox}')">${member.label}</div>`;
+                        suggestions += `<div class="suggestion-item" onclick="selectMember('${member.name} (${member.sacco_id})', '${inputName}', '${suggestionsBox}')">${member.name} (${member.sacco_id})</div>`;
                     });
                     document.getElementById(suggestionsBox).innerHTML = suggestions;
                 }
             };
-            xmlhttp.open("GET", "/search/members?query=" + str, true);
+            xmlhttp.open("GET", `${memberSearchUrl}?q=${str}`, true);
             xmlhttp.send();
         }
 
@@ -176,12 +179,12 @@
                     let response = JSON.parse(xmlhttp.responseText);
                     let suggestions = '';
                     response.forEach(account => {
-                        suggestions += `<div class="suggestion-item" onclick="selectAccount('${account.value}', '${inputName}', '${suggestionsBox}')">${account.label}</div>`;
+                        suggestions += `<div class="suggestion-item" onclick="selectAccount('${account.name} (${account.code})', '${inputName}', '${suggestionsBox}')">${account.name} (${account.code})</div>`;
                     });
                     document.getElementById(suggestionsBox).innerHTML = suggestions;
                 }
             };
-            xmlhttp.open("GET", "/search/accounts?query=" + str, true);
+            xmlhttp.open("GET", `${accountSearchUrl}?q=${str}`, true);
             xmlhttp.send();
         }
 
@@ -196,5 +199,3 @@
         }
     </script>
 @endsection
-
-                                           
