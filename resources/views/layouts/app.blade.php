@@ -20,8 +20,13 @@
 <body class="text-start">
     <div class="app-admin-wrap layout-sidebar-vertical sidebar-full">
     @include('partials.header')
-        @include('partials.menu')
-        <div class="main-content-wrap mobile-menu-content bg-off-white m-0" style="padding: 1px;">
+        
+    @if (Auth::check() && Auth::user()->member_position == 2)
+                            @include('partials.menu')
+                        @else
+                            @include('partials.menu_members')
+                        @endif
+        <div class="main-content-wrap mobile-menu-content bg-off-white m-0" style="padding: 3px;">
             
             <div class="main-content pt-4">
                 @yield('content')

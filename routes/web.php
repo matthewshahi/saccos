@@ -2,26 +2,46 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\Auth\CustomAuthController;
+ 
+
 
 Route::get('/', [HomeController::class, 'redirectBasedOnAuth'])->name('home');
 Route::get('/home', [HomeController::class, 'redirectBasedOnAuth'])->name('home');
 
-Route::get('/dashboard', [HomeController::class, 'index'])->name('dashboard')->middleware('auth');
+
 
 
 Route::get('login', [CustomAuthController::class, 'showLoginForm'])->name('login');
 Route::post('login', [CustomAuthController::class, 'login']);
 Route::post('logout', [CustomAuthController::class, 'logout'])->name('logout');
 
+
+Route::middleware(['auth'])->group(function () {
  
+    // Member statement route for non-officials
+    Route::get('/members/statement/self', [HomeController::class, 'viewStatement'])
+        ->name('members.statement');    
+    
+    Route::get('/members/status/{self}', [HomeController::class, 'memberStatus'])
+        ->name('members.status') ; 
+
+    Route::get('/loans/apply', [HomeController::class, 'loansApply'])->name('loans.apply');
+
+    Route::get('/loans/guarantee/requests', [HomeController::class, 'listGuaranteeRequests'])->name('loans.guarantee.requests');
+    Route::get('/loans/pending/approval', [HomeController::class, 'listLoansPendingApproval'])->name('loans.pending.approval');
+
+    Route::get('/profile/password', [HomeController::class, 'showChangeSelfPasswordForm'])->name('profile.password');
+    Route::post('/profile/password', [HomeController::class, 'updateSelfPassword'])->name('profile.updatePassword');
+        
+});
+
 
 
 // Middleware group for authentication
-Route::middleware(['auth'])->group(function () {
+Route::middleware(['auth', 'check_member_position'])->group(function () {
+    Route::get('/dashboard', [HomeController::class, 'index'])->name('dashboard')->middleware('auth');
     // Members
-    
-    Route::get('/profile/password', [HomeController::class, 'showChangeSelfPasswordForm'])->name('profile.password');
-    Route::post('/profile/password', [HomeController::class, 'updateSelfPassword'])->name('profile.updatePassword');
+     
 
     Route::get('/members/list', [HomeController::class, 'membersList'])->name('members.list')->middleware('check_user_rights:list_sacco_member');
     Route::get('/members/add', [HomeController::class, 'addNewMember'])->name('members.add')->middleware('check_user_rights:add_new_sacco_member');
@@ -47,7 +67,9 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/ajax-get-members', [HomeController::class, 'ajaxGetMembers'])->name('ajaxGetMembers')->middleware('check_user_rights:list_sacco_member');
 
-    Route::get('/members/statement/{id}', [HomeController::class, 'viewStatement'])->name('members.statement')->middleware('check_user_rights:rpt_loans_issued'); 
+    Route::get('/members/statement/{id?}', [HomeController::class, 'viewStatement'])
+    ->name('members.statement')
+    ->middleware('check_user_rights:rpt_loans_issued');
     Route::match(['get', 'post'], '/members/contributions/{id}', [HomeController::class, 'viewContributions'])->name('members.contributions')->middleware('check_user_rights:edit_member_share_contribution');
    
     Route::get('/members/change-password/{id}', [HomeController::class, 'changePassword'])->name('members.changePassword')->middleware('check_user_rights:edit_password');
@@ -109,8 +131,10 @@ Route::middleware(['auth'])->group(function () {
             ->middleware('check_user_rights:rpt_loans_issued');
 
             
-        Route::get('/admin/access-rights', [HomeController::class, 'adminAccessRights'])->name('admin.access-rights');
-        Route::post('/admin/access-rights/save', [HomeController::class, 'user_rights_save'])->name('admin.access-rights.save');
+        Route::get('/admin/access-rights', [HomeController::class, 'adminAccessRights'])->name('admin.access-rights')->middleware('check_user_rights:modify_useraccessrights'); 
+        Route::post('/admin/access-rights/save', [HomeController::class, 'user_rights_save'])->name('admin.access-rights.save')->middleware('check_user_rights:modify_useraccessrights');
+        Route::match(['get', 'post'], '/admin/access-rights/add_modules', [HomeController::class, 'user_rights_add_module'])->name('admin.access-rights.add.module')->middleware('check_user_rights:modify_useraccessrights');
+
 
 
         Route::match(['get', 'post'], '/reports/profit_and_loss', [HomeController::class, 'reportSasraProfitAndLoss'])
@@ -164,14 +188,13 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/proc/end/month/loans', [HomeController::class, 'endMonthLoans'])->name('proc.end.month.loans');
 
 
-    Route::get('/loans/apply', [HomeController::class, 'loansApply'])->name('loans.apply');
+    
     Route::post('/loans/apply', [HomeController::class, 'submitLoanApplication'])->name('loans.application.submit');
     Route::get('/loans/approval', [HomeController::class, 'listLoansForApproval'])->name('loans.approval');
     Route::get('/loans/approve/{loanId}', [HomeController::class, 'approveLoan'])->name('loans.approve');
     Route::get('/loans/delete/{loanId}', [HomeController::class, 'deleteLoan'])->name('loans.delete');
 
-    Route::get('/loans/guarantee/requests', [HomeController::class, 'listGuaranteeRequests'])->name('loans.guarantee.requests');
-    Route::get('/loans/pending/approval', [HomeController::class, 'listLoansPendingApproval'])->name('loans.pending.approval');
+    
     Route::get('/admin/loans/pending/approval', [HomeController::class, 'adminListLoansPendingApproval'])->name('admin.loans.pending.approval')->middleware('check_user_rights:update_loan_batch');
     
 
@@ -248,7 +271,8 @@ Route::middleware(['auth'])->group(function () {
 
 
      
-
-
+    
 });
+
+
 

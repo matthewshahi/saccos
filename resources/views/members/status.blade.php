@@ -4,18 +4,15 @@
     <div class="breadcrumb d-flex justify-content-between align-items-center">
         <h1>Member Status Report</h1>
         <div class="header-part-right">
-        <ul>
+            <ul>
                 @if(Auth::check())
                     <li>{{ Auth::user()->member_name }}</li>
                 @endif
                 @if(isset($currentPeriod))
                     <li><a href="{{ route('admin.periods') }}">{{ $currentPeriod->period_name }}</a></li>
                 @endif
-
-              
-              <li><i class="i-Full-Screen header-icon d-none d-sm-inline-block" data-fullscreen=""></i></li>
+                <li><i class="i-Full-Screen header-icon d-none d-sm-inline-block" data-fullscreen=""></i></li>
             </ul>
-            
         </div>
     </div>
     <div class="separator-breadcrumb border-top"></div>
@@ -103,27 +100,37 @@
                                                         <th>Guarantor Name</th>
                                                         <th>Sacco No.</th>
                                                         <th>Amount Guaranteed</th>
-                                                        <th> Amount Freed</th>
+                                                        <th>Amount Freed</th>
                                                         <th>Amount Tied</th>
-                                                        <th>Action</th>
+                                                        @if($showHyperlinks)
+                                                            <th>Action</th>
+                                                        @endif
                                                     </tr>
                                                 </thead>
                                                 <tbody>
                                                     @foreach($loan->guarantors as $guarantor)
                                                         <tr>
                                                             <td>{{ $loop->iteration }}</td>
-                                                            <td><a href="{{ route('changeGuarantors', ['member_id' => $guarantor->member_id, 'guarantor_id' => $guarantor->loan_guar_id]) }}">{{ $guarantor->member_name }}</a></td>
+                                                            <td>
+                                                                @if($showHyperlinks)
+                                                                    <a href="{{ route('changeGuarantors', ['member_id' => $guarantor->member_id, 'guarantor_id' => $guarantor->loan_guar_id]) }}">{{ $guarantor->member_name }}</a>
+                                                                @else
+                                                                    {{ $guarantor->member_name }}
+                                                                @endif
+                                                            </td>
                                                             <td>{{ $guarantor->member_sacco_id }}</td>
                                                             <td>{{ number_format($guarantor->loan_guar_amount_guaranteed, 2) }}</td>
                                                             <td>{{ number_format($guarantor->loan_guar_amount_freed, 2) }}</td>
                                                             <td>{{ number_format($guarantor->loan_guar_amount_guaranteed - $guarantor->loan_guar_amount_freed, 2) }}</td>
-                                                            <td>
-                                                                <form action="{{ route('deleteGuarantor', ['member_id' => $member->member_id, 'guarantor_id' => $guarantor->loan_guar_id]) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this guarantor?');">
-                                                                    @csrf
-                                                                    @method('DELETE')
-                                                                    <button type="submit" class="btn btn-danger btn-sm"><i class="fas fa-times"></i></button>
-                                                                </form>
-                                                            </td>
+                                                            @if($showHyperlinks)
+                                                                <td>
+                                                                    <form action="{{ route('deleteGuarantor', ['member_id' => $member->member_id, 'guarantor_id' => $guarantor->loan_guar_id]) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this guarantor?');">
+                                                                        @csrf
+                                                                        @method('DELETE')
+                                                                        <button type="submit" class="btn btn-danger btn-sm"><i class="nav-icon i-Close-Window fw-bold"></i></button>
+                                                                    </form>
+                                                                </td>
+                                                            @endif
                                                         </tr>
                                                     @endforeach
                                                 </tbody>

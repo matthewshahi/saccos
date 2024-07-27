@@ -362,9 +362,9 @@
                                     <!-- <li class="item-name">
                                         <a href="{{url('/reports/sasra/loan_performance/v2')}}">Loans Performance / RISK classifications - V2</a>
                                     </li> -->
-                                    <li class="item-name">
+                                    <!-- <li class="item-name">
                                         <a href="{{url('/reports/sasra/loan_performance/insider_lending')}}">Insider Lending</a>
-                                    </li>
+                                    </li> -->
                                     <!-- <li class="item-name">
                                         <a href="{{url('/reports/sasra/outstandingloans/y')}}">Loans - All OutStanding</a>
                                     </li>

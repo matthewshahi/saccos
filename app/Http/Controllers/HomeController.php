@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Carbon\Carbon;
 use DateTime;
+use Illuminate\Support\Facades\Route;
  
 
 class HomeController extends Controller
@@ -24,6 +25,7 @@ class HomeController extends Controller
 
     public function __construct()
     {
+        // dd(Route::currentRouteName());
         $this->middleware('auth');
         $this->recordLimit = 3000;
         $this->minAge = 18; // Minimum age to join
@@ -38,15 +40,39 @@ class HomeController extends Controller
             ->value('default_value') ?? 0;
     }
 
-
     public function redirectBasedOnAuth()
     {
         if (auth()->check()) {
-            return redirect()->route('dashboard');
+            $user = auth()->user();
+          
+
+            // Check if the user is an official
+            if ($user->member_position == 2) {
+                return redirect()->to('/dashboard');
+            } else {
+                return redirect()->to('/members/statement/self'); // Redirect to the member statement URL
+            }
+        }
+       
+
+        return view('home'); 
+    }
+
+    public function member_statement_self()
+        {
+            dd("56789 what need sto go here");
         }
 
-        return view('home'); // This is the view for non-authenticated users
-    }
+
+    // public function redirectBasedOnAuth()
+    // {
+    //     if (auth()->check()) {
+    //         dd(auth()->user()->member_position);
+    //         return redirect()->route('dashboard');
+    //     }
+
+    //     return view('home'); 
+    // }
 
     
     
@@ -721,6 +747,14 @@ private function dashboard_getLoansAndRepayments()
     
     public function memberStatus($id)
 {
+
+    $showHyperlinks = true;
+    $user = auth()->user();
+    if ($user->member_position != 2 || $id === null) {
+        $id = $user->member_id;
+        $showHyperlinks = false; 
+    }
+
     // Fetch the threshold amount from the sacco_defaults table
     $default = DB::table('sacco_defaults')
         ->where('default_name', 'threshold_amount')
@@ -798,6 +832,7 @@ private function dashboard_getLoansAndRepayments()
         'loansTakenWithGuarantors' => $loansTakenWithGuarantors,
         'loansGuaranteed' => $loansGuaranteed,
         'threshold_amount' => $threshold_amount,
+        'showHyperlinks' => $showHyperlinks
     ];
 
     return view('members.status', $data);
@@ -859,6 +894,10 @@ private function dashboard_getLoansAndRepayments()
         'guarantor_id' => $guarantor_id,
     ];
 
+
+
+
+
     return view('guarantors.change', $data);
 }
  
@@ -887,9 +926,12 @@ public function ajaxGetMembers(Request $request)
 
 public function updateGuarantors(Request $request, $member_id, $guarantor_id)
 {
-    $loan_id = $request->input('loan_id'); // Assuming you are passing loan_id in the request
+    // Debug output
+    // dd($request->all());
+
+    $loan_id = $request->input('loan_id');
+    $current_loan_guar_id = $request->input('loan_guar_id');
     $batch_tied_shares_to_pay = $request->input('batch_tied_shares_to_pay');
-    $current_loan_guar_id = $request->input('current_loan_guar_id');
 
     // Fetch the maximum number of guarantors from sacco_defaults
     $default = DB::table('sacco_defaults')
@@ -910,21 +952,19 @@ public function updateGuarantors(Request $request, $member_id, $guarantor_id)
 
     $guarantors_guarantor_name = [];
     $guarantors_amount_guaranteed = [];
-    $free_shares = [];
     $guarantors_guarantor_id = [];
 
-    for ($ix = 0; $ix < $submittedRows; $ix++) {
+    for ($ix = 1; $ix <= $submittedRows; $ix++) {
         $guarantors_guarantor_name[$ix] = $request->input("guarantors_guarantor_name{$ix}");
         $guarantors_amount_guaranteed[$ix] = floatval(str_replace(',', '', $request->input("guarantors_amount_guaranteed{$ix}")));
-        $free_shares[$ix] = floatval(str_replace(',', '', $request->input("free_shares{$ix}")));
     }
 
     // Initial validation and checks
     $nmsg = '';
 
-    for ($ix = 0; $ix < $submittedRows; $ix++) {
+    for ($ix = 1; $ix <= $submittedRows; $ix++) {
         if (!empty($guarantors_guarantor_name[$ix])) {
-            $memno = explode("- (", $guarantors_guarantor_name[$ix]);
+            $memno = explode(" (", $guarantors_guarantor_name[$ix]);
             $memno[0] = trim($memno[0]);
             $memno[1] = trim($memno[1]);
             $memno1 = substr($memno[1], 0, strlen($memno[1]) - 1);
@@ -946,11 +986,11 @@ public function updateGuarantors(Request $request, $member_id, $guarantor_id)
 
             if ($member_id != $guarantors_guarantor_id[$ix]) {
                 if (($member->member_total_share * $max_guarantor_factor) - $member->member_tied_shares < $guarantors_amount_guaranteed[$ix]) {
-                    $nmsg .= "Error, {$guarantors_guarantor_name[$ix]}, in row " . ($ix + 1) . " has over guaranteed<br>";
+                    $nmsg .= "Error, {$guarantors_guarantor_name[$ix]}, in row " . ($ix) . " has over guaranteed<br>";
                 }
             } else {
                 if ($member->member_total_share - $member->member_tied_shares_self < $guarantors_amount_guaranteed[$ix]) {
-                    $nmsg .= "Error, {$guarantors_guarantor_name[$ix]}, row " . ($ix + 1) . " has over guaranteed him/herself<br>";
+                    $nmsg .= "Error, {$guarantors_guarantor_name[$ix]}, row " . ($ix) . " has over guaranteed him/herself<br>";
                 }
             }
         }
@@ -963,7 +1003,7 @@ public function updateGuarantors(Request $request, $member_id, $guarantor_id)
     // Calculate the total value guaranteed
     $val = 0;
 
-    for ($ix = 0; $ix < $submittedRows; $ix++) {
+    for ($ix = 1; $ix <= $submittedRows; $ix++) {
         if (!empty($guarantors_guarantor_name[$ix])) {
             $val += $guarantors_amount_guaranteed[$ix];
         }
@@ -993,9 +1033,9 @@ public function updateGuarantors(Request $request, $member_id, $guarantor_id)
         ]);
 
     // Insert new guarantors
-    $desc = "New Guarantor added - directly from GID". $current_loan_guar_id;
+    $desc = "New Guarantor added - directly from GID " . $current_loan_guar_id;
 
-    for ($ix = 0; $ix < $submittedRows; $ix++) {
+    for ($ix = 1; $ix <= $submittedRows; $ix++) {
         if (!empty($guarantors_guarantor_name[$ix])) {
             $guarantors_amount_guaranteed[$ix] = $guarantors_amount_guaranteed[$ix] * $g_factor;
 
@@ -1025,9 +1065,22 @@ public function updateGuarantors(Request $request, $member_id, $guarantor_id)
     return redirect()->route('members.list')->with('success', 'Guarantors updated successfully.');
 }
 
- 
-public function viewStatement($id)
+
+public function viewStatement($id = null)
 {
+   
+     $user = auth()->user();
+
+        // If the user is not an official or no ID is provided, use the authenticated user's ID
+        if ($user->member_position != 2) {
+            $id = $user->member_id;
+        }
+
+        if($id === null)
+        {
+            $id = $user->member_id;
+        }
+      
     $member = DB::table('sacco_members')->where('member_id', $id)->first();
 
     // Set period_from and period_to, defaulting to '000000' and '999900' if not provided
@@ -4115,336 +4168,437 @@ public function fetchSasraShareData(Request $request)
 
 
 
-// Function to fetch all main accounts and their corresponding sub-accounts
-private function report_sasra_getMainSubAccounts($a_type)
-{
-    return DB::table('sacco_sub_account')
-        ->join('sacco_main_account', 'sacco_sub_account.sub_account_main_account', '=', 'sacco_main_account.main_account_id')
-        ->where('sacco_sub_account.sub_account_deleted', '<>', 'Y')
-        ->where(function($query) use ($a_type) {
-            $query->where('sacco_main_account.main_account_type', 'like', $a_type . '%')
-                  ->orWhere('sacco_main_account.main_account_type', 'like', $a_type . 's%');  // Explicit plural form
-        })
-        ->orderBy('sacco_main_account.main_account_code')
-        ->orderBy('sacco_sub_account.sub_account_code')
-        ->orderBy('sacco_sub_account.sub_account_name')
-        ->select('sacco_main_account.main_account_code', 'sacco_sub_account.sub_account_code', 'sacco_sub_account.sub_account_name', 'sacco_sub_account.sub_account_id')
-        ->get();
-}
+// // Function to fetch all main accounts and their corresponding sub-accounts
+// private function report_sasra_getMainSubAccounts($a_type)
+// {
+//     return DB::table('sacco_sub_account')
+//         ->join('sacco_main_account', 'sacco_sub_account.sub_account_main_account', '=', 'sacco_main_account.main_account_id')
+//         ->where('sacco_sub_account.sub_account_deleted', '<>', 'Y')
+//         ->where(function($query) use ($a_type) {
+//             $query->where('sacco_main_account.main_account_type', 'like', $a_type . '%')
+//                   ->orWhere('sacco_main_account.main_account_type', 'like', $a_type . 's%');  // Explicit plural form
+//         })
+//         ->orderBy('sacco_main_account.main_account_code')
+//         ->orderBy('sacco_sub_account.sub_account_code')
+//         ->orderBy('sacco_sub_account.sub_account_name')
+//         ->select('sacco_main_account.main_account_code', 'sacco_sub_account.sub_account_code', 'sacco_sub_account.sub_account_name', 'sacco_sub_account.sub_account_id')
+//         ->get();
+// }
 
-// Function to fetch debit and credit totals for a sub-account within a period
-private function report_sasra_getTrialBalances($sub_account_id, $pfrom, $pto)
-{
-    return DB::table('sacco_accounts_trans')
-        ->select(DB::raw('SUM(accounts_trans_debit) AS sub_total_debit'), DB::raw('SUM(accounts_trans_credit) AS sub_total_credit'))
-        ->where('accounts_trans_sub_account', $sub_account_id)
-        ->whereBetween('accounts_trans_period', [$pfrom, $pto])
-        ->first();
-}
+// // Function to fetch debit and credit totals for a sub-account within a period
+// private function report_sasra_getTrialBalances($sub_account_id, $pfrom, $pto)
+// {
+//     return DB::table('sacco_accounts_trans')
+//         ->select(DB::raw('SUM(accounts_trans_debit) AS sub_total_debit'), DB::raw('SUM(accounts_trans_credit) AS sub_total_credit'))
+//         ->where('accounts_trans_sub_account', $sub_account_id)
+//         ->whereBetween('accounts_trans_period', [$pfrom, $pto])
+//         ->first();
+// }
 
-// Main function to fetch trial balance data
-private function report_sasra_getTrialBalanceData($start, $end)
-{
-    $accountTypes = ['INCOME', 'EXPENSE'];  // Use only INCOME and EXPENSE for Profit and Loss
+// // Main function to fetch trial balance data
+// private function report_sasra_getTrialBalanceData($start, $end)
+// {
+//     $accountTypes = ['INCOME', 'EXPENSE'];  // Use only INCOME and EXPENSE for Profit and Loss
 
-    $accounts = [];
-    foreach ($accountTypes as $type) {
-        $mainSubAccounts = $this->report_sasra_getMainSubAccounts($type);
-        foreach ($mainSubAccounts as $account) {
-            $trialBalances = $this->report_sasra_getTrialBalances($account->sub_account_id, $start, $end);
-            $dval = $trialBalances->sub_total_debit;
-            $cval = $trialBalances->sub_total_credit;
+//     $accounts = [];
+//     foreach ($accountTypes as $type) {
+//         $mainSubAccounts = $this->report_sasra_getMainSubAccounts($type);
+//         foreach ($mainSubAccounts as $account) {
+//             $trialBalances = $this->report_sasra_getTrialBalances($account->sub_account_id, $start, $end);
+//             $dval = $trialBalances->sub_total_debit;
+//             $cval = $trialBalances->sub_total_credit;
 
-            if ($dval < 0 && $cval >= 0) {
-                $cval = ($dval * -1) + $cval;
-                $dval = 0;
-            }
+//             if ($dval < 0 && $cval >= 0) {
+//                 $cval = ($dval * -1) + $cval;
+//                 $dval = 0;
+//             }
 
-            if ($cval < 0 && $dval >= 0) {
-                $dval = $dval + ($cval * -1);
-                $cval = 0;
-            }
+//             if ($cval < 0 && $dval >= 0) {
+//                 $dval = $dval + ($cval * -1);
+//                 $cval = 0;
+//             }
 
-            if ($cval < 0 && $dval < 0) {
-                $dval = $cval * -1;
-                $cval = $dval * -1;
-            }
+//             if ($cval < 0 && $dval < 0) {
+//                 $dval = $cval * -1;
+//                 $cval = $dval * -1;
+//             }
 
-            if ($dval > $cval) {
-                $dval = $dval - $cval;
-                $cval = 0;
-            } else {
-                $cval = $cval - $dval;
-                $dval = 0;
-            }
+//             if ($dval > $cval) {
+//                 $dval = $dval - $cval;
+//                 $cval = 0;
+//             } else {
+//                 $cval = $cval - $dval;
+//                 $dval = 0;
+//             }
 
-            $accounts[] = [
-                'main_account_code' => $account->main_account_code,
-                'sub_account_code' => $account->sub_account_code,
-                'sub_account_name' => $account->sub_account_name,
-                'adjusted_debit' => $dval,
-                'adjusted_credit' => $cval,
-                'main_account_type' => $type
-            ];
-        }
-    }
+//             $accounts[] = [
+//                 'main_account_code' => $account->main_account_code,
+//                 'sub_account_code' => $account->sub_account_code,
+//                 'sub_account_name' => $account->sub_account_name,
+//                 'adjusted_debit' => $dval,
+//                 'adjusted_credit' => $cval,
+//                 'main_account_type' => $type
+//             ];
+//         }
+//     }
 
-    return collect($accounts);
-}
+//     return collect($accounts);
+// }
 
-// Function to display the report
-public function reportSasraProfitAndLoss(Request $request)
-{
-    $start = $request->input('startPeriod', now()->startOfMonth()->format('Ym'));
-    $end = $request->input('endPeriod', now()->format('Ym'));
+// // Function to display the report
+// public function reportSasraProfitAndLoss(Request $request)
+// {
+//     $start = $request->input('startPeriod', now()->startOfMonth()->format('Ym'));
+//     $end = $request->input('endPeriod', now()->format('Ym'));
 
-    $accounts = $this->report_sasra_getTrialBalanceData($start, $end);
+//     $accounts = $this->report_sasra_getTrialBalanceData($start, $end);
 
-    return view('reports.sasra.profit_and_loss', [
-        'accounts' => $accounts,
-        'startPeriod' => $start,
-        'endPeriod' => $end
-    ]);
-}
-
-
-
-
-public function reportSasraLoanPerformance(Request $request, $version = null)
-{
-    $title = $version === 'insider_lending' ? 'SASRA - Insider Lending Report' : 'SASRA - Loan Performance Report';
-    return view('reports.sasra.loan_performance', ['version' => $version, 'title' => $title]);
-}
-
-public function fetchLoanPerformanceData(Request $request)
-{
-    $PeriodNow = $this->currentPeriod->period_code ?? date('Ym');
-    $IgnoreLoanBalanceBelow = $this->IgnoreLoanBalanceBelow;
-
-    $offset = $request->input('offset', 0);
-    $limit = $request->input('limit', 5);
-    $search = $request->input('search');
-    $version = $request->input('version');
-
-    $loans = $this->getLoanData($PeriodNow, $IgnoreLoanBalanceBelow, $search, $offset, $limit, $version);
-
-    foreach ($loans as $loan) {
-        $loan->category = $this->categorizeLoan($loan, $PeriodNow);
-    }
-
-    return response()->json(['loans' => $loans]);
-}
-
-private function getLoanData($PeriodNow, $IgnoreLoanBalanceBelow, $search = null, $offset = 0, $limit = 5, $version = null)
-{
-    // First, get the loans with balances above the threshold
-    $loansQuery = DB::table('sacco_loans')
-        ->join('sacco_loan_types', 'sacco_loans.loan_loan_type', '=', 'sacco_loan_types.loan_type_id')
-        ->join('sacco_members', 'sacco_loans.loan_member', '=', 'sacco_members.member_id')
-        ->select(
-            'sacco_loans.loan_id',
-            'sacco_members.member_name',
-            'sacco_members.member_national_id',
-            'sacco_loan_types.loan_type_name',
-            'sacco_loans.loan_taken_period',
-            'sacco_loans.loan_taken_start_period',
-            'sacco_loans.loan_amount',
-            'sacco_loans.loan_loan_paid',
-            DB::raw('(sacco_loans.loan_amount - sacco_loans.loan_loan_paid) as OutstandingAmount')
-        )
-        ->whereRaw('(sacco_loans.loan_amount - sacco_loans.loan_loan_paid) > ?', [$IgnoreLoanBalanceBelow])
-        ->orderBy('sacco_loans.loan_id', 'desc');
-
-    if ($version === 'insider_lending') {
-        $loansQuery->where('sacco_members.member_position', '=', 2);
-    }
-
-    if ($search) {
-        $loansQuery->where(function ($query) use ($search) {
-            $query->where('sacco_members.member_name', 'LIKE', '%' . $search . '%')
-                ->orWhere('sacco_members.member_national_id', 'LIKE', '%' . $search . '%')
-                ->orWhere('sacco_loan_types.loan_type_name', 'LIKE', '%' . $search . '%');
-        });
-    }
-
-    $loans = $loansQuery->distinct()->offset($offset)->limit($limit)->get();
-
-    // Get the latest payment information for the fetched loans using subquery
-    $loanIds = $loans->pluck('loan_id')->toArray();
-    $lastPayments = DB::table('sacco_loan_payments')
-        ->select('loan_payments_loan_id', 'loan_payments_period as last_paid')
-        ->whereIn('loan_payments_loan_id', $loanIds)
-        ->whereRaw('loan_payments_id IN (SELECT MAX(loan_payments_id) FROM sacco_loan_payments GROUP BY loan_payments_loan_id)')
-        ->get()
-        ->keyBy('loan_payments_loan_id');
-
-    // Attach the last payment information to the loans
-    foreach ($loans as $loan) {
-        $loan->last_paid = $lastPayments->get($loan->loan_id)->last_paid ?? null;
-    }
-
-    return $loans;
-}
-
-private function categorizeLoan($loan, $PeriodNow)
-{
-    // Get the current year and month
-    $periodNowYear = intval(substr($PeriodNow, 0, 4));
-    $periodNowMonth = intval(substr($PeriodNow, 4, 2));
-
-    // Determine the correct loan start period
-    if (preg_match('/^\d{6}$/', $loan->loan_taken_start_period)) {
-        $startPeriod = $loan->loan_taken_period;
-    } else {
-        $startPeriod = $loan->loan_taken_period;
-    }
-
-    // Extract year and month from the start period
-    $loanTakenYear = intval(substr($startPeriod, 0, 4));
-    $loanTakenMonth = intval(substr($startPeriod, 4, 2));
-
-    // If the loan was taken in the current period, categorize as "Current"
-    if ($loanTakenYear == $periodNowYear && $loanTakenMonth == $periodNowMonth) {
-        return 'Current';
-    }
-
-    // Calculate the period difference in months
-    $periodDifference = ($periodNowYear - $loanTakenYear) * 12 + ($periodNowMonth - $loanTakenMonth);
-
-    // Categorize the loan based on the period difference
-    if ($periodDifference < 2) {
-        return 'Current';
-    } elseif ($periodDifference < 4) {
-        return 'Watch';
-    } elseif ($periodDifference < 6) {
-        return 'Substandard';
-    } elseif ($periodDifference < 12) {
-        return 'Doubtful';
-    } else {
-        return 'Loss';
-    }
-}
+//     return view('reports.sasra.profit_and_loss', [
+//         'accounts' => $accounts,
+//         'startPeriod' => $start,
+//         'endPeriod' => $end
+//     ]);
+// }
 
 
 
 
+// public function reportSasraLoanPerformance(Request $request, $version = null)
+// {
+//     $title = $version === 'insider_lending' ? 'SASRA - Insider Lending Report' : 'SASRA - Loan Performance Report';
+//     return view('reports.sasra.loan_performance', ['version' => $version, 'title' => $title]);
+// }
+
+// public function fetchLoanPerformanceData(Request $request)
+// {
+//     $PeriodNow = $this->currentPeriod->period_code ?? date('Ym');
+//     $IgnoreLoanBalanceBelow = $this->IgnoreLoanBalanceBelow;
+
+//     $offset = $request->input('offset', 0);
+//     $limit = $request->input('limit', 5);
+//     $search = $request->input('search');
+//     $version = $request->input('version');
+
+//     $loans = $this->getLoanData($PeriodNow, $IgnoreLoanBalanceBelow, $search, $offset, $limit, $version);
+
+//     foreach ($loans as $loan) {
+//         $loan->category = $this->categorizeLoan($loan, $PeriodNow);
+//     }
+
+//     return response()->json(['loans' => $loans]);
+// }
+
+// private function getLoanData($PeriodNow, $IgnoreLoanBalanceBelow, $search = null, $offset = 0, $limit = 5, $version = null)
+// {
+//     // First, get the loans with balances above the threshold
+//     $loansQuery = DB::table('sacco_loans')
+//         ->join('sacco_loan_types', 'sacco_loans.loan_loan_type', '=', 'sacco_loan_types.loan_type_id')
+//         ->join('sacco_members', 'sacco_loans.loan_member', '=', 'sacco_members.member_id')
+//         ->select(
+//             'sacco_loans.loan_id',
+//             'sacco_members.member_name',
+//             'sacco_members.member_national_id',
+//             'sacco_loan_types.loan_type_name',
+//             'sacco_loans.loan_taken_period',
+//             'sacco_loans.loan_taken_start_period',
+//             'sacco_loans.loan_amount',
+//             'sacco_loans.loan_loan_paid',
+//             DB::raw('(sacco_loans.loan_amount - sacco_loans.loan_loan_paid) as OutstandingAmount')
+//         )
+//         ->whereRaw('(sacco_loans.loan_amount - sacco_loans.loan_loan_paid) > ?', [$IgnoreLoanBalanceBelow])
+//         ->orderBy('sacco_loans.loan_id', 'desc');
+
+//     if ($version === 'insider_lending') {
+//         $loansQuery->where('sacco_members.member_position', '=', 2);
+//     }
+
+//     if ($search) {
+//         $loansQuery->where(function ($query) use ($search) {
+//             $query->where('sacco_members.member_name', 'LIKE', '%' . $search . '%')
+//                 ->orWhere('sacco_members.member_national_id', 'LIKE', '%' . $search . '%')
+//                 ->orWhere('sacco_loan_types.loan_type_name', 'LIKE', '%' . $search . '%');
+//         });
+//     }
+
+//     $loans = $loansQuery->distinct()->offset($offset)->limit($limit)->get();
+
+//     // Get the latest payment information for the fetched loans using subquery
+//     $loanIds = $loans->pluck('loan_id')->toArray();
+//     $lastPayments = DB::table('sacco_loan_payments')
+//         ->select('loan_payments_loan_id', 'loan_payments_period as last_paid')
+//         ->whereIn('loan_payments_loan_id', $loanIds)
+//         ->whereRaw('loan_payments_id IN (SELECT MAX(loan_payments_id) FROM sacco_loan_payments GROUP BY loan_payments_loan_id)')
+//         ->get()
+//         ->keyBy('loan_payments_loan_id');
+
+//     // Attach the last payment information to the loans
+//     foreach ($loans as $loan) {
+//         $loan->last_paid = $lastPayments->get($loan->loan_id)->last_paid ?? null;
+//     }
+
+//     return $loans;
+// }
+
+// private function categorizeLoan($loan, $PeriodNow)
+// {
+//     // Get the current year and month
+//     $periodNowYear = intval(substr($PeriodNow, 0, 4));
+//     $periodNowMonth = intval(substr($PeriodNow, 4, 2));
+
+//     // Determine the correct loan start period
+//     if (preg_match('/^\d{6}$/', $loan->loan_taken_start_period)) {
+//         $startPeriod = $loan->loan_taken_period;
+//     } else {
+//         $startPeriod = $loan->loan_taken_period;
+//     }
+
+//     // Extract year and month from the start period
+//     $loanTakenYear = intval(substr($startPeriod, 0, 4));
+//     $loanTakenMonth = intval(substr($startPeriod, 4, 2));
+
+//     // If the loan was taken in the current period, categorize as "Current"
+//     if ($loanTakenYear == $periodNowYear && $loanTakenMonth == $periodNowMonth) {
+//         return 'Current';
+//     }
+
+//     // Calculate the period difference in months
+//     $periodDifference = ($periodNowYear - $loanTakenYear) * 12 + ($periodNowMonth - $loanTakenMonth);
+
+//     // Categorize the loan based on the period difference
+//     if ($periodDifference < 2) {
+//         return 'Current';
+//     } elseif ($periodDifference < 4) {
+//         return 'Watch';
+//     } elseif ($periodDifference < 6) {
+//         return 'Substandard';
+//     } elseif ($periodDifference < 12) {
+//         return 'Doubtful';
+//     } else {
+//         return 'Loss';
+//     }
+// }
 
 
-public function adminAccessRights(Request $request)
-    {
-        // Get all active members
-        $members = $this->user_rights_getActiveMembers();
 
-        // Get all modules
-        $modules = $this->user_rights_getModules();
 
-        // Get the selected member ID from the request, default to the first member if not provided
-        $selectedMemberId = $request->query('rights_user', $members->first()->member_id ?? null);
-
-        // Get details of the selected member
-        $selectedMember = $this->user_rights_getMemberById($selectedMemberId);
-
-        // Get the granted rights for the selected member
-        $grantedRights = $this->user_rights_getGrantedRights($selectedMemberId);
-
-        // Return the view with the relevant data
-        return view('admin.access-rights', compact('members', 'modules', 'selectedMemberId', 'selectedMember', 'grantedRights'));
-    }
-
-    /**
-     * Save the modified user access rights.
-     *
-     * @param Request $request
-     * @return \Illuminate\Http\RedirectResponse
-     */
-    public function user_rights_save(Request $request)
-    {
-        $totalModules = $request->input('TotalModules');
-        $rightsUserId = $request->input('rights_user');
-
-        // Iterate through each module and update or insert the rights
-        for ($i = 0; $i < $totalModules; $i++) {
-            $rightsAccess = $request->input("rights_accessX$i", 'N');
-            $rightsApp = $request->input("rights_appX$i");
-
-            $this->user_rights_updateOrCreate($rightsUserId, $rightsApp, $rightsAccess);
-        }
-
-        // Redirect back to the admin access rights page with the selected user ID
-        return redirect()->route('admin.access-rights', ['rights_user' => $rightsUserId])->with('success', 'User rights updated successfully');
-    }
-
-    /**
-     * Get all active members.
-     *
-     * @return \Illuminate\Support\Collection
-     */
-    private function user_rights_getActiveMembers()
+private function access_rights_get_members()
     {
         return DB::table('sacco_members')
+            ->select('member_id', 'member_name', 'member_phone_no')
             ->where('member_active', 'Y')
-            ->where('member_deleted', '<>', 'Y')
+            ->where('member_deleted', '!=', 'Y')
+            ->where('member_position', '2')
             ->orderBy('member_name')
             ->get();
     }
 
-    /**
-     * Get all modules.
-     *
-     * @return \Illuminate\Support\Collection
-     */
-    private function user_rights_getModules()
+    private function access_rights_get_modules($rightsUserId = null)
     {
-        return DB::table('sacco_modules')
-            ->where('module_deleted', '<>', 'Y')
-            ->orderBy('module_description')
+        $modules = DB::table('sacco_modules')
+            ->select('sacco_modules.module_id', 'sacco_modules.module_name', 'sacco_userrights.rights_access')
+            ->leftJoin('sacco_userrights', function($join) use ($rightsUserId) {
+                $join->on('sacco_modules.module_id', '=', 'sacco_userrights.rights_app')
+                     ->where('sacco_userrights.rights_user', '=', $rightsUserId);
+            })
+            ->where('sacco_modules.module_active', 'Y')
+            ->where('sacco_modules.module_deleted', '!=', 'Y')
+            ->orderBy('sacco_modules.module_name')
             ->get();
+
+        return $modules;
     }
 
-    /**
-     * Get the details of a member by their ID.
-     *
-     * @param int $memberId
-     * @return \Illuminate\Database\Eloquent\Model|\Illuminate\Database\Query\Builder|object|null
-     */
-    private function user_rights_getMemberById($memberId)
+    public function adminAccessRights(Request $request)
     {
-        return DB::table('sacco_members')
-            ->where('member_id', $memberId)
-            ->first();
+        $members = $this->access_rights_get_members();
+
+        $rightsUserId = $request->input('rights_user');
+        $modules = $this->access_rights_get_modules($rightsUserId);
+
+        return view('admin.access-rights', compact('members', 'modules', 'rightsUserId'));
     }
 
-    /**
-     * Get the granted rights for a member.
-     *
-     * @param int $memberId
-     * @return \Illuminate\Support\Collection
-     */
-    private function user_rights_getGrantedRights($memberId)
-    {
-        return DB::table('sacco_userrights')
-            ->where('rights_user', $memberId)
-            ->pluck('rights_access', 'rights_app');
+    
+    public function user_rights_save(Request $request)
+{
+    $moduleId = $request->input('module_id');
+    $rightsUserId = $request->input('rights_user');
+    $granted = $request->input('granted') == 'true';
+    $bulkUpdate = $request->input('bulk') == 'true';
+
+    if ($bulkUpdate) {
+        $moduleIds = DB::table('sacco_modules')
+            ->where('module_active', 'Y')
+            ->where('module_deleted', '!=', 'Y')
+            ->pluck('module_id');
+
+        if ($granted) {
+            foreach ($moduleIds as $id) {
+                DB::table('sacco_userrights')->updateOrInsert(
+                    ['rights_user' => $rightsUserId, 'rights_app' => $id],
+                    ['rights_access' => 'Y', 'rights_userid' => auth()->id(), 'rights_ip' => $request->ip()]
+                );
+            }
+        } else {
+            DB::table('sacco_userrights')
+                ->where('rights_user', $rightsUserId)
+                ->whereIn('rights_app', $moduleIds)
+                ->delete();
+        }
+
+        return response()->json(['success' => true]);
     }
 
-    /**
-     * Update or insert user rights.
-     *
-     * @param int $rightsUserId
-     * @param int $rightsApp
-     * @param string $rightsAccess
-     * @return void
-     */
-    private function user_rights_updateOrCreate($rightsUserId, $rightsApp, $rightsAccess)
-    {
+    if ($granted) {
+        // Add or update the record
         DB::table('sacco_userrights')->updateOrInsert(
-            ['rights_user' => $rightsUserId, 'rights_app' => $rightsApp],
-            ['rights_access' => $rightsAccess, 'rights_userid' => auth()->user()->id, 'rights_ip' => request()->ip()]
+            ['rights_user' => $rightsUserId, 'rights_app' => $moduleId],
+            ['rights_access' => 'Y', 'rights_userid' => auth()->id(), 'rights_ip' => $request->ip()]
         );
+    } else {
+        // Delete the record
+        DB::table('sacco_userrights')->where([
+            ['rights_user', '=', $rightsUserId],
+            ['rights_app', '=', $moduleId]
+        ])->delete();
+    }
+
+    return response()->json(['success' => true]);
+}
+
+public function user_rights_add_module(Request $request)
+    {
+        if ($request->isMethod('post')) {
+            $request->validate([
+                'module_name' => 'required|unique:sacco_modules,module_name',
+                'module_description' => 'required',
+            ]);
+
+            DB::table('sacco_modules')->insert([
+                'module_name' => $request->input('module_name'),
+                'module_description' => $request->input('module_description'),
+                'module_active' => 'Y',
+                'module_userid' => auth()->id(),
+                'module_ip' => $request->ip(),
+                'module_transdate' => now()
+            ]);
+
+            return redirect()->route('admin.access-rights.add.module')->with('success', 'Module added successfully.');
+        }
+
+        return view('admin.add-module');
     }
 
 
- 
+    protected function getOutstandingLoansQuery($ignoreLoanBalanceBelow)
+    {
+        return DB::table('sacco_loans')
+            ->join('sacco_members', 'sacco_loans.loan_member', '=', 'sacco_members.member_id')
+            ->join('sacco_loan_types', 'sacco_loans.loan_loan_type', '=', 'sacco_loan_types.loan_type_id')
+            ->leftJoin('sacco_loan_payments', function ($join) {
+                $join->on('sacco_loans.loan_id', '=', 'sacco_loan_payments.loan_payments_loan_id')
+                     ->whereRaw('sacco_loan_payments.loan_payments_period = (
+                         SELECT MAX(lp.loan_payments_period)
+                         FROM sacco_loan_payments lp
+                         WHERE lp.loan_payments_loan_id = sacco_loans.loan_id
+                     )');
+            })
+            ->select(
+                'sacco_loans.*',
+                'sacco_members.member_name',
+                'sacco_members.member_sacco_id',
+                'sacco_members.member_national_id',
+                'sacco_members.member_phone_no',
+                'sacco_members.member_position',
+                'sacco_loan_types.loan_type_name',
+                'sacco_loan_payments.loan_payments_period'
+            )
+            ->where('sacco_loans.loan_stoped', 'N')
+            ->where(DB::raw('sacco_loans.loan_amount - sacco_loans.loan_loan_paid'), '>', $ignoreLoanBalanceBelow)
+            ->orderBy('sacco_members.member_name');
+    }
+    
+    protected function applySearchFilter($query, $search)
+    {
+        return $query->where(function($q) use ($search) {
+            $q->where('sacco_members.member_name', 'like', "%{$search}%")
+                ->orWhere('sacco_members.member_phone_no', 'like', "%{$search}%")
+                ->orWhere('sacco_members.member_national_id', 'like', "%{$search}%");
+        });
+    }
+    
+    protected function getLoanCategory($loanPaymentsPeriod, $loanTakenPeriod, $currentPeriod)
+    {
+        // If no loan payment period is available, fall back to the loan taken period
+        $period = $loanPaymentsPeriod ?? $loanTakenPeriod;
+    
+        if (!$period) {
+            return 'Loss';
+        }
+    
+        $lastPeriodDate = \DateTime::createFromFormat('Ym', $period);
+        $currentDate = \DateTime::createFromFormat('Ym', $currentPeriod);
+    
+        $interval = $lastPeriodDate->diff($currentDate);
+        $months = $interval->y * 12 + $interval->m;
+    
+        if ($months <= 2) {
+            return 'Current';
+        } elseif ($months <= 4) {
+            return 'Watch';
+        } elseif ($months <= 6) {
+            return 'Substandard';
+        } elseif ($months <= 9) {
+            return 'Doubtful';
+        } else {
+            return 'Loss';
+        }
+    }
+    public function reportSasraLoanPerformance(Request $request, $version = null)
+    {
+        // Get the current period in YYYYmm format
+        $currentPeriod = date('Ym');
+        // Get the minimum loan balance to be considered outstanding
+        $ignoreLoanBalanceBelow = $this->IgnoreLoanBalanceBelow;
+    
+        // Get the query for outstanding loans
+        $query = $this->getOutstandingLoansQuery($ignoreLoanBalanceBelow);
+    
+        // Apply search filters if any
+        if ($request->has('search')) {
+            $search = $request->input('search');
+            $query = $this->applySearchFilter($query, $search);
+        }
+    
+        // Get the offset and limit for pagination
+        $offset = $request->input('offset', 0);
+        $limit = $request->input('limit', 10);
+    
+        // Get the loans
+        $loans = $query->offset($offset)->limit($limit)->get();
+    
+        // Add loan category for each loan
+        foreach ($loans as $loan) {
+            $loan->loan_category = $this->getLoanCategory($loan->loan_payments_period, $loan->loan_taken_period, $currentPeriod);
+            $loan->position = $loan->member_position == 2 ? 'Official' : 'Member';
+        }
+    
+        // Check if the request is AJAX
+        if ($request->ajax()) {
+            return response()->json($loans);
+        }
+    
+        // Return the initial view with the current period
+        return view('reports.sasra.loan_performance', [
+            'currentPeriod' => $currentPeriod,
+            'version' => $version
+        ]);
+    }
+        
+
+
+
+    
 }
 
   

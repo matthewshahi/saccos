@@ -2,7 +2,7 @@
 
 @section('content')
     <div class="breadcrumb d-flex justify-content-between align-items-center">
-        <h1>Modify Member Shares</h1>
+        <h1>Change Guarantors</h1>
         <div class="header-part-right">
             <ul>
                 @if(Auth::check())
@@ -21,16 +21,6 @@
         <div class="col-md-12 mb-4">
             <div class="card text-start">
                 <div class="card-body">
-                    @if(session('success'))
-                        <div class="alert alert-success">
-                            {{ session('success') }}
-                        </div>
-                    @endif
-                    @if(session('error'))
-                        <div class="alert alert-danger">
-                            {{ session('error') }}
-                        </div>
-                    @endif
                     @if ($errors->any())
                         <div class="alert alert-danger">
                             <ul>
@@ -40,58 +30,89 @@
                             </ul>
                         </div>
                     @endif
-                    <form action="{{ route('modify.member.shares') }}" method="POST" autocomplete="off">
+
+                    <h4 class="card-title mb-3">Guarantor and Loan Details</h4>
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Guarantor name</th>
+                                    <th scope="col">{{ $currentGuarantor->member_name }}, {{ $currentGuarantor->member_sacco_id }}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Amount Guaranteed</td>
+                                    <td>{{ number_format($currentGuarantor->loan_guar_amount_guaranteed, 2) }}</td>
+                                    <td>Tied shares</td>
+                                    <td>{{ number_format($currentGuarantor->loan_guar_amount_guaranteed - $currentGuarantor->loan_guar_amount_freed, 2) }}</td>
+                                </tr>
+                                <tr>
+                                    <td>Loan type</td>
+                                    <td>{{ $loan->loan_type_name }}</td>
+                                    <td>Loan no.</td>
+                                    <td>{{ $loan->loan_id }}</td>
+                                </tr>
+                                <tr>
+                                    <td>Loan taken by</td>
+                                    <td>{{ $loan->loan_taker_name }}</td>
+                                    <td>Loan amount taken</td>
+                                    <td>{{ number_format($loan->loan_amount, 2) }}</td>
+                                </tr>
+                                <tr>
+                                    <td>Period Taken</td>
+                                    <td>{{ $loan->loan_taken_period }}</td>
+                                    <td>Loan balance</td>
+                                    <td>{{ number_format($loan->loan_amount - $loan->loan_loan_paid, 2) }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <form action="{{ route('updateGuarantors', ['member_id' => $member_id, 'guarantor_id' => $guarantor_id]) }}" method="POST">
                         @csrf
+                        <h4 class="card-title mb-3 mt-5">New Guarantors</h4>
                         <div class="table-responsive">
-                            <table class="display table table-striped table-bordered" style="width: 100%">
+                            <table class="table table-hover">
                                 <thead>
                                     <tr>
-                                        <th>#</th>
-                                        <th>Member Name*</th>
-                                        <th>Account*</th>
-                                        <th>Action*</th>
-                                        <th>Amount*</th>
-                                        <th>Doc. No.</th>
-                                        <th>Description</th>
-                                        <th>Date*</th>
+                                        <th scope="col">#</th>
+                                        <th scope="col">Member</th>
+                                        <th scope="col">Amount</th>
+                                        <th scope="col">Free shares</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    @for($i = 0; $i < $modify_member_shares_journal_entries; $i++)
+                                    @for ($i = 1; $i <= $maximum_no_of_guarantors; $i++)
                                         <tr>
-                                            <td>{{ $i + 1 }}</td>
+                                            <th scope="row">{{ $i }}</th>
                                             <td>
-                                                <input type="text" name="member_name[]" class="form-control member-name" value="{{ old('member_name.' . $i) }}" onkeyup="showHintMembers(this.value, 'member_name{{ $i }}', 'suggestions-box-member{{ $i }}')" autocomplete="off">
+                                                <input class="form-control member-search" type="text" id="member{{ $i }}" name="guarantors_guarantor_name{{ $i }}" placeholder="Member" onkeyup="showHintMembers(this.value, 'member{{ $i }}', 'suggestions-box-member{{ $i }}')" autocomplete="off">
                                                 <div id="suggestions-box-member{{ $i }}" class="suggestions-box"></div>
                                             </td>
                                             <td>
-                                                <input type="text" name="sub_account_name[]" class="form-control account-name" value="{{ old('sub_account_name.' . $i) }}" onkeyup="showHintAccounts(this.value, 'sub_account_name{{ $i }}', 'suggestions-box-account{{ $i }}')" autocomplete="off">
-                                                <div id="suggestions-box-account{{ $i }}" class="suggestions-box"></div>
+                                                <input class="form-control" type="text" name="guarantors_amount_guaranteed{{ $i }}" placeholder="Amount">
                                             </td>
                                             <td>
-                                                <select name="share_action[]" class="form-control" required>
-                                                    <option value="1">Increase shares</option>
-                                                    <option value="-1">Reduce shares</option>
-                                                </select>
-                                            </td>
-                                            <td>
-                                                <input type="text" name="amount[]" class="form-control" value="{{ old('amount.' . $i) }}" required>
-                                            </td>
-                                            <td>
-                                                <input type="text" name="share_doc_no[]" class="form-control" value="{{ old('share_doc_no.' . $i) }}">
-                                            </td>
-                                            <td>
-                                                <input type="text" name="share_description[]" class="form-control" value="{{ old('share_description.' . $i) }}">
-                                            </td>
-                                            <td>
-                                                <input type="date" name="share_date_paid[]" class="form-control" value="{{ old('share_date_paid.' . $i, date('Y-m-d')) }}">
+                                                <input class="form-control" type="text" name="free_shares{{ $i }}" value="hidden" disabled>
                                             </td>
                                         </tr>
                                     @endfor
                                 </tbody>
                             </table>
                         </div>
-                        <button type="submit" class="btn btn-primary">Submit</button>
+
+                        <input type="hidden" name="loan_id" value="{{ $loan->loan_id }}">
+                        <input type="hidden" name="loan_member" value="{{ $loan->loan_member }}">
+                        <input type="hidden" name="loan_guar_id" value="{{ $currentGuarantor->loan_guar_id }}">
+                        <input type="hidden" name="loan_guar_loan_id" value="{{ $currentGuarantor->loan_guar_loan_id }}">
+                        <input type="hidden" name="loan_guar_guarantor_id" value="{{ $currentGuarantor->loan_guar_guarantor_id }}">
+                        <input type="hidden" name="submittedRows" value="{{ $maximum_no_of_guarantors }}">
+                        <input type="hidden" name="batch_tied_shares_to_pay" value="{{ $currentGuarantor->loan_guar_amount_guaranteed - $currentGuarantor->loan_guar_amount_freed }}">
+
+                        <div class="col-md-2 mt-3 mt-md-0">
+                            <button class="btn btn-primary w-100">Submit</button>
+                        </div>
                     </form>
                 </div>
             </div>
@@ -140,47 +161,17 @@
                     let response = JSON.parse(xmlhttp.responseText);
                     let suggestions = '';
                     response.forEach(member => {
-                        suggestions += `<div class="suggestion-item" onclick="selectMember('${member.value}', '${inputName}', '${suggestionsBox}')">${member.label}</div>`;
+                        suggestions += `<div class="suggestion-item" onclick="selectMember('${member.name} (${member.sacco_id})', '${inputName}', '${suggestionsBox}')">${member.name} (${member.sacco_id})</div>`;
                     });
                     document.getElementById(suggestionsBox).innerHTML = suggestions;
                 }
             };
-            xmlhttp.open("GET", "/search/members?query=" + str, true);
-            xmlhttp.send();
-        }
-
-        function showHintAccounts(str, inputName, suggestionsBox) {
-            if (str.length == 0) {
-                document.getElementById(suggestionsBox).innerHTML = "";
-                return;
-            }
-            let xmlhttp;
-            if (window.XMLHttpRequest) {
-                xmlhttp = new XMLHttpRequest();
-            } else {
-                xmlhttp = new ActiveXObject("Microsoft.XMLHTTP");
-            }
-            xmlhttp.onreadystatechange = function () {
-                if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
-                    let response = JSON.parse(xmlhttp.responseText);
-                    let suggestions = '';
-                    response.forEach(account => {
-                        suggestions += `<div class="suggestion-item" onclick="selectAccount('${account.value}', '${inputName}', '${suggestionsBox}')">${account.label}</div>`;
-                    });
-                    document.getElementById(suggestionsBox).innerHTML = suggestions;
-                }
-            };
-            xmlhttp.open("GET", "/search/accounts?query=" + str, true);
+            xmlhttp.open("GET", "{{ route('ajaxGetMembers') }}?q=" + str, true);
             xmlhttp.send();
         }
 
         function selectMember(value, inputName, suggestionsBox) {
-            document.querySelector(`input[name='${inputName}']`).value = value;
-            document.getElementById(suggestionsBox).innerHTML = ''; // Clear suggestions
-        }
-
-        function selectAccount(value, inputName, suggestionsBox) {
-            document.querySelector(`input[name='${inputName}']`).value = value;
+            document.getElementById(inputName).value = value;
             document.getElementById(suggestionsBox).innerHTML = ''; // Clear suggestions
         }
     </script>
