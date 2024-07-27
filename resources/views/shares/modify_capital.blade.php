@@ -156,7 +156,8 @@
                     document.getElementById(suggestionsBox).innerHTML = suggestions;
                 }
             };
-            xmlhttp.open("GET", "/search/members?query=" + str, true);
+            // xmlhttp.open("GET", "/search/members?query=" + str, true);
+            xmlhttp.open("GET", "{{ url('/search/members') }}?query=" + str, true);
             xmlhttp.send();
         }
 
@@ -181,7 +182,9 @@
                     document.getElementById(suggestionsBox).innerHTML = suggestions;
                 }
             };
-            xmlhttp.open("GET", "/search/accounts?query=" + str, true);
+            // xmlhttp.open("GET", "/search/accounts?query=" + str, true);
+            xmlhttp.open("GET", "{{ url('/search/accounts') }}?query=" + str, true);
+            
             xmlhttp.send();
         }
 
