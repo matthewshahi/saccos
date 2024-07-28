@@ -2,7 +2,7 @@
 
 @section('content')
 <div class="breadcrumb d-flex justify-content-between align-items-center">
-    <h1>Member Status Report</h1>
+    <h1>Consolidated - Shares, Capital, Fosa, Loans Reports</h1>
 </div>
 <div class="separator-breadcrumb border-top"></div>
 
@@ -42,9 +42,7 @@
         </div>
     </div>
 </div>
-@endsection
 
-@section('styles')
 <style>
     .loading-status {
         position: fixed;
@@ -71,9 +69,7 @@
         z-index: 1;
     }
 </style>
-@endsection
 
-@section('scripts')
 <!-- Include jQuery library -->
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/FileSaver.min.js"></script>
@@ -185,4 +181,6 @@
         });
     });
 </script>
+
+
 @endsection

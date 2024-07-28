@@ -40,14 +40,24 @@
                                 @php
                                     $netDebit = $account->sub_account_debit - $account->sub_account_credit;
                                     $netCredit = $account->sub_account_credit - $account->sub_account_debit;
+
+                                    if ($netDebit < 0) {
+                                        $netCredit = abs($netDebit);
+                                        $netDebit = 0;
+                                    }
+
+                                    if ($netCredit < 0) {
+                                        $netDebit = abs($netCredit);
+                                        $netCredit = 0;
+                                    }
                                 @endphp
-                            <tr>
-                                <td>{{ $account->main_account_code . '/' . $account->sub_account_code }}</td>
-                                <td>{{ $account->main_account_name }}</td>
-                                <td>{{ $account->sub_account_name }}</td>
-                                <td style="text-align: right;">{{ $netDebit > 0 ? number_format($netDebit, 2) : '0.00' }}</td>
-                                <td style="text-align: right;">{{ $netCredit > 0 ? number_format($netCredit, 2) : '0.00' }}</td>
-                            </tr>
+                                <tr>
+                                    <td>{{ $account->main_account_code . '/' . $account->sub_account_code }}</td>
+                                    <td>{{ $account->main_account_name }}</td>
+                                    <td>{{ $account->sub_account_name }}</td>
+                                    <td style="text-align: right;">{{ $netDebit > 0 ? number_format($netDebit, 2) : '0.00' }}</td>
+                                    <td style="text-align: right;">{{ $netCredit > 0 ? number_format($netCredit, 2) : '0.00' }}</td>
+                                </tr>
                             @endforeach
                         </tbody>
                         <tfoot>

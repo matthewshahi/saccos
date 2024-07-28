@@ -81,7 +81,7 @@ class HomeController extends Controller
     {
         $activeMembersCount = $this->dashboard_getActiveMembersCount();
         $newMembersCount = $this->dashboard_getNewMembersCount();
-        $pendingAppsCount = $this->dashboard_getPendingAppsCount();
+        // $pendingAppsCount = $this->dashboard_getPendingAppsCount();
         $savingsDepositsTotal = $this->dashboard_getSavingsDepositsTotal();
         $loansIssuedTotal = $this->dashboard_getLoansIssuedTotal();
         $repaymentsTotal = $this->dashboard_getRepaymentsTotal();
@@ -92,6 +92,7 @@ class HomeController extends Controller
         $savingsPerMonth = $this->dashboard_getSavingsPerMonth();
         $latestMembers = $this->dashboard_getLatestMembers();
         $saccoOfficials = $this->dashboard_getSaccoOfficials();
+        $pendingAppsCount = $this->dashboard_showProfitabilityThisMonth();
     
         $currentPeriod = $this->currentPeriod;
     
@@ -335,6 +336,34 @@ private function dashboard_getLoansAndRepayments()
 
     return ['loans' => $loans, 'repayments' => $repayments];
 }
+
+
+private function dashboard_showProfitabilityThisMonth()
+{
+    $currentPeriod = date('Ym');
+
+    // Fetch total income for the current period
+    $totalIncome = DB::table('sacco_accounts_trans')
+        ->join('sacco_sub_account', 'sacco_accounts_trans.accounts_trans_sub_account', '=', 'sacco_sub_account.sub_account_id')
+        ->join('sacco_main_account', 'sacco_sub_account.sub_account_main_account', '=', 'sacco_main_account.main_account_id')
+        ->where('sacco_accounts_trans.accounts_trans_period', $currentPeriod)
+        ->where('sacco_main_account.main_account_type', 'income')
+        ->sum(DB::raw('sacco_accounts_trans.accounts_trans_credit - sacco_accounts_trans.accounts_trans_debit'));
+
+    // Fetch total expenses for the current period
+    $totalExpenses = DB::table('sacco_accounts_trans')
+        ->join('sacco_sub_account', 'sacco_accounts_trans.accounts_trans_sub_account', '=', 'sacco_sub_account.sub_account_id')
+        ->join('sacco_main_account', 'sacco_sub_account.sub_account_main_account', '=', 'sacco_main_account.main_account_id')
+        ->where('sacco_accounts_trans.accounts_trans_period', $currentPeriod)
+        ->where('sacco_main_account.main_account_type', 'expense')
+        ->sum(DB::raw('sacco_accounts_trans.accounts_trans_debit - sacco_accounts_trans.accounts_trans_credit'));
+
+    // Calculate profitability
+    $profitability = $totalIncome - $totalExpenses;
+
+    return $profitability;
+}
+
 
      
 
@@ -3121,6 +3150,7 @@ private function insertCapitalShareRecord($memberId, $amount, $paidBy, $period, 
     ]);
 }
 
+//eports.members.status
 private function updateMemberTotalShares($memberId, $amount)
 {
     DB::table('sacco_members')->where('member_id', $memberId)->increment('member_total_share', $amount);
@@ -5698,42 +5728,234 @@ private function closeTemporaryAccounts($appropriationAccountId, $period, $netPr
             'End of Year Processing'
         );
     }
+
+    
 }
+
+
 
 public function reportsAccountsAllTime(Request $request)
 {
-    $routeName = $request->route()->getName();
-    $data = $this->reportsAccountsAllTime_fetchAccountData();
+    $routeName = \Route::currentRouteName();
+    $title = '';
 
     switch ($routeName) {
         case 'reports.accounts.AllTimeAccountsFullTrialBalance':
             $title = 'All Time Trial Balance';
+            $data = $this->reportsAccountsAllTime_fetchData(['ASSET - FIXED', 'ASSETS - CURRENT', 'CAPITAL', 'EXPENSE', 'EXPENSES', 'INCOME', 'INCOME - CURRENT', 'LIABILITIES - SHORT']);
             return view('reports.accounts.all_time_trial_balance', compact('data', 'title'));
-
         case 'reports.accounts.AllTimeAccountsFullProftAndLoss':
             $title = 'All Time Profit and Loss';
+            $data = $this->reportsAccountsAllTime_fetchData(['EXPENSE', 'EXPENSES', 'INCOME', 'INCOME - CURRENT']);
             return view('reports.accounts.all_time_profit_and_loss', compact('data', 'title'));
-
         case 'reports.accounts.AllTimeAccountsFullBalanceSheet':
             $title = 'All Time Balance Sheet';
+            $data = $this->reportsAccountsAllTime_fetchData(['ASSET - FIXED', 'ASSETS - CURRENT', 'CAPITAL', 'LIABILITY', 'LIABILITIES - SHORT']);
             return view('reports.accounts.all_time_balance_sheet', compact('data', 'title'));
-
         default:
             abort(404);
     }
 }
 
-private function reportsAccountsAllTime_fetchAccountData()
+private function reportsAccountsAllTime_fetchData(array $accountTypes)
 {
-    $data = DB::table('sacco_main_account')
-        ->join('sacco_sub_account', 'sacco_main_account.main_account_id', '=', 'sacco_sub_account.sub_account_main_account')
-        ->select('sacco_main_account.*', 'sacco_sub_account.*')
+    return DB::table('sacco_sub_account')
+        ->join('sacco_main_account', 'sacco_sub_account.sub_account_main_account', '=', 'sacco_main_account.main_account_id')
+        ->whereIn('sacco_main_account.main_account_type', $accountTypes)
+        ->select(
+            'sacco_sub_account.sub_account_id',
+            'sacco_sub_account.sub_account_name',
+            'sacco_sub_account.sub_account_code',
+            'sacco_sub_account.sub_account_debit',
+            'sacco_sub_account.sub_account_credit',
+            'sacco_main_account.main_account_name',
+            'sacco_main_account.main_account_code',
+            'sacco_main_account.main_account_type'
+        )
         ->orderBy('sacco_main_account.main_account_name')
         ->orderBy('sacco_sub_account.sub_account_name')
         ->get();
-
-    return $data;
 }
+
+
+
+
+
+ 
+
+public function reportsLoansIssued(Request $request)
+{
+    return view('reports.loans.issued');
+}
+
+public function getLoansIssued(Request $request)
+{
+    $offset = $request->input('offset', 0);
+    $limit = $request->input('limit', 30);
+    $search = $request->input('search', '');
+
+    $query = DB::table('sacco_loans')
+        ->join('sacco_members', 'sacco_loans.loan_member', '=', 'sacco_members.member_id')
+        ->join('sacco_department', 'sacco_members.member_dept', '=', 'sacco_department.department_id')
+        ->join('sacco_company', 'sacco_department.department_company_id', '=', 'sacco_company.company_id')
+        ->join('sacco_loan_types', 'sacco_loans.loan_loan_type', '=', 'sacco_loan_types.loan_type_id')
+        ->select(
+            'sacco_loans.loan_id',
+            'sacco_loans.loan_amount',
+            'sacco_loans.loan_loan_paid',
+            'sacco_loans.loan_on as loan_issued_date',
+            'sacco_loans.loan_stoped as loan_status',
+            'sacco_members.member_name',
+            'sacco_members.member_phone_no',
+            'sacco_members.member_national_id',
+            'sacco_members.member_kra_pin',
+            'sacco_loan_types.loan_type_name',
+            'sacco_company.company_name',
+            'sacco_loans.loan_taken_period'
+        );
+
+    if (!empty($search)) {
+        $query->where(function ($q) use ($search) {
+            $q->where('sacco_members.member_name', 'like', "%$search%")
+                ->orWhere('sacco_members.member_phone_no', 'like', "%$search%")
+                ->orWhere('sacco_members.member_national_id', 'like', "%$search%")
+                ->orWhere('sacco_loan_types.loan_type_name', 'like', "%$search%")
+                ->orWhere('sacco_company.company_name', 'like', "%$search%");
+        });
+    }
+
+    $issuedLoans = $query->orderBy('sacco_loans.loan_taken_period', 'desc')
+        ->orderBy('sacco_loans.loan_id', 'desc')
+        ->offset($offset)
+        ->limit($limit)
+        ->get();
+
+    return response()->json(['data' => $issuedLoans]);
+}
+
+public function downloadLoansIssuedReport(Request $request)
+{
+    $search = $request->input('search', '');
+
+    $query = DB::table('sacco_loans')
+        ->join('sacco_members', 'sacco_loans.loan_member', '=', 'sacco_members.member_id')
+        ->join('sacco_department', 'sacco_members.member_dept', '=', 'sacco_department.department_id')
+        ->join('sacco_company', 'sacco_department.department_company_id', '=', 'sacco_company.company_id')
+        ->join('sacco_loan_types', 'sacco_loans.loan_loan_type', '=', 'sacco_loan_types.loan_type_id')
+        ->select(
+            'sacco_loans.loan_id',
+            'sacco_loans.loan_amount',
+            'sacco_loans.loan_loan_paid',
+            'sacco_loans.loan_on as loan_issued_date',
+            'sacco_loans.loan_stoped as loan_status',
+            'sacco_members.member_name',
+            'sacco_members.member_phone_no',
+            'sacco_members.member_national_id',
+            'sacco_members.member_kra_pin',
+            'sacco_loan_types.loan_type_name',
+            'sacco_company.company_name',
+            'sacco_loans.loan_taken_period'
+        );
+
+    if (!empty($search)) {
+        $query->where(function ($q) use ($search) {
+            $q->where('sacco_members.member_name', 'like', "%$search%")
+                ->orWhere('sacco_members.member_phone_no', 'like', "%$search%")
+                ->orWhere('sacco_members.member_national_id', 'like', "%$search%")
+                ->orWhere('sacco_loan_types.loan_type_name', 'like', "%$search%")
+                ->orWhere('sacco_company.company_name', 'like', "%$search%");
+        });
+    }
+
+    $issuedLoans = $query->get();
+
+    $filename = 'issued_loans_report_' . date('Ymd') . '.csv';
+    $handle = fopen($filename, 'w+');
+    fputcsv($handle, [
+        'Loan ID', 'Member Name', 'Phone Number', 'National ID', 'KRA PIN', 'Company', 'Loan Type', 'Loan Amount', 'Loan Paid', 'Loan Balance', 'Loan Taken Period', 'Issued Date', 'Status'
+    ]);
+
+    foreach ($issuedLoans as $loan) {
+        $loanBalance = $loan->loan_amount - $loan->loan_loan_paid;
+        fputcsv($handle, [
+            $loan->loan_id,
+            $loan->member_name,
+            $loan->member_phone_no,
+            $loan->member_national_id,
+            $loan->member_kra_pin,
+            $loan->company_name,
+            $loan->loan_type_name,
+            number_format($loan->loan_amount, 2),
+            number_format($loan->loan_loan_paid, 2),
+            number_format($loanBalance, 2),
+            $loan->loan_taken_period,
+            \Carbon\Carbon::parse($loan->loan_issued_date)->format('d-m-Y'),
+            $loan->loan_status == 'N' ? 'Active' : 'Stopped'
+        ]);
+    }
+
+    fclose($handle);
+
+    return response()->download($filename)->deleteFileAfterSend(true);
+}
+
+
+ 
+
+ 
+public function reportsLoansRepayments(Request $request)
+{
+    $startPeriod = $request->input('startPeriod', date('Ym', strtotime('-3 months')));
+    $endPeriod = $request->input('endPeriod', date('Ym'));
+    $searchName = $request->input('searchName', '');
+    $searchCompany = $request->input('searchCompany', '');
+    $searchLoanType = $request->input('searchLoanType', '');
+
+    $query = DB::table('sacco_loan_payments')
+        ->join('sacco_loans', 'sacco_loan_payments.loan_payments_loan_id', '=', 'sacco_loans.loan_id')
+        ->join('sacco_members', 'sacco_loans.loan_member', '=', 'sacco_members.member_id')
+        ->join('sacco_department', 'sacco_members.member_dept', '=', 'sacco_department.department_id')
+        ->join('sacco_company', 'sacco_department.department_company_id', '=', 'sacco_company.company_id')
+        ->join('sacco_loan_types', 'sacco_loans.loan_loan_type', '=', 'sacco_loan_types.loan_type_id')
+        ->select(
+            'sacco_loan_payments.loan_payments_id',
+            'sacco_members.member_name',
+            'sacco_members.member_phone_no',
+            'sacco_members.member_sacco_id',
+            'sacco_loan_types.loan_type_name',
+            'sacco_loans.loan_amount',
+            'sacco_loans.loan_loan_paid',
+            'sacco_loan_payments.loan_payments_amount',
+            'sacco_loan_payments.loan_payments_period',
+            'sacco_loan_payments.loan_payments_paid_on',
+            'sacco_loan_payments.loan_payments_docno'
+        );
+
+    // Apply search filters if any
+    if (!empty($searchName) || !empty($searchCompany) || !empty($searchLoanType)) {
+        if (!empty($searchName)) {
+            $query->where('sacco_members.member_name', 'like', '%' . $searchName . '%');
+        }
+        if (!empty($searchCompany)) {
+            $query->where('sacco_company.company_name', 'like', '%' . $searchCompany . '%');
+        }
+        if (!empty($searchLoanType)) {
+            $query->where('sacco_loan_types.loan_type_name', 'like', '%' . $searchLoanType . '%');
+        }
+    } else {
+        // Default to the last 3 months if no search filters are applied
+        $query->whereBetween('sacco_loan_payments.loan_payments_period', [$startPeriod, $endPeriod]);
+    }
+
+    $loanRepayments = $query->orderBy('sacco_loan_payments.loan_payments_period', 'desc')
+        ->orderBy('sacco_loan_payments.loan_payments_id', 'desc')
+        ->get();
+
+    return view('reports.loans.repayments', compact('startPeriod', 'endPeriod', 'searchName', 'searchCompany', 'searchLoanType', 'loanRepayments'));
+}
+
+
+
 
 
 }

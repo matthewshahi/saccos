@@ -18,6 +18,137 @@
     <div class="separator-breadcrumb border-top"></div>
 
     <div class="row mb-4">
+    <div class="col-md-3 col-sm-6 mb-4">
+        <a href="{{ url('members/active/y') }}" class="card-link">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h6 class="card-title">Active Members</h6>
+                    <div class="d-flex justify-content-center align-items-center">
+                        <i class="i-Business-Man text-primary" style="font-size: 2rem; margin-right: 0.5rem;"></i>
+                        <p class="card-text mb-0" id="activeMembersCount" style="font-size: 1.5rem;">{{ number_format($activeMembersCount) }}</p>
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-3 col-sm-6 mb-4">
+    <a href="{{ url('members/active/y') }}" class="card-link">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h6 class="card-title">New Members ({{ $currentPeriod->period_name }})</h6>
+                    <div class="d-flex justify-content-center align-items-center">
+                        <i class="i-Add-User text-success" style="font-size: 2rem; margin-right: 0.5rem;"></i>
+                        <p class="card-text mb-0" id="newMembersCount" style="font-size: 1.5rem;">{{ number_format($newMembersCount) }}</p>
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-3 col-sm-6 mb-4">
+        <a href="{{ url('/reports/accounts/profit-loss') }}" class="card-link">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h6 class="card-title">Protability ({{date('Ym')}})</h6>
+                    <div class="d-flex justify-content-center align-items-center">
+                        <i class="i-Waiter text-warning" style="font-size: 2rem; margin-right: 0.5rem;"></i>
+                        <p class="card-text mb-0" id="pendingAppsCount" style="font-size: 1.5rem;">{{ number_format($pendingAppsCount) }}</p>
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-3 col-sm-6 mb-4">
+        <a href="{{ url('/reports/members/status') }}" class="card-link">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h6 class="card-title">All Time Deposits</h6>
+                    <div class="d-flex justify-content-center align-items-center">
+                        <i class="i-Safe-Box text-info" style="font-size: 2rem; margin-right: 0.5rem;"></i>
+                        <p class="card-text mb-0" id="savingsDepositsTotal" style="font-size: 1.5rem;">KES {{ number_format($savingsDepositsTotal, 2) }}</p>
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-3 col-sm-6 mb-4">
+        <a href="{{ url('/reports/loans/issued') }}" class="card-link">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h6 class="card-title">All Time Loans</h6>
+                    <div class="d-flex justify-content-center align-items-center">
+                        <i class="i-Money-2 text-primary" style="font-size: 2rem; margin-right: 0.5rem;"></i>
+                        <p class="card-text mb-0" id="loansIssuedTotal" style="font-size: 1.5rem;">KES {{ number_format($loansIssuedTotal, 2) }}</p>
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-3 col-sm-6 mb-4">
+        <a href="{{ url('/reports/loans/repayments') }}" class="card-link">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h6 class="card-title">Repayments ({{ $currentPeriod->period_name }})</h6>
+                    <div class="d-flex justify-content-center align-items-center">
+                        <i class="i-Money-Bag text-success" style="font-size: 2rem; margin-right: 0.5rem;"></i>
+                        <p class="card-text mb-0" id="repaymentsTotal" style="font-size: 1.5rem;">KES {{ number_format($repaymentsTotal, 2) }}</p>
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-3 col-sm-6 mb-4">
+        <a href="{{ route('dashboard') }}" class="card-link">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h6 class="card-title">Active Loans</h6>
+                    <div class="d-flex justify-content-center align-items-center">
+                        <i class="i-Checked-User text-primary" style="font-size: 2rem; margin-right: 0.5rem;"></i>
+                        <p class="card-text mb-0" id="activeLoansCount" style="font-size: 1.5rem;">{{ number_format($activeLoansCount) }}</p>
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-3 col-sm-6 mb-4">
+        <a href="{{ route('dashboard') }}" class="card-link">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h6 class="card-title">Delinquent Loans</h6>
+                    <div class="d-flex justify-content-center align-items-center">
+                        <i class="i-Danger text-danger" style="font-size: 2rem; margin-right: 0.5rem;"></i>
+                        <p class="card-text mb-0" id="delinquentLoansCount" style="font-size: 1.5rem;">{{ number_format($delinquentLoansCount) }}</p>
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
+<script>
+    $(document).ready(function() {
+        function formatNumber(num) {
+            if (num >= 1000000) {
+                return (num / 1000000).toFixed(1) + 'M';
+            } else if (num >= 1000) {
+                return (num / 1000).toFixed(1) + 'K';
+            }
+            return num;
+        }
+
+        $('#activeMembersCount').text(formatNumber({{ $activeMembersCount }}));
+        $('#newMembersCount').text(formatNumber({{ $newMembersCount }}));
+        $('#pendingAppsCount').text(formatNumber({{ $pendingAppsCount }}));
+        $('#savingsDepositsTotal').text('KES ' + formatNumber({{ $savingsDepositsTotal }}));
+        $('#loansIssuedTotal').text('KES ' + formatNumber({{ $loansIssuedTotal }}));
+        $('#repaymentsTotal').text('KES ' + formatNumber({{ $repaymentsTotal }}));
+        $('#activeLoansCount').text(formatNumber({{ $activeLoansCount }}));
+        $('#delinquentLoansCount').text(formatNumber({{ $delinquentLoansCount }}));
+    });
+</script>
+
+
+    <!-- <div class="row mb-4">
         <div class="col-md-3 col-sm-6 mb-4">
             <a href="{{ route('dashboard') }}" class="card-link">
                 <div class="card">
@@ -122,7 +253,7 @@
                 </div>
             </a>
         </div>
-    </div>
+    </div> -->
 
     <div class="row mb-4">
         <div class="col-lg-8 col-md-12">

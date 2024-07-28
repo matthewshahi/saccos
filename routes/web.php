@@ -244,6 +244,19 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
     // Reports
        
     Route::get('/reports/members/status', [HomeController::class, 'reportsMembersStatus'])->name('reports.members.status');
+    Route::get('/reports/loans/issued', [HomeController::class, 'reportsLoansIssued'])->name('reports.loans.issued')->middleware('check_user_rights:rpt_loans_issued');
+    Route::get('/reports/loans/issued/data', [HomeController::class, 'getLoansIssued'])->name('reports.loans.issued.data')->middleware('check_user_rights:rpt_loans_issued');
+    Route::get('/reports/loans/issued/download', [HomeController::class, 'downloadLoansIssuedReport'])->name('reports.loans.issued.download')->middleware('check_user_rights:rpt_loans_issued');
+
+    // Route::get('/reports/loans/repayments', [HomeController::class, 'reportsLoansRepayments'])->name('reports.loans.repayments')->middleware('check_user_rights:rpt_loans_repayments')->middleware('check_user_rights:rpt_loans_issued');
+    // Route::get('/reports/loans/repayments/data', [HomeController::class, 'getLoansRepayments'])->name('reports.loans.repayments.data')->middleware('check_user_rights:rpt_loans_issued');
+    Route::get('/reports/loans/repayments', [HomeController::class, 'reportsLoansRepayments'])->name('reports.loans.repayments')->middleware('check_user_rights:rpt_loans_repayments');
+    Route::get('/reports/loans/repayments/data', [HomeController::class, 'getLoansRepayments'])->name('reports.loans.repayments.data')->middleware('check_user_rights:rpt_loans_issued');
+    Route::get('/reports/loans/repayments/download', [HomeController::class, 'downloadLoansRepaymentsReport'])->name('reports.loans.repayments.download')->middleware('check_user_rights:rpt_loans_issued');
+    
+
+
+
     Route::get('/reports/members/status/data', [HomeController::class, 'reportsMembersStatusData'])->name('reports.members.status.data');
     Route::get('/reports/members/status/download', [HomeController::class, 'downloadMembersStatus'])->name('reports.members.status.download');
 
@@ -254,7 +267,10 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
     Route::get('/reports/loans/balances', [HomeController::class, 'reportsLoansBalances'])->name('reports.loans.balances');
     Route::get('/reports/shares/period', [HomeController::class, 'reportsSharesPeriod'])->name('reports.shares.period');
 
-    Route::get('/reports/loans/issued', [HomeController::class, 'reportsLoansIssued'])->name('reports.loans.issued');
+    Route::get('/reports/loans/issued', [HomeController::class, 'reportsLoansIssued'])->name('reports.loans.issued')->middleware('check_user_rights:rpt_loans_issued');
+    Route::get('/reports/loans/issued/data', [HomeController::class, 'getLoansIssued'])->name('reports.loans.issued.data')->middleware('check_user_rights:rpt_loans_issued');
+
+
     Route::get('/reports/loans/member', [HomeController::class, 'reportsLoansMember'])->name('reports.loans.member');
     Route::get('/reports/guarantors', [HomeController::class, 'reportsGuarantors'])->name('reports.guarantors');
     Route::get('/reports/contributions', [HomeController::class, 'reportsContributions'])->name('reports.contributions');
