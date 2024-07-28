@@ -31,12 +31,17 @@
                     <li class="Ul_li--hover">
                         <a class="has-arrow" href="#">
                             <i class="i-File-Clipboard-File--Text text-20 me-2 text-muted"></i>
-                            <span class="item-name text-15 text-muted">Loan Application</span>
+                            <span class="item-name text-15 text-muted">Loans</span>
                         </a>
                         <ul class="mm-collapse">
                             <li class="item-name">
                                 <a href="{{ url('/loans/apply') }}">
                                     <span class="text-muted">Apply for Loan</span>
+                                </a>
+                            </li>
+                            <li class="item-name">
+                                <a href="{{ url('/loans/types/list') }}">
+                                    <span class="text-muted">Loan Types</span>
                                 </a>
                             </li>
                         </ul>

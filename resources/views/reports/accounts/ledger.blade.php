@@ -79,6 +79,9 @@
                             </div>
                         </fieldset>
                     </form>
+                    <button id="downloadExcel" class="btn btn-success mb-3">
+                        <i class="i-Download"></i> Download Excel
+                    </button>
                     <div class="table-responsive mt-4">
                         <table class="display table table-striped table-bordered" id="ledger_table" style="width: 100%">
                             <thead>
@@ -122,9 +125,7 @@
             </div>
         </div>
     </div>
-@endsection
 
-@section('styles')
     <style>
         .custom-search-form {
             margin-bottom: 20px;
@@ -136,6 +137,12 @@
             border-radius: 0.25rem;
         }
     </style>
-@endsection
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.16.9/xlsx.full.min.js"></script>
 
- 
+    <script>
+        document.getElementById('downloadExcel').addEventListener('click', function() {
+            var wb = XLSX.utils.table_to_book(document.getElementById('ledger_table'), { sheet: "Ledger Transactions" });
+            XLSX.writeFile(wb, 'ledger_transactions.xlsx');
+        });
+    </script>
+@endsection

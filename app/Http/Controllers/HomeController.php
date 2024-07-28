@@ -4596,9 +4596,1146 @@ public function user_rights_add_module(Request $request)
     }
         
 
+    public function adminDefaults()
+    {
+        // Fetch all defaults from the sacco_defaults table
+        $defaults = DB::table('sacco_defaults')->get();
+    
+        // Pass the defaults to the view
+        return view('admin.defaults', compact('defaults'));
+    }
+
+
+    public function updateDefaults(Request $request)
+{
+    $defaults = $request->input('defaults');
+
+    foreach ($defaults as $id => $value) {
+        DB::table('sacco_defaults')
+            ->where('default_id', $id)
+            ->update(['default_value' => $value]);
+    }
+
+    return redirect()->route('admin.defaults')->with('success', 'Default values updated successfully.');
+}
+public function storeDefault(Request $request)
+{
+    $request->validate([
+        'default_name' => 'required|string|max:250',
+        'default_value' => 'required|string|max:250',
+    ]);
+
+    DB::table('sacco_defaults')->insert([
+        'default_name' => $request->input('default_name'),
+        'default_value' => $request->input('default_value'),
+        'default_transdate' => now(),
+        'default_userid' => auth()->id(),
+        'default_ip' => $request->ip(),
+    ]);
+
+    return redirect()->route('admin.defaults')->with('success', 'New default added successfully.');
+}
+
+
+
+
+
+public function loansTypes()
+    {
+        // Fetch loan types that are not deleted
+        $loanTypes = DB::table('sacco_loan_types')
+            ->where('loan_type_deleted', '<>', 'Y')
+            ->orderBy('loan_type_name')
+            ->get();
+
+        // Fetch sub-account details ordered by name
+        $subAccountDetails = DB::table('sacco_sub_account')
+            ->join('sacco_main_account', 'sacco_sub_account.sub_account_main_account', '=', 'sacco_main_account.main_account_id')
+            ->where('sacco_sub_account.sub_account_deleted', '<>', 'Y')
+            ->select('sacco_sub_account.sub_account_id', 'sacco_sub_account.sub_account_name', 'sacco_sub_account.sub_account_code', 'sacco_main_account.main_account_code')
+            ->orderBy('sacco_sub_account.sub_account_name')
+            ->get()
+            ->keyBy('sub_account_id');
+
+        return view('loans.types', compact('loanTypes', 'subAccountDetails'));
+    }
+
+    public function editLoanType($id)
+    {
+        // Fetch the loan type details
+        $loanType = DB::table('sacco_loan_types')
+            ->where('loan_type_id', $id)
+            ->where('loan_type_deleted', '<>', 'Y')
+            ->first();
+
+        if (!$loanType) {
+            return redirect()->route('loans.types')->with('error', 'Loan type not found.');
+        }
+
+        // Fetch sub-account details ordered by name
+        $subAccounts = DB::table('sacco_sub_account')
+            ->join('sacco_main_account', 'sacco_sub_account.sub_account_main_account', '=', 'sacco_main_account.main_account_id')
+            ->where('sacco_sub_account.sub_account_deleted', '<>', 'Y')
+            ->select('sacco_sub_account.sub_account_id', 'sacco_sub_account.sub_account_name', 'sacco_sub_account.sub_account_code', 'sacco_main_account.main_account_code')
+            ->orderBy('sacco_sub_account.sub_account_name')
+            ->get();
+
+        return view('loans.edit', compact('loanType', 'subAccounts'));
+    }
+
+    public function updateLoanType(Request $request, $id)
+    {
+        $request->validate([
+            'loan_type_name' => 'required|string|max:250',
+            'loan_type_interest' => 'required|numeric',
+            'loan_type_interest_type' => 'required|string|max:100',
+            'loan_type_duration' => 'required|integer',
+            'loan_type_guaranteable_percent' => 'required|integer',
+            'loan_type_code' => 'required|string|max:100',
+            'loan_type_max_amount' => 'required|numeric',
+            'loan_type_qualification_period' => 'required|integer',
+            'loan_type_acount' => 'required|integer',
+            'loan_type_int_account' => 'required|integer',
+            'loan_type_comm_account' => 'required|integer',
+            'loan_type_insurable' => 'required|string|max:1',
+        ]);
+
+        DB::table('sacco_loan_types')
+            ->where('loan_type_id', $id)
+            ->update([
+                'loan_type_name' => $request->input('loan_type_name'),
+                'loan_type_interest' => $request->input('loan_type_interest'),
+                'loan_type_interest_type' => $request->input('loan_type_interest_type'),
+                'loan_type_duration' => $request->input('loan_type_duration'),
+                'loan_type_guaranteable_percent' => $request->input('loan_type_guaranteable_percent'),
+                'loan_type_code' => $request->input('loan_type_code'),
+                'loan_type_max_amount' => $request->input('loan_type_max_amount'),
+                'loan_type_qualification_period' => $request->input('loan_type_qualification_period'),
+                'loan_type_acount' => $request->input('loan_type_acount'),
+                'loan_type_int_account' => $request->input('loan_type_int_account'),
+                'loan_type_comm_account' => $request->input('loan_type_comm_account'),
+                'loan_type_insurable' => $request->input('loan_type_insurable'),
+            ]);
+
+        return redirect()->route('loans.types')->with('success', 'Loan type updated successfully.');
+    }
+
+    public function createLoanType()
+    {
+        $subAccounts = DB::table('sacco_sub_account')
+            ->join('sacco_main_account', 'sacco_sub_account.sub_account_main_account', '=', 'sacco_main_account.main_account_id')
+            ->where('sacco_sub_account.sub_account_deleted', '<>', 'Y')
+            ->select('sacco_sub_account.sub_account_id', 'sacco_sub_account.sub_account_name', 'sacco_sub_account.sub_account_code', 'sacco_main_account.main_account_code')
+            ->orderBy('sacco_sub_account.sub_account_name')
+            ->get();
+
+        return view('loans.create', ['subAccounts' => $subAccounts]);
+    }
+
+    public function storeLoanType(Request $request)
+    {
+        $request->validate([
+            'loan_type_name' => 'required|string|max:250',
+            'loan_type_interest' => 'required|numeric',
+            'loan_type_interest_type' => 'required|string|max:100',
+            'loan_type_duration' => 'required|integer',
+            'loan_type_guaranteable_percent' => 'required|integer',
+            'loan_type_code' => 'required|string|max:100',
+            'loan_type_max_amount' => 'required|numeric',
+            'loan_type_qualification_period' => 'required|integer',
+            'loan_type_acount' => 'required|integer',
+            'loan_type_int_account' => 'required|integer',
+            'loan_type_comm_account' => 'required|integer',
+            'loan_type_insurable' => 'required|string|max:1',
+        ]);
+
+        DB::table('sacco_loan_types')->insert([
+            'loan_type_name' => $request->loan_type_name,
+            'loan_type_interest' => $request->loan_type_interest,
+            'loan_type_interest_type' => $request->loan_type_interest_type,
+            'loan_type_duration' => $request->loan_type_duration,
+            'loan_type_guaranteable_percent' => $request->loan_type_guaranteable_percent,
+            'loan_type_code' => $request->loan_type_code,
+            'loan_type_max_amount' => $request->loan_type_max_amount,
+            'loan_type_qualification_period' => $request->loan_type_qualification_period,
+            'loan_type_acount' => $request->loan_type_acount,
+            'loan_type_int_account' => $request->loan_type_int_account,
+            'loan_type_comm_account' => $request->loan_type_comm_account,
+            'loan_type_insurable' => $request->loan_type_insurable,
+            'loan_type_by' => auth()->id(),
+            'loan_type_ip' => $request->ip(),
+        ]);
+
+        return redirect()->route('loans.types')->with('success', 'Loan type added successfully.');
+    }
+
+    public function deleteLoanType($id)
+{
+    $loanType = DB::table('sacco_loan_types')
+        ->where('loan_type_id', $id)
+        ->first();
+
+    if (!$loanType) {
+        return redirect()->route('loans.types')->with('error', 'Loan type not found.');
+    }
+
+    DB::table('sacco_loan_types')
+        ->where('loan_type_id', $id)
+        ->update([
+            'loan_type_deleted' => 'Y',
+            'loan_type_deleted_by' => auth()->id(),
+            'loan_type_deleted_on' => now(),
+            'loan_type_deleted_ip' => request()->ip(),
+        ]);
+
+    return redirect()->route('loans.types')->with('success', 'Loan type deleted successfully.');
+}
+
+
+public function loansTypesList()
+{
+    // Fetch loan types that are not deleted
+    $loanTypes = DB::table('sacco_loan_types')
+        ->where('loan_type_deleted', '<>', 'Y')
+        ->orderBy('loan_type_name')
+        ->get();
+
+    // Fetch sub-account details
+    $subAccountDetails = DB::table('sacco_sub_account')
+        ->join('sacco_main_account', 'sacco_sub_account.sub_account_main_account', '=', 'sacco_main_account.main_account_id')
+        ->where('sacco_sub_account.sub_account_deleted', '<>', 'Y')
+        ->select('sacco_sub_account.sub_account_id', 'sacco_sub_account.sub_account_name', 'sacco_sub_account.sub_account_code', 'sacco_main_account.main_account_code')
+        ->get()
+        ->keyBy('sub_account_id');
+
+    return view('loans.types_list', compact('loanTypes', 'subAccountDetails'));
+}
+
+
+public function loansCategories()
+{
+    // Fetch loan categories that are not deleted
+    $loanCategories = DB::table('sacco_loan_category')
+        ->where('loan_category_deleted', '!=', 'Y')
+        ->orderBy('loan_category_name')
+        ->get();
+
+    return view('loans.categories', compact('loanCategories'));
+}
+
+public function createLoanCategory()
+{
+    return view('loans.create_category');
+}
+
+public function storeLoanCategory(Request $request)
+{
+    $request->validate([
+        'loan_category_name' => 'required|string|max:100',
+    ]);
+
+    DB::table('sacco_loan_category')->insert([
+        'loan_category_name' => $request->loan_category_name,
+        'loan_category_company_id' => auth()->user()->company_id,
+        'loan_category_user_id' => auth()->id(),
+        'loan_category_ip' => $request->ip(),
+    ]);
+
+    return redirect()->route('loans.categories')->with('success', 'Loan category added successfully.');
+}
+
+public function editLoanCategory($id)
+{
+    // Fetch the loan category details
+    $loanCategory = DB::table('sacco_loan_category')
+        ->where('loan_category_id', $id)
+        ->where('loan_category_deleted', '<>', 'Y')
+        ->first();
+
+    if (!$loanCategory) {
+        return redirect()->route('loans.categories')->with('error', 'Loan category not found.');
+    }
+
+    return view('loans.edit_category', compact('loanCategory'));
+}
+
+public function updateLoanCategory(Request $request, $id)
+{
+    $request->validate([
+        'loan_category_name' => 'required|string|max:100',
+    ]);
+
+    DB::table('sacco_loan_category')
+        ->where('loan_category_id', $id)
+        ->update([
+            'loan_category_name' => $request->input('loan_category_name'),
+            'loan_category_user_id' => auth()->id(),
+            'loan_category_ip' => $request->ip(),
+        ]);
+
+    return redirect()->route('loans.categories')->with('success', 'Loan category updated successfully.');
+}
+
+public function deleteLoanCategory($id)
+{
+    $loanCategory = DB::table('sacco_loan_category')
+        ->where('loan_category_id', $id)
+        ->first();
+
+    if (!$loanCategory) {
+        return redirect()->route('loans.categories')->with('error', 'Loan category not found.');
+    }
+
+    DB::table('sacco_loan_category')
+        ->where('loan_category_id', $id)
+        ->update([
+            'loan_category_deleted' => 'Y',
+            'loan_category_deleted_by' => auth()->id(),
+            'loan_category_deleted_on' => now(),
+            'loan_category_deleted_ip' => request()->ip(),
+        ]);
+
+    return redirect()->route('loans.categories')->with('success', 'Loan category deleted successfully.');
+}
+
+
+
+
+public function accountsMain()
+    {
+        $mainAccounts = DB::table('sacco_main_account')
+            ->where('main_account_deleted', '<>', 'Y')
+            ->orderBy('main_account_name')
+            ->get();
+
+        return view('accounts.main.index', compact('mainAccounts'));
+    }
+
+    public function createMainAccount()
+    {
+        $accountTypes = [
+            'ASSET - FIXED',
+            'ASSETS - CURRENT',
+            'CAPITAL',
+            'EXPENSE',
+            'INCOME',
+            'LIABILITIES - SHORT',
+        ];
+
+        return view('accounts.main.create', compact('accountTypes'));
+    }
+
+    public function storeMainAccount(Request $request)
+    {
+        $request->validate([
+            'main_account_name' => 'required|string|max:100|unique:sacco_main_account,main_account_name',
+            'main_account_type' => 'required|string|max:100',
+        ]);
+
+        $mainAccountCode = $this->generateMainAccountCode($request->input('main_account_type'));
+
+        DB::table('sacco_main_account')->insert([
+            'main_account_name' => strtoupper($request->input('main_account_name')),
+            'main_account_code' => $mainAccountCode,
+            'main_account_type' => strtoupper($request->input('main_account_type')),
+            'main_account_user_id' => auth()->id(),
+            'main_account_ip' => $request->ip(),
+        ]);
+
+        return redirect()->route('accounts.main')->with('success', 'Main account added successfully.');
+    }
+
+    public function editMainAccount($id)
+    {
+        $mainAccount = DB::table('sacco_main_account')
+            ->where('main_account_id', $id)
+            ->where('main_account_deleted', '<>', 'Y')
+            ->first();
+
+        if (!$mainAccount) {
+            return redirect()->route('accounts.main')->with('error', 'Main account not found.');
+        }
+
+        $accountTypes = [
+            'ASSET - FIXED',
+            'ASSETS - CURRENT',
+            'CAPITAL',
+            'EXPENSE',
+            'INCOME',
+            'LIABILITIES - SHORT',
+        ];
+
+        return view('accounts.main.edit', compact('mainAccount', 'accountTypes'));
+    }
+
+    public function updateMainAccount(Request $request, $id)
+    {
+        $request->validate([
+            'main_account_name' => 'required|string|max:100|unique:sacco_main_account,main_account_name,' . $id . ',main_account_id',
+            'main_account_type' => 'required|string|max:100',
+        ]);
+
+        DB::table('sacco_main_account')
+            ->where('main_account_id', $id)
+            ->update([
+                'main_account_name' => strtoupper($request->input('main_account_name')),
+                'main_account_type' => strtoupper($request->input('main_account_type')),
+                'main_account_user_id' => auth()->id(),
+                'main_account_ip' => $request->ip(),
+            ]);
+
+        return redirect()->route('accounts.main')->with('success', 'Main account updated successfully.');
+    }
+
+    private function generateMainAccountCode($type)
+    {
+        $firstChar = strtoupper($type[0]);
+        $lastCode = DB::table('sacco_main_account')
+            ->where('main_account_type', $type)
+            ->max('main_account_code');
+
+        $lastNumber = $lastCode ? (int)substr($lastCode, 1) : 0;
+        $newNumber = str_pad($lastNumber + 1, 3, '0', STR_PAD_LEFT);
+
+        return $firstChar . $newNumber;
+    }
+
+
+
 
 
     
+    public function accountsSub()
+{
+    $subAccounts = DB::table('sacco_sub_account')
+        ->join('sacco_main_account', 'sacco_sub_account.sub_account_main_account', '=', 'sacco_main_account.main_account_id')
+        ->select(
+            'sacco_sub_account.sub_account_id',
+            'sacco_sub_account.sub_account_name',
+            'sacco_sub_account.sub_account_code',
+            'sacco_sub_account.sub_account_main_account',
+            'sacco_sub_account.sub_account_debit',
+            'sacco_sub_account.sub_account_credit',
+            'sacco_main_account.main_account_code'
+        )
+        ->where('sacco_sub_account.sub_account_deleted', '<>', 'Y')
+        ->orderBy('sacco_sub_account.sub_account_name')
+        ->get();
+
+    return view('accounts.sub.index', compact('subAccounts'));
+}
+
+// Method to handle adding a new sub account
+
+
+
+
+public function createSubAccount()
+{
+    $mainAccounts = DB::table('sacco_main_account')
+        ->where('main_account_deleted', '<>', 'Y')
+        ->orderBy('main_account_name')
+        ->get();
+
+    return view('accounts.sub.create', compact('mainAccounts'));
+}
+
+
+
+public function editSubAccount($id)
+{
+    $subAccount = DB::table('sacco_sub_account')->where('sub_account_id', $id)->where('sub_account_deleted', '<>', 'Y')->first();
+
+    if (!$subAccount) {
+        return redirect()->route('accounts.sub')->with('error', 'Sub-account not found.');
+    }
+
+    $mainAccounts = DB::table('sacco_main_account')
+        ->where('main_account_deleted', '<>', 'Y')
+        ->orderBy('main_account_name')
+        ->get();
+
+    return view('accounts.sub.edit', compact('subAccount', 'mainAccounts'));
+}
+
+public function storeSubAccount(Request $request)
+{
+    $request->validate([
+        'sub_account_name' => 'required|string|max:100|unique:sacco_sub_account,sub_account_name',
+        'sub_account_code' => 'required|string|max:3',
+        'sub_account_main_account' => 'required|integer',
+    ]);
+
+    // Check for the combination of main account and sub account code
+    $existingSubAccount = DB::table('sacco_sub_account')
+        ->where('sub_account_main_account', $request->sub_account_main_account)
+        ->where('sub_account_code', $request->sub_account_code)
+        ->first();
+
+    if ($existingSubAccount) {
+        return redirect()->back()->withErrors(['The combination of main account and sub account code already exists.'])->withInput();
+    }
+
+    DB::table('sacco_sub_account')->insert([
+        'sub_account_name' => strtoupper($request->sub_account_name),
+        'sub_account_code' => $request->sub_account_code,
+        'sub_account_main_account' => $request->sub_account_main_account,
+        'sub_account_debit' => 0,
+        'sub_account_credit' => 0,
+        'sub_account_user_id' => auth()->id(),
+        'sub_account_ip' => $request->ip(),
+    ]);
+
+    return redirect()->route('accounts.sub')->with('success', 'Sub account added successfully.');
+}
+
+public function updateSubAccount(Request $request, $id)
+{
+    $request->validate([
+        'sub_account_name' => 'required|string|max:100|unique:sacco_sub_account,sub_account_name,' . $id . ',sub_account_id',
+        'sub_account_code' => 'required|string|max:3',
+        'sub_account_main_account' => 'required|integer',
+    ]);
+
+    // Check for the combination of main account and sub account code
+    $existingSubAccount = DB::table('sacco_sub_account')
+        ->where('sub_account_main_account', $request->sub_account_main_account)
+        ->where('sub_account_code', $request->sub_account_code)
+        ->where('sub_account_id', '<>', $id)
+        ->first();
+
+    if ($existingSubAccount) {
+        return redirect()->back()->withErrors(['The combination of main account and sub account code already exists.'])->withInput();
+    }
+
+    DB::table('sacco_sub_account')
+        ->where('sub_account_id', $id)
+        ->update([
+            'sub_account_name' => strtoupper($request->sub_account_name),
+            'sub_account_code' => $request->sub_account_code,
+            'sub_account_main_account' => $request->sub_account_main_account,
+        ]);
+
+    return redirect()->route('accounts.sub')->with('success', 'Sub account updated successfully.');
+}
+
+
+
+
+
+
+public function accountsTransfer()
+{
+    
+    return view('accounts.transfer');
+}
+ 
+
+
+// public function storeAccountsTransfer(Request $request)
+// {
+//     $entries = $request->except('_token');
+//     $totalDebit = 0;
+//     $totalCredit = 0;
+//     $currentPeriod = $this->currentPeriod->period_name;
+//    dd($request->all());
+//     $validEntries = [];
+
+//     foreach ($entries as $key => $value) {
+//         if (strpos($key, '.') !== false) {
+//             $index = explode('.', $key)[1];
+
+//             if (!empty($entries['accountsTransfer_account.' . $index])) {
+//                 $validEntries[$index] = [
+//                     'account' => $entries['accountsTransfer_account.' . $index],
+//                     'debit' => $entries['accountsTransfer_debit.' . $index],
+//                     'credit' => $entries['accountsTransfer_credit.' . $index],
+//                     'doc_no' => $entries['accountsTransfer_doc_no.' . $index],
+//                     'description' => $entries['accountsTransfer_description.' . $index],
+//                     'date' => $entries['accountsTransfer_date.' . $index],
+//                 ];
+//             }
+//         }
+//     }
+
+//     foreach ($validEntries as $index => $entry) {
+//         $validator = Validator::make($entry, [
+//             'account' => 'required|string',
+//             'debit' => 'nullable|numeric',
+//             'credit' => 'nullable|numeric',
+//             'doc_no' => 'required|string',
+//             'description' => 'required|string',
+//             'date' => 'required|date',
+//         ]);
+
+//         if ($validator->fails()) {
+//             return redirect()->back()->withErrors($validator)->withInput();
+//         }
+
+        
+
+//         $totalDebit += $entry['debit'] ?? 0;
+//         $totalCredit += $entry['credit'] ?? 0;
+
+        
+//     }
+
+
+ 
+//     if ($totalDebit !== $totalCredit) {
+//         return redirect()->back()->withErrors(['error' => 'Total debits and credits must be equal.'])->withInput();
+//     }
+    
+//     dd($totalCredit." and debits are ".$totalCredit);
+
+//     foreach ($validEntries as $index => $entry) {
+//         $accountDetails = explode(' - ', $entry['account']);
+//         $accountCode = explode('/', $accountDetails[0]);
+
+//         $subAccount = DB::table('sacco_sub_account')
+//             ->join('sacco_main_account', 'sacco_sub_account.sub_account_main_account', '=', 'sacco_main_account.main_account_id')
+//             ->where('sacco_main_account.main_account_code', $accountCode[0])
+//             ->where('sacco_sub_account.sub_account_code', $accountCode[1])
+//             ->select('sacco_sub_account.sub_account_id')
+//             ->first();
+
+//         if ($subAccount) {
+//             $subAccountId = $subAccount->sub_account_id;
+//             $this->updateSaccoAccountsTrans(
+//                 $subAccountId,
+//                 $entry['debit'],
+//                 $entry['credit'],
+//                 $entry['doc_no'],
+//                 $entry['description'],
+//                 $entry['date'],
+//                 $currentPeriod,
+//                 'Journal Transfer'
+//             );
+//         }
+//     }
+
+//     return redirect()->route('accounts.transfer')->with('success', 'Journal entries updated successfully.');
+// }
+
+
+public function storeAccountsTransfer(Request $request)
+{
+    $data = $request->all();
+    $totalDebit = 0;
+    $totalCredit = 0;
+    $filledRows = [];
+
+    // Loop through the data to validate only filled rows and calculate totals
+    foreach ($data as $key => $value) {
+        if (strpos($key, 'accountsTransfer_account_') === 0) {
+            $index = explode('_', $key)[2];
+            $debit = floatval($data["accountsTransfer_debit_$index"]) ?? 0;
+            $credit = floatval($data["accountsTransfer_credit_$index"]) ?? 0;
+
+            if (!empty($value) || $debit > 0 || $credit > 0 || !empty($data["accountsTransfer_doc_no_$index"]) || !empty($data["accountsTransfer_description_$index"])) {
+                // Ensure no negative values
+                if ($debit < 0 || $credit < 0) {
+                    return redirect()->back()->withErrors(['Debits and credits cannot be negative.'])->withInput();
+                }
+
+                // Ensure either debit or credit has a positive value
+                if ($debit == 0 && $credit == 0) {
+                    continue;
+                }
+
+                $filledRows[] = $index;
+                $totalDebit += $debit;
+                $totalCredit += $credit;
+            }
+        }
+    }
+
+    // Validate filled rows
+    foreach ($filledRows as $index) {
+        $request->validate([
+            "accountsTransfer_account_$index" => 'required|string',
+            "accountsTransfer_doc_no_$index" => 'required|string',
+            "accountsTransfer_description_$index" => 'required|string',
+            "accountsTransfer_date_$index" => 'required|date',
+        ]);
+    }
+
+    // Check if total debits equal total credits
+    if ($totalDebit != $totalCredit) {
+        return redirect()->back()->withErrors(['Total debits must equal total credits.'])->withInput();
+    }
+
+    // Proceed with storing the valid data
+    foreach ($filledRows as $index) {
+        $account = explode(' - ', $data["accountsTransfer_account_$index"])[0];
+        list($mainAccountCode, $subAccountCode) = explode('/', $account);
+
+        // Fetch the sub_account_id
+        $subAccount = DB::table('sacco_sub_account')
+            ->join('sacco_main_account', 'sacco_sub_account.sub_account_main_account', '=', 'sacco_main_account.main_account_id')
+            ->select('sacco_sub_account.sub_account_id')
+            ->where('sacco_main_account.main_account_code', trim($mainAccountCode))
+            ->where('sacco_sub_account.sub_account_code', trim($subAccountCode))
+            ->where('sacco_sub_account.sub_account_deleted', '<>', 'Y')
+            ->first();
+
+        if (!$subAccount) {
+            return redirect()->back()->withErrors(["Account $account not found."])->withInput();
+        }
+
+        $subAccountId = $subAccount->sub_account_id;
+        $debit = floatval($data["accountsTransfer_debit_$index"]) ?? 0;
+        $credit = floatval($data["accountsTransfer_credit_$index"]) ?? 0;
+
+        $this->updateSaccoAccountsTrans(
+            $subAccountId,
+            $debit,
+            $credit,
+            $data["accountsTransfer_doc_no_$index"],
+            $data["accountsTransfer_description_$index"],
+            $data["accountsTransfer_date_$index"],
+            $this->currentPeriod->period_name,
+            'Journal Transfer'
+        );
+    }
+
+    return redirect()->route('accounts.transfer')->with('success', 'Accounts transfer completed successfully.');
+}
+
+
+
+
+
+
+
+
+public function reportsAccountsTrialBalance(Request $request)
+{
+    $currentPeriod = $this->currentPeriod->period_name;
+    $startPeriod = $request->input('start_period', date('Ym', strtotime('-11 months')));
+    $endPeriod = $request->input('end_period', date('Ym'));
+
+    // Validate the periods
+    if (!ctype_digit($startPeriod) || !ctype_digit($endPeriod)) {
+        return redirect()->route('reports.accounts.trial-balance')
+                         ->withErrors(['period' => 'Periods must be numeric and in the format YYYYmm.']);
+    }
+
+    if ($startPeriod > $endPeriod) {
+        return redirect()->route('reports.accounts.trial-balance')
+                         ->withErrors(['period' => 'Start period cannot be greater than end period.']);
+    }
+
+    if ($startPeriod < date('Ym', strtotime('-11 months', strtotime($endPeriod . '01')))) {
+        return redirect()->route('reports.accounts.trial-balance')
+                         ->withErrors(['period' => 'The selected period range should not exceed 12 months.']);
+    }
+
+    $accounts = $this->fetchAccountsForTrialBalance($startPeriod, $endPeriod);
+
+    $view = 'reports.accounts.trial_balance'; // Default view
+    if ($request->route()->named('reports.accounts.profit-loss')) {
+        $view = 'reports.accounts.profit_loss';
+    } elseif ($request->route()->named('reports.accounts.balance-sheet')) {
+        $view = 'reports.accounts.balance_sheet';
+    } elseif ($request->route()->named('reports.accounts.trial-balance-horizontal')) {
+        $view = 'reports.accounts.trial_balance_horizontal';
+    } elseif ($request->route()->named('reports.accounts.profit-loss-horizontal')) {
+        $view = 'reports.accounts.profit_loss_horizontal';
+    } elseif ($request->route()->named('reports.accounts.balance-sheet-horizontal')) {
+        $view = 'reports.accounts.balance_sheet_horizontal';
+    }
+
+    return view($view, [
+        'accounts' => $accounts,
+        'startPeriod' => $startPeriod,
+        'endPeriod' => $endPeriod,
+        'currentPeriod' => $currentPeriod,
+    ]);
+}
+
+
+
+private function fetchAccountsForTrialBalance($startPeriod, $endPeriod)
+{
+    $accounts = [];
+
+    // Chunk through transactions to avoid memory issues
+    DB::table('sacco_accounts_trans')
+        ->whereBetween('accounts_trans_period', [$startPeriod, $endPeriod])
+        ->orderBy('accounts_trans_id', 'asc')
+        ->chunk(10000, function ($transactions) use (&$accounts) {
+            foreach ($transactions as $transaction) {
+                $subAccount = DB::table('sacco_sub_account')
+                    ->join('sacco_main_account', 'sacco_sub_account.sub_account_main_account', '=', 'sacco_main_account.main_account_id')
+                    ->where('sacco_sub_account.sub_account_id', $transaction->accounts_trans_sub_account)
+                    ->select(
+                        'sacco_sub_account.sub_account_id',
+                        'sacco_sub_account.sub_account_name',
+                        'sacco_sub_account.sub_account_code',
+                        'sacco_main_account.main_account_code',
+                        'sacco_main_account.main_account_type'
+                    )
+                    ->first();
+
+                if ($subAccount) {
+                    $key = $subAccount->sub_account_id;
+
+                    if (!isset($accounts[$key])) {
+                        $accounts[$key] = (object) [
+                            'sub_account_id' => $subAccount->sub_account_id,
+                            'sub_account_name' => $subAccount->sub_account_name,
+                            'sub_account_code' => $subAccount->sub_account_code,
+                            'main_account_code' => $subAccount->main_account_code,
+                            'main_account_type' => $subAccount->main_account_type,
+                            'total_debit' => 0,
+                            'total_credit' => 0
+                        ];
+                    }
+
+                    $accounts[$key]->total_debit += $transaction->accounts_trans_debit;
+                    $accounts[$key]->total_credit += $transaction->accounts_trans_credit;
+                }
+            }
+        });
+
+    // Convert array to a collection
+    $accountsCollection = collect($accounts);
+
+    // Group the accounts by main account type
+    $groupedAccounts = $accountsCollection->groupBy('main_account_type');
+
+    return $groupedAccounts;
+}
+
+
+
+
+
+
+public function adminBudget(Request $request)
+{
+    $currentYear = date('Y');
+    $year = $request->input('year', $currentYear);
+
+    // Fetch budget data for the selected year
+    $budgets = $this->adminBudget_fetchBudgets($year);
+
+    // Fetch all sub accounts for creating budgets
+    $subAccounts = $this->adminBudget_fetchSubAccounts();
+
+    return view('admin.budget', [
+        'year' => $year,
+        'budgets' => $budgets,
+        'subAccounts' => $subAccounts,
+        'currentYear' => $currentYear
+    ]);
+}
+
+private function adminBudget_fetchBudgets($year)
+{
+    return DB::table('sacco_budget')
+        ->join('sacco_sub_account', 'sacco_budget.budget_account_id', '=', 'sacco_sub_account.sub_account_id')
+        ->join('sacco_main_account', 'sacco_sub_account.sub_account_main_account', '=', 'sacco_main_account.main_account_id')
+        ->where('budget_year', $year)
+        ->select('sacco_budget.*', 'sacco_sub_account.sub_account_name', 'sacco_sub_account.sub_account_code', 'sacco_main_account.main_account_code', 'sacco_main_account.main_account_name', 'sacco_main_account.main_account_type')
+        ->get();
+}
+
+private function adminBudget_fetchSubAccounts()
+{
+    return DB::table('sacco_sub_account')
+        ->join('sacco_main_account', 'sacco_sub_account.sub_account_main_account', '=', 'sacco_main_account.main_account_id')
+        ->select('sacco_sub_account.*', 'sacco_main_account.main_account_code', 'sacco_main_account.main_account_name', 'sacco_main_account.main_account_type')
+        ->get();
+}
+
+public function adminBudget_store(Request $request)
+{
+    $data = $request->validate([
+        'year' => 'required|integer',
+        'budget.*.account_id' => 'required|integer',
+        'budget.*.amount_debit' => 'required|numeric|min:0',
+        'budget.*.amount_credit' => 'required|numeric|min:0',
+    ]);
+
+    foreach ($data['budget'] as $budget) {
+        if ($budget['amount_debit'] > 0 && $budget['amount_credit'] > 0) {
+            return back()->withErrors(['Both debit and credit cannot have values.']);
+        }
+
+        DB::table('sacco_budget')->updateOrInsert(
+            [
+                'budget_year' => $data['year'],
+                'budget_account_id' => $budget['account_id']
+            ],
+            [
+                'budget_amount_debit' => $budget['amount_debit'],
+                'budget_amount_credit' => $budget['amount_credit'],
+                'budget_user_id' => auth()->id(),
+                'budget_ip' => $request->ip()
+            ]
+        );
+    }
+
+    return back()->with('success', 'Budget updated successfully.');
+}
+
+public function reportsAccountsBudgetVsActuals(Request $request)
+{
+    $currentYear = date('Y');
+    $year = $request->input('year', $currentYear);
+
+    // Fetch budget data for the selected year
+    $budgets = DB::table('sacco_budget')
+        ->join('sacco_sub_account', 'sacco_budget.budget_account_id', '=', 'sacco_sub_account.sub_account_id')
+        ->join('sacco_main_account', 'sacco_sub_account.sub_account_main_account', '=', 'sacco_main_account.main_account_id')
+        ->where('budget_year', $year)
+        ->select('sacco_budget.*', 'sacco_sub_account.sub_account_name', 'sacco_sub_account.sub_account_code', 'sacco_main_account.main_account_name', 'sacco_main_account.main_account_code', 'sacco_main_account.main_account_type')
+        ->get();
+
+    // Fetch actuals data for the selected year
+    $actualsData = DB::table('sacco_accounts_trans')
+        ->select(
+            'accounts_trans_sub_account',
+            DB::raw('SUM(accounts_trans_debit) as actual_debit'),
+            DB::raw('SUM(accounts_trans_credit) as actual_credit')
+        )
+        ->where('accounts_trans_period', 'like', "$year%")
+        ->groupBy('accounts_trans_sub_account')
+        ->get()
+        ->keyBy('accounts_trans_sub_account');
+
+    return view('admin.budget_vs_actuals', [
+        'year' => $year,
+        'budgets' => $budgets,
+        'actualsData' => $actualsData,
+        'currentYear' => $currentYear
+    ]);
+}
+
+
+public function reportsAccountsTrialBalanceBudget(Request $request)
+{
+    $currentYear = date('Y');
+    $year = $request->input('year', $currentYear);
+
+    // Fetch budget data for the selected year
+    $budgets = $this->reportsAccountsTrialBalanceBudget_fetchBudgets($year);
+
+    // Fetch actuals data for the selected year
+    $actualsData = $this->reportsAccountsTrialBalanceBudget_fetchActuals($year);
+
+    // Filter only INCOME and EXPENSE/EXPENSES accounts for P&L
+    $incomeExpenseBudgets = $budgets->filter(function ($budget) {
+        return in_array($budget->main_account_type, ['INCOME', 'EXPENSE', 'EXPENSES']);
+    });
+
+    return view('reports.accounts.profit_loss_budget', [
+        'year' => $year,
+        'budgets' => $incomeExpenseBudgets,
+        'actualsData' => $actualsData,
+        'currentYear' => $currentYear
+    ]);
+}
+
+private function reportsAccountsTrialBalanceBudget_fetchBudgets($year)
+{
+    return DB::table('sacco_budget')
+        ->join('sacco_sub_account', 'sacco_budget.budget_account_id', '=', 'sacco_sub_account.sub_account_id')
+        ->join('sacco_main_account', 'sacco_sub_account.sub_account_main_account', '=', 'sacco_main_account.main_account_id')
+        ->where('budget_year', $year)
+        ->select('sacco_budget.*', 'sacco_sub_account.sub_account_name', 'sacco_sub_account.sub_account_code', 'sacco_main_account.main_account_code', 'sacco_main_account.main_account_name', 'sacco_main_account.main_account_type')
+        ->get();
+}
+
+private function reportsAccountsTrialBalanceBudget_fetchActuals($year)
+{
+    return DB::table('sacco_accounts_trans')
+        ->select(
+            'accounts_trans_sub_account',
+            DB::raw('SUM(accounts_trans_debit) as actual_debit'),
+            DB::raw('SUM(accounts_trans_credit) as actual_credit')
+        )
+        ->where('accounts_trans_period', 'like', "$year%")
+        ->groupBy('accounts_trans_sub_account')
+        ->get()
+        ->keyBy('accounts_trans_sub_account');
+}
+
+
+
+
+public function showEndOfYearProcessingForm()
+{
+    $currentYear = date('Y');
+
+    $previousProcesses = DB::table('sacco_end_year_proc')
+        ->join('sacco_members', 'sacco_end_year_proc.end_year_proc_by', '=', 'sacco_members.member_id')
+        ->select('sacco_end_year_proc.*', 'sacco_members.member_name')
+        ->orderBy('sacco_end_year_proc.end_year_proc_on', 'desc')
+        ->limit(20)
+        ->get();
+
+    return view('admin.end_of_year_processing_form', [
+        'currentYear' => $currentYear,
+        'previousProcesses' => $previousProcesses
+    ]);
+}
+
+public function endOfYearProcessing(Request $request)
+{
+    $startPeriod = $request->input('start_period');
+    $endPeriod = $request->input('end_period');
+
+    // Validation
+    if (!is_numeric($startPeriod) || strlen($startPeriod) != 6 || !is_numeric($endPeriod) || strlen($endPeriod) != 6) {
+        return back()->withErrors(['Start and end periods must be numeric and 6 characters long.']);
+    }
+
+    // Check if start period is greater than end period
+    if ($startPeriod > $endPeriod) {
+        return back()->withErrors(['Start period must be less than or equal to end period.']);
+    }
+
+    // Fetch the latest processed period
+    $latestProcessedPeriod = DB::table('sacco_end_year_proc')
+        ->orderBy('end_year_proc_period', 'desc')
+        ->value('end_year_proc_period');
+
+    // Check if the selected periods are already processed or are in the past
+    if ($latestProcessedPeriod && $startPeriod <= $latestProcessedPeriod) {
+        return back()->withErrors(['The selected periods are already processed or are in the past.']);
+    }
+
+    // Retrieve the appropriation account from sacco_defaults
+    $appropriationAccount = DB::table('sacco_defaults')
+        ->where('default_name', 'appropriation_account')
+        ->first();
+
+    if (!$appropriationAccount) {
+        return back()->withErrors(['Appropriation account not found.']);
+    }
+
+    // Process each month separately within the selected period range
+    $currentPeriod = $startPeriod;
+    while ($currentPeriod <= $endPeriod) {
+        $totalIncome = DB::table('sacco_accounts_trans')
+            ->join('sacco_sub_account', 'sacco_accounts_trans.accounts_trans_sub_account', '=', 'sacco_sub_account.sub_account_id')
+            ->join('sacco_main_account', 'sacco_sub_account.sub_account_main_account', '=', 'sacco_main_account.main_account_id')
+            ->where('accounts_trans_period', $currentPeriod)
+            ->whereIn('sacco_main_account.main_account_type', ['INCOME', 'INCOME - CURRENT'])
+            ->sum('accounts_trans_credit');
+
+        $totalExpenses = DB::table('sacco_accounts_trans')
+            ->join('sacco_sub_account', 'sacco_accounts_trans.accounts_trans_sub_account', '=', 'sacco_sub_account.sub_account_id')
+            ->join('sacco_main_account', 'sacco_sub_account.sub_account_main_account', '=', 'sacco_main_account.main_account_id')
+            ->where('accounts_trans_period', $currentPeriod)
+            ->whereIn('sacco_main_account.main_account_type', ['EXPENSE', 'EXPENSES'])
+            ->sum('accounts_trans_debit');
+
+        $netProfitOrLoss = $totalIncome - $totalExpenses;
+
+        // Close Temporary Accounts and Transfer to Appropriation Account
+        $this->closeTemporaryAccounts($appropriationAccount->default_value, $currentPeriod, $netProfitOrLoss);
+
+        // Move to the next month
+        $year = substr($currentPeriod, 0, 4);
+        $month = substr($currentPeriod, 4, 2);
+        if ($month == 12) {
+            $currentPeriod = ($year + 1) . '01';
+        } else {
+            $currentPeriod = $year . str_pad($month + 1, 2, '0', STR_PAD_LEFT);
+        }
+    }
+
+    // Update sacco_end_year_proc table
+    DB::table('sacco_end_year_proc')->insert([
+        'end_year_proc_period' => $endPeriod,
+        'end_year_proc_by' => auth()->id(),
+        'end_year_proc_on' => now(),
+        'end_year_proc_ip' => request()->ip(),
+    ]);
+
+    return back()->with('success', 'End of year processing completed successfully.');
+}
+
+private function closeTemporaryAccounts($appropriationAccountId, $period, $netProfitOrLoss)
+{
+    $temporaryAccounts = DB::table('sacco_accounts_trans')
+        ->join('sacco_sub_account', 'sacco_accounts_trans.accounts_trans_sub_account', '=', 'sacco_sub_account.sub_account_id')
+        ->join('sacco_main_account', 'sacco_sub_account.sub_account_main_account', '=', 'sacco_main_account.main_account_id')
+        ->where('accounts_trans_period', $period)
+        ->whereIn('sacco_main_account.main_account_type', ['INCOME', 'INCOME - CURRENT', 'EXPENSE', 'EXPENSES'])
+        ->select('sacco_accounts_trans.*', 'sacco_main_account.main_account_type')
+        ->get();
+
+    foreach ($temporaryAccounts as $account) {
+        $debit = $account->accounts_trans_debit;
+        $credit = $account->accounts_trans_credit;
+
+        // Create a contra entry for the temporary account
+        $this->updateSaccoAccountsTrans(
+            $account->accounts_trans_sub_account,
+            $credit,
+            $debit,
+            'ENDYEAR' . $period,
+            'Closing Entry (' . $account->accounts_trans_id . ')',
+            now(),
+            $period,
+            'End of Year Processing'
+        );
+
+        // Transfer the contra entry to the appropriation account
+        $this->updateSaccoAccountsTrans(
+            $appropriationAccountId,
+            $debit,
+            $credit,
+            'ENDYEAR' . $period,
+            'Transfer to Appropriation Account (' . $account->accounts_trans_id . ')',
+            now(),
+            $period,
+            'End of Year Processing'
+        );
+    }
+}
+
+public function reportsAccountsAllTime(Request $request)
+{
+    $routeName = $request->route()->getName();
+    $data = $this->reportsAccountsAllTime_fetchAccountData();
+
+    switch ($routeName) {
+        case 'reports.accounts.AllTimeAccountsFullTrialBalance':
+            $title = 'All Time Trial Balance';
+            return view('reports.accounts.all_time_trial_balance', compact('data', 'title'));
+
+        case 'reports.accounts.AllTimeAccountsFullProftAndLoss':
+            $title = 'All Time Profit and Loss';
+            return view('reports.accounts.all_time_profit_and_loss', compact('data', 'title'));
+
+        case 'reports.accounts.AllTimeAccountsFullBalanceSheet':
+            $title = 'All Time Balance Sheet';
+            return view('reports.accounts.all_time_balance_sheet', compact('data', 'title'));
+
+        default:
+            abort(404);
+    }
+}
+
+private function reportsAccountsAllTime_fetchAccountData()
+{
+    $data = DB::table('sacco_main_account')
+        ->join('sacco_sub_account', 'sacco_main_account.main_account_id', '=', 'sacco_sub_account.sub_account_main_account')
+        ->select('sacco_main_account.*', 'sacco_sub_account.*')
+        ->orderBy('sacco_main_account.main_account_name')
+        ->orderBy('sacco_sub_account.sub_account_name')
+        ->get();
+
+    return $data;
+}
+
+
 }
 
   

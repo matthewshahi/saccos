@@ -11,7 +11,7 @@
                 <ul class="metismenu" id="menu">
                     <li class="Ul_li--hover">
                         <a class="has-arrow" href="#">
-                            <i class="i-Library text-20 me-2 text-muted"></i>
+                            <i class="i-Library text-20 me-2" style="color: #663399;"></i>
                             <span class="item-name text-15 text-muted">Members</span>
                         </a>
                         <ul class="mm-collapse">
@@ -47,10 +47,9 @@
                             </li>
                         </ul>
                     </li>
-
                     <li class="Ul_li--hover">
                         <a class="has-arrow" href="#">
-                            <i class="i-Money-Bag text-20 me-2 text-muted"></i>
+                            <i class="i-Money-Bag text-20 me-2" style="color: #663399;"></i>
                             <span class="item-name text-15 text-muted">Shares/deposits</span>
                         </a>
                         <ul class="mm-collapse">
@@ -73,7 +72,7 @@
                     </li>
                     <li class="Ul_li--hover">
                         <a class="has-arrow" href="#">
-                            <i class="i-Business-Mens text-20 me-2 text-muted"></i>
+                            <i class="i-Business-Mens text-20 me-2" style="color: #663399;"></i>
                             <span class="item-name text-15 text-muted">Capital</span>
                         </a>
                         <ul class="mm-collapse">
@@ -96,7 +95,7 @@
                     </li>
                     <li class="Ul_li--hover">
                         <a class="has-arrow" href="#">
-                            <i class="i-Bank text-20 me-2 text-muted"></i>
+                            <i class="i-Bank text-20 me-2" style="color: #663399;"></i>
                             <span class="item-name text-15 text-muted">FOSA</span>
                         </a>
                         <ul class="mm-collapse">
@@ -105,21 +104,11 @@
                                     <span class="text-muted">Add/reduce</span>
                                 </a>
                             </li>
-                            <!-- <li class="item-name">
-                                <a href="{{ route('transfer.member.fosa') }}">
-                                    <span class="text-muted">Transfer between members</span>
-                                </a>
-                            </li> -->
-                            <!-- <li class="item-name">
-                                <a href="{{ route('proc.end.month.fosa') }}">
-                                    <span class="text-muted">End month proc.</span>
-                                </a>
-                            </li> -->
                         </ul>
                     </li>
                     <li class="Ul_li--hover">
                         <a class="has-arrow" href="#">
-                            <i class="i-Calendar-4 text-20 me-2 text-muted"></i>
+                            <i class="i-Calendar-4 text-20 me-2" style="color: #663399;"></i>
                             <span class="item-name text-15 text-muted">End month proc.</span>
                         </a>
                         <ul class="mm-collapse">
@@ -133,22 +122,11 @@
                                     <span class="text-muted">End month processing - Shares</span>
                                 </a>
                             </li>
-                            <!-- <li class="item-name">
-                                <a href="{{ route('proc.end.month.fosa') }}">
-                                    <span class="text-muted">End month processing - FOSA</span>
-                                </a>
-                            </li> -->
-                            <!-- <li class="item-name">
-                                <a href="{{ route('proc.end.month.loans') }}">
-                                    <span class="text-muted">End month processing - Loans</span>
-                                </a>
-                            </li> -->
                         </ul>
                     </li>
-
                     <li class="Ul_li--hover">
                         <a class="has-arrow" href="#">
-                            <i class="i-File-Clipboard-File--Text text-20 me-2 text-muted"></i>
+                            <i class="i-File-Clipboard-File--Text text-20 me-2" style="color: #663399;"></i>
                             <span class="item-name text-15 text-muted">Loans</span>
                         </a>
                         <ul class="mm-collapse">
@@ -157,29 +135,9 @@
                                     <span class="text-muted">Loans issued</span>
                                 </a>
                             </li>
-                            <!-- <li class="item-name">
-                                <a href="{{ url('/loans/batch') }}">
-                                    <span class="text-muted">Loan batches</span>
-                                </a>
-                            </li> -->
                             <li class="item-name">
                                 <a href="{{ url('/loans/apply') }}">
                                     <span class="text-muted">Apply for Loan (Self)</span>
-                                </a>
-                            </li>
-                            <!-- <li class="item-name">
-                                <a href="{{ url('/loans/end-month') }}">
-                                    <span class="text-muted">End month processing</span>
-                                </a>
-                            </li>
-                            <li class="item-name">
-                                <a href="{{ url('/loans/un-finished') }}">
-                                    <span class="text-muted">Reduce/Increase loan</span>
-                                </a>
-                            </li>
-                            <li class="item-name">
-                                <a href="{{ url('/loans/shares-to-loans') }}">
-                                    <span class="text-muted">Clear Loan using shares</span>
                                 </a>
                             </li>
                             <li class="item-name">
@@ -192,33 +150,49 @@
                                     <span class="text-muted">Loan categories</span>
                                 </a>
                             </li>
-                            <li class="item-name">
-                                <a href="{{ url('/loans/calculator') }}">
-                                    <span class="text-muted">Loan Calculator</span>
-                                </a>
-                            </li> -->
-                            <!-- <li class="item-name has-arrow">
-                                <a href="#">
-                                    <span class="text-muted">Guarantors</span>
-                                </a>
-                                <ul class="mm-collapse">
-                                    <li class="item-name">
-                                        <a href="{{ url('/guarantors/deduction') }}">
-                                            <span class="text-muted">Recover from guarantors shares</span>
-                                        </a>
-                                    </li>
-                                    <li class="item-name">
-                                        <a href="{{ url('/guarantors/reset') }}">
-                                            <span class="text-muted">Reprocess all guarantors</span>
-                                        </a>
-                                    </li>
-                                </ul>
-                            </li> -->
                         </ul>
                     </li>
                     <li class="Ul_li--hover">
                         <a class="has-arrow" href="#">
-                            <i class="i-Administrator text-20 me-2 text-muted"></i>
+                            <i class="i-Financial text-20 me-2" style="color: #663399;"></i>
+                            <span class="item-name text-15 text-muted">Journals</span>
+                        </a>
+                        <ul class="mm-collapse">
+                            <li class="item-name">
+                                <a href="{{ url('/accounts/main') }}">
+                                    <span class="text-muted">Main Accounts</span>
+                                </a>
+                            </li>
+                        
+                            <li class="item-name">
+                                <a href="{{ url('/accounts/sub') }}">
+                                    <span class="text-muted">Sub Accounts</span>
+                                </a>
+                            </li>
+                            <li class="item-name">
+                                <a href="{{ url('/admin/budget') }}">
+                                    <span class="text-muted">Set Budget</span>
+                                </a>
+                            </li>
+                            
+                            <li class="item-name">
+                                <a href="{{ url('/accounts/transfer') }}">
+                                    <span class="text-muted">Transfer Ledgers</span>
+                                </a>
+                            </li>
+
+                            <li class="item-name">
+                                <a href="{{ url('/admin/end-of-year-processing') }}">
+                                    <span class="text-muted">Close the year</span>
+                                </a>
+                            </li>
+
+
+                        </ul>
+                    </li>
+                    <li class="Ul_li--hover">
+                        <a class="has-arrow" href="#">
+                            <i class="i-Administrator text-20 me-2" style="color: #663399;"></i>
                             <span class="item-name text-15 text-muted">Reports</span>
                         </a>
                         <ul class="mm-collapse">
@@ -227,88 +201,15 @@
                                     <span class="text-muted">Full Consolidated report</span>
                                 </a>
                             </li>
-                            <!-- <li class="item-name has-arrow">
+                            <li class="item-name has-arrow">
                                 <a href="#">
-                                    <span class="text-muted">Shares/FOSA/Share capital</span>
-                                </a>
-                                <ul class="mm-collapse">
-                                    <li class="item-name">
-                                        <a href="{{ url('/reports/shares/contribution') }}">
-                                            <span class="text-muted">Share contributions Report</span>
-                                        </a>
-                                    </li>
-                                    <li class="item-name">
-                                        <a href="{{ url('/reports/shares/capital') }}">
-                                            <span class="text-muted">Share capital contributions Report</span>
-                                        </a>
-                                    </li>
-                                    <li class="item-name">
-                                        <a href="{{ url('/reports/fosa/contribution') }}">
-                                            <span class="text-muted">FOSA contributions Report</span>
-                                        </a>
-                                    </li>
-                                    <li class="item-name">
-                                        <a href="{{ url('/reports/loans/balances') }}">
-                                            <span class="text-muted">Loan/Share/Capital balances (as at a period)</span>
-                                        </a>
-                                    </li>
-                                    <li class="item-name">
-                                        <a href="{{ url('/reports/shares/period') }}">
-                                            <span class="text-muted">Share contributions for the last 12 months</span>
-                                        </a>
-                                    </li>
-                                </ul>
-                            </li> -->
-                            <!-- <li class="item-name has-arrow">
-                                <a href="#">
-                                    <span class="text-muted">Loan Reports</span>
-                                </a>
-                                <ul class="mm-collapse">
-                                    <li class="item-name">
-                                        <a href="{{ url('/reports/loans/issued') }}">
-                                            <span class="text-muted">Loans issued</span>
-                                        </a>
-                                    </li>
-                                    <li class="item-name">
-                                        <a href="{{ url('/reports/loans/member') }}">
-                                            <span class="text-muted">Member loans Report</span>
-                                        </a>
-                                    </li>
-                                    <li class="item-name">
-                                        <a href="{{ url('/reports/guarantors') }}">
-                                            <span class="text-muted">Guarantors report</span>
-                                        </a>
-                                    </li>
-                                    <li class="item-name">
-                                        <a href="{{ url('/reports/contributions') }}">
-                                            <span class="text-muted">Monthly contributions</span>
-                                        </a>
-                                    </li>
-                                    <li class="item-name">
-                                        <a href="{{ url('/reports/contributions/principal') }}">
-                                            <span class="text-muted">Monthly contributions (principals)</span>
-                                        </a>
-                                    </li>
-                                    <li class="item-name">
-                                        <a href="{{ url('/reports/loans/repayments') }}">
-                                            <span class="text-muted">Loan payments listing</span>
-                                        </a>
-                                    </li>
-                                    <li class="item-name">
-                                        <a href="{{ url('/reports/loans/balances/period') }}">
-                                            <span class="text-muted">Loan/Share/Capital balances (as at a period)</span>
-                                        </a>
-                                    </li>
-                                </ul>
-                            </li> -->
-                            <!-- <li class="item-name has-arrow">
-                                <a href="#">
-                                    <span class="text-muted">Final accounts</span>
+                                    <i class="i-Pie-Chart text-20 me-2" style="color: #663399;"></i>
+                                    <span class="item-name text-15 text-muted">Final accounts</span>
                                 </a>
                                 <ul class="mm-collapse">
                                     <li class="item-name">
                                         <a href="{{ url('/reports/accounts/ledger') }}">
-                                            <span class="text-muted">General ledger listing</span>
+                                            <span class="text-muted">Ledgers</span>
                                         </a>
                                     </li>
                                     <li class="item-name">
@@ -318,7 +219,7 @@
                                     </li>
                                     <li class="item-name">
                                         <a href="{{ url('/reports/accounts/profit-loss') }}">
-                                            <span class="text-muted">Profit and Loss</span>
+                                            <span class="text-muted">Profit and Loss </span>
                                         </a>
                                     </li>
                                     <li class="item-name">
@@ -326,12 +227,36 @@
                                             <span class="text-muted">Balance sheet</span>
                                         </a>
                                     </li>
+                                   
+                                    <li class="item-name">
+                                        <a href="{{ url('/reports/accounts/balance-sheet-horizontal') }}">
+                                            <span class="text-muted">Balance sheet - V2</span>
+                                        </a>
+                                    </li>
+
+                                    <li class="item-name">
+                                        <a href="{{ url('/reports/accounts/accounts/alltimetrialbalance') }}">
+                                            <span class="text-muted">Trial Balance - V3</span>
+                                        </a>
+                                    </li>
+
+                                    <li class="item-name">
+                                        <a href="{{ url('/reports/accounts/accounts/alltimetprofitandloss') }}">
+                                            <span class="text-muted">Profit and Loss - V3</span>
+                                        </a>
+                                    </li>
+
+                                    <li class="item-name">
+                                        <a href="{{ url('/reports/accounts/accounts/alltimetbalancesheet') }}">
+                                            <span class="text-muted">Balance sheet - V3</span>
+                                        </a>
+                                    </li>
+
                                 </ul>
-                            </li> -->
-                            <!-- SASRA Menu -->
+                            </li>
                             <li class="Ul_li--hover">
                                 <a class="has-arrow" href="#">
-                                    <i class="i-Bar-Chart text-20 me-2 text-muted"></i>
+                                    <i class="i-Bar-Chart text-20 me-2" style="color: #663399;"></i>
                                     <span class="item-name text-15 text-muted">SASRA</span>
                                 </a>
                                 <ul class="mm-collapse">
@@ -350,125 +275,23 @@
                                     <li class="item-name">
                                         <a href="{{url('/reports/profit_and_loss')}}">ROI</a>
                                     </li>
-                                    <!-- <li class="item-name">
-                                        <a href="{{url('/reports/sasra/finance_position_report')}}">Finance Position</a>
-                                    </li>
-                                    <li class="item-name">
-                                        <a href="{{url('/reports/sasra/income_report')}}">Income Report</a>
-                                    </li> -->
                                     <li class="item-name">
                                         <a href="{{url('/reports/sasra/loan_performance')}}">Loans Performance / RISK classifications</a>
                                     </li>
-                                    <!-- <li class="item-name">
-                                        <a href="{{url('/reports/sasra/loan_performance/v2')}}">Loans Performance / RISK classifications - V2</a>
-                                    </li> -->
-                                    <!-- <li class="item-name">
-                                        <a href="{{url('/reports/sasra/loan_performance/insider_lending')}}">Insider Lending</a>
-                                    </li> -->
-                                    <!-- <li class="item-name">
-                                        <a href="{{url('/reports/sasra/outstandingloans/y')}}">Loans - All OutStanding</a>
-                                    </li>
-                                    <li class="item-name">
-                                        <a href="{{url('/reports/sasra/outstandingloans/y/active')}}">Loans - OutStanding & Active members only</a>
-                                    </li>
-                                    <li class="item-name">
-                                        <a href="{{url('/reports/sasra/outstandingloans/n')}}">Loans - Fully Paid</a>
-                                    </li>
-                                    <li class="item-name">
-                                        <a href="{{url('/reports/sasra/deposits')}}">Capital Balances</a>
-                                    </li>
-                                    <li class="item-name">
-                                        <a href="{{url('/reports/sasra/share')}}">Share Balances (beta)</a>
-                                    </li>
-                                    <li class="item-name">
-                                        <a href="{{url('/reports/sasra/return_on_investment_report')}}">Return on Investment Report</a>
-                                    </li>
-                                    <li class="item-name">
-                                        <a href="{{url('/reports/sasra/finance_position_report')}}">Finance Position Report</a>
-                                    </li>
-                                    <li class="item-name">
-                                        <a href="{{url('/reports/sasra/income_report')}}">Income Report</a>
-                                    </li>
-                                    <li class="item-name">
-                                        <a href="{{url('/reports/sasra/loan_performance')}}">Loans Performance / RISK classifications</a>
-                                    </li>
-                                    <li class="item-name">
-                                        <a href="{{url('/reports/sasra/loan_performance/true')}}">Loans Performance / RISK classifications - V2</a>
-                                    </li>
-                                    <li class="item-name">
-                                        <a href="{{url('/reports/sasra/insider_lending')}}">Insider Lending</a>
-                                    </li> -->
                                 </ul>
                             </li>
                         </ul>
                     </li>
-                    <!-- <li class="Ul_li--hover">
-                        <a class="has-arrow" href="#">
-                            <i class="i-Pie-Chart text-20 me-2 text-muted"></i>
-                            <span class="item-name text-15 text-muted">Interest & Dividends</span>
-                        </a>
-                        <ul class="mm-collapse">
-                            <li class="item-name">
-                                <a href="{{ url('/interest/shares') }}">
-                                    <span class="text-muted">Interest on share deposits</span>
-                                </a>
-                            </li>
-                            <li class="item-name">
-                                <a href="{{ url('/dividends/shares') }}">
-                                    <span class="text-muted">Dividends on Share capital</span>
-                                </a>
-                            </li>
-                            <li class="item-name">
-                                <a href="{{ url('/interest/fosa') }}">
-                                    <span class="text-muted">Interest on FOSA</span>
-                                </a>
-                            </li>
-                        </ul>
-                    </li> -->
+                    
                     <li class="Ul_li--hover">
                         <a class="has-arrow" href="#">
-                            <i class="i-Journal text-20 me-2 text-muted"></i>
-                            <span class="item-name text-15 text-muted">Journal Accounts</span>
-                        </a>
-                        <!-- <ul class="mm-collapse">
-                            <li class="item-name">
-                                <a href="{{ url('/accounts/main') }}">
-                                    <span class="text-muted">Main accounts</span>
-                                </a>
-                            </li>
-                            <li class="item-name">
-                                <a href="{{ url('/accounts/sub') }}">
-                                    <span class="text-muted">Sub accounts</span>
-                                </a>
-                            </li>
-                            <li class="item-name">
-                                <a href="{{ url('/accounts/transfer') }}">
-                                    <span class="text-muted">Journal accounts transfers</span>
-                                </a>
-                            </li>
-                        </ul> -->
-                    </li>
-                    <li class="Ul_li--hover">
-                        <a class="has-arrow" href="#">
-                            <i class="i-Download text-20 me-2 text-muted"></i>
+                            <i class="i-Download text-20 me-2" style="color: #663399;"></i>
                             <span class="item-name text-15 text-muted">Downloads</span>
                         </a>
-                        <!-- <ul class="mm-collapse">
-                            <li class="item-name">
-                                <a href="{{ url('/downloads/view') }}">
-                                    <span class="text-muted">View downloads</span>
-                                </a>
-                            </li>
-                            <li class="item-name">
-                                <a href="{{ url('/downloads/add-type') }}">
-                                    <span class="text-muted">Add more download types</span>
-                                </a>
-                            </li>
-                        </ul> -->
                     </li>
                     <li class="Ul_li--hover">
                         <a class="has-arrow" href="#">
-                            <i class="i-Administrator text-20 me-2 text-muted"></i>
+                            <i class="i-Administrator text-20 me-2" style="color: #663399;"></i>
                             <span class="item-name text-15 text-muted">Sacco Admin</span>
                         </a>
                         <ul class="mm-collapse">
@@ -482,75 +305,26 @@
                                             <span class="text-muted">Modify access rights</span>
                                         </a>
                                     </li>
-                                    <!-- <li class="item-name">
-                                        <a href="{{ url('/admin/modules') }}">
-                                            <span class="text-muted">Sacco system modules</span>
-                                        </a>
-                                    </li> -->
                                 </ul>
                             </li>
                             <li class="item-name has-arrow">
-                                <!-- <a href="#">
+                                <a href="{{ url('/admin/defaults') }}">
                                     <span class="text-muted">Sacco defaults</span>
-                                </a> -->
-                                <!-- <ul class="mm-collapse">
-                                    <li class="item-name">
-                                        <a href="{{ url('/admin/defaults') }}">
-                                            <span class="text-muted">List sacco defaults</span>
-                                        </a>
-                                    </li>
-                                    <li class="item-name">
-                                        <a href="{{ url('/admin/defaults/add') }}">
-                                            <span class="text-muted">Add defaults</span>
-                                        </a>
-                                    </li>
-                                    <li class="item-name">
-                                        <a href="{{ url('/admin/default-accounts/add') }}">
-                                            <span class="text-muted">Add default accounts</span>
-                                        </a>
-                                    </li>
-                                </ul> -->
-                            </li>
-                            <li class="item-name has-arrow">
-                                <!-- <a href="#">
-                                    <span class="text-muted">Budget and dividends</span>
-                                </a> -->
-                                <!-- <ul class="mm-collapse">
-                                    <li class="item-name">
-                                        <a href="{{ url('/admin/budget') }}">
-                                            <span class="text-muted">Set budget</span>
-                                        </a>
-                                    </li>
-                                </ul> -->
+                                </a>
                             </li>
                             <li class="item-name">
                                 <a href="{{ url('/admin/periods') }}">
                                     <span class="text-muted">Accounting periods</span>
                                 </a>
                             </li>
-                            <!-- <li class="item-name">
-                                <a href="{{ url('/admin/year-end') }}">
-                                    <span class="text-muted">End of year processing</span>
-                                </a>
-                            </li> -->
                         </ul>
                     </li>
                     <li class="Ul_li--hover">
                         <a class="has-arrow" href="#">
-                            <i class="i-Administrator text-20 me-2 text-muted"></i>
+                            <i class="i-Administrator text-20 me-2" style="color: #663399;"></i>
                             <span class="item-name text-15 text-muted">User Profile</span>
                         </a>
                         <ul class="mm-collapse">
-                            <!-- <li class="item-name">
-                                <a href="{{ url('/profile') }}">
-                                    <span class="text-muted">View Profile</span>
-                                </a>
-                            </li>
-                            <li class="item-name">
-                                <a href="{{ url('/profile/edit/' . Auth::id()) }}">
-                                    <span class="text-muted">Edit Profile</span>
-                                </a>
-                            </li> -->
                             <li class="item-name">
                                 <a href="{{ url('/profile/password') }}">
                                     <span class="text-muted">Change Password</span>
