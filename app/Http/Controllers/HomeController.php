@@ -22,6 +22,7 @@ class HomeController extends Controller
     protected $minimumLoanThreshold;
     protected $currentPeriod;
     protected $IgnoreLoanBalanceBelow;
+    protected $default_company_name;
 
     public function __construct()
     {
@@ -38,6 +39,9 @@ class HomeController extends Controller
         $this->IgnoreLoanBalanceBelow = DB::table('sacco_defaults')
             ->where('default_name', 'min_loan_amount_bill_able')
             ->value('default_value') ?? 0;
+        
+       
+
     }
 
     public function redirectBasedOnAuth()
@@ -1551,7 +1555,7 @@ public function updatePassword(Request $request, $id)
         $data = [
             'currentPeriod' => $currentPeriod,
             'periods' => $periods,
-        ];
+        ]; 
 
         return view('admin.periods.index', compact('data'));
     }
@@ -1609,10 +1613,19 @@ public function updatePassword(Request $request, $id)
     {
         $period = DB::table('sacco_period')->where('period_id', $id)->first();
 
+        // dd($period->period_name );
+
         if (!$period) {
             return redirect()->route('admin.periods')->withErrors(['Period not found.']);
         }
 
+        $isOpen = $this->isPeriodOpen($period->period_name);
+
+        if (!$isOpen) {
+            return redirect()->route('admin.periods')->withErrors(['Period is closed.']);
+        }
+
+        // dd($isOpen);
         DB::table('sacco_period')
             ->update(['period_active' => 'N']);
 
@@ -1628,6 +1641,33 @@ public function updatePassword(Request $request, $id)
         $data = [];
         return redirect()->route('admin.periods')->with('success', 'Period activated successfully.')->with('data', $data);
     }
+
+
+   private function isPeriodOpen($periodToCheck)
+{
+    // Fetch the last closed period from the table
+    $lastClosedPeriod = DB::table('sacco_end_year_proc')
+        ->orderBy('end_year_proc_period', 'desc')
+        ->value('end_year_proc_period');
+        if($periodToCheck <= $lastClosedPeriod)
+        {
+            return false;
+        }
+
+        $currentDate = Carbon::now();
+        $checkDate = Carbon::createFromFormat('Ym', $periodToCheck)->startOfMonth();
+    
+        // Calculate the difference in months between the current date and the period to check
+        $monthsDifference = $currentDate->diffInMonths($checkDate);
+    
+         
+        if ($monthsDifference > 16) {
+            return false; // Period is too far behind
+        }
+return true;
+    
+}
+
 
     public function modifyShares(Request $request)
 {
