@@ -131,11 +131,16 @@
                             <span class="item-name text-15 text-muted">Loans</span>
                         </a>
                         <ul class="mm-collapse">
-                            <li class="item-name">
+                        <li class="item-name">
+                                <a href="{{ url('/loans/batch') }}">
+                                    <span class="text-muted">Batches</span>
+                                </a>
+                            </li>
+                            <!-- <li class="item-name">
                                 <a href="{{ url('/loans/issued') }}">
                                     <span class="text-muted">Loans issued</span>
                                 </a>
-                            </li>
+                            </li> -->
                             <li class="item-name">
                                 <a href="{{ url('/loans/apply') }}">
                                     <span class="text-muted">Apply for Loan (Self)</span>

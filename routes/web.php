@@ -3,6 +3,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\Auth\CustomAuthController;
  
+use App\Http\Controllers\LoanController;
 
 
 Route::get('/', [HomeController::class, 'redirectBasedOnAuth'])->name('home');
@@ -207,7 +208,47 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
 
     // Loans
     Route::get('/loans/issued', [HomeController::class, 'loansIssued'])->name('loans.issued');
-    Route::get('/loans/batch', [HomeController::class, 'loansBatch'])->name('loans.batch');
+   
+
+
+    Route::get('/loans/batches', [LoanController::class, 'loans_batches'])->name('loans.batches');
+    Route::get('/loans/batch', [LoanController::class, 'loans_batch'])->name('loans.batch');
+    Route::post('/loans/batch/store', [LoanController::class, 'loans_batch_store'])->name('loans.batch.store')->middleware('check_user_rights:add_loan_type');
+    Route::get('/loans/batch/edit/{batch_id}', [LoanController::class, 'loans_batch_edit'])->name('loans.batch.edit')->middleware('check_user_rights:add_loan_type');
+    Route::post('/loans/batch/update/{batch_id}', [LoanController::class, 'loans_batch_update'])->name('loans.batch.update')->middleware('check_user_rights:add_loan_type');
+    Route::get('/loans/batch/delete/{batch_id}', [LoanController::class, 'loans_batch_delete'])->name('loans.batch.delete')->middleware('check_user_rights:add_loan_type');
+    Route::get('/loans/batch/loans/{batch_id}', [LoanController::class, 'loans_batch_loans'])->name('loans.batch.loans')->middleware('check_user_rights:add_loan_type');
+    Route::post('/loans/batch/loans/add/{batch_id}', [LoanController::class, 'loans_batch_loans_add'])->name('loans.batch.loans.add')->middleware('check_user_rights:add_loan_type');
+     
+    Route::get('/loans/batch/transactions/{batch_id}', [LoanController::class, 'loans_batch_transactions'])->name('loans.batch.transactions')->middleware('check_user_rights:add_loan_type');
+    Route::get('/loans/batch/transactions/add/{batch_id}', [LoanController::class, 'loans_batch_transactions_add_view'])->name('loans.batch.transactions.add_view')->middleware('check_user_rights:add_loan_type');
+    Route::post('/loans/batch/transactions/add/{batch_id}', [LoanController::class, 'loans_batch_transactions_add'])->name('loans.batch.transactions.add')->middleware('check_user_rights:add_loan_type');
+    Route::get('/loans/batch/transactions/delete/{transaction_id}', [LoanController::class, 'loans_batch_transactions_delete'])->name('loans.batch.transactions.delete')->middleware('check_user_rights:add_loan_type');
+    Route::get('/search/loan_batch/members', [LoanController::class, 'searchMembers'])->name('search.loan_batch.members')->middleware('check_user_rights:add_loan_type');
+    Route::get('/search/loan_batch/member_loans', [LoanController::class, 'searchMemberLoans'])->name('loan_batch.member_loans')->middleware('check_user_rights:add_loan_type');
+    Route::get('/loans/get-free-shares', [LoanController::class, 'LoanGetFreeShares'])->name('loan.get.free.shares')->middleware('check_user_rights:add_loan_type');
+    Route::post('/loans/batch/transactions/update/{batch_id}/{transaction_id}', [LoanController::class, 'loans_batch_transactions_update'])->name('loans.batch.transactions.update')->middleware('check_user_rights:add_loan_type');
+
+    // Other routes...
+ 
+    Route::get('/loans/batch/transactions/edit/{transaction_id}', [LoanController::class, 'loans_batch_transactions_edit'])->name('loans.batch.transactions.edit')->middleware('check_user_rights:add_loan_type');
+    Route::get('/loans/batch/transactions/edit/{batch_id}/{transaction_id}', [LoanController::class, 'loans_batch_transactions_edit'])->name('loans.batch.transactions.edit')->middleware('check_user_rights:add_loan_type');
+
+    Route::get('/loans/batch/transactions/delete/{transaction_id}', [LoanController::class, 'loans_batch_transactions_delete'])->name('loans.batch.transactions.delete')->middleware('check_user_rights:add_loan_type');
+    
+
+
+ 
+
+
+
+
+
+
+
+    // Route::get('/loans/batch/edit/{batch_id}', [LoanController::class, 'loans_batch_edit'])->name('loans.batch.edit');
+
+
   
     Route::get('/loans/end-month', [HomeController::class, 'loansEndMonth'])->name('loans.end-month');
     Route::get('/loans/un-finished', [HomeController::class, 'loansUnFinished'])->name('loans.un-finished');
@@ -267,8 +308,8 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
     Route::get('/reports/loans/balances', [HomeController::class, 'reportsLoansBalances'])->name('reports.loans.balances');
     Route::get('/reports/shares/period', [HomeController::class, 'reportsSharesPeriod'])->name('reports.shares.period');
 
-    Route::get('/reports/loans/issued', [HomeController::class, 'reportsLoansIssued'])->name('reports.loans.issued')->middleware('check_user_rights:rpt_loans_issued');
-    Route::get('/reports/loans/issued/data', [HomeController::class, 'getLoansIssued'])->name('reports.loans.issued.data')->middleware('check_user_rights:rpt_loans_issued');
+    // Route::get('/reports/loans/issued', [HomeController::class, 'reportsLoansIssued'])->name('reports.loans.issued')->middleware('check_user_rights:rpt_loans_issued');
+    // Route::get('/reports/loans/issued/data', [HomeController::class, 'getLoansIssued'])->name('reports.loans.issued.data')->middleware('check_user_rights:rpt_loans_issued');
 
 
     Route::get('/reports/loans/member', [HomeController::class, 'reportsLoansMember'])->name('reports.loans.member');

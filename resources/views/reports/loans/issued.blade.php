@@ -2,7 +2,7 @@
 
 @section('content')
 <div class="breadcrumb d-flex justify-content-between align-items-center">
-    <h1>Loan Repayments Report</h1>
+    <h1>Loan Issued</h1>
     <div class="header-part-right">
         <ul>
             @if(Auth::check())
@@ -16,200 +16,80 @@
     </div>
 </div>
 <div class="separator-breadcrumb border-top"></div>
-
-<div class="row mb-4">
-    <div class="col-md-12 mb-4">
-        <div class="card text-start">
-            <div class="card-body">
-                <div class="card-title mb-3">Loan Repayments Report</div>
-                <form id="searchForm" method="GET" action="{{ route('reports.loans.repayments') }}">
-                    <div class="form-group">
-                        <label for="startPeriod">Start Period (YYYYMM)</label>
-                        <input type="text" name="startPeriod" id="startPeriod" class="form-control" value="{{ request('startPeriod', date('Ym')) }}" placeholder="Start Period">
-                    </div>
-                    <div class="form-group">
-                        <label for="endPeriod">End Period (YYYYMM)</label>
-                        <input type="text" name="endPeriod" id="endPeriod" class="form-control" value="{{ request('endPeriod', date('Ym')) }}" placeholder="End Period">
-                    </div>
-                    <button type="submit" class="btn btn-primary">Search</button>
-                </form>
-                <button id="downloadExcel" class="btn btn-success mb-3">Download Excel</button>
-                <div id="loan-repayment-table-container" style="overflow-x: auto;">
-                    <table class="table table-bordered" id="loan-repayment-table" style="white-space: nowrap;">
-                        <thead>
-                            <tr>
-                                <th>#</th>
-                                <th>Member Name</th>
-                                <th>Phone Number</th>
-                                <th>Sacco ID</th>
-                                <th>Loan Type</th>
-                                <th class="text-right">Loan Amount</th>
-                                <th class="text-right">Loan Balance</th>
-                                <th class="text-right">Amount Paid</th>
-                                <th>Period Paid</th>
-                                <th>Paid On</th>
-                                <th>Document Number</th>
-                            </tr>
-                        </thead>
-                        <tbody id="loan-repayment-data"></tbody>
-                        <tfoot>
-                            <tr>
-                                <th colspan="5" class="text-right">Totals:</th>
-                                <th class="text-right" id="total-loan-amount"></th>
-                                <th class="text-right" id="total-loan-balance"></th>
-                                <th class="text-right" id="total-amount-paid"></th>
-                                <th colspan="3"></th>
-                            </tr>
-                        </tfoot>
-                    </table>
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card mb-4">
+                <div class="card-body">
+                   
+                    <form method="GET" action="{{ route('reports.loans.issued') }}">
+                        <div class="row">
+                            <div class="col-md-6 form-group mb-3">
+                                <label for="search_name">Member Name</label>
+                                <input class="form-control" id="search_name" type="text" name="search_name" placeholder="Enter member name" value="{{ request('search_name') }}">
+                            </div>
+                            <div class="col-md-6 form-group mb-3">
+                                <label for="search_company_name">Company Name</label>
+                                <input class="form-control" id="search_company_name" type="text" name="search_company_name" placeholder="Enter company name" value="{{ request('search_company_name') }}">
+                            </div>
+                            <div class="col-md-6 form-group mb-3">
+                                <label for="search_sacco_id">Sacco ID</label>
+                                <input class="form-control" id="search_sacco_id" type="text" name="search_sacco_id" placeholder="Enter sacco ID" value="{{ request('search_sacco_id') }}">
+                            </div>
+                            <div class="col-md-3 form-group mb-3">
+                                <label for="start_period">Start Period (YYYYmm)</label>
+                                <input class="form-control" id="start_period" type="text" name="start_period" placeholder="e.g., 202301" value="{{ request('start_period') }}">
+                            </div>
+                            <div class="col-md-3 form-group mb-3">
+                                <label for="end_period">End Period (YYYYmm)</label>
+                                <input class="form-control" id="end_period" type="text" name="end_period" placeholder="e.g., 202312" value="{{ request('end_period') }}">
+                            </div>
+                            <div class="col-md-12">
+                                <button class="btn btn-primary">Search</button>
+                            </div>
+                        </div>
+                    </form>
                 </div>
-                <div id="loading-status" class="loading-status">Loading...</div>
+            </div>
+        </div>
+
+        <div class="col-md-12 mb-4">
+            <div class="card text-start">
+                <div class="card-body">
+                   
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th scope="col">#</th>
+                                    <th scope="col">Member Name</th>
+                                    <th scope="col">Company Name</th>
+                                    <th scope="col">Sacco ID</th>
+                                    <th scope="col">Loan Amount</th>
+                                    <th scope="col">Loan Taken Period</th>
+                                    <th scope="col">Start Deduction Period</th>
+                                    <th scope="col">Issued On</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($loansIssued as $index => $loan)
+                                <tr>
+                                    <td>{{ $index + 1 }}</td>
+                                    <td>{{ $loan->member_name }}</td>
+                                    <td>{{ $loan->company_name }}</td>
+                                    <td>{{ $loan->member_sacco_id }}</td>
+                                    <td>{{ number_format($loan->loan_amount, 2) }}</td>
+                                    <td>{{ $loan->loan_taken_period }}</td>
+                                    <td>{{ $loan->loan_start_deduction_period }}</td>
+                                    <td>{{ \Carbon\Carbon::parse($loan->loan_on)->format('d/m/Y') }}</td>
+                                </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </div>
-
-<style>
-    .loading-status {
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        font-size: 36px;
-        font-weight: bold;
-        color: #000;
-        z-index: 9999;
-        animation: blinkingText 1.2s infinite;
-    }
-
-    @keyframes blinkingText {
-        0% { color: #000; }
-        49% { color: #000; }
-        50% { color: transparent; }
-        99% { color: transparent; }
-        100% { color: #000; }
-    }
-
-    .table {
-        position: relative;
-        z-index: 1;
-    }
-</style>
-
-<!-- Include jQuery library -->
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/FileSaver.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.16.9/xlsx.full.min.js"></script>
-
-<script>
-    $(document).ready(function() {
-        let offset = 0;
-        const limit = 100;
-        let isLoading = false;
-        let allRecordsLoaded = false;
-        let rowCount = 1;
-        let totalLoanAmount = 0;
-        let totalLoanBalance = 0;
-        let totalAmountPaid = 0;
-
-        function fetchRepayments(startPeriod, endPeriod) {
-            if (isLoading || allRecordsLoaded) return;
-            isLoading = true;
-
-            $.ajax({
-                url: "{{ route('reports.loans.repayments.data') }}",
-                method: "GET",
-                data: { startPeriod: startPeriod, endPeriod: endPeriod, offset: offset, limit: limit },
-                success: function(response) {
-                    const repayments = response.data;
-
-                    let tableRows = '';
-                    repayments.forEach((repayment, index) => {
-                        const loanBalance = repayment.loan_amount - repayment.loan_loan_paid;
-                        tableRows += `
-                            <tr>
-                                <td>${rowCount++}</td>
-                                <td>${repayment.member_name}</td>
-                                <td>${repayment.member_phone_no}</td>
-                                <td>${repayment.member_sacco_id}</td>
-                                <td>${repayment.loan_type_name}</td>
-                                <td class="text-right">${parseFloat(repayment.loan_amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                                <td class="text-right">${parseFloat(loanBalance).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                                <td class="text-right">${parseFloat(repayment.loan_payments_amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                                <td>${repayment.loan_payments_period}</td>
-                                <td>${new Date(repayment.loan_payments_paid_on).toLocaleDateString()}</td>
-                                <td>${repayment.loan_payments_docno}</td>
-                            </tr>
-                        `;
-                        totalLoanAmount += parseFloat(repayment.loan_amount);
-                        totalLoanBalance += parseFloat(loanBalance);
-                        totalAmountPaid += parseFloat(repayment.loan_payments_amount);
-                    });
-
-                    $('#loan-repayment-table tbody').append(tableRows);
-
-                    if (repayments.length < limit) {
-                        allRecordsLoaded = true;
-                        $('#loading-status').text('All records loaded').removeClass('loading-status');
-                        displayTotals();
-                    } else {
-                        offset += limit;
-                        isLoading = false;
-                        fetchRepayments(startPeriod, endPeriod); // Recursively fetch the next batch
-                    }
-                },
-                error: function(xhr, status, error) {
-                    console.error('Error:', error);
-                    $('#loading-status').text('Failed to fetch repayment data. Please try again later.');
-                    isLoading = false;
-                }
-            });
-        }
-
-        function displayTotals() {
-            $('#total-loan-amount').text(totalLoanAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
-            $('#total-loan-balance').text(totalLoanBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
-            $('#total-amount-paid').text(totalAmountPaid.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
-        }
-
-        $('#searchForm').on('submit', function(e) {
-            e.preventDefault();
-            offset = 0;
-            rowCount = 1;
-            totalLoanAmount = 0;
-            totalLoanBalance = 0;
-            totalAmountPaid = 0;
-            allRecordsLoaded = false;
-            $('#loan-repayment-table tbody').empty();
-            $('#loading-status').text('Loading...').addClass('loading-status');
-            fetchRepayments($('#startPeriod').val(), $('#endPeriod').val());
-        });
-
-        // Initial load
-        fetchRepayments('{{ request('startPeriod', date('Ym')) }}', '{{ request('endPeriod', date('Ym')) }}');
-
-        $('#downloadExcel').on('click', function() {
-            $.ajax({
-                url: "{{ route('reports.loans.repayments.download') }}",
-                method: "GET",
-                data: { startPeriod: $('#startPeriod').val(), endPeriod: $('#endPeriod').val() },
-                xhrFields: {
-                    responseType: 'blob'
-                },
-                success: function(data) {
-                    const url = window.URL.createObjectURL(new Blob([data]));
-                    const link = document.createElement('a');
-                    link.href = url;
-                    link.setAttribute('download', 'LoanRepaymentsReport.xlsx');
-                    document.body.appendChild(link);
-                    link.click();
-                },
-                error: function(xhr, status, error) {
-                    console.error('Error:', error);
-                    alert('Failed to download the report. Please try again later.');
-                }
-            });
-        });
-    });
-</script>
 @endsection
