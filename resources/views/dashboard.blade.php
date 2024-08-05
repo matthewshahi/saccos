@@ -97,7 +97,7 @@
         </a>
     </div>
     <div class="col-md-3 col-sm-6 mb-4">
-        <a href="{{ route('dashboard') }}" class="card-link">
+        <a href="{{ url('/reports/loans/issued') }}" class="card-link">
             <div class="card">
                 <div class="card-body text-center">
                     <h6 class="card-title">Active Loans</h6>
@@ -110,7 +110,7 @@
         </a>
     </div>
     <div class="col-md-3 col-sm-6 mb-4">
-        <a href="{{ route('dashboard') }}" class="card-link">
+    <a href="{{ url('/reports/sasra/loan_performance/') }}" class="card-link">
             <div class="card">
                 <div class="card-body text-center">
                     <h6 class="card-title">Delinquent Loans</h6>
