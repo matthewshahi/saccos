@@ -48,7 +48,7 @@
         <a href="{{ url('/reports/accounts/profit-loss') }}" class="card-link">
             <div class="card">
                 <div class="card-body text-center">
-                    <h6 class="card-title">Protability ({{date('Ym')}})</h6>
+                    <h6 class="card-title">Profitability ({{date('Ym')}})</h6>
                     <div class="d-flex justify-content-center align-items-center">
                         <i class="i-Waiter text-warning" style="font-size: 2rem; margin-right: 0.5rem;"></i>
                         <p class="card-text mb-0" id="pendingAppsCount" style="font-size: 1.5rem;">{{ number_format($pendingAppsCount) }}</p>
