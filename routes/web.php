@@ -2,6 +2,8 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\Auth\CustomAuthController;
+
+use App\Http\Controllers\LoanPerformanceController;
  
 use App\Http\Controllers\LoanController;
 
@@ -166,7 +168,7 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
         ->name('reports.sasra.loanperformance.data')
         ->middleware('check_user_rights:rpt_loans_issued');
         
-        Route::get('/reports/sasra/loan_performance/{version?}', [HomeController::class, 'reportSasraLoanPerformance'])
+        Route::get('/reports/sasra/loan_performance/{version?}', [LoanPerformanceController::class, 'reportLoanPerformance'])
         ->name('reports.sasra.loanperformance')
         ->middleware('check_user_rights:rpt_loans_issued');
 

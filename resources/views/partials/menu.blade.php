@@ -307,6 +307,9 @@
                                     <li class="item-name">
                                         <a href="{{url('/reports/sasra/loan_performance')}}">Loans Performance / RISK classifications</a>
                                     </li>
+                                    <li class="item-name">
+                                        <a href="{{url('/reports/sasra/loan_performance/1')}}">Loans Performance / RISK classifications / Officia;s</a>
+                                    </li>
                                 </ul>
                             </li>
                         </ul>
