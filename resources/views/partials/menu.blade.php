@@ -349,6 +349,11 @@
                                     <span class="text-muted">Accounting periods</span>
                                 </a>
                             </li>
+                            <li class="item-name">
+                                <a href="{{ url('/admin/mpesa') }}">
+                                    <span class="text-muted">MPESA configs</span>
+                                </a>
+                            </li>
                         </ul>
                     </li>
                     <li class="Ul_li--hover">

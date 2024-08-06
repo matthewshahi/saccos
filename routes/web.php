@@ -7,6 +7,8 @@ use App\Http\Controllers\LoanPerformanceController;
  
 use App\Http\Controllers\LoanController;
 
+use App\Http\Controllers\MpesaController;
+
 
 Route::get('/', [HomeController::class, 'redirectBasedOnAuth'])->name('home');
 Route::get('/home', [HomeController::class, 'redirectBasedOnAuth'])->name('home');
@@ -401,6 +403,9 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
     Route::get('/admin/periods/create', [HomeController::class, 'adminPeriodsCreate'])->name('admin.periods.create')->middleware('check_user_rights:add_period');
     Route::post('/admin/periods/store', [HomeController::class, 'adminPeriodsStore'])->name('admin.periods.store')->middleware('check_user_rights:add_period');
     Route::get('/admin/periods/activate/{id}', [HomeController::class, 'adminPeriodsActivate'])->name('admin.periods.activate')->middleware('check_user_rights:add_period');
+
+    Route::get('/admin/mpesa', [MpesaController::class, 'showMpesaConfig'])->name('admin.mpesa')->middleware('check_user_rights:add_new_sacco_member');
+    Route::post('/admin/mpesa/store', [MpesaController::class, 'storeMpesaConfig'])->name('mpesa.config.store')->middleware('check_user_rights:add_new_sacco_member');
 
 
      
