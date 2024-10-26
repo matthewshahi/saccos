@@ -5426,6 +5426,59 @@ public function reportsAccountsTrialBalance(Request $request)
 
 
 
+// private function fetchAccountsForTrialBalance($startPeriod, $endPeriod)
+// {
+//     $accounts = [];
+
+//     // Chunk through transactions to avoid memory issues
+//     DB::table('sacco_accounts_trans')
+//         ->whereBetween('accounts_trans_period', [$startPeriod, $endPeriod])
+//         ->orderBy('accounts_trans_id', 'asc')
+//         ->chunk(10000, function ($transactions) use (&$accounts) {
+//             foreach ($transactions as $transaction) {
+//                 $subAccount = DB::table('sacco_sub_account')
+//                     ->join('sacco_main_account', 'sacco_sub_account.sub_account_main_account', '=', 'sacco_main_account.main_account_id')
+//                     ->where('sacco_sub_account.sub_account_id', $transaction->accounts_trans_sub_account)
+//                     ->select(
+//                         'sacco_sub_account.sub_account_id',
+//                         'sacco_sub_account.sub_account_name',
+//                         'sacco_sub_account.sub_account_code',
+//                         'sacco_main_account.main_account_code',
+//                         'sacco_main_account.main_account_type'
+//                     )
+//                     ->first();
+
+//                 if ($subAccount) {
+//                     $key = $subAccount->sub_account_id;
+
+//                     if (!isset($accounts[$key])) {
+//                         $accounts[$key] = (object) [
+//                             'sub_account_id' => $subAccount->sub_account_id,
+//                             'sub_account_name' => $subAccount->sub_account_name,
+//                             'sub_account_code' => $subAccount->sub_account_code,
+//                             'main_account_code' => $subAccount->main_account_code,
+//                             'main_account_type' => $subAccount->main_account_type,
+//                             'total_debit' => 0,
+//                             'total_credit' => 0
+//                         ];
+//                     }
+
+//                     $accounts[$key]->total_debit += $transaction->accounts_trans_debit;
+//                     $accounts[$key]->total_credit += $transaction->accounts_trans_credit;
+//                 }
+//             }
+//         });
+
+//     // Convert array to a collection
+//     $accountsCollection = collect($accounts);
+
+//     // Group the accounts by main account type
+//     $groupedAccounts = $accountsCollection->groupBy('main_account_type');
+
+//     return $groupedAccounts;
+// }
+
+
 private function fetchAccountsForTrialBalance($startPeriod, $endPeriod)
 {
     $accounts = [];
@@ -5449,15 +5502,15 @@ private function fetchAccountsForTrialBalance($startPeriod, $endPeriod)
                     ->first();
 
                 if ($subAccount) {
-                    $key = $subAccount->sub_account_id;
+                    $key = trim($subAccount->sub_account_id);
 
                     if (!isset($accounts[$key])) {
                         $accounts[$key] = (object) [
-                            'sub_account_id' => $subAccount->sub_account_id,
-                            'sub_account_name' => $subAccount->sub_account_name,
-                            'sub_account_code' => $subAccount->sub_account_code,
-                            'main_account_code' => $subAccount->main_account_code,
-                            'main_account_type' => $subAccount->main_account_type,
+                            'sub_account_id' => trim($subAccount->sub_account_id),
+                            'sub_account_name' => trim($subAccount->sub_account_name),
+                            'sub_account_code' => trim($subAccount->sub_account_code),
+                            'main_account_code' => trim($subAccount->main_account_code),
+                            'main_account_type' => trim($subAccount->main_account_type),
                             'total_debit' => 0,
                             'total_credit' => 0
                         ];
@@ -5477,9 +5530,6 @@ private function fetchAccountsForTrialBalance($startPeriod, $endPeriod)
 
     return $groupedAccounts;
 }
-
-
-
 
 
 

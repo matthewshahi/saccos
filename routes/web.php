@@ -8,7 +8,7 @@ use App\Http\Controllers\LoanPerformanceController;
 use App\Http\Controllers\LoanController;
 
 use App\Http\Controllers\MpesaController;
-
+use App\Http\Controllers\RandController;
 
 Route::get('/', [HomeController::class, 'redirectBasedOnAuth'])->name('home');
 Route::get('/home', [HomeController::class, 'redirectBasedOnAuth'])->name('home');
@@ -407,7 +407,13 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
     Route::get('/admin/mpesa', [MpesaController::class, 'showMpesaConfig'])->name('admin.mpesa')->middleware('check_user_rights:add_new_sacco_member');
     Route::post('/admin/mpesa/store', [MpesaController::class, 'storeMpesaConfig'])->name('mpesa.config.store')->middleware('check_user_rights:add_new_sacco_member');
 
+    
 
+
+    Route::get('/randomize-members', [RandController::class, 'randomizeMembers'])->name('randomize.members');
+    Route::get('/randomize-loan-payments', [RandController::class, 'randomizeLoanPayments'])->name('randomize.loan.payments');
+    Route::get('/randomize-shares', [RandController::class, 'randomizeShares'])->name('randomize.shares');
+    Route::get('/randomize-accounts-transactions', [RandController::class, 'randomizeAccountsTransactions'])->name('randomize.accounts.transactions');
      
     
 });

@@ -81,6 +81,8 @@
                                     <tr>
                                         <td colspan="4"><strong>{{ $mainAccountType }}</strong></td>
                                     </tr>
+
+                                   
                                     @foreach($accountGroup as $account)
                                         @php
                                             $debit = (float) $account->total_debit;
