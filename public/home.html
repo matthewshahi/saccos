@@ -11,22 +11,32 @@
     <style>
         body {
             font-family: 'Poppins', sans-serif;
-            background-color: #f7f3e8; /* Light brown background */
+            background-color: #f7f3e8;
         }
         .navbar {
-            background-color: #a0522d; /* Rich brown */
+            background-color: #a0522d;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
         }
         .navbar-brand, .nav-link {
             color: #ffffff !important;
         }
+        .nav-link:hover {
+            color: #f7c28e !important;
+        }
         .hero-section {
-            background-image: url('https://source.unsplash.com/1600x600/?financial,success');
-            background-size: cover;
-            background-position: center;
-            color: white;
             text-align: center;
             padding: 100px 20px;
+            color: white;
+            background-image: url('https://picsum.photos/1600/600?random=11');
+            background-size: cover;
+            background-position: center;
             text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.5);
+        }
+        .hero-section h1 {
+            margin-bottom: 20px;
+            font-size: 48px;
         }
         .section-title {
             margin: 50px 0 30px;
@@ -34,36 +44,55 @@
             color: #a0522d;
             font-weight: 600;
         }
-        .carousel-item img {
-            width: 100%;
-            height: 600px;
+        .cta-button {
+            display: inline-block;
+            padding: 10px 20px;
+            border: 2px solid #a0522d;
+            color: #a0522d;
+            text-decoration: none;
+            border-radius: 5px;
+            transition: all 0.3s ease;
+        }
+        .cta-button:hover {
+            background-color: #a0522d;
+            color: #ffffff;
+        }
+        .card img {
+            height: 250px;
             object-fit: cover;
+            object-position: top;
         }
-        .card {
-            border: none;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-            border-radius: 10px;
-            margin-bottom: 30px;
-        }
-        .leadership-card img {
-            width: 150px;
-            height: 150px;
-            object-fit: cover;
-            border-radius: 50%;
-            border: 5px solid #a0522d;
-        }
-        .btn-outline-primary {
-            border-color: #a0522d; /* Accent brown */
+        .faq-section .accordion-button {
+            background-color: #f7f3e8;
             color: #a0522d;
         }
-        .btn-outline-primary:hover {
+        .footer {
             background-color: #a0522d;
             color: #ffffff;
+            padding: 20px;
+            text-align: center;
         }
-        footer {
-            background-color: #a0522d;
-            color: #ffffff;
-            padding: 20px 0;
+        .testimonial-card {
+            background-color: #ffffff;
+            border: 1px solid #ddd;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        .map-container {
+            position: relative;
+            padding-bottom: 56.25%; /* 16:9 aspect ratio */
+            height: 0;
+            overflow: hidden;
+        }
+        .map-container iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: 0;
         }
     </style>
 </head>
@@ -78,57 +107,34 @@
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
+                    <li class="nav-item"><a class="nav-link" href="#home">Home</a></li>
                     <li class="nav-item"><a class="nav-link" href="#about">About Us</a></li>
                     <li class="nav-item"><a class="nav-link" href="#services">Our Services</a></li>
-                    <li class="nav-item"><a class="nav-link" href="#leadership">Leadership</a></li>
-                    <li class="nav-item"><a class="nav-link" href="#news">News</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#membership">Membership</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#faqs">FAQs</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#resources">Resources</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#news">News & Updates</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#testimonials">Testimonials</a></li>
                     <li class="nav-item"><a class="nav-link" href="#contact">Contact Us</a></li>
                 </ul>
             </div>
         </div>
     </nav>
 
-    <!-- Hero Section with Carousel -->
-    <section class="hero-section">
-        <div id="carouselExample" class="carousel slide" data-bs-ride="carousel">
-            <div class="carousel-inner">
-                <div class="carousel-item active">
-                    <img src="https://source.unsplash.com/1600x600/?community,finance" class="d-block w-100" alt="First Slide">
-                    <div class="carousel-caption d-none d-md-block">
-                        <h1>Welcome to iSave SACCO</h1>
-                        <p>Building Financial Success Together</p>
-                    </div>
-                </div>
-                <div class="carousel-item">
-                    <img src="https://source.unsplash.com/1600x600/?growth,savings" class="d-block w-100" alt="Second Slide">
-                    <div class="carousel-caption d-none d-md-block">
-                        <h1>Empowering Your Financial Future</h1>
-                        <p>Join us and unlock the potential of smart financial solutions.</p>
-                    </div>
-                </div>
-                <div class="carousel-item">
-                    <img src="https://source.unsplash.com/1600x600/?success,teamwork" class="d-block w-100" alt="Third Slide">
-                    <div class="carousel-caption d-none d-md-block">
-                        <h1>Supporting Our Community</h1>
-                        <p>Your growth is our success.</p>
-                    </div>
-                </div>
-            </div>
-            <button class="carousel-control-prev" type="button" data-bs-target="#carouselExample" data-bs-slide="prev">
-                <span class="carousel-control-prev-icon" aria-hidden="true"></span>
-                <span class="visually-hidden">Previous</span>
-            </button>
-            <button class="carousel-control-next" type="button" data-bs-target="#carouselExample" data-bs-slide="next">
-                <span class="carousel-control-next-icon" aria-hidden="true"></span>
-                <span class="visually-hidden">Next</span>
-            </button>
-        </div>
+    <!-- Home (Hero Section) -->
+    <section id="home" class="hero-section">
+        <h1>Empowering Members Towards Financial Freedom</h1>
+        <p>iSave SACCO - Building Financial Success Together</p>
+        <a href="#membership" class="cta-button mt-3">Join Now</a>
     </section>
 
     <!-- About Us Section -->
     <section id="about" class="container mt-5">
         <h2 class="section-title">About Us</h2>
-        <p>iSave SACCO was formed in January 2007 by a group of staff from iWayAfrica Services in Kenya. It currently has a membership of over 130 members. Our mission is to empower our members by providing reliable and personalized financial solutions. We believe in community growth, transparency, and supporting our members on their financial journeys.</p>
+        <p><strong>Mission:</strong> To empower our members by providing reliable and personalized financial solutions that promote economic stability and growth.</p>
+        <p><strong>Vision:</strong> To be the leading SACCO known for financial excellence, transparency, and community growth.</p>
+        <p><strong>Core Values:</strong> Integrity, Service, Transparency, Accountability, and Innovation.</p>
+        <p><strong>Our Story:</strong> Established in January 2007 by staff from iWayAfrica Services in Kenya, iSave SACCO has grown to serve over 130 members. We are committed to promoting financial independence and supporting our community's economic development.</p>
     </section>
 
     <!-- Our Services Section -->
@@ -137,61 +143,122 @@
         <div class="row">
             <div class="col-md-4">
                 <div class="card text-center">
-                    <img src="https://source.unsplash.com/400x300/?loan,service" class="card-img-top" alt="Loans">
+                    <img src="https://picsum.photos/400/300?random=5" class="card-img-top" alt="Loans">
                     <div class="card-body">
                         <h5 class="card-title">Loan Products</h5>
-                        <p class="card-text">Affordable and flexible loan solutions for all your financial needs.</p>
+                        <p class="card-text">We offer development loans, emergency loans, and more to meet your needs.</p>
                     </div>
                 </div>
             </div>
             <div class="col-md-4">
                 <div class="card text-center">
-                    <img src="https://source.unsplash.com/400x300/?investment,wealth" class="card-img-top" alt="Investments">
+                    <img src="https://picsum.photos/400/300?random=6" class="card-img-top" alt="Investments">
                     <div class="card-body">
                         <h5 class="card-title">Investment Opportunities</h5>
-                        <p class="card-text">Grow your wealth with our secure investment plans tailored for members.</p>
+                        <p class="card-text">Explore secure investment options that help you grow your wealth.</p>
                     </div>
                 </div>
             </div>
             <div class="col-md-4">
                 <div class="card text-center">
-                    <img src="https://source.unsplash.com/400x300/?education,learning" class="card-img-top" alt="Education">
+                    <img src="https://picsum.photos/400/300?random=7" class="card-img-top" alt="Education">
                     <div class="card-body">
-                        <h5 class="card-title">Financial Education</h5>
-                        <p class="card-text">Access workshops and resources to boost your financial knowledge.</p>
+                        <h5 class="card-title">Financial Literacy Programs</h5>
+                        <p class="card-text">Attend our workshops and seminars to learn about financial management.</p>
                     </div>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- Leadership Section -->
-    <section id="leadership" class="container mt-5">
-        <h2 class="section-title">Leadership</h2>
-        <div class="row text-center">
-            <div class="col-md-4">
-                <div class="leadership-card">
-                    <img src="https://source.unsplash.com/150x150/?business,leader" alt="Leader">
-                    <h5 class="mt-3">John Doe</h5>
-                    <p class="text-muted">Chairperson</p>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="leadership-card">
-                    <img src="https://source.unsplash.com/150x150/?executive,finance" alt="Leader">
-                    <h5 class="mt-3">Jane Smith</h5>
-                    <p class="text-muted">Treasurer</p>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="leadership-card">
-                    <img src="https://source.unsplash.com/150x150/?ceo,corporate
+    <!-- Membership Section -->
+    <section id="membership" class="container mt-5">
+        <h2 class="section-title">Membership</h2>
+        <p><strong>How to Join:</strong> Fill out the membership form, provide the required documents, and submit them to our office or through our online portal.</p>
+        <p><strong>Membership Benefits:</strong> Access to affordable loans, exclusive investment opportunities, financial advisory services, and educational resources.</p>
+        <p><strong>Eligibility Criteria:</strong> Open to all individuals interested in joining a supportive financial community.</p>
+        <a href="#contact" class="cta-button mt-3">Become a Member</a>
+    </section>
 
-" alt="Leader">
-                    <h5 class="mt-3">Michael Lee</h5>
-                    <p class="text-muted">Secretary</p>
+    <!-- FAQs Section -->
+    <section id="faqs" class="container mt-5 faq-section">
+        <h2 class="section-title">FAQs</h2>
+        <div class="accordion" id="faqAccordion">
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="headingOne">
+                    <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOne" aria-expanded="true" aria-controls="collapseOne">
+                        How do I become a member?
+                    </button>
+                </h2>
+                <div id="collapseOne" class="accordion-collapse collapse show" aria-labelledby="headingOne" data-bs-parent="#faqAccordion">
+                    <div class="accordion-body">
+                        You can become a member by completing the membership application form, submitting the required documents, and paying the initial membership fee.
+                    </div>
                 </div>
             </div>
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="headingTwo">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTwo" aria-expanded="false" aria-controls="collapseTwo">
+                        What types of loans can I apply for?
+                    </button>
+                </h2>
+                <div id="collapseTwo" class="accordion-collapse collapse" aria-labelledby="headingTwo" data-bs-parent="#faqAccordion">
+                    <div class="accordion-body">
+                        We offer a variety of loans, including development loans, emergency loans, and more tailored to meet our members' needs.
+                    </div>
+                </div>
+            </div>
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="headingThree">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseThree" aria-expanded="false" aria-controls="collapseThree">
+                        What is the loan application process?
+                    </button>
+                </h2>
+                <div id="collapseThree" class="accordion-collapse collapse" aria-labelledby="headingThree" data-bs-parent="#faqAccordion">
+                    <div class="accordion-body">
+                        The process involves submitting a completed loan application form, meeting eligibility criteria, and undergoing a review by the loan committee.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Resources Section -->
+    <section id="resources" class="container mt-5">
+        <h2 class="section-title">Resources</h2>
+        <ul>
+            <li><a href="#" download>Membership Application Form</a></li>
+            <li><a href="#" download>Loan Application Form</a></li>
+            <li><a href="#" download>Financial Management Guide</a></li>
+            <li><a href="#" download>Annual Report 2023</a></li>
+        </ul>
+    </section>
+
+    <!-- News & Updates Section -->
+    <section id="news" class="container mt-5">
+        <h2 class="section-title">News & Updates</h2>
+        <div class="row">
+            <div class="col-md-6">
+                <h5>Annual General Meeting 2024</h5>
+                <p>Our upcoming AGM will be held in March 2024. Members are encouraged to attend and participate actively.</p>
+            </div>
+            <div class="col-md-6">
+                <h5>Member Success Story</h5>
+                <p>Read about how one of our members achieved their dream of home ownership through our tailored loan program.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Testimonials Section -->
+    <section id="testimonials" class="container mt-5">
+        <h2 class="section-title">Testimonials</h2>
+        <div class="testimonial-card">
+            <p>"Joining iSave SACCO was one of the best decisions I've made. Their loan services helped me expand my business."</p>
+            <p><strong>- Jane K.</strong></p>
+        </div>
+        <div class="testimonial-card">
+            <p>"The financial education programs have taught me how to manage my money better and invest wisely."</p>
+            <p><strong>- Peter M.</strong></p>
         </div>
     </section>
 
@@ -199,7 +266,7 @@
     <section id="contact" class="container mt-5">
         <h2 class="section-title">Contact Us</h2>
         <p>For more information, contact us at <strong>0736 642232</strong> or visit our <a href="https://www.facebook.com/isavesacco/" target="_blank">Facebook page</a>.</p>
-        <form>
+        <form id="contactForm">
             <div class="mb-3">
                 <label for="name" class="form-label">Name</label>
                 <input type="text" class="form-control" id="name" required>
@@ -214,19 +281,26 @@
             </div>
             <button type="submit" class="btn btn-outline-primary">Submit</button>
         </form>
+        <div class="map-container mt-4">
+            <iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3168.814123!2d-122.0840899!3d37.422065!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x808fb72f13c9df67%3A0x557f6f620f7162cd!2sGoogleplex!5e0!3m2!1sen!2sus!4v1635671765561!5m2!1sen!2sus" allowfullscreen loading="lazy"></iframe>
+        </div>
     </section>
 
     <!-- Footer -->
-    <footer class="text-center mt-5">
+    <footer class="footer mt-5">
         <p>&copy; 2024 iSave SACCO. All Rights Reserved.</p>
+        <div>
+            <a href="https://www.facebook.com/isavesacco/" target="_blank" class="text-light"><i class="fab fa-facebook-f"></i></a>
+            <!-- Add other social media icons as needed -->
+        </div>
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Example AJAX form submission
-        document.querySelector('form').addEventListener('submit', function(e) {
+        // AJAX form submission
+        document.querySelector('#contactForm').addEventListener('submit', function(e) {
             e.preventDefault();
-            alert('Form submitted! (AJAX functionality can be added here)');
+            alert('Thank you for contacting us. We will get back to you soon!');
         });
     </script>
 </body>
