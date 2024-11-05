@@ -63,7 +63,7 @@
                                     <th scope="row">{{ $index + 1 }}</th>
                                     <td>{{ $transaction->loan_type_name }}</td>
                                     <td>{{ $transaction->loan_category_name }}</td>
-                                    <td>{{ $transaction->member_name }}</td>
+                                    <td>{{ $transaction->member_name }} ({{ $transaction->member_id }})</td>
                                     <td>{{ number_format($transaction->batch_trans_loan_amount, 2) }}</td>
                                     <td>{{ $transaction->batch_trans_loan_duration }}</td>
                                     <td>{{ $transaction->batch_trans_doc_no }}</td>

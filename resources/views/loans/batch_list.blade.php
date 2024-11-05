@@ -35,6 +35,19 @@
         </div>
     @endif
 
+    @if ($errors->any())
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <ul>
+                @foreach ($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+    @endif
+
     <div class="col-md-12 mb-3">
         <div class="card text-start">
             <div class="card-body">
@@ -76,7 +89,7 @@
                                     <td>{{ $batch->batch_updated == 'Y' ? 'Yes' : 'No' }}</td>
                                     <td>
                                         <a href="{{ route('loans.batch.transactions', $batch->batch_id) }}" class="btn btn-info">View Transactions</a>
-                                        @if($batch->batch_approved === 'N' && $batch->batch_updated === 'N')
+                                        @if($batch->batch_approved === 'N' || $batch->batch_updated === 'N')
                                             <a href="{{ route('loans.batch.transactions.add_view', $batch->batch_id) }}" class="btn btn-success">Add Transaction</a>
                                             <a href="{{ route('loans.batch.edit', $batch->batch_id) }}" class="btn btn-warning">Edit</a>
                                             <a href="{{ route('loans.batch.delete', $batch->batch_id) }}" class="btn btn-danger" onclick="return confirm('Are you sure?')">Delete</a>

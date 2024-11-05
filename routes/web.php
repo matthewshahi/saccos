@@ -9,9 +9,10 @@ use App\Http\Controllers\LoanController;
 
 use App\Http\Controllers\MpesaController;
 use App\Http\Controllers\RandController;
+use App\Http\Controllers\LoanEndMonthController;
 
 Route::get('/', [HomeController::class, 'redirectBasedOnAuth'])->name('home');
-Route::get('/home', [HomeController::class, 'redirectBasedOnAuth'])->name('home');
+Route::get('/home', [HomeController::class, 'redirectBasedOnAuth'])->name('home1');
 
 
 
@@ -24,11 +25,13 @@ Route::post('logout', [CustomAuthController::class, 'logout'])->name('logout');
 Route::middleware(['auth'])->group(function () {
  
     // Member statement route for non-officials
-    Route::get('/members/statement/self', [HomeController::class, 'viewStatement'])
-        ->name('members.statement');    
+    Route::get('/members/statement/self', [HomeController::class, 'viewStatement']);
+          
     
-    Route::get('/members/status/{self}', [HomeController::class, 'memberStatus'])
-        ->name('members.status') ; 
+    Route::get('/members/status/{self}', [HomeController::class, 'memberStatus']);
+        // ->name('members.status') ; 
+    Route::get('/members/status/{id}', [HomeController::class, 'memberStatus'])->name('members.status')->middleware('check_user_rights:rpt_loans_issued'); 
+
 
     Route::get('/loans/apply', [HomeController::class, 'loansApply'])->name('loans.apply');
 
@@ -66,11 +69,10 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
     Route::post('/members/next-of-kin/update/{id}', [HomeController::class, 'updateNextOfKin'])->name('members.updateNextOfKin')->middleware('check_user_rights:add_next_of_kin'); 
     Route::get('/members/delete-next-of-kin/{member_id}/{kin_id}', [HomeController::class, 'deleteNextOfKin'])->name('members.deleteNextOfKin')->middleware('check_user_rights:add_next_of_kin'); 
     
-    Route::get('/members/status/{id}', [HomeController::class, 'memberStatus'])->name('members.status')->middleware('check_user_rights:rpt_loans_issued'); 
 
     Route::delete('/members/{member_id}/guarantors/{guarantor_id}', [HomeController::class, 'deleteGuarantor'])->name('deleteGuarantor')->middleware('check_user_rights:loan_guarantors_change');
     
-    Route::delete('/guarantor/{member_id}/{guarantor_id}', [HomeController::class, 'deleteGuarantor'])->name('deleteGuarantor')->middleware('check_user_rights:loan_guarantors_change');
+    // Route::delete('/guarantor/{member_id}/{guarantor_id}', [HomeController::class, 'deleteGuarantor'])->name('deleteGuarantor')->middleware('check_user_rights:loan_guarantors_change');
     Route::get('/changeGuarantors/{member_id}/{guarantor_id}', [HomeController::class, 'changeGuarantors'])->name('changeGuarantors')->middleware('check_user_rights:loan_guarantors_change');
 
     Route::post('/updateGuarantors/{member_id}/{guarantor_id}', [HomeController::class, 'updateGuarantors'])->name('updateGuarantors')->middleware('check_user_rights:loan_guarantors_change');
@@ -195,8 +197,8 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
 
     // End month processing
     Route::get('/list/contribution', [HomeController::class, 'listContribution'])->name('list.contribution')->middleware('check_user_rights:list_sacco_member_contributions');
-    Route::get('/proc/end/month/loans', [HomeController::class, 'endMonthLoans'])->name('proc.end.month.loans');
-
+    Route::get('/proc/end/month/loans', [LoanEndMonthController::class, 'endMonthLoans'])->name('proc.end.month.loans');
+    Route::post('/proc/end/month/loans', [LoanEndMonthController::class, 'processEndMonthLoans'])->name('proc.end.month.loans.process');
 
     
     Route::post('/loans/apply', [HomeController::class, 'submitLoanApplication'])->name('loans.application.submit');
@@ -215,8 +217,8 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
    
 
 
-    Route::get('/loans/batches', [LoanController::class, 'loans_batches'])->name('loans.batches');
-    Route::get('/loans/batch', [LoanController::class, 'loans_batch'])->name('loans.batch');
+    Route::get('/loans/batches', [LoanController::class, 'loans_batches'])->name('loans.batches')->middleware('check_user_rights:add_loan_type');
+    Route::get('/loans/batch', [LoanController::class, 'loans_batch'])->name('loans.batch')->middleware('check_user_rights:add_loan_type');
     Route::post('/loans/batch/store', [LoanController::class, 'loans_batch_store'])->name('loans.batch.store')->middleware('check_user_rights:add_loan_type');
     Route::get('/loans/batch/edit/{batch_id}', [LoanController::class, 'loans_batch_edit'])->name('loans.batch.edit')->middleware('check_user_rights:add_loan_type');
     Route::post('/loans/batch/update/{batch_id}', [LoanController::class, 'loans_batch_update'])->name('loans.batch.update')->middleware('check_user_rights:add_loan_type');
@@ -235,7 +237,7 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
 
     // Other routes...
  
-    Route::get('/loans/batch/transactions/edit/{transaction_id}', [LoanController::class, 'loans_batch_transactions_edit'])->name('loans.batch.transactions.edit')->middleware('check_user_rights:add_loan_type');
+    // Route::get('/loans/batch/transactions/edit/{transaction_id}', [LoanController::class, 'loans_batch_transactions_edit'])->name('loans.batch.transactions.edit')->middleware('check_user_rights:add_loan_type');
     Route::get('/loans/batch/transactions/edit/{batch_id}/{transaction_id}', [LoanController::class, 'loans_batch_transactions_edit'])->name('loans.batch.transactions.edit')->middleware('check_user_rights:add_loan_type');
 
     Route::get('/loans/batch/transactions/delete/{transaction_id}', [LoanController::class, 'loans_batch_transactions_delete'])->name('loans.batch.transactions.delete')->middleware('check_user_rights:add_loan_type');

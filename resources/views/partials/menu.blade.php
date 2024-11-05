@@ -120,7 +120,12 @@
                             </li>
                             <li class="item-name">
                                 <a href="{{ route('proc.end.month.shares') }}">
-                                    <span class="text-muted">End month processing - Shares</span>
+                                    <span class="text-muted">Shares</span>
+                                </a>
+                            </li>
+                            <li class="item-name">
+                                <a href="{{ route('proc.end.month.loans') }}">
+                                    <span class="text-muted">Loans</span>
                                 </a>
                             </li>
                         </ul>
