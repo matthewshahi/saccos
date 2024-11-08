@@ -197,8 +197,11 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
 
     // End month processing
     Route::get('/list/contribution', [HomeController::class, 'listContribution'])->name('list.contribution')->middleware('check_user_rights:list_sacco_member_contributions');
-    Route::get('/proc/end/month/loans', [LoanEndMonthController::class, 'endMonthLoans'])->name('proc.end.month.loans');
-    Route::post('/proc/end/month/loans', [LoanEndMonthController::class, 'processEndMonthLoans'])->name('proc.end.month.loans.process');
+    Route::get('/proc/end/month/loans', [LoanEndMonthController::class, 'endMonthLoans'])->name('proc.end.month.loans')->middleware('check_user_rights:list_sacco_member_contributions');
+    Route::post('/proc/end/month/loans', [LoanEndMonthController::class, 'processEndMonthLoans'])->name('proc.end.month.loans.process')->middleware('check_user_rights:list_sacco_member_contributions');
+    // Route::post('/end/month/loans', [LoanEndMonthController::class, 'processEndMonthLoans'])->name('proc.end.month.loans')->middleware('check_user_rights:list_sacco_member_contributions');
+    Route::get('/end/month/loans', [LoanEndMonthController::class, 'endMonthLoans'])->name('proc.end.month.loans')->middleware('check_user_rights:list_sacco_member_contributions');
+    Route::post('/end/month/loans', [LoanEndMonthController::class, 'processEndMonthLoans'])->name('proc.end.month.loans.process')->middleware('check_user_rights:list_sacco_member_contributions');
 
     
     Route::post('/loans/apply', [HomeController::class, 'submitLoanApplication'])->name('loans.application.submit');

@@ -2934,7 +2934,8 @@ public function processEndMonthShares(Request $request)
             ->leftJoin('sacco_position', 'sacco_members.member_position', '=', 'sacco_position.position_id')
             ->select('sacco_members.*', 'sacco_company.company_name', 'sacco_department.department_name', 'sacco_position.position_name')
             ->where('sacco_members.member_deleted', '<>', 'Y')
-            ->where('sacco_members.member_active', 'Y')
+            ->where('sacco_members.member_active', 'Y') 
+
             ->where(function ($query) use ($pms_srch) {
                 $query->where('sacco_department.department_name', 'like', $pms_srch)
                     ->orWhere('sacco_position.position_name', 'like', $pms_srch)
@@ -2996,10 +2997,14 @@ public function processEndMonthShares(Request $request)
             ->where('loan_amount', '>', 0)
             ->where('loan_loan_paid', '<', DB::raw('loan_amount'))
             ->where('loan_stoped', '<>', 'Y')
-            ->where('loan_start_deduction_period', '<=', $currentPeriod)
+            ->where('loan_start_deduction_period', '<=', $this->currentPeriod->period_name)
+            ->where('sacco_loans.loan_taken_period', '<=', $this->currentPeriod->period_name) 
             ->whereRaw('loan_amount - loan_loan_paid > ?', [$min_loan_amount_bill_able])
             ->sum('loan_monthly_repayment_amount');
 
+ 
+       
+       
         return $total_m_emi;
     }
 

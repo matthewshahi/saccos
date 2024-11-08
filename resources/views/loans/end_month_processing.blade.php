@@ -57,7 +57,9 @@
     <div class="card-body">
         <h4 class="card-title mb-3">End Month Processing - Loans</h4>
         <p>Please ensure all details are correct before proceeding. This process is not reversible.</p>
-        <form action="{{ route('proc.end.month.loans') }}" method="POST">
+        
+        <!-- Form with confirmation on submit -->
+        <form action="{{ route('proc.end.month.loans') }}" method="POST" onsubmit="return confirmSubmission()">
             @csrf
             <div class="table-responsive">
                 <table class="table table-striped">
@@ -93,6 +95,8 @@
                                 </td>
                                 <td>
                                     <input type="checkbox" name="update{{ $index }}" value="{{ $company->company_id }}" />
+                                    <!-- Hidden field for loan type ID -->
+                                    <input type="hidden" name="loan_type_e{{ $index }}" value="{{ $company->loan_type_id }}" />
                                 </td>
                             </tr>
                         @endforeach
@@ -112,4 +116,11 @@
         </form>
     </div>
 </div>
+
+<!-- Confirmation Script -->
+<script>
+function confirmSubmission() {
+    return confirm("Are you sure you want to update selected accounts? This process is irreversible. Confirm to continue or cancel.");
+}
+</script>
 @endsection
