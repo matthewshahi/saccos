@@ -1115,6 +1115,9 @@ public function viewStatement($id = null)
         }
       
     $member = DB::table('sacco_members')->where('member_id', $id)->first();
+    if (!$member) {
+        return back()->withErrors(['error' => 'Member not found.']);
+    }
 
     // Set period_from and period_to, defaulting to '000000' and '999900' if not provided
     $period_from = request('period_from', '000000');

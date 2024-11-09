@@ -72,8 +72,8 @@
                                             </td>
                                             <td>
                                                 <select name="share_action[]" class="form-control">
-                                                    <option value="-1" {{ old('share_action.' . $i) == '-1' ? 'selected' : '' }}>Reduce shares</option>
-                                                    <option value="1" {{ old('share_action.' . $i) == '1' ? 'selected' : '' }}>Increase shares</option>
+                                                    <option value="-1" {{ old('share_action.' . $i) == '-1' ? 'selected' : '' }}>Reduce Capital</option>
+                                                    <option value="1" {{ old('share_action.' . $i) == '1' ? 'selected' : '' }}>Increase Capital</option>
                                                 </select>
                                             </td>
                                             <td>

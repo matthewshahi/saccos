@@ -6,10 +6,10 @@
         <div class="header-part-right">
         <ul>
                 @if(Auth::check())
-                    <li>{{ Auth::user()->member_name }}</li>
+                    <li class="d-none d-sm-inline-block">{{ Auth::user()->member_name }}</li>
                 @endif
                 @if(isset($currentPeriod))
-                    <li><a href="{{ route('admin.periods') }}">{{ $currentPeriod->period_name }}</a></li>
+                    <li class="d-none d-sm-inline-block"><a href="{{ route('admin.periods') }}">{{ $currentPeriod->period_name }}</a></li>
                 @endif
 
               
@@ -82,7 +82,7 @@
                     <tr>
                         <td>{{ $index + 1 }}.</td>
                         <td>{{ $contribution->share_capitalperiod }}</td>
-                        <td>{{ \Carbon\Carbon::parse($contribution->share_capitaldate_paid)->format('d-m-Y') }}</td>
+                        <td style="white-space: nowrap;">{{ \Carbon\Carbon::parse($contribution->share_capitaldate_paid)->format('d-m-Y') }}</td>
                         <td>{{ $contribution->share_capitaldescription }}</td>
                         <td>{{ $contribution->share_capitaldoc_no }}</td>
                         <td align="right">
@@ -137,7 +137,7 @@
                     <tr>
                         <td>{{ $index + 1 }}.</td>
                         <td>{{ $contribution->share_period }}</td>
-                        <td>{{ \Carbon\Carbon::parse($contribution->share_date_paid)->format('d-m-Y') }}</td>
+                        <td style="white-space: nowrap;">{{ \Carbon\Carbon::parse($contribution->share_date_paid)->format('d-m-Y') }}</td>
                         <td>{{ $contribution->share_description }}</td>
                         <td>{{ $contribution->share_doc_no }}</td>
                         <td align="right">
@@ -185,7 +185,7 @@
                     <tr>
                         <td align="right">{{ $index + 1 }}.</td>
                         <td>{{ $contribution->fosa_period }}</td>
-                        <td>{{ \Carbon\Carbon::parse($contribution->fosa_date_paid)->format('d-m-Y') }}</td>
+                        <td style="white-space: nowrap;">{{ \Carbon\Carbon::parse($contribution->fosa_date_paid)->format('d-m-Y') }}</td>
                         <td>{{ $contribution->fosa_description }}</td>
                         <td>{{ $contribution->fosa_doc_no }}</td>
                         <td align="right">
@@ -277,15 +277,15 @@
                                             $new_balance -= $payment->loan_payments_amount;
                                         @endphp
                                         <tr style="border-bottom: 1px solid #ddd;">
-                                            <td>{{ $index + 1 }}</td>
-                                            <td>{{ $payment->loan_payments_period }}</td>
-                                            <td>{{ \Carbon\Carbon::parse($payment->loan_payments_paid_on)->format('d-m-Y') }}</td>
+                                            <td>{{ $index + 1 }}.&nbsp;</td>
+                                            <td>{{ $payment->loan_payments_period }}&nbsp;</td>
+                                            <td style="white-space: nowrap;">{{ \Carbon\Carbon::parse($payment->loan_payments_paid_on)->format('d-m-Y') }}&nbsp;</td>
                                             <td>{{ $payment->loan_payments_docno }}</td>
                                             <td>{{ $payment->loan_payments_description }}</td>
-                                            <td align="right">{{ number_format($payment->loan_payments_amount, 2) }}</td>
-                                            <td align="right">{{ number_format($payment->loan_payments_interest, 2) }}</td>
-                                            <td align="right">{{ number_format($payment->loan_payments_amount + $payment->loan_payments_interest, 2) }}</td>
-                                            <td align="right">{{ number_format($new_balance, 2) }}</td>
+                                            <td align="right">&nbsp;{{ number_format($payment->loan_payments_amount, 2) }}</td>
+                                            <td align="right">&nbsp;{{ number_format($payment->loan_payments_interest, 2) }}</td>
+                                            <td align="right">&nbsp;{{ number_format($payment->loan_payments_amount + $payment->loan_payments_interest, 2) }}</td>
+                                            <td align="right">&nbsp;{{ number_format($new_balance, 2) }}</td>
                                         </tr>
                                     @endforeach
                                 </tbody>
