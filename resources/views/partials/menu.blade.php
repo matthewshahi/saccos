@@ -321,7 +321,7 @@
                     </li>
                     
                     <li class="Ul_li--hover">
-                        <a class="has-arrow" href="#">
+                        <a class="has-arrow" href="{{url('/file-upload')}}">
                             <i class="i-Download text-20 me-2" style="color: #663399;"></i>
                             <span class="item-name text-15 text-muted">Downloads</span>
                         </a>

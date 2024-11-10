@@ -3088,14 +3088,19 @@ public function transferShareToCapitalShares(Request $request)
         $sanitizedData = $request->all();
         $submitted = (int)$sanitizedData['submitted'];
 
+        //dd($sanitizedData);
+
         for ($ix = 0; $ix < $submitted; $ix++) {
-            if (!empty($sanitizedData["member_name$ix"]) && !empty($sanitizedData["member_namex1$ix"]) && !empty($sanitizedData["share_date_paid$ix"])) {
-                $fromMember = $this->getMemberFromString($sanitizedData["member_name$ix"]);
-                $toMember = $this->getMemberFromString($sanitizedData["member_namex1$ix"]);
-                $amount = $this->convertCurrency($sanitizedData["amount$ix"]);
-                $shareDocNo = $sanitizedData["share_doc_no$ix"];
-                $shareDescription = substr($sanitizedData["share_description$ix"], 0, 20); // Truncate to 20 characters
-                $shareDatePaid = $sanitizedData["share_date_paid$ix"];
+            
+            if (!empty($sanitizedData["member_name"][$ix]) && $sanitizedData["amount"][$ix]>0 && !empty($sanitizedData["member_namex1"][$ix]) && !empty($sanitizedData["share_date_paid"][$ix])) {
+                //dd($sanitizedData["member_name"][0]);
+                $fromMember = $this->getMemberFromString($sanitizedData["member_name"][$ix]);
+                $toMember = $this->getMemberFromString($sanitizedData["member_namex1"][$ix]);
+                $amount = $this->convertCurrency($sanitizedData["amount"][$ix]);
+                $shareDocNo = $sanitizedData["share_doc_no"][$ix];
+                $shareDescription = substr($sanitizedData["share_description"][$ix], 0, 20); // Truncate to 20 characters
+                $shareDatePaid = $sanitizedData["share_date_paid"][$ix];
+                
 
                 if (empty($shareDescription)) {
                     $errors[] = "Error, missing description in row " . ($ix + 1);
@@ -3105,8 +3110,10 @@ public function transferShareToCapitalShares(Request $request)
                 }
 
                 if ($fromMember && $toMember && is_numeric($amount) && $amount > 0 && !empty($shareDescription) && !empty($shareDocNo)) {
+                    
                     $fullDescription = $shareDescription . " (transfer from {$fromMember->member_name} - {$fromMember->member_sacco_id} to {$toMember->member_name} - {$toMember->member_sacco_id})";
                     $fullDescription = substr($fullDescription, 0, 100); // Truncate to 100 characters
+                    // dd($fullDescription);
                     $this->processShareTransfer($fromMember, $toMember, $amount, $shareDocNo, $fullDescription, $shareDatePaid, $currentPeriod->period_name);
                 } else {
                     $errors[] = "Error in row " . ($ix + 1);
@@ -3151,39 +3158,80 @@ private function convertCurrency($amount)
 
 private function processShareTransfer($fromMember, $toMember, $amount, $docNo, $description, $datePaid, $period)
 {
-    DB::transaction(function () use ($fromMember, $toMember, $amount, $docNo, $description, $datePaid, $period) {
+    $defaultShareAccount = DB::table('sacco_defaults')->where('default_name', 'default_share_account')->value('default_value');
+    $defaultShareCapitalAccount = DB::table('sacco_defaults')->where('default_name', 'default_share_capital_account')->value('default_value');
+
+    // Check if the values are numeric and not empty
+    if (is_numeric($defaultShareAccount) || is_numeric($defaultShareCapitalAccount)) {
+        // If either is numeric, return or throw an error
+        return back()->withErrors([
+            'error' => 'An error occurred: Default share account or capital account returned a numeric value.'
+        ]);
+    }
+
+    DB::transaction(function () use ($fromMember, $toMember, $amount, $docNo, $description, $datePaid, $period, $defaultShareAccount, $defaultShareCapitalAccount) {
         $this->insertShareRecord($fromMember->member_id, $amount * -1, 'JOURNAL', $period, "$description ($toMember->member_name)", $docNo, $datePaid);
         $this->updateMemberTotalShares($fromMember->member_id, $amount * -1);
 
         $this->insertCapitalShareRecord($toMember->member_id, $amount, 'JOURNAL', $period, "$description ($fromMember->member_name)", $docNo, $datePaid);
         $this->updateMemberTotalShares($toMember->member_id, $amount);
 
-        $defaultShareAccount = DB::table('sacco_defaults')->where('default_name', 'default_share_account')->value('default_value');
-        $defaultShareCapitalAccount = DB::table('sacco_defaults')->where('default_name', 'default_share_capital_account')->value('default_value');
-
         $this->updateSaccoAccountsTrans($defaultShareAccount, $amount, 0, $docNo, "$description ($toMember->member_name)", $datePaid, $period, "Member to Shares transfer");
         $this->updateSaccoAccountsTrans($defaultShareCapitalAccount, 0, $amount, $docNo, "$description ($fromMember->member_name)", $datePaid, $period, "Member to Shares transfer");
     });
 }
 
+
+// private function processShareTransfer($fromMember, $toMember, $amount, $docNo, $description, $datePaid, $period)
+// {
+//     $defaultShareAccount = DB::table('sacco_defaults')->where('default_name', 'default_share_account')->value('default_value');
+//         $defaultShareCapitalAccount = DB::table('sacco_defaults')->where('default_name', 'default_share_capital_account')->value('default_value');
+   
+//     DB::transaction(function () use ($fromMember, $toMember, $amount, $docNo, $description, $datePaid, $period) {
+//         $this->insertShareRecord($fromMember->member_id, $amount * -1, 'JOURNAL', $period, "$description ($toMember->member_name)", $docNo, $datePaid);
+//         $this->updateMemberTotalShares($fromMember->member_id, $amount * -1);
+
+//         $this->insertCapitalShareRecord($toMember->member_id, $amount, 'JOURNAL', $period, "$description ($fromMember->member_name)", $docNo, $datePaid);
+//         $this->updateMemberTotalShares($toMember->member_id, $amount);
+
+//         $this->updateSaccoAccountsTrans($defaultShareAccount, $amount, 0, $docNo, "$description ($toMember->member_name)", $datePaid, $period, "Member to Shares transfer");
+//         $this->updateSaccoAccountsTrans($defaultShareCapitalAccount, 0, $amount, $docNo, "$description ($fromMember->member_name)", $datePaid, $period, "Member to Shares transfer");
+//     });
+// }
+
 private function insertShareRecord($memberId, $amount, $paidBy, $period, $description, $docNo, $datePaid)
 {
-    DB::table('sacco_shares')->insert([
-        'share_member_id' => $memberId,
-        'share_amount_paying' => $amount,
-        'share_paid_by' => $paidBy,
-        'share_period' => $period,
-        'share_description' => substr($description, 0, 100), // Truncate to 100 characters
-        'share_doc_no' => $docNo,
-        'share_date_paid' => $datePaid,
-        'share_end_month_proc' => 'N',
-        'share_by' => Auth::id(),
-        'share_ip' => request()->ip(),
-    ]);
+    
+    try {
+        DB::table('sacco_shares')->insert([
+            'share_member_id' => $memberId,
+            'share_amount_paying' => $amount,
+            'share_paid_by' => $paidBy,
+            'share_period' => $period,
+            'share_description' => substr($description, 0, 100), // Truncate to 100 characters
+            'share_doc_no' => $docNo,
+            'share_date_paid' => $datePaid,
+            'share_end_month_proc' => 'N',
+            'share_by' => Auth::id(),
+            'share_ip' => request()->ip(),
+        ]);
+    } catch (\Exception $e) {
+        dd("Error inserting share record: " . $e->getMessage(), [
+            'memberId' => $memberId,
+            'amount' => $amount,
+            'paidBy' => $paidBy,
+            'period' => $period,
+            'description' => substr($description, 0, 100),
+            'docNo' => $docNo,
+            'datePaid' => $datePaid,
+            'errorTrace' => $e->getTrace(),
+        ]);
+    }
 }
 
 private function insertCapitalShareRecord($memberId, $amount, $paidBy, $period, $description, $docNo, $datePaid)
 {
+     
     DB::table('sacco_capital_shares')->insert([
         'share_capitalmember_id' => $memberId,
         'share_capitalamount_paying' => $amount,

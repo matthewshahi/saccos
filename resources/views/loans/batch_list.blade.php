@@ -52,6 +52,8 @@
         <div class="card text-start">
             <div class="card-body">
                 <div class="d-flex justify-content-between mb-3">
+                            <a href="{{ route('files.list') }}" class="btn btn-outline-primary btn-sm">List Files</a>
+
                     <a href="{{ route('loans.batch') }}" class="btn btn-primary">Add New Loan Batch</a>
                 </div>
                 <form action="{{ route('loans.batches') }}" method="GET" class="mb-3">

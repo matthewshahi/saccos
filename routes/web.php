@@ -7,6 +7,10 @@ use App\Http\Controllers\LoanController;
 use App\Http\Controllers\MpesaController;
 use App\Http\Controllers\RandController;
 use App\Http\Controllers\LoanEndMonthController;
+use App\Http\Controllers\FileUploadController;
+use App\Http\Controllers\PublicFileController;
+use App\Http\Controllers\PublicLoansController;
+
 
 Route::get('/', [HomeController::class, 'redirectBasedOnAuth'])->name('home');
 Route::get('/home', [HomeController::class, 'redirectBasedOnAuth'])->name('home1');
@@ -31,6 +35,19 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/profile/password', [HomeController::class, 'showChangeSelfPasswordForm'])->name('profile.password');
     Route::post('/profile/password', [HomeController::class, 'updateSelfPassword'])->name('profile.updatePassword');
+
+    Route::get('/downloads', [PublicFileController::class, 'publicDownloads'])->name('public.downloads');
+    Route::get('/downloads/{file}/download', [PublicFileController::class, 'downloadFile'])->name('public.download.file');
+
+    Route::get('/loans/types/list', [PublicLoansController::class, 'loansTypesList'])->name('loans.types.list');
+    Route::get('/loans/types/list', [PublicLoansController::class, 'loansTypesList'])->name('loans.types.list');
+    Route::get('/public/loans/types/list', [PublicLoansController::class, 'loansTypesList'])->name('loans.types.list');
+    Route::get('/public/loans/details/{id}', [PublicLoansController::class, 'loanDetails'])->name('loan.details');
+    Route::get('/public/loan-calculator/{id}', [PublicLoansController::class, 'showLoanCalculator'])->name('loan.calculator');
+    Route::post('/public/loan-calculator/{id}/calculate', [PublicLoansController::class, 'calculateLoan'])->name('loan.calculate');
+    // Route::get('/public/loans/details/{id}', [PublicLoansController::class, 'loanDetails'])->name('loan.details');
+    // Route::post('/public/loans/details/{id}/calculate', [PublicLoansController::class, 'calculateLoan'])->name('loan.calculate');
+    
    
 
 });
@@ -205,8 +222,8 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
     Route::get('/accounts/transfer', [HomeController::class, 'accountsTransfer'])->name('accounts.transfer')->middleware('check_user_rights:modify_member_shares_journal');
     Route::post('/accounts/transfer', [HomeController::class, 'storeAccountsTransfer'])->name('accounts.transfer.store')->middleware('check_user_rights:modify_member_shares_journal');
 
-    Route::get('/downloads/view', [HomeController::class, 'downloadsView'])->name('downloads.view')->middleware('check_user_rights:downloads');
-    Route::get('/downloads/add-type', [HomeController::class, 'downloadsAddType'])->name('downloads.add-type')->middleware('check_user_rights:downloads');
+    // Route::get('/downloads/view', [HomeController::class, 'downloadsView'])->name('downloads.view')->middleware('check_user_rights:downloads');
+    // Route::get('/downloads/add-type', [HomeController::class, 'downloadsAddType'])->name('downloads.add-type')->middleware('check_user_rights:downloads');
 
     Route::get('/admin/users', [HomeController::class, 'adminUsers'])->name('admin.users')->middleware('check_user_rights:modify_useraccessrights');
     Route::get('/admin/user-types', [HomeController::class, 'adminUserTypes'])->name('admin.user-types')->middleware('check_user_rights:modify_useraccessrights');
@@ -225,6 +242,13 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
     Route::get('/admin/mpesa', [MpesaController::class, 'showMpesaConfig'])->name('admin.mpesa')->middleware('check_user_rights:add_mpesa_details');
     Route::post('/admin/mpesa/store', [MpesaController::class, 'storeMpesaConfig'])->name('mpesa.config.store')->middleware('check_user_rights:add_mpesa_details');
 
+    Route::post('/file-upload', [FileUploadController::class, 'upload'])->name('file.upload')->middleware('check_user_rights:file_upload');
+    Route::get('/file-upload', [FileUploadController::class, 'showUploadForm'])->name('file.upload.form')->middleware('check_user_rights:file_upload');
+    Route::get('/files', [FileUploadController::class, 'listFiles'])->name('files.list')->middleware('check_user_rights:file_upload');
+    Route::get('/files/download/{file}', [FileUploadController::class, 'download'])->name('file.download')->middleware('check_user_rights:file_upload');
+    Route::delete('/files/delete/{file}', [FileUploadController::class, 'delete'])->name('file.delete');
+
+   
     Route::get('/randomize-members', [RandController::class, 'randomizeMembers'])->name('randomize.members')->middleware('check_user_rights:testing_randomize_members');
     Route::get('/randomize-loan-payments', [RandController::class, 'randomizeLoanPayments'])->name('randomize.loan.payments')->middleware('check_user_rights:testing_randomize_members');
     Route::get('/randomize-shares', [RandController::class, 'randomizeShares'])->name('randomize.shares')->middleware('check_user_rights:testing_randomize_members');

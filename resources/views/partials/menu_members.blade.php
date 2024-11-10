@@ -47,6 +47,12 @@
                         </ul>
                     </li>
                     <li class="Ul_li--hover">
+                        <a class="has-arrow" href="{{url('/downloads')}}">
+                            <i class="i-Download text-20 me-2" style="color: #663399;"></i>
+                            <span class="item-name text-15 text-muted">Downloads</span>
+                        </a>
+                    </li>
+                    <li class="Ul_li--hover">
                         <a class="has-arrow" href="#">
                             <i class="i-Administrator text-20 me-2 text-muted"></i>
                             <span class="item-name text-15 text-muted">User Profile</span>
