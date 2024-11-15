@@ -10,7 +10,7 @@ use App\Http\Controllers\LoanEndMonthController;
 use App\Http\Controllers\FileUploadController;
 use App\Http\Controllers\PublicFileController;
 use App\Http\Controllers\PublicLoansController;
-
+use App\Http\Controllers\PublicRegistrationController;
 
 Route::get('/', [HomeController::class, 'redirectBasedOnAuth'])->name('home');
 Route::get('/home', [HomeController::class, 'redirectBasedOnAuth'])->name('home1');
@@ -19,6 +19,9 @@ Route::get('login', [CustomAuthController::class, 'showLoginForm'])->name('login
 Route::post('login', [CustomAuthController::class, 'login']);
 Route::post('logout', [CustomAuthController::class, 'logout'])->name('logout');
 Route::get('/loans/calculator', [HomeController::class, 'loansCalculator'])->name('loans.calculator');
+ 
+Route::get('/register', [PublicRegistrationController::class, 'showForm'])->name('register.form');
+Route::post('/register', [PublicRegistrationController::class, 'submit'])->name('register.submit');
 
 Route::middleware(['auth'])->group(function () {
 

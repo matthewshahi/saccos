@@ -53,6 +53,12 @@
                         </a>
                     </li>
                     <li class="Ul_li--hover">
+                    <li class="Ul_li--hover">
+    <a href="{{ url('/register') }}">
+        <i class="i-Handshake text-20 me-2 text-dark"></i>
+        <span class="item-name text-15 text-muted">Register (Non Members)</span>
+    </a>
+</li>                        <li class="Ul_li--hover">
                         <a class="has-arrow" href="#">
                             <i class="i-Administrator text-20 me-2 text-muted"></i>
                             <span class="item-name text-15 text-muted">User Profile</span>
