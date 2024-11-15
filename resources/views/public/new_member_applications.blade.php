@@ -6,41 +6,26 @@
 </div>
 <div class="separator-breadcrumb border-top"></div>
 
-@if(session('success'))
-    <div class="alert alert-success alert-dismissible fade show" role="alert">
-        {{ session('success') }}
-        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-            <span aria-hidden="true">&times;</span>
-        </button>
+<!-- Search Bar -->
+<form action="{{ route('members.list') }}" method="GET" class="mb-4">
+    <div class="input-group">
+        <input type="text" name="search" class="form-control" placeholder="Search by name, email, phone, ID, or location" value="{{ request('search') }}">
+        <button type="submit" class="btn btn-primary">Search</button>
     </div>
-@endif
+</form>
 
-@if ($errors->any())
-    <div class="alert alert-danger alert-dismissible fade show" role="alert">
-        <ul>
-            @foreach ($errors->all() as $error)
-                <li>{{ $error }}</li>
-            @endforeach
-        </ul>
-        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-            <span aria-hidden="true">&times;</span>
-        </button>
-    </div>
-@endif
-
-<div class="card mb-4">
+<div class="card">
     <div class="card-body">
-        <h4 class="card-title mb-3">List of New Members</h4>
+        <h4 class="card-title mb-3">New Member Applications</h4>
         <div class="table-responsive">
-            <table class="table table-light">
+            <table class="table">
                 <thead>
                     <tr>
                         <th>#</th>
-                        <th>First Name</th>
-                        <th>Last Name</th>
+                        <th>Name</th>
                         <th>Email</th>
                         <th>Phone</th>
-                        <th>ID Number</th>
+                        <th>ID</th>
                         <th>Location</th>
                         <th>Contacted</th>
                         <th>Contacted By</th>
@@ -52,26 +37,25 @@
                     @foreach($members as $index => $member)
                         <tr>
                             <td>{{ $members->firstItem() + $index }}</td>
-                            <td>{{ $member->first_name }}</td>
-                            <td>{{ $member->last_name }}</td>
+                            <td>{{ $member->first_name }} {{ $member->last_name }}</td>
                             <td>{{ $member->email }}</td>
                             <td>{{ $member->phone }}</td>
                             <td>{{ $member->national_id }}</td>
                             <td>{{ $member->physical_location }}</td>
                             <td>
-                                <select name="contacted" data-member-id="{{ $member->id }}" class="form-control auto-save-field">
-                                    <option value="0" {{ $member->contacted == 0 ? 'selected' : '' }}>No</option>
-                                    <option value="1" {{ $member->contacted == 1 ? 'selected' : '' }}>Yes</option>
+                                <select class="form-control auto-save" data-id="{{ $member->id }}" data-field="contacted">
+                                    <option value="1" {{ $member->contacted ? 'selected' : '' }}>Yes</option>
+                                    <option value="0" {{ !$member->contacted ? 'selected' : '' }}>No</option>
                                 </select>
                             </td>
                             <td>
-                                <input type="text" name="contacted_by" value="{{ $member->contacted_by }}" data-member-id="{{ $member->id }}" class="form-control auto-save-field" placeholder="Enter name">
+                                <input type="text" class="form-control auto-save" data-id="{{ $member->id }}" data-field="contacted_by" value="{{ $member->contacted_by }}">
                             </td>
                             <td>
-                                <input type="date" name="contacted_on" value="{{ $member->contacted_on }}" data-member-id="{{ $member->id }}" class="form-control auto-save-field">
+                                <input type="date" class="form-control auto-save" data-id="{{ $member->id }}" data-field="contacted_on" value="{{ $member->contacted_on }}">
                             </td>
                             <td>
-                                <input type="text" name="comments" value="{{ $member->comments }}" data-member-id="{{ $member->id }}" class="form-control auto-save-field" placeholder="Enter comments">
+                                <textarea class="form-control auto-save" data-id="{{ $member->id }}" data-field="comments">{{ $member->comments }}</textarea>
                             </td>
                         </tr>
                     @endforeach
@@ -79,44 +63,39 @@
             </table>
         </div>
 
-        <!-- Pagination Links -->
+        <!-- Pagination -->
         <div class="d-flex justify-content-center mt-4">
             {{ $members->links() }}
         </div>
     </div>
 </div>
 
-<!-- JavaScript to handle auto-save on field change -->
 <script>
-    document.querySelectorAll('.auto-save-field').forEach(field => {
-        field.addEventListener('change', function() {
-            const memberId = this.dataset.memberId;
-            const fieldName = this.name;
-            const fieldValue = this.value;
+    document.addEventListener('DOMContentLoaded', function () {
+        const autoSaveElements = document.querySelectorAll('.auto-save');
 
-            // Construct the URL using relative path for the current application root
-            const updateUrl = `{{ url('/new_members/update') }}/${memberId}`;
+        autoSaveElements.forEach(element => {
+            element.addEventListener('change', function () {
+                const memberId = this.dataset.id;
+                const field = this.dataset.field;
+                const value = this.value;
 
-            fetch(updateUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                },
-                body: JSON.stringify({
-                    field: fieldName,
-                    value: fieldValue
+                fetch(`{{ url('/new_members/update') }}/${memberId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    },
+                    body: JSON.stringify({ field, value })
                 })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    console.log('Field updated successfully');
-                } else {
-                    console.error('Failed to update field');
-                }
-            })
-            .catch(error => console.error('Error:', error));
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status !== 'success') {
+                        alert('Error updating field');
+                    }
+                })
+                .catch(error => console.error('Error:', error));
+            });
         });
     });
 </script>
