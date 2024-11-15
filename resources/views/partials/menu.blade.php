@@ -46,6 +46,12 @@
                                     <span class="text-muted">Add New Member</span>
                                 </a>
                             </li>
+                            <li class="Ul_li--hover">
+    <a href="{{ url('/register') }}">
+        <i class="i-Handshake text-20 me-2 text-dark"></i>
+        <span class="item-name text-15 text-muted">Review New Applications</span>
+    </a>
+</li>   
                         </ul>
                     </li>
                     <li class="Ul_li--hover">
