@@ -46,7 +46,7 @@ class PublicRegistrationController extends Controller
         $recaptchaSuccess = $recaptchaData['success'] ?? false;
         $recaptchaScore = $recaptchaData['score'] ?? 0;
 
-        dd( $recaptchaScore);
+        // dd( $recaptchaScore);
 
         if (!$recaptchaSuccess || $recaptchaScore < 0.5) { // 0.5 threshold for spam
             return redirect()->back()->withErrors(['captcha' => 'reCAPTCHA verification failed or score too low.'])->withInput();
