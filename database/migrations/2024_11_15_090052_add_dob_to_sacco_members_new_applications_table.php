@@ -4,7 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-class AddDobAndTermsToSaccoMembersNewApplicationsTable extends Migration
+class AddDobToSaccoMembersNewApplicationsTable extends Migration
 {
     /**
      * Run the migrations.
@@ -14,10 +14,7 @@ class AddDobAndTermsToSaccoMembersNewApplicationsTable extends Migration
     public function up()
     {
         Schema::table('sacco_members_new_applications', function (Blueprint $table) {
-            // Add date of birth column
-            $table->date('dob')->nullable()->after('last_name');
-            // Add terms column as a boolean to indicate terms acceptance
-            $table->boolean('terms')->default(false)->after('location');
+            $table->date('dob')->nullable()->after('last_name'); // Adding Date of Birth column
         });
     }
 
@@ -30,7 +27,6 @@ class AddDobAndTermsToSaccoMembersNewApplicationsTable extends Migration
     {
         Schema::table('sacco_members_new_applications', function (Blueprint $table) {
             $table->dropColumn('dob');
-            $table->dropColumn('terms');
         });
     }
 }
