@@ -47,7 +47,7 @@
                                 </a>
                             </li>
                             <li class="Ul_li--hover">
-    <a href="{{ url('/register') }}">
+    <a href="{{ url('new_members/list') }}">
         <i class="i-Handshake text-20 me-2 text-dark"></i>
         <span class="item-name text-15 text-muted">Review New Applications</span>
     </a>
