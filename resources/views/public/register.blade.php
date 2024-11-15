@@ -59,9 +59,9 @@
                     <input type="text" class="form-control" id="phone" name="phone" value="{{ old('phone') }}" required>
                 </div>
                 <div class="col-md-6 form-group mb-3">
-                    <label for="location">Location</label>
-                    <input type="text" class="form-control" id="location" name="location" value="{{ old('location') }}" required>
-                </div>
+    <label for="physical_location">Location</label>
+    <input type="text" class="form-control" id="physical_location" name="physical_location" value="{{ old('physical_location') }}" required>
+</div>
                 <div class="col-md-12 form-group mt-3">
                     <input type="checkbox" id="terms" name="terms" required>
                     <label for="terms">I agree to the <a href="#">terms and conditions</a>.</label>
