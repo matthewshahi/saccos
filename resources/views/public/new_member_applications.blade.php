@@ -6,26 +6,41 @@
 </div>
 <div class="separator-breadcrumb border-top"></div>
 
-<!-- Search Bar -->
-<form action="{{ route('members.list') }}" method="GET" class="mb-4">
-    <div class="input-group">
-        <input type="text" name="search" class="form-control" placeholder="Search by name, email, phone, ID, or location" value="{{ request('search') }}">
-        <button type="submit" class="btn btn-primary">Search</button>
+@if(session('success'))
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        {{ session('success') }}
+        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+        </button>
     </div>
-</form>
+@endif
 
-<div class="card">
+@if ($errors->any())
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <ul>
+            @foreach ($errors->all() as $error)
+                <li>{{ $error }}</li>
+            @endforeach
+        </ul>
+        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+        </button>
+    </div>
+@endif
+
+<div class="card mb-4">
     <div class="card-body">
-        <h4 class="card-title mb-3">New Member Applications</h4>
+        <h4 class="card-title mb-3">List of New Members</h4>
         <div class="table-responsive">
-            <table class="table">
+            <table class="table table-light">
                 <thead>
                     <tr>
                         <th>#</th>
-                        <th>Name</th>
+                        <th>First Name</th>
+                        <th>Last Name</th>
                         <th>Email</th>
                         <th>Phone</th>
-                        <th>ID</th>
+                        <th>ID Number</th>
                         <th>Location</th>
                         <th>Contacted</th>
                         <th>Contacted By</th>
@@ -37,25 +52,26 @@
                     @foreach($members as $index => $member)
                         <tr>
                             <td>{{ $members->firstItem() + $index }}</td>
-                            <td>{{ $member->first_name }} {{ $member->last_name }}</td>
+                            <td>{{ $member->first_name }}</td>
+                            <td>{{ $member->last_name }}</td>
                             <td>{{ $member->email }}</td>
                             <td>{{ $member->phone }}</td>
                             <td>{{ $member->national_id }}</td>
                             <td>{{ $member->physical_location }}</td>
                             <td>
-                                <select class="form-control auto-save" data-id="{{ $member->id }}" data-field="contacted">
-                                    <option value="1" {{ $member->contacted ? 'selected' : '' }}>Yes</option>
-                                    <option value="0" {{ !$member->contacted ? 'selected' : '' }}>No</option>
+                                <select name="contacted" data-member-id="{{ $member->id }}" class="form-control auto-save-field">
+                                    <option value="0" {{ $member->contacted == 0 ? 'selected' : '' }}>No</option>
+                                    <option value="1" {{ $member->contacted == 1 ? 'selected' : '' }}>Yes</option>
                                 </select>
                             </td>
                             <td>
-                                <input type="text" class="form-control auto-save" data-id="{{ $member->id }}" data-field="contacted_by" value="{{ $member->contacted_by }}">
+                                <input type="text" name="contacted_by" value="{{ $member->contacted_by }}" data-member-id="{{ $member->id }}" class="form-control auto-save-field" placeholder="Enter name">
                             </td>
                             <td>
-                                <input type="date" class="form-control auto-save" data-id="{{ $member->id }}" data-field="contacted_on" value="{{ $member->contacted_on }}">
+                                <input type="date" name="contacted_on" value="{{ $member->contacted_on }}" data-member-id="{{ $member->id }}" class="form-control auto-save-field">
                             </td>
                             <td>
-                                <textarea class="form-control auto-save" data-id="{{ $member->id }}" data-field="comments">{{ $member->comments }}</textarea>
+                                <input type="text" name="comments" value="{{ $member->comments }}" data-member-id="{{ $member->id }}" class="form-control auto-save-field" placeholder="Enter comments">
                             </td>
                         </tr>
                     @endforeach
@@ -63,21 +79,22 @@
             </table>
         </div>
 
-        <!-- Pagination -->
+        <!-- Pagination Links -->
         <div class="d-flex justify-content-center mt-4">
             {{ $members->links() }}
         </div>
     </div>
 </div>
 
-<<script>
+<!-- JavaScript to handle auto-save on field change -->
+<script>
     document.querySelectorAll('.auto-save-field').forEach(field => {
         field.addEventListener('change', function() {
             const memberId = this.dataset.memberId;
             const fieldName = this.name;
             const fieldValue = this.value;
-            
-            // Construct the URL using Laravel's URL helper with relative path under /new_app
+
+            // Construct the URL using relative path for the current application root
             const updateUrl = `{{ url('/new_members/update') }}/${memberId}`;
 
             fetch(updateUrl, {
