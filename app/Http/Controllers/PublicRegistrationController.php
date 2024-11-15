@@ -24,9 +24,9 @@ class PublicRegistrationController extends Controller
             'last_name' => 'required|string|max:50',
             'dob' => 'required|date|before:today',
             'national_id' => 'required|string|max:20',
-            'email' => 'required|email|max:100',
+            'email' => 'required|email|max:100|unique:sacco_members_new_applications,email', // Prevent duplicates
             'phone' => 'required|string|max:15',
-            'location' => 'required|string|max:100',
+            'physical_location' => 'required|string|max:100', // Updated to match DB field name
             'terms' => 'accepted',
             'g-recaptcha-response' => 'required'
         ]);
@@ -46,14 +46,9 @@ class PublicRegistrationController extends Controller
         $recaptchaSuccess = $recaptchaData['success'] ?? false;
         $recaptchaScore = $recaptchaData['score'] ?? 0;
 
-        // dd( $recaptchaScore);
-
         if (!$recaptchaSuccess || $recaptchaScore < 0.5) { // 0.5 threshold for spam
             return redirect()->back()->withErrors(['captcha' => 'reCAPTCHA verification failed or score too low.'])->withInput();
         }
-
-        
-
 
         // Check for duplicate entry using email
         $duplicate = DB::table('sacco_members_new_applications')
@@ -74,7 +69,7 @@ class PublicRegistrationController extends Controller
             'national_id' => $request->input('national_id'),
             'email' => $request->input('email'),
             'phone' => $request->input('phone'),
-            'location' => $request->input('location'),
+            'physical_location' => $request->input('physical_location'), // Corrected to match DB field
             'created_at' => now(),
             'updated_at' => now(),
         ]);
