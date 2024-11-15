@@ -70,32 +70,36 @@
     </div>
 </div>
 
-<script>
-    document.addEventListener('DOMContentLoaded', function () {
-        const autoSaveElements = document.querySelectorAll('.auto-save');
+<<script>
+    document.querySelectorAll('.auto-save-field').forEach(field => {
+        field.addEventListener('change', function() {
+            const memberId = this.dataset.memberId;
+            const fieldName = this.name;
+            const fieldValue = this.value;
+            
+            // Construct the URL using Laravel's URL helper with relative path under /new_app
+            const updateUrl = `{{ url('/new_members/update') }}/${memberId}`;
 
-        autoSaveElements.forEach(element => {
-            element.addEventListener('change', function () {
-                const memberId = this.dataset.id;
-                const field = this.dataset.field;
-                const value = this.value;
-
-                fetch(`/new_members/update/${memberId}`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                    },
-                    body: JSON.stringify({ field, value })
+            fetch(updateUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                },
+                body: JSON.stringify({
+                    field: fieldName,
+                    value: fieldValue
                 })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.status !== 'success') {
-                        alert('Error updating field');
-                    }
-                })
-                .catch(error => console.error('Error:', error));
-            });
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    console.log('Field updated successfully');
+                } else {
+                    console.error('Failed to update field');
+                }
+            })
+            .catch(error => console.error('Error:', error));
         });
     });
 </script>
