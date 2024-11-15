@@ -43,8 +43,8 @@
                     <input type="text" class="form-control" id="last_name" name="last_name" value="{{ old('last_name') }}" required>
                 </div>
                 <div class="col-md-6 form-group mb-3">
-                    <label for="date_of_birth">Date of Birth</label>
-                    <input type="date" class="form-control" id="date_of_birth" name="date_of_birth" value="{{ old('date_of_birth') }}" required>
+                    <label for="dob">Date of Birth</label>
+                    <input type="date" class="form-control" id="dob" name="dob" value="{{ old('dob') }}" required>
                 </div>
                 <div class="col-md-6 form-group mb-3">
                     <label for="national_id">National ID</label>
@@ -62,7 +62,13 @@
                     <label for="location">Location</label>
                     <input type="text" class="form-control" id="location" name="location" value="{{ old('location') }}" required>
                 </div>
-
+                <div class="col-md-12 form-group mt-3">
+                    <input type="checkbox" id="terms" name="terms" required>
+                    <label for="terms">I agree to the <a href="#">terms and conditions</a>.</label>
+                    @error('terms')
+                        <span class="text-danger">{{ $message }}</span>
+                    @enderror
+                </div>
                 <input type="hidden" name="g-recaptcha-response" id="g-recaptcha-response">
 
                 <div class="col-md-12 mt-3">
