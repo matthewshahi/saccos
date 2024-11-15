@@ -31,7 +31,7 @@
 <div class="card mb-4">
     <div class="card-body">
         <h4 class="card-title">Register as a Member</h4>
-        <form action="{{ route('register.submit') }}" method="POST">
+        <form action="{{ route('register.submit') }}" method="POST" id="registration-form">
             @csrf
             <div class="row">
                 <div class="col-md-6 form-group mb-3">
@@ -62,20 +62,23 @@
                     <label for="location">Location</label>
                     <input type="text" class="form-control" id="location" name="location" value="{{ old('location') }}" required>
                 </div>
-                <div class="col-md-12 form-group mt-3 text-center">
-                    <!-- ReCAPTCHA Widget -->
-                    <div class="g-recaptcha d-inline-block" data-sitekey="{{ env('RECAPTCHA_SITE_KEY') }}"></div>
-                    @error('g-recaptcha-response')
-                        <div class="text-danger mt-2">{{ $message }}</div>
-                    @enderror
-                </div>
-                <div class="col-md-12 mt-4 text-center">
-                    <button type="submit" class="btn btn-primary btn-block">Submit Registration</button>
+
+                <input type="hidden" name="g-recaptcha-response" id="g-recaptcha-response">
+
+                <div class="col-md-12 mt-3">
+                    <button type="submit" class="btn btn-primary">Submit Registration</button>
                 </div>
             </div>
         </form>
     </div>
 </div>
 
-<script src="https://www.google.com/recaptcha/api.js" async defer></script>
+<script src="https://www.google.com/recaptcha/api.js?render={{ env('RECAPTCHA_SITE_KEY') }}"></script>
+<script>
+    grecaptcha.ready(function() {
+        grecaptcha.execute('{{ env('RECAPTCHA_SITE_KEY') }}', {action: 'submit'}).then(function(token) {
+            document.getElementById('g-recaptcha-response').value = token;
+        });
+    });
+</script>
 @endsection
