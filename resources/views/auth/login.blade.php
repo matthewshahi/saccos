@@ -30,6 +30,7 @@
                         <div class="form-group row">
                             <div class="col-sm-9 offset-sm-3">
                                 <button type="submit" class="btn btn-primary">Login</button>
+                                <a href="{{ url('/register') }}" class="btn btn-link">Or click here to apply for membership</a>
                             </div>
                         </div>
                     </form>

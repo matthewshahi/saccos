@@ -20,12 +20,15 @@
 <body class="text-start">
     <div class="app-admin-wrap layout-sidebar-vertical sidebar-full">
     @include('partials.header')
-        
-    @if (Auth::check() && Auth::user()->member_position == 2)
-                            @include('partials.menu')
-                        @else
-                            @include('partials.menu_members')
-                        @endif
+    
+        @if (Auth::check() && Auth::user()->member_position == 2)
+            @include('partials.menu')
+        @elseif (Auth::check() && Auth::user()->member_position == 1)
+            @include('partials.menu_members')
+        @else
+            @include('partials.menu_public')
+        @endif
+
         <div class="main-content-wrap mobile-menu-content bg-off-white m-0" style="padding: 3px;">
             
             <div class="main-content pt-4">
