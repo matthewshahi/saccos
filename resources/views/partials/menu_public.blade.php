@@ -20,10 +20,15 @@
     </a>
 </li>    
 <li class="item-name">
-                                <a href="{{ url('/loans/types/list') }}">
+                                <a href="{{ url('/') }}">
                                     <span class="text-muted">Available Loans</span>
                                 </a>
-                            </li>               
+                            </li>   
+                            <li class="item-name">
+                                <a href="{{ url('/loans/types/list') }}">
+                                    <span class="text-muted">Login (Members Only)</span>
+                                </a>
+                            </li>              
                 </ul>
             </div>
         </div>
