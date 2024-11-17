@@ -43,7 +43,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/loans/apply', [HomeController::class, 'loansApply'])->name('loans.apply');
     Route::get('/loans/guarantee/requests', [HomeController::class, 'listGuaranteeRequests'])->name('loans.guarantee.requests');
     Route::get('/loans/pending/approval', [HomeController::class, 'listLoansPendingApproval'])->name('loans.pending.approval');
-    Route::get('/loans/types/list', [HomeController::class, 'loansTypesList'])->name('loans.types.list');
+    // Route::get('/loans/types/list', [HomeController::class, 'loansTypesList'])->name('loans.types.list');
 
     Route::get('/profile/password', [HomeController::class, 'showChangeSelfPasswordForm'])->name('profile.password');
     Route::post('/profile/password', [HomeController::class, 'updateSelfPassword'])->name('profile.updatePassword');
