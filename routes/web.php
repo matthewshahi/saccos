@@ -24,6 +24,14 @@ Route::get('/loans/calculator', [HomeController::class, 'loansCalculator'])->nam
 Route::get('/register', [PublicRegistrationController::class, 'showForm'])->name('register.form');
 Route::post('/register', [PublicRegistrationController::class, 'submit'])->name('register.submit');
 
+Route::get('/loans/types/list', [PublicLoansController::class, 'loansTypesList'])->name('loans.types.list');
+    Route::get('/loans/types/list', [PublicLoansController::class, 'loansTypesList'])->name('loans.types.list');
+    Route::get('/public/loans/types/list', [PublicLoansController::class, 'loansTypesList'])->name('loans.types.list');
+    Route::get('/public/loans/details/{id}', [PublicLoansController::class, 'loanDetails'])->name('loan.details');
+    Route::get('/public/loan-calculator/{id}', [PublicLoansController::class, 'showLoanCalculator'])->name('loan.calculator');
+    Route::post('/public/loan-calculator/{id}/calculate', [PublicLoansController::class, 'calculateLoan'])->name('loan.calculate');
+    
+
 Route::middleware(['auth'])->group(function () {
 
     // Member statement route for non-officials
