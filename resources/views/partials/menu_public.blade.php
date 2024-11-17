@@ -17,7 +17,12 @@
         <i class="i-Handshake text-20 me-2 text-dark"></i>
         <span class="item-name text-15 text-muted">Register (Non Members)</span>
     </a>
-</li>                   
+</li>    
+<li class="item-name">
+                                <a href="{{ url('/loans/types/list') }}">
+                                    <span class="text-muted">Loan Types</span>
+                                </a>
+                            </li>               
                 </ul>
             </div>
         </div>
