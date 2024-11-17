@@ -46,12 +46,12 @@
                                     <span class="text-muted">Add New Member</span>
                                 </a>
                             </li>
-                            <li class="Ul_li--hover">
-    <a href="{{ url('new_members/list') }}">
-        <i class="i-Handshake text-20 me-2 text-dark"></i>
-        <span class="item-name text-15 text-muted">Review New Applications</span>
-    </a>
-</li>   
+                            <li class="item-name">
+                                <a href="{{ url('new_members/list') }}">
+                                    <span class="text-muted">New Membership Requests</span>
+                                </a>
+                            </li>
+ 
                         </ul>
                     </li>
                     <li class="Ul_li--hover">
