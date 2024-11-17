@@ -30,7 +30,7 @@ Route::get('/loans/types/list', [PublicLoansController::class, 'loansTypesList']
     Route::get('/public/loans/details/{id}', [PublicLoansController::class, 'loanDetails'])->name('loan.details');
     Route::get('/public/loan-calculator/{id}', [PublicLoansController::class, 'showLoanCalculator'])->name('loan.calculator');
     Route::post('/public/loan-calculator/{id}/calculate', [PublicLoansController::class, 'calculateLoan'])->name('loan.calculate');
-    
+
 
 Route::middleware(['auth'])->group(function () {
 
@@ -51,13 +51,13 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/downloads', [PublicFileController::class, 'publicDownloads'])->name('public.downloads');
     Route::get('/downloads/{file}/download', [PublicFileController::class, 'downloadFile'])->name('public.download.file');
 
-    Route::get('/loans/types/list', [PublicLoansController::class, 'loansTypesList'])->name('loans.types.list');
-    Route::get('/loans/types/list', [PublicLoansController::class, 'loansTypesList'])->name('loans.types.list');
-    Route::get('/public/loans/types/list', [PublicLoansController::class, 'loansTypesList'])->name('loans.types.list');
-    Route::get('/public/loans/details/{id}', [PublicLoansController::class, 'loanDetails'])->name('loan.details');
-    Route::get('/public/loan-calculator/{id}', [PublicLoansController::class, 'showLoanCalculator'])->name('loan.calculator');
-    Route::post('/public/loan-calculator/{id}/calculate', [PublicLoansController::class, 'calculateLoan'])->name('loan.calculate');
+    // Route::get('/loans/types/list', [PublicLoansController::class, 'loansTypesList'])->name('loans.types.list');
+    // Route::get('/loans/types/list', [PublicLoansController::class, 'loansTypesList'])->name('loans.types.list');
+    // Route::get('/public/loans/types/list', [PublicLoansController::class, 'loansTypesList'])->name('loans.types.list');
     // Route::get('/public/loans/details/{id}', [PublicLoansController::class, 'loanDetails'])->name('loan.details');
+    // Route::get('/public/loan-calculator/{id}', [PublicLoansController::class, 'showLoanCalculator'])->name('loan.calculator');
+    // Route::post('/public/loan-calculator/{id}/calculate', [PublicLoansController::class, 'calculateLoan'])->name('loan.calculate');
+    // // Route::get('/public/loans/details/{id}', [PublicLoansController::class, 'loanDetails'])->name('loan.details');
     // Route::post('/public/loans/details/{id}/calculate', [PublicLoansController::class, 'calculateLoan'])->name('loan.calculate');
     
    
