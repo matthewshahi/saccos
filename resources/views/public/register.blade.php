@@ -31,6 +31,12 @@
 <div class="card mb-4">
     <div class="card-body">
         <h4 class="card-title">Register as a Member</h4>
+        <p class="text-muted">
+            By completing this form, you are expressing interest in joining the SACCO. Once your application is received, it will be evaluated by our team. 
+            You may be contacted for additional details or documentation, such as a copy of your National ID, passport, next of kin information, etc. 
+            Please ensure your contact details are accurate, as our officials will reach out to guide you through the onboarding process. 
+            We aim to process applications as quickly as possible—expect a response soon!
+        </p>
         <form action="{{ route('register.submit') }}" method="POST" id="registration-form">
             @csrf
             <div class="row">
@@ -59,9 +65,9 @@
                     <input type="text" class="form-control" id="phone" name="phone" value="{{ old('phone') }}" required>
                 </div>
                 <div class="col-md-6 form-group mb-3">
-    <label for="physical_location">Location</label>
-    <input type="text" class="form-control" id="physical_location" name="physical_location" value="{{ old('physical_location') }}" required>
-</div>
+                    <label for="physical_location">Location</label>
+                    <input type="text" class="form-control" id="physical_location" name="physical_location" value="{{ old('physical_location') }}" required>
+                </div>
                 <div class="col-md-12 form-group mt-3">
                     <input type="checkbox" id="terms" name="terms" required>
                     <label for="terms">I agree to the <a href="#">terms and conditions</a>.</label>
