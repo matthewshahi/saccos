@@ -14,7 +14,10 @@ class AddDobToSaccoMembersNewApplicationsTable extends Migration
     public function up()
     {
         Schema::table('sacco_members_new_applications', function (Blueprint $table) {
-            $table->date('dob')->nullable()->after('last_name'); // Adding Date of Birth column
+            // Add the column only if it doesn't already exist
+            if (!Schema::hasColumn('sacco_members_new_applications', 'dob')) {
+                $table->date('dob')->nullable()->after('last_name');
+            }
         });
     }
 
@@ -26,7 +29,10 @@ class AddDobToSaccoMembersNewApplicationsTable extends Migration
     public function down()
     {
         Schema::table('sacco_members_new_applications', function (Blueprint $table) {
-            $table->dropColumn('dob');
+            // Drop the column only if it exists
+            if (Schema::hasColumn('sacco_members_new_applications', 'dob')) {
+                $table->dropColumn('dob');
+            }
         });
     }
 }
