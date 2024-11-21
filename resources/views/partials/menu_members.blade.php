@@ -110,4 +110,14 @@
             </div>
         </div>
     </div>
+    <div class="support-contact bg-light text-dark p-3 d-flex justify-content-between align-items-center" style="position: absolute; bottom: 0; left: 0; width: 100%; border-top: 1px solid #ddd;">
+        <div>
+            <strong>Support:</strong> Matthew Shahi
+        </div>
+        <div>
+            <a href="tel:+254722400737" style="text-decoration: none; color: #6c757d; font-weight: bold;">
+                <i class="i-Phone-2 me-1"></i>+254722400737
+            </a>
+        </div>
+    </div>
 </div>
