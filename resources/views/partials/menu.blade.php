@@ -17,8 +17,7 @@
 
             @if (file_exists(public_path($domainLogoPath))) <!-- Check if the domain-specific logo exists -->
                 <img src="{{ asset($domainLogoPath) }}" alt="Logo" style="height: 50px;">
-            @elseif (file_exists(public_path($defaultLogoPath))) <!-- Fallback to default logo -->
-                <img src="{{ asset($defaultLogoPath) }}" alt="Default Logo" style="height: 50px;">
+           
             @else
                 <span style="margin-left: 10px; font-size: 33px; color: rebeccapurple; font-weight: 900; font-family: 'Montserrat', sans-serif; background: linear-gradient(to right, rebeccapurple, indigo); -webkit-background-clip: text; color: transparent; text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);">
                     {{ $defaultCompanyName }}
@@ -413,10 +412,5 @@
             </div>
         </div>
     </div>
-    <div class="support-contact text-white p-2 d-flex justify-content-between align-items-center"
-     style="position: absolute; bottom: 0; left: 0; width: 100%; background: linear-gradient(to right, rgba(102, 51, 153, 0.8), rgba(75, 0, 130, 0.8)); 
-            font-size: 14px; border-top: 1px solid rgba(255, 255, 255, 0.1);">
-    <div style="font-size: 13px;">
-        <strong>ERP provided by:</strong> <br>Shahi Services, +254722400737
-    </div>
+     
 </div>

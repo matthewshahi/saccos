@@ -185,4 +185,17 @@ return [
         // 'Example' => App\Facades\Example::class,
     ])->toArray(),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Custom Application Settings
+    |--------------------------------------------------------------------------
+    |
+    | These custom settings allow you to define application-specific
+    | configurations such as ERP and support contacts that can be
+    | globally accessed within your application.
+    |
+    */
+
+    'erp_contact' => env('ERP_CONTACT', '+254 722 400737'),
+    'sacco_support' => env('SACCO_SUPPORT', '+254 722 400737'),
 ];
