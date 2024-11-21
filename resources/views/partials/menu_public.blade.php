@@ -60,7 +60,7 @@
      style="position: absolute; bottom: 0; left: 0; width: 100%; background: linear-gradient(to right, rgba(102, 51, 153, 0.8), rgba(75, 0, 130, 0.8)); 
             font-size: 14px; border-top: 1px solid rgba(255, 255, 255, 0.1);">
     <div style="font-size: 13px;">
-        <strong>Support:</strong> <br>Matthew Shahi, +254722400737
+        <strong>ERP provided by:</strong> <br>Shahi Services, +254722400737
     </div>
      
 </div>
