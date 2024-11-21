@@ -3,7 +3,7 @@
     <a href="{{ url('/') }}" style="text-decoration: none;">
             @php
                 $currentDomain = parse_url(url('/'), PHP_URL_HOST); // Extract domain name
-                $logoPath = url('/images/' . $currentDomain . '.jpg'); // Construct logo URL
+                $logoPath = url('/image/' . $currentDomain . '.jpg'); // Construct logo URL
                 
             @endphp
             @if (@getimagesize($logoPath)) <!-- Check if the logo exists -->
