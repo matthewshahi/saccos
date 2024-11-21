@@ -12,6 +12,7 @@ use App\Http\Controllers\PublicFileController;
 use App\Http\Controllers\PublicLoansController;
 use App\Http\Controllers\PublicRegistrationController;
 use App\Http\Controllers\PublicRegistrationActionsController;
+use App\Http\Controllers\MemberDashboardController;
 
 Route::get('/', [HomeController::class, 'redirectBasedOnAuth'])->name('home');
 Route::get('/home', [HomeController::class, 'redirectBasedOnAuth'])->name('home1');
@@ -33,6 +34,12 @@ Route::get('/loans/types/list', [PublicLoansController::class, 'loansTypesList']
 
 
 Route::middleware(['auth'])->group(function () {
+
+    Route::get('/dashboard/member_dashboard', [MemberDashboardController::class, 'index'])->name('member_dashboard');
+    Route::get('contributions/member-shares', [MemberDashboardController::class, 'shareListings'])->name('member.sharelistings');
+    Route::get('/contributions/member-capital', [MemberDashboardController::class, 'capitalListings'])->name('capital.listings');
+    Route::get('/contributions/fosa', [MemberDashboardController::class, 'fosaListings'])->name('fosa.listings');
+    Route::get('/loans/taken', [MemberDashboardController::class, 'loansTaken'])->name('loans.taken');
 
     // Member statement route for non-officials
     Route::get('/members/statement/self', [HomeController::class, 'viewStatement']);

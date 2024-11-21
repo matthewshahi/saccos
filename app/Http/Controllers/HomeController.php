@@ -50,12 +50,14 @@ class HomeController extends Controller
             $user = auth()->user();
           
 
-            // Check if the user is an official
             if ($user->member_position == 2) {
-                return redirect()->to('/dashboard');
+                return redirect('/dashboard');
+            } elseif ($user->member_position == 1) {
+                return redirect('/dashboard/member_dashboard');
             } else {
-                return redirect()->to('/members/statement/self'); // Redirect to the member statement URL
+                return redirect('/register');
             }
+
         }
        
 
