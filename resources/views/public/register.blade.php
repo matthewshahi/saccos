@@ -30,15 +30,15 @@
 
 <div class="card mb-4">
     <div class="card-body">
-        <h4 class="card-title">Register as a Member</h4>
+        <h4 class="card-title text-primary">Register as a Member</h4>
         <p class="text-muted">
-            By completing this form, you are expressing interest in joining the SACCO. Once your application is received, it will be evaluated by our team. 
-            You may be contacted for additional details or documentation, such as a copy of your National ID, passport, next of kin information, etc. 
-            Please ensure your contact details are accurate, as our officials will reach out to guide you through the onboarding process. 
-            We aim to process applications as quickly as possible—expect a response soon!
+            Please fill in the form below to apply for SACCO membership. Ensure all details are accurate. Once submitted, our team will contact you for further details if required.
         </p>
         <form action="{{ route('register.submit') }}" method="POST" id="registration-form">
             @csrf
+            
+            <!-- Personal Details Section -->
+            <h5 class="mb-3 text-primary">Personal Details</h5>
             <div class="row">
                 <div class="col-md-6 form-group mb-3">
                     <label for="first_name">First Name</label>
@@ -57,6 +57,34 @@
                     <input type="text" class="form-control" id="national_id" name="national_id" value="{{ old('national_id') }}" required>
                 </div>
                 <div class="col-md-6 form-group mb-3">
+                    <label for="marital_status">Marital Status</label>
+                    <select class="form-control" id="marital_status" name="marital_status">
+                        <option value="">Select</option>
+                        <option value="Single" {{ old('marital_status') == 'Single' ? 'selected' : '' }}>Single</option>
+                        <option value="Married" {{ old('marital_status') == 'Married' ? 'selected' : '' }}>Married</option>
+                        <option value="Divorced" {{ old('marital_status') == 'Divorced' ? 'selected' : '' }}>Divorced</option>
+                        <option value="Widowed" {{ old('marital_status') == 'Widowed' ? 'selected' : '' }}>Widowed</option>
+                    </select>
+                </div>
+                <div class="col-md-6 form-group mb-3">
+                    <label for="gender">Gender</label>
+                    <select class="form-control" id="gender" name="gender">
+                        <option value="">Select</option>
+                        <option value="Male" {{ old('gender') == 'Male' ? 'selected' : '' }}>Male</option>
+                        <option value="Female" {{ old('gender') == 'Female' ? 'selected' : '' }}>Female</option>
+                        <option value="Other" {{ old('gender') == 'Other' ? 'selected' : '' }}>Other</option>
+                    </select>
+                </div>
+                <div class="col-md-6 form-group mb-3">
+                    <label for="dependents">Dependents</label>
+                    <input type="number" class="form-control" id="dependents" name="dependents" value="{{ old('dependents') }}">
+                </div>
+            </div>
+
+            <!-- Contact Details Section -->
+            <h5 class="mt-4 mb-3 text-primary">Contact Details</h5>
+            <div class="row">
+                <div class="col-md-6 form-group mb-3">
                     <label for="email">Email Address</label>
                     <input type="email" class="form-control" id="email" name="email" value="{{ old('email') }}" required>
                 </div>
@@ -68,18 +96,67 @@
                     <label for="physical_location">Location</label>
                     <input type="text" class="form-control" id="physical_location" name="physical_location" value="{{ old('physical_location') }}" required>
                 </div>
-                <div class="col-md-12 form-group mt-3">
-                    <input type="checkbox" id="terms" name="terms" required>
-                    <label for="terms">I agree to the <a href="#">terms and conditions</a>.</label>
-                    @error('terms')
-                        <span class="text-danger">{{ $message }}</span>
-                    @enderror
-                </div>
-                <input type="hidden" name="g-recaptcha-response" id="g-recaptcha-response">
+            </div>
 
-                <div class="col-md-12 mt-3">
-                    <button type="submit" class="btn btn-primary">Submit Registration</button>
+            <!-- Next of Kin Section -->
+            <h5 class="mt-4 mb-3 text-primary">Next of Kin Details</h5>
+            <p class="text-muted">You may add up to 3 next of kin.</p>
+            @for ($i = 0; $i < 3; $i++)
+                <div class="row border rounded p-3 mb-3">
+                    <div class="col-md-3 form-group mb-3">
+                        <label for="next_of_kin[{{ $i }}][name]">Name</label>
+                        <input type="text" class="form-control" name="next_of_kin[{{ $i }}][name]" value="{{ old('next_of_kin.'.$i.'.name') }}">
+                    </div>
+                    <div class="col-md-3 form-group mb-3">
+                        <label for="next_of_kin[{{ $i }}][relationship]">Relationship</label>
+                        <input type="text" class="form-control" name="next_of_kin[{{ $i }}][relationship]" value="{{ old('next_of_kin.'.$i.'.relationship') }}">
+                    </div>
+                    <div class="col-md-3 form-group mb-3">
+                        <label for="next_of_kin[{{ $i }}][phone]">Phone Number</label>
+                        <input type="text" class="form-control" name="next_of_kin[{{ $i }}][phone]" value="{{ old('next_of_kin.'.$i.'.phone') }}">
+                    </div>
+                    <div class="col-md-3 form-group mb-3">
+                        <label for="next_of_kin[{{ $i }}][share_percent]">Share (%)</label>
+                        <input type="number" class="form-control" name="next_of_kin[{{ $i }}][share_percent]" value="{{ old('next_of_kin.'.$i.'.share_percent') }}" min="0" max="100">
+                    </div>
                 </div>
+            @endfor
+
+            <!-- Bank Details Section -->
+            <h5 class="mt-4 mb-3 text-primary">Bank Details</h5>
+            <div class="row">
+                <div class="col-md-6 form-group mb-3">
+                    <label>Bank Name</label>
+                    <input type="text" class="form-control" value="{{ $bankDetails['bank_name'] }}" readonly>
+                </div>
+                <div class="col-md-6 form-group mb-3">
+                    <label>Branch Name</label>
+                    <input type="text" class="form-control" value="{{ $bankDetails['branch_name'] }}" readonly>
+                </div>
+                <div class="col-md-6 form-group mb-3">
+                    <label>Account Name</label>
+                    <input type="text" class="form-control" value="{{ $bankDetails['account_name'] }}" readonly>
+                </div>
+                <div class="col-md-6 form-group mb-3">
+                    <label>Account Number</label>
+                    <input type="text" class="form-control" value="{{ $bankDetails['account_number'] }}" readonly>
+                </div>
+            </div>
+
+            <!-- Terms Section -->
+            <div class="col-md-12 form-group mt-4">
+                <input type="checkbox" id="certification_statement" name="certification_statement" required>
+                <label for="certification_statement">I certify that the information provided is accurate to the best of my knowledge.</label>
+            </div>
+
+            <div class="col-md-12 form-group mt-3">
+                <input type="checkbox" id="terms" name="terms" required>
+                <label for="terms">I agree to the <a href="#">terms and conditions</a>.</label>
+            </div>
+            <input type="hidden" name="g-recaptcha-response" id="g-recaptcha-response">
+
+            <div class="col-md-12 mt-3">
+                <button type="submit" class="btn btn-primary w-100">Submit Registration</button>
             </div>
         </form>
     </div>

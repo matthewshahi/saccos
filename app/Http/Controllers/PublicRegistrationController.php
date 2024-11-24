@@ -12,7 +12,15 @@ class PublicRegistrationController extends Controller
     // Display the registration form
     public function showForm()
     {
-        return view('public.register');
+        // Fetch bank details from the database
+        $bankDetails = [
+            'bank_name' => DB::table('sacco_defaults')->where('default_name', 'BANK_NAME')->value('default_value'),
+            'branch_name' => DB::table('sacco_defaults')->where('default_name', 'BANK_BRANCH')->value('default_value'),
+            'account_name' => DB::table('sacco_defaults')->where('default_name', 'BANK_ACCOUNT_NAME')->value('default_value'),
+            'account_number' => DB::table('sacco_defaults')->where('default_name', 'BANK_ACCOUNT_NUMBER')->value('default_value'),
+        ];
+
+        return view('public.register', compact('bankDetails'));
     }
 
     // Handle form submission
@@ -26,10 +34,26 @@ class PublicRegistrationController extends Controller
             'national_id' => 'required|string|max:20',
             'email' => 'required|email|max:100|unique:sacco_members_new_applications,email', // Prevent duplicates
             'phone' => 'required|string|max:15',
-            'physical_location' => 'required|string|max:100', // Updated to match DB field name
+            'physical_location' => 'required|string|max:100',
+            'next_of_kin' => 'nullable|array|max:3', // Validate as array
+            'next_of_kin.*.name' => 'nullable|string|max:100',
+            'next_of_kin.*.relationship' => 'nullable|string|max:50',
+            'next_of_kin.*.phone' => 'nullable|string|max:15',
+            'next_of_kin.*.id' => 'nullable|string|max:20',
+            'next_of_kin.*.share_percent' => 'nullable|numeric|min:0|max:100',
             'terms' => 'accepted',
-            'g-recaptcha-response' => 'required'
+            'g-recaptcha-response' => 'required',
         ]);
+
+        // Ensure the total kin_share_percent does not exceed 100%
+        if (!empty($request->next_of_kin)) {
+            $totalSharePercent = collect($request->next_of_kin)->sum('share_percent');
+            if ($totalSharePercent > 100) {
+                return redirect()->back()->withErrors([
+                    'next_of_kin' => 'The total share percentage for next of kin cannot exceed 100%.',
+                ])->withInput();
+            }
+        }
 
         // If validation fails, redirect back with errors
         if ($validator->fails()) {
@@ -39,7 +63,7 @@ class PublicRegistrationController extends Controller
         // Verify reCAPTCHA v3
         $response = Http::asForm()->post('https://www.google.com/recaptcha/api/siteverify', [
             'secret' => env('RECAPTCHA_SECRET_KEY'),
-            'response' => $request->input('g-recaptcha-response')
+            'response' => $request->input('g-recaptcha-response'),
         ]);
 
         $recaptchaData = $response->json();
@@ -50,18 +74,7 @@ class PublicRegistrationController extends Controller
             return redirect()->back()->withErrors(['captcha' => 'reCAPTCHA verification failed or score too low.'])->withInput();
         }
 
-        // Check for duplicate entry using email
-        $duplicate = DB::table('sacco_members_new_applications')
-            ->where('email', $request->input('email'))
-            ->exists();
-
-        if ($duplicate) {
-            return redirect()->back()->withErrors([
-                'duplicate' => 'A member with similar details was found. Please enter unique details.'
-            ])->withInput();
-        }
-
-        // Save the validated data to the temporary applications table
+        // Save the validated data to the database
         DB::table('sacco_members_new_applications')->insert([
             'first_name' => $request->input('first_name'),
             'last_name' => $request->input('last_name'),
@@ -69,7 +82,12 @@ class PublicRegistrationController extends Controller
             'national_id' => $request->input('national_id'),
             'email' => $request->input('email'),
             'phone' => $request->input('phone'),
-            'physical_location' => $request->input('physical_location'), // Corrected to match DB field
+            'physical_location' => $request->input('physical_location'),
+            'next_of_kin_name' => json_encode(array_column($request->next_of_kin, 'name')),
+            'next_of_kin_relationship' => json_encode(array_column($request->next_of_kin, 'relationship')),
+            'next_of_kin_phone' => json_encode(array_column($request->next_of_kin, 'phone')),
+            'next_of_kin_id' => json_encode(array_column($request->next_of_kin, 'id')),
+            'kin_share_percent' => json_encode(array_column($request->next_of_kin, 'share_percent')),
             'created_at' => now(),
             'updated_at' => now(),
         ]);

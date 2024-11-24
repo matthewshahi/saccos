@@ -53,11 +53,14 @@
         </div>
     </div>
     
-    <div class="support-contact text-white p-2 d-flex justify-content-between align-items-center" style="position: absolute; bottom: 0; left: 0; width: 100%; background: linear-gradient(to right, rgba(102, 51, 153, 0.8), rgba(75, 0, 130, 0.8)); 
-            font-size: 14px; border-top: 1px solid rgba(255, 255, 255, 0.1);">
-    <div style="font-size: 13px;">
-        <strong>ERP provided by:</strong> <br>Shahi Services, +254722400737
+    <div class="support-contact p-2 d-flex justify-content-between align-items-center" 
+     style="position: absolute; bottom: 0; left: 0; width: 100%; background: linear-gradient(to right, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.9)); 
+            font-size: 14px; border-top: 1px solid rgba(102, 51, 153, 0.2);">
+    <div style="font-size: 13px; color: rgba(102, 51, 153, 1); font-weight: 600;">
+        <strong>ERP provided by:</strong> <br> Shahi Services, 
+        <a href="tel:+254722400737" style="text-decoration: none; color: rgba(102, 51, 153, 1); font-weight: bold;">
+            +254722400737
+        </a>
     </div>
-     
 </div>
 </div>

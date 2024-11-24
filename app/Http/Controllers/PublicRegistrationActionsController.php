@@ -38,7 +38,7 @@ class PublicRegistrationActionsController extends Controller
             'value' => 'nullable|string|max:255',
         ]);
 
-        $field = $validatedData['field'];
+        $field = $validatedData['field']; 
         $value = $validatedData['value'];
 
         DB::table('sacco_members_new_applications')
