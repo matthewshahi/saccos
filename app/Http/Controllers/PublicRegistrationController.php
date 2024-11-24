@@ -60,19 +60,21 @@ class PublicRegistrationController extends Controller
             return redirect()->back()->withErrors($validator)->withInput();
         }
 
-        // Verify reCAPTCHA v3
         $response = Http::asForm()->post('https://www.google.com/recaptcha/api/siteverify', [
             'secret' => env('RECAPTCHA_SECRET_KEY'),
             'response' => $request->input('g-recaptcha-response'),
+            'remoteip' => $request->ip(), // Optional
         ]);
-
+        
         $recaptchaData = $response->json();
-        $recaptchaSuccess = $recaptchaData['success'] ?? false;
-        $recaptchaScore = $recaptchaData['score'] ?? 0;
-
-        dd($recaptchaSuccess);
-        if (!$recaptchaSuccess || $recaptchaScore < 0.5) { // 0.5 threshold for spam
-            return redirect()->back()->withErrors(['captcha' => 'reCAPTCHA verification failed or score too low.'])->withInput();
+        
+        if (!($recaptchaData['success'] ?? false)) {
+            logger()->error('reCAPTCHA verification failed', ['response' => $recaptchaData]);
+            return redirect()->back()->withErrors(['captcha' => 'reCAPTCHA verification failed.'])->withInput();
+        }
+        
+        if (($recaptchaData['score'] ?? 0) < 0.5) {
+            return redirect()->back()->withErrors(['captcha' => 'Suspicious activity detected. Try again.'])->withInput();
         }
 
         // Save the validated data to the database
