@@ -1,10 +1,10 @@
 <?php
+
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
- 
-class FixKinSharePercentInSaccoMembersTables extends Migration
+class UpdateKinSharePercentToJsonInSaccoMembersNewApplications extends Migration
 {
     /**
      * Run the migrations.
@@ -12,13 +12,15 @@ class FixKinSharePercentInSaccoMembersTables extends Migration
     public function up(): void
     {
         Schema::table('sacco_members_new_applications', function (Blueprint $table) {
-            // Drop the existing problematic column
-            $table->dropColumn('kin_share_percent');
+            // Drop the existing `kin_share_percent` column if it exists
+            if (Schema::hasColumn('sacco_members_new_applications', 'kin_share_percent')) {
+                $table->dropColumn('kin_share_percent');
+            }
         });
 
         Schema::table('sacco_members_new_applications', function (Blueprint $table) {
-            // Recreate the column as JSON with a default empty array
-            $table->json('kin_share_percent')->default(json_encode([]))->after('next_of_kin_id');
+            // Add the `kin_share_percent` column back as JSON
+            $table->json('kin_share_percent')->nullable()->after('next_of_kin_id');
         });
     }
 
@@ -33,7 +35,7 @@ class FixKinSharePercentInSaccoMembersTables extends Migration
         });
 
         Schema::table('sacco_members_new_applications', function (Blueprint $table) {
-            // Recreate the column as a string (original state)
+            // Add the column back as a string (original state)
             $table->string('kin_share_percent', 255)->nullable()->after('next_of_kin_id');
         });
     }
