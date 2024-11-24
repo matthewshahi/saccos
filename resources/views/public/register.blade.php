@@ -75,10 +75,7 @@
                         <option value="Other" {{ old('gender') == 'Other' ? 'selected' : '' }}>Other</option>
                     </select>
                 </div>
-                <div class="col-md-6 form-group mb-3">
-                    <label for="dependents">Dependents</label>
-                    <input type="number" class="form-control" id="dependents" name="dependents" value="{{ old('dependents') }}">
-                </div>
+                 
             </div>
 
             <!-- Contact Details Section -->
