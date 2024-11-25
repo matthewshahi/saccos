@@ -47,4 +47,14 @@ class PublicRegistrationActionsController extends Controller
 
         return response()->json(['status' => 'success', 'message' => 'Field updated successfully']);
     }
+    public function getMemberDetails($id)
+        {
+            $member = DB::table('sacco_members_new_applications')->where('id', $id)->first();
+
+            if (!$member) {
+                return response()->json(['error' => 'Member not found'], 404);
+            }
+
+            return response()->json($member);
+        }
 }

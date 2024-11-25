@@ -16,7 +16,7 @@ use App\Http\Controllers\MemberDashboardController;
 
 Route::get('/', [HomeController::class, 'redirectBasedOnAuth'])->name('home');
 Route::get('/home', [HomeController::class, 'redirectBasedOnAuth'])->name('home1');
-
+ 
 Route::get('login', [CustomAuthController::class, 'showLoginForm'])->name('login');
 Route::post('login', [CustomAuthController::class, 'login']);
 Route::post('logout', [CustomAuthController::class, 'logout'])->name('logout');
@@ -74,6 +74,7 @@ Route::middleware(['auth'])->group(function () {
 Route::middleware(['auth', 'check_member_position'])->group(function () {
     Route::get('/new_members/list', [PublicRegistrationActionsController::class, 'listMembers'])->name('members.list')->middleware('check_user_rights:new_member_applications_list');
     Route::post('/new_members/update/{id}', [PublicRegistrationActionsController::class, 'updateField'])->middleware('check_user_rights:new_member_applications_update');
+    Route::get('/new_members/details/{id}', [PublicRegistrationActionsController::class, 'getMemberDetails'])->name('members.details')->middleware('check_user_rights:new_member_applications_update');
 
     Route::get('/dashboard', [HomeController::class, 'index'])->name('dashboard')->middleware('auth');
 

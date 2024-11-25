@@ -31,6 +31,7 @@
                         <th>Contacted By</th>
                         <th>Contacted On</th>
                         <th>Comments</th>
+                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -57,6 +58,9 @@
                             <td>
                                 <textarea class="form-control auto-save" data-id="{{ $member->id }}" data-field="comments">{{ $member->comments }}</textarea>
                             </td>
+                            <td>
+                                <button type="button" class="btn btn-info btn-sm view-details" data-id="{{ $member->id }}">View Details</button>
+                            </td>
                         </tr>
                     @endforeach
                 </tbody>
@@ -70,8 +74,29 @@
     </div>
 </div>
 
+<!-- Modal -->
+<div class="modal fade" id="memberDetailsModal" tabindex="-1" aria-labelledby="memberDetailsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="memberDetailsModalLabel">Member Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="modal-content">
+                    <p class="text-center text-muted">Loading details...</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
     document.addEventListener('DOMContentLoaded', function () {
+        // Auto-save functionality
         const autoSaveElements = document.querySelectorAll('.auto-save');
 
         autoSaveElements.forEach(element => {
@@ -95,6 +120,43 @@
                     }
                 })
                 .catch(error => console.error('Error:', error));
+            });
+        });
+
+        // View details button click
+        const viewDetailsButtons = document.querySelectorAll('.view-details');
+        viewDetailsButtons.forEach(button => {
+            button.addEventListener('click', function () {
+                const memberId = this.dataset.id;
+
+                fetch(`{{ url('/new_members/details') }}/${memberId}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        const modalContent = document.getElementById('modal-content');
+                        modalContent.innerHTML = `
+                            <p><strong>Name:</strong> ${data.first_name} ${data.last_name}</p>
+                            <p><strong>Email:</strong> ${data.email}</p>
+                            <p><strong>Phone:</strong> ${data.phone}</p>
+                            <p><strong>National ID:</strong> ${data.national_id}</p>
+                            <p><strong>Location:</strong> ${data.physical_location}</p>
+                            <p><strong>Marital Status:</strong> ${data.marital_status}</p>
+                            <p><strong>Gender:</strong> ${data.gender}</p>
+                            <p><strong>Dependents:</strong> ${data.dependents}</p>
+                            <p><strong>Next of Kin:</strong></p>
+                            <ul>
+                                ${JSON.parse(data.next_of_kin_name).map((name, index) => `
+                                    <li>
+                                        <strong>Name:</strong> ${name}, 
+                                        <strong>Relationship:</strong> ${JSON.parse(data.next_of_kin_relationship)[index]}, 
+                                        <strong>Phone:</strong> ${JSON.parse(data.next_of_kin_phone)[index]},
+                                        <strong>Share:</strong> ${JSON.parse(data.kin_share_percent)[index]}%
+                                    </li>
+                                `).join('')}
+                            </ul>
+                        `;
+                        new bootstrap.Modal(document.getElementById('memberDetailsModal')).show();
+                    })
+                    .catch(error => console.error('Error fetching member details:', error));
             });
         });
     });

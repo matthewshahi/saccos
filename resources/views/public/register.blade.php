@@ -48,10 +48,12 @@
                     <label for="last_name">Last Name</label>
                     <input type="text" class="form-control" id="last_name" name="last_name" value="{{ old('last_name') }}" required>
                 </div>
+                
                 <div class="col-md-6 form-group mb-3">
-                    <label for="dob">Date of Birth</label>
-                    <input type="date" class="form-control" id="dob" name="dob" value="{{ old('dob') }}" required>
+                    <label for="birth_date">Date of Birth</label>
+                    <input type="date" class="form-control" id="birth_date" name="birth_date" value="{{ old('birth_date') }}" required>
                 </div>
+
                 <div class="col-md-6 form-group mb-3">
                     <label for="national_id">National ID</label>
                     <input type="text" class="form-control" id="national_id" name="national_id" value="{{ old('national_id') }}" required>
@@ -72,7 +74,7 @@
                         <option value="">Select</option>
                         <option value="Male" {{ old('gender') == 'Male' ? 'selected' : '' }}>Male</option>
                         <option value="Female" {{ old('gender') == 'Female' ? 'selected' : '' }}>Female</option>
-                        <option value="Other" {{ old('gender') == 'Other' ? 'selected' : '' }}>Other</option>
+                        
                     </select>
                 </div>
                  
