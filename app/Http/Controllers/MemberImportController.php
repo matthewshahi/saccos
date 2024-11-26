@@ -230,8 +230,7 @@ class MemberImportController extends Controller
     
             if ($member) {
                 // Show member being processed
-                echo "<br>Processing Share Contribution for: " . $member->member_name . " (Member ID: " . $member->member_id . ")\n";
-    
+                echo "<br>" . $member->member_name . " (Member ID: " . $member->member_id . ") | " . $share->share_amount_paying ;    
                 // Create ledger entries
                 DB::table('sacco_accounts_trans')->insert([
                     [
