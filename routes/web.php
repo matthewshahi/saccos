@@ -13,6 +13,8 @@ use App\Http\Controllers\PublicLoansController;
 use App\Http\Controllers\PublicRegistrationController;
 use App\Http\Controllers\PublicRegistrationActionsController;
 use App\Http\Controllers\MemberDashboardController;
+use App\Http\Controllers\MemberImportController;
+
 
 Route::get('/', [HomeController::class, 'redirectBasedOnAuth'])->name('home');
 Route::get('/home', [HomeController::class, 'redirectBasedOnAuth'])->name('home1');
@@ -75,6 +77,12 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
     Route::get('/new_members/list', [PublicRegistrationActionsController::class, 'listMembers'])->name('members.list')->middleware('check_user_rights:new_member_applications_list');
     Route::post('/new_members/update/{id}', [PublicRegistrationActionsController::class, 'updateField'])->middleware('check_user_rights:new_member_applications_update');
     Route::get('/new_members/details/{id}', [PublicRegistrationActionsController::class, 'getMemberDetails'])->name('members.details')->middleware('check_user_rights:new_member_applications_update');
+
+    
+
+    Route::get('/import/members', [MemberImportController::class, 'showForm'])->name('import.members.form')->middleware('check_user_rights:new_member_applications_update');
+    Route::post('/import/members', [MemberImportController::class, 'import'])->name('import.members.process')->middleware('check_user_rights:new_member_applications_update');
+
 
     Route::get('/dashboard', [HomeController::class, 'index'])->name('dashboard')->middleware('auth');
 
