@@ -214,4 +214,106 @@ class MemberImportController extends Controller
                 ->increment('main_account_credit', $creditTotal);
         }
     }
+
+    public function updatefLedgers()
+{
+    // Fetch all shares and capital contributions
+    $shares = DB::table('sacco_shares')->get();
+    $capitalContributions = DB::table('sacco_capital_shares')->get();
+
+    // Process Shares
+    foreach ($shares as $share) {
+        $member = DB::table('sacco_members')->where('member_id', $share->share_member_id)->first();
+
+        if ($member) {
+            // Create ledger entries
+            DB::table('sacco_accounts_trans')->insert([
+                [
+                    'accounts_trans_member_id' => $member->member_id,
+                    'accounts_trans_sub_account' => 12, // Credit member shares
+                    'accounts_trans_period' => $share->share_period,
+                    'accounts_trans_debit' => 0,
+                    'accounts_trans_credit' => $share->share_amount_paying,
+                    'accounts_trans_doc_no' => 'SHARE-' . $share->share_period,
+                    'accounts_trans_decription' => 'Share Contribution for ' . $member->member_name,
+                    'accounts_trans_dat_date' => $share->share_date_paid,
+                    'accounts_trans_transdate' => $share->share_transdate,
+                ],
+                [
+                    'accounts_trans_member_id' => $member->member_id,
+                    'accounts_trans_sub_account' => 31, // Debit Adom account
+                    'accounts_trans_period' => $share->share_period,
+                    'accounts_trans_debit' => $share->share_amount_paying,
+                    'accounts_trans_credit' => 0,
+                    'accounts_trans_doc_no' => 'SHARE-' . $share->share_period,
+                    'accounts_trans_decription' => 'Share Contribution for ' . $member->member_name,
+                    'accounts_trans_dat_date' => $share->share_date_paid,
+                    'accounts_trans_transdate' => $share->share_transdate,
+                ]
+            ]);
+
+            // Update sub-accounts
+            DB::table('sacco_sub_account')->where('sub_account_id', 12)->increment('sub_account_credit', $share->share_amount_paying);
+            DB::table('sacco_sub_account')->where('sub_account_id', 31)->increment('sub_account_debit', $share->share_amount_paying);
+        }
+    }
+
+    // Process Capital Contributions
+    foreach ($capitalContributions as $capital) {
+        $member = DB::table('sacco_members')->where('member_id', $capital->share_capitalmember_id)->first();
+
+        if ($member) {
+            // Create ledger entries
+            DB::table('sacco_accounts_trans')->insert([
+                [
+                    'accounts_trans_member_id' => $member->member_id,
+                    'accounts_trans_sub_account' => 44, // Credit member capital
+                    'accounts_trans_period' => $capital->share_capitalperiod,
+                    'accounts_trans_debit' => 0,
+                    'accounts_trans_credit' => $capital->share_capitalamount_paying,
+                    'accounts_trans_doc_no' => 'CAPITAL-' . $capital->share_capitalperiod,
+                    'accounts_trans_decription' => 'Capital Contribution for ' . $member->member_name,
+                    'accounts_trans_dat_date' => $capital->share_capitaldate_paid,
+                    'accounts_trans_transdate' => $capital->share_capitaltransdate,
+                ],
+                [
+                    'accounts_trans_member_id' => $member->member_id,
+                    'accounts_trans_sub_account' => 31, // Debit Adom account
+                    'accounts_trans_period' => $capital->share_capitalperiod,
+                    'accounts_trans_debit' => $capital->share_capitalamount_paying,
+                    'accounts_trans_credit' => 0,
+                    'accounts_trans_doc_no' => 'CAPITAL-' . $capital->share_capitalperiod,
+                    'accounts_trans_decription' => 'Capital Contribution for ' . $member->member_name,
+                    'accounts_trans_dat_date' => $capital->share_capitaldate_paid,
+                    'accounts_trans_transdate' => $capital->share_capitaltransdate,
+                ]
+            ]);
+
+            // Update sub-accounts
+            DB::table('sacco_sub_account')->where('sub_account_id', 44)->increment('sub_account_credit', $capital->share_capitalamount_paying);
+            DB::table('sacco_sub_account')->where('sub_account_id', 31)->increment('sub_account_debit', $capital->share_capitalamount_paying);
+        }
+    }
+
+    // Update Member Totals
+    $members = DB::table('sacco_members')->get();
+    foreach ($members as $member) {
+        $totalShares = DB::table('sacco_shares')->where('share_member_id', $member->member_id)->sum('share_amount_paying');
+        $totalCapital = DB::table('sacco_capital_shares')->where('share_capitalmember_id', $member->member_id)->sum('share_capitalamount_paying');
+
+        DB::table('sacco_members')->where('member_id', $member->member_id)->update([
+            'member_total_share' => $totalShares,
+            'member_total_share_capital' => $totalCapital,
+        ]);
+    }
+
+    // Update Main Accounts
+    $totalDebit = DB::table('sacco_accounts_trans')->sum('accounts_trans_debit');
+    $totalCredit = DB::table('sacco_accounts_trans')->sum('accounts_trans_credit');
+
+    DB::table('sacco_main_account')->where('main_account_id', 10)->update(['main_account_debit' => $totalDebit]);
+    DB::table('sacco_main_account')->where('main_account_id', 5)->update(['main_account_credit' => $totalCredit]);
+
+    return response()->json(['status' => 'success', 'message' => 'Ledgers updated successfully!']);
+}
 }

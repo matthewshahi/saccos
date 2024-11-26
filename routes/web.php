@@ -80,8 +80,9 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
 
     
 
-    Route::get('/import/members', [MemberImportController::class, 'showForm'])->name('import.members.form')->middleware('check_user_rights:new_member_applications_update');
-    Route::post('/import/members', [MemberImportController::class, 'import'])->name('import.members.process')->middleware('check_user_rights:new_member_applications_update');
+    Route::get('/import/members', [MemberImportController::class, 'showForm'])->name('import.members.form')->middleware('check_user_rights:new_member_applications_updateXXX');
+    Route::post('/import/members', [MemberImportController::class, 'import'])->name('import.members.process')->middleware('check_user_rights:new_member_applications_updateXXX');
+    Route::get('/update/ledgers', [MemberImportController::class, 'updatefLedgers'])->name('update.ledgers');
 
 
     Route::get('/dashboard', [HomeController::class, 'index'])->name('dashboard')->middleware('auth');
