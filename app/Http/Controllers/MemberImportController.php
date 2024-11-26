@@ -95,10 +95,13 @@ class MemberImportController extends Controller
             'member_transdate' => now(),
         ]);
 
+        // Fetch `member_id` based on `member_sacco_id`
+        $memberId = DB::table('sacco_members')->where('member_sacco_id', $memberSaccoId)->value('member_id');
+
         // Insert capital into `sacco_capital_shares`
         if ($capitalAmount > 0) {
             DB::table('sacco_capital_shares')->insert([
-                'share_capitalmember_id' => $memberSaccoId,
+                'share_capitalmember_id' => $memberId,
                 'share_capitalamount_paying' => $capitalAmount,
                 'share_capitalperiod' => date('Ym'), // Default to current month
                 'share_capitaldescription' => 'Initial Capital Deposit',
@@ -116,7 +119,7 @@ class MemberImportController extends Controller
                 $sharePeriod = Carbon::create(2024, 2, 1)->addMonths($monthOffset)->format('Ym');
 
                 DB::table('sacco_shares')->insert([
-                    'share_member_id' => $memberSaccoId,
+                    'share_member_id' => $memberId,
                     'share_amount_paying' => $shareAmount,
                     'share_period' => $sharePeriod,
                     'share_description' => 'Monthly Share Contribution',
@@ -128,13 +131,13 @@ class MemberImportController extends Controller
         }
 
         // Update ledgers for shares and capital
-        $this->updateLedgers($memberSaccoId, $capitalAmount, $row);
+        $this->updateLedgers($memberId, $capitalAmount, $row);
     }
 
     /**
      * Update ledgers for shares and capital.
      */
-    private function updateLedgers($memberSaccoId, $capitalAmount, $row)
+    private function updateLedgers($memberId, $capitalAmount, $row)
     {
         $ledgerEntries = [];
 
@@ -176,7 +179,7 @@ class MemberImportController extends Controller
         // Insert ledger entries into `sacco_accounts_trans`
         foreach ($ledgerEntries as $entry) {
             DB::table('sacco_accounts_trans')->insert([
-                'accounts_trans_member_id' => $memberSaccoId,
+                'accounts_trans_member_id' => $memberId,
                 'accounts_trans_sub_account' => $entry['sub_account'],
                 'accounts_trans_period' => date('Ym'),
                 'accounts_trans_debit' => $entry['debit'],
