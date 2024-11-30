@@ -15,6 +15,10 @@ use App\Http\Controllers\PublicRegistrationActionsController;
 use App\Http\Controllers\MemberDashboardController;
 use App\Http\Controllers\MemberImportController;
 
+use App\Http\Controllers\MpesaTheController;  // Corrected to MpesaTheController
+use App\Http\Controllers\MpesaTestController;
+use App\Http\Controllers\MpesaRegistrationController;
+use App\Http\Controllers\MpesaC2BController;
 
 Route::get('/', [HomeController::class, 'redirectBasedOnAuth'])->name('home');
 Route::get('/home', [HomeController::class, 'redirectBasedOnAuth'])->name('home1');
@@ -73,7 +77,38 @@ Route::middleware(['auth'])->group(function () {
 
 });
 
+$stkPushRoute = Str::random(10);  // Generates a random route string for security
+$stkCallbackRoute = Str::random(10);  // Generates a random route string for callback
+
+Route:: get('/plans', [MpesaTheController::class, 'plans']);
+Route:: get('/checkout', [MpesaTheController::class, 'checkout']);
+Route:: get('/stk/check/{id}', [MpesaTheController::class, 'checkPayment']);
+Route:: post('/pay/stk/callback/e/{unique_number}', [MpesaTheController::class, 'handleSTKPushCallback']);
+Route::get('/stk/initiate', [MpesaTheController::class, 'showSTKPushForm'])->name('stk.push');
+Route::post('/stk/initiate/{unique_number}', [MpesaTheController::class, 'initiateSTKPush'])->name('stk.push.submit');
+Route::post('/consumer/stk/initiate/{unique_number}', [MpesaTheController::class, 'consumerinitiateSTKPush'])->name('consumer.stk.push.submit');
+Route::get('/consumer/paybill/validation', [MpesaTheController::class, 'registerurls'])->name('register.paybill.urls');
+Route::match(['get', 'post'], '/pay/skt/confirmation', [MpesaTheController::class, 'stkconfirmation'])->name('StkmPesaConfirmation');
+Route::match(['get', 'post'], '/pay/stk/validation', [MpesaTheController::class, 'stkvalidation'])->name('StkmPesaValidation');
+// STK Push Initiation Route
+Route::middleware(['throttle:10,1'])->post('/payment_stk/' . $stkPushRoute, [MpesaTheController::class, 'initiateSTKPush'])->name('payment_stk.push');
+// STK Push Callback Route
+Route::middleware(['throttle:10,1'])->post('/payment_stk/' . $stkCallbackRoute, [MpesaTheController::class, 'handleSTKPushCallback'])->name('payment_stk.callback');
+
+
+Route::get('/secure-config/register/{id?}', [MpesaRegistrationController::class, 'showForm'])->name('mpesa.register.form');
+Route::post('/secure-config/register', [MpesaRegistrationController::class, 'registerUrls'])->name('mpesa.register');
+
+// C2B Routes remain unchanged, just updated to point to the new controller
+Route::match(['get', 'post'], '/pay/confirmation', [MpesaC2BController::class, 'confirmation'])->name('mPesaConfirmation');
+Route::match(['get', 'post'], '/pay/validation', [MpesaC2BController::class, 'validation'])->name('mPesaValidation');
+
+
+
+
 Route::middleware(['auth', 'check_member_position'])->group(function () {
+  
+
     Route::get('/new_members/list', [PublicRegistrationActionsController::class, 'listMembers'])->name('members.list')->middleware('check_user_rights:new_member_applications_list');
     Route::post('/new_members/update/{id}', [PublicRegistrationActionsController::class, 'updateField'])->middleware('check_user_rights:new_member_applications_update');
     Route::get('/new_members/details/{id}', [PublicRegistrationActionsController::class, 'getMemberDetails'])->name('members.details')->middleware('check_user_rights:new_member_applications_update');
@@ -132,9 +167,9 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
     Route::get('/reports/sasra/share', [HomeController::class, 'reportSasraShareBalances'])->name('reports.sasra.share.balances')->middleware('check_user_rights:rpt_loans_issued');
     Route::get('/reports/sasra/share/data', [HomeController::class, 'fetchSasraShareData'])->name('reports.sasra.share.data')->middleware('check_user_rights:rpt_loans_issued');
 
-    Route::get('/admin/access-rights', [HomeController::class, 'adminAccessRights'])->name('admin.access-rights')->middleware('check_user_rights:modify_useraccessrights');
-    Route::post('/admin/access-rights/save', [HomeController::class, 'user_rights_save'])->name('admin.access-rights.save')->middleware('check_user_rights:modify_useraccessrights');
-    Route::match(['get', 'post'], '/admin/access-rights/add_modules', [HomeController::class, 'user_rights_add_module'])->name('admin.access-rights.add.module')->middleware('check_user_rights:modify_useraccessrights');
+    Route::get('/admin/access-rights', [HomeController::class, 'adminAccessRights'])->name('admin.access-rights');
+    Route::post('/admin/access-rights/save', [HomeController::class, 'user_rights_save'])->name('admin.access-rights.save');
+    Route::match(['get', 'post'], '/admin/access-rights/add_modules', [HomeController::class, 'user_rights_add_module'])->name('admin.access-rights.add.module');
 
     Route::match(['get', 'post'], '/reports/profit_and_loss', [HomeController::class, 'reportSasraProfitAndLoss'])->name('reports.sasra.profitandloss')->middleware('check_user_rights:rpt_profit_loss');
     Route::get('/reports/profit_and_loss/data', [HomeController::class, 'fetchSasraProfitAndLossData'])->name('reports.sasra.profitandloss.data')->middleware('check_user_rights:rpt_profit_loss');

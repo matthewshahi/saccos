@@ -381,7 +381,7 @@
                                 </a>
                             </li>
                             <li class="item-name">
-                                <a href="{{ url('/admin/mpesa') }}">
+                                <a href="{{ url('/secure-config/register') }}">
                                     <span class="text-muted">MPESA configs</span>
                                 </a>
                             </li>
