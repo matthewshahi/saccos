@@ -15,10 +15,8 @@ use App\Http\Controllers\PublicRegistrationActionsController;
 use App\Http\Controllers\MemberDashboardController;
 use App\Http\Controllers\MemberImportController;
 
-use App\Http\Controllers\MpesaTheController;  // Corrected to MpesaTheController
-use App\Http\Controllers\MpesaTestController;
-use App\Http\Controllers\MpesaRegistrationController;
-use App\Http\Controllers\MpesaC2BController;
+
+
 
 Route::get('/', [HomeController::class, 'redirectBasedOnAuth'])->name('home');
 Route::get('/home', [HomeController::class, 'redirectBasedOnAuth'])->name('home1');
@@ -64,46 +62,20 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/downloads', [PublicFileController::class, 'publicDownloads'])->name('public.downloads');
     Route::get('/downloads/{file}/download', [PublicFileController::class, 'downloadFile'])->name('public.download.file');
 
-    // Route::get('/loans/types/list', [PublicLoansController::class, 'loansTypesList'])->name('loans.types.list');
-    // Route::get('/loans/types/list', [PublicLoansController::class, 'loansTypesList'])->name('loans.types.list');
-    // Route::get('/public/loans/types/list', [PublicLoansController::class, 'loansTypesList'])->name('loans.types.list');
-    // Route::get('/public/loans/details/{id}', [PublicLoansController::class, 'loanDetails'])->name('loan.details');
-    // Route::get('/public/loan-calculator/{id}', [PublicLoansController::class, 'showLoanCalculator'])->name('loan.calculator');
-    // Route::post('/public/loan-calculator/{id}/calculate', [PublicLoansController::class, 'calculateLoan'])->name('loan.calculate');
-    // // Route::get('/public/loans/details/{id}', [PublicLoansController::class, 'loanDetails'])->name('loan.details');
-    // Route::post('/public/loans/details/{id}/calculate', [PublicLoansController::class, 'calculateLoan'])->name('loan.calculate');
     
    
 
 });
 
-$stkPushRoute = Str::random(10);  // Generates a random route string for security
-$stkCallbackRoute = Str::random(10);  // Generates a random route string for callback
+ 
 
-Route:: get('/plans', [MpesaTheController::class, 'plans']);
-Route:: get('/checkout', [MpesaTheController::class, 'checkout']);
-Route:: get('/stk/check/{id}', [MpesaTheController::class, 'checkPayment']);
-Route:: post('/pay/stk/callback/e/{unique_number}', [MpesaTheController::class, 'handleSTKPushCallback']);
-Route::get('/stk/initiate', [MpesaTheController::class, 'showSTKPushForm'])->name('stk.push');
-Route::post('/stk/initiate/{unique_number}', [MpesaTheController::class, 'initiateSTKPush'])->name('stk.push.submit');
-Route::post('/consumer/stk/initiate/{unique_number}', [MpesaTheController::class, 'consumerinitiateSTKPush'])->name('consumer.stk.push.submit');
-Route::get('/consumer/paybill/validation', [MpesaTheController::class, 'registerurls'])->name('register.paybill.urls');
-Route::match(['get', 'post'], '/pay/skt/confirmation', [MpesaTheController::class, 'stkconfirmation'])->name('StkmPesaConfirmation');
-Route::match(['get', 'post'], '/pay/stk/validation', [MpesaTheController::class, 'stkvalidation'])->name('StkmPesaValidation');
-// STK Push Initiation Route
-Route::middleware(['throttle:10,1'])->post('/payment_stk/' . $stkPushRoute, [MpesaTheController::class, 'initiateSTKPush'])->name('payment_stk.push');
-// STK Push Callback Route
-Route::middleware(['throttle:10,1'])->post('/payment_stk/' . $stkCallbackRoute, [MpesaTheController::class, 'handleSTKPushCallback'])->name('payment_stk.callback');
+Route::prefix('mpesa')->group(function () {
+    // Route to display the form
+    Route::get('/form', [MpesaController::class, 'showSTKPushForm'])->name('mpesa_form');
 
-
-Route::get('/secure-config/register/{id?}', [MpesaRegistrationController::class, 'showForm'])->name('mpesa.register.form');
-Route::post('/secure-config/register', [MpesaRegistrationController::class, 'registerUrls'])->name('mpesa.register');
-
-// C2B Routes remain unchanged, just updated to point to the new controller
-Route::match(['get', 'post'], '/pay/confirmation', [MpesaC2BController::class, 'confirmation'])->name('mPesaConfirmation');
-Route::match(['get', 'post'], '/pay/validation', [MpesaC2BController::class, 'validation'])->name('mPesaValidation');
-
-
+    // Route to handle STK Push submission
+    Route::post('/stkpush', [MpesaController::class, 'initiateSTKPush'])->name('mpesa_stkpush');
+});
 
 
 Route::middleware(['auth', 'check_member_position'])->group(function () {
