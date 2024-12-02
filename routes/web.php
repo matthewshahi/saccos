@@ -14,6 +14,7 @@ use App\Http\Controllers\PublicRegistrationController;
 use App\Http\Controllers\PublicRegistrationActionsController;
 use App\Http\Controllers\MemberDashboardController;
 use App\Http\Controllers\MemberImportController;
+use App\Http\Controllers\MpesaConfigController;
 
 
 
@@ -75,6 +76,25 @@ Route::prefix('mpesa')->group(function () {
 
     // Route to handle STK Push submission
     Route::post('/stkpush', [MpesaController::class, 'initiateSTKPush'])->name('mpesa_stkpush');
+});
+
+
+
+Route::prefix('mpesa/config')->middleware(['auth', 'check_member_position'])->group(function () {
+    // Route for listing all configurations
+    Route::get('/', [MpesaConfigController::class, 'index'])->name('mpesa_config.index');
+
+    // Route for displaying the form to create a new configuration
+    Route::get('/create', [MpesaConfigController::class, 'create'])->name('mpesa_config.create');
+
+    // Route for storing a new configuration
+    Route::post('/store', [MpesaConfigController::class, 'store'])->name('mpesa_config.store');
+
+    // Route for displaying the form to edit a configuration
+    Route::get('/edit/{id}', [MpesaConfigController::class, 'edit'])->name('mpesa_config.edit');
+
+    // Route for updating an existing configuration
+    Route::post('/update/{id}', [MpesaConfigController::class, 'update'])->name('mpesa_config.update');
 });
 
 
