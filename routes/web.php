@@ -70,10 +70,6 @@ Route::middleware(['auth'])->group(function () {
 
 });
 
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\MpesaConfigController;
-use App\Http\Controllers\MpesaTheController;
-use App\Http\Controllers\MpesaController;
 
 Route::prefix('mpesa')->group(function () {
     /**
