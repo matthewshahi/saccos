@@ -15,6 +15,7 @@ use App\Http\Controllers\PublicRegistrationActionsController;
 use App\Http\Controllers\MemberDashboardController;
 use App\Http\Controllers\MemberImportController;
 use App\Http\Controllers\MpesaConfigController;
+use App\Http\Controllers\MpesaTheController;
 
 
 
@@ -69,20 +70,66 @@ Route::middleware(['auth'])->group(function () {
 
 });
 
+use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\MpesaConfigController;
+use App\Http\Controllers\MpesaTheController;
+use App\Http\Controllers\MpesaController;
+
 Route::prefix('mpesa')->group(function () {
-    Route::get('/stkpush', [MpesaController::class, 'showStkPushForm'])->name('stkpush.form');
-    Route::post('/stkpush', [MpesaController::class, 'storeStkPush'])->name('stkpush.store');
-    Route::post('/stkpush/callback', [MpesaController::class, 'handleStkPushCallback'])->name('stkpush.callback');
+    /**
+     * Public-facing routes (No authentication required)
+     * These routes are accessible by Safaricom servers for C2B operations.
+     */
+    Route::post('/pay/validation', [MpesaTheController::class, 'validationRequest'])->name('mpesa.pay.validation');
+    Route::post('/pay/confirmation', [MpesaTheController::class, 'handleC2BPayment'])->name('mpesa.pay.confirmation');
+    Route::post('/stkpush/callback', [MpesaController::class, 'handleSTKPushCallback'])->name('stkpush.callback');
+
+    
+    Route::middleware(['auth'])->group(function () {
+        Route::get('/stkpush', [MpesaTheController::class, 'showSTKPushForm'])->name('stkpush.form'); // Show STK Push form
+        Route::post('/stkpush', [MpesaController::class, 'storeStkPush'])->name('stkpush.store'); // Initiate STK Push
+        Route::get('/stk/check/{id}', [MpesaController::class, 'checkPayment'])->name('stkpush.check'); // Check payment status
+        Route::get('/payment/success', [MpesaController::class, 'paymentSuccess'])->name('payment.success'); // Payment success
+        Route::get('/payment/failed', [MpesaController::class, 'paymentFailed'])->name('payment.failed'); // Payment failure (optional)
+    });
+
+   
+    Route::middleware(['auth', 'check_member_position'])->group(function () {
+        Route::post('/register-urls', [MpesaTheController::class, 'registerUrls'])->name('mpesa.register.urls'); // Register URLs for validation/confirmation
+
+         
+        Route::prefix('config')->group(function () {
+            Route::get('/', [MpesaConfigController::class, 'index'])->name('mpesa_config.index'); // List all configurations
+            Route::get('/create', [MpesaConfigController::class, 'create'])->name('mpesa_config.create'); // Show create form
+            Route::post('/store', [MpesaConfigController::class, 'store'])->name('mpesa_config.store'); // Store new configuration
+            Route::get('/edit/{id}', [MpesaConfigController::class, 'edit'])->name('mpesa_config.edit'); // Show edit form
+            Route::post('/update/{id}', [MpesaConfigController::class, 'update'])->name('mpesa_config.update'); // Update configuration
+        });
+    });
 });
+
+
+// Route::post('/mpesa/pay/validation', [MpesaTheController::class, 'validationRequest'])->name('mpesa.pay.validation');
+// Route::post('/mpesa/pay/confirmation', [MpesaTheController::class, 'handleC2BPayment'])->name('mpesa.pay.confirmation');
+// Route::post('/mpesa/stkpush/callback', [MpesaController::class, 'handleSTKPushCallback'])->name('stkpush.callback');
+
+// Route::middleware(['auth'])->group(function () {
+//     Route::get('/mpesa/stkpush', [MpesaTheController::class, 'showSTKPushForm'])->name('stkpush.form');
+//     Route::post('/mpesa/stkpush', [MpesaController::class, 'storeStkPush'])->name('stkpush.store');
+//     Route::post('/mpesa/register-urls', [MpesaTheController::class, 'registerUrls'])->name('mpesa.register.urls');
+//     Route::get('/mpesa/payment/success', [MpesaController::class, 'paymentSuccess'])->name('payment.success');
+//     Route::get('/mpesa/payment/failed', [MpesaController::class, 'paymentFailed'])->name('payment.failed');
+// });
+
  
 
-Route::prefix('mpesa/config')->middleware(['auth', 'check_member_position'])->group(function () {
-    Route::get('/', [MpesaConfigController::class, 'index'])->name('mpesa_config.index');
-    Route::get('/create', [MpesaConfigController::class, 'create'])->name('mpesa_config.create');
-    Route::post('/store', [MpesaConfigController::class, 'store'])->name('mpesa_config.store');
-    Route::get('/edit/{id}', [MpesaConfigController::class, 'edit'])->name('mpesa_config.edit');
-    Route::post('/update/{id}', [MpesaConfigController::class, 'update'])->name('mpesa_config.update');
-});
+// Route::prefix('mpesa/config')->middleware(['auth', 'check_member_position'])->group(function () {
+//     Route::get('/', [MpesaConfigController::class, 'index'])->name('mpesa_config.index');
+//     Route::get('/create', [MpesaConfigController::class, 'create'])->name('mpesa_config.create');
+//     Route::post('/store', [MpesaConfigController::class, 'store'])->name('mpesa_config.store');
+//     Route::get('/edit/{id}', [MpesaConfigController::class, 'edit'])->name('mpesa_config.edit');
+//     Route::post('/update/{id}', [MpesaConfigController::class, 'update'])->name('mpesa_config.update');
+// });
 
 
 Route::middleware(['auth', 'check_member_position'])->group(function () {
