@@ -91,7 +91,7 @@ Route::prefix('mpesa')->group(function () {
 
    
     Route::middleware(['auth', 'check_member_position'])->group(function () {
-        Route::post('/register-urls', [MpesaTheController::class, 'registerUrls'])->name('mpesa.register.urls'); // Register URLs for validation/confirmation
+        Route::get('/register-urls', [MpesaTheController::class, 'registerUrls'])->name('mpesa.register.urls')->middleware('check_user_rights:add_new_sacco_member'); // Register URLs for validation/confirmation
 
          
         Route::prefix('config')->group(function () {
