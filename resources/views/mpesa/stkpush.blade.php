@@ -2,67 +2,77 @@
 
 @section('content')
 <div class="container py-4">
-    <div class="col-md-8 mx-auto">
-        <div class="card shadow-sm mb-4">
+    <div class="col-md-12">
+        <div class="card mb-4">
             <div class="card-body">
-                <div class="card-title mb-3 text-center"><h4>Initiate M-Pesa Payment</h4></div>
-                <p class="text-muted text-center">
-                    Please enter your phone number and the amount to pay. After submission, you will receive an M-Pesa prompt on your phone to complete the payment.
+                <div class="card-title mb-3">STK Push Payment</div>
+                <!-- Instructions -->
+                <p class="text-muted">
+                    Please fill in the required fields below to initiate an STK Push request. Ensure the phone number is in the 
+                    <strong>international format</strong> (e.g., <code>2547XXXXXXXX</code>). An STK Push prompt will be sent to the phone number provided.
                 </p>
-                <form method="POST" action="{{ route('mpesa_stkpush') }}">
+                <p class="text-muted">
+                    <strong>Note:</strong> Follow the instructions on your phone to complete the transaction.
+                </p>
+                
+                <!-- Form -->
+                <form method="POST" action="{{ route('stkpush.store') }}">
                     @csrf
-                    <div class="row g-3">
-                        <!-- Phone Number Input -->
-                        <div class="col-12">
-                            <label for="phone_number" class="form-label">Phone Number</label>
+                    <div class="row">
+                        <div class="col-md-6 form-group mb-3">
+                            <label for="phone_number">Phone Number <span class="text-danger">*</span></label>
                             <input 
-                                type="text" 
+                                class="form-control" 
                                 id="phone_number" 
                                 name="phone_number" 
-                                class="form-control @error('phone_number') is-invalid @enderror" 
-                                placeholder="2547XXXXXXXX" 
+                                type="text" 
+                                placeholder="Enter phone number in 2547XXXXXXXX format" 
                                 value="{{ old('phone_number') }}" 
                                 required>
                             @error('phone_number')
-                                <div class="invalid-feedback">{{ $message }}</div>
+                                <span class="text-danger">{{ $message }}</span>
                             @enderror
                         </div>
 
-                        <!-- Amount Input -->
-                        <div class="col-12">
-                            <label for="amount" class="form-label">Amount</label>
+                        <div class="col-md-6 form-group mb-3">
+                            <label for="amount">Amount (KES) <span class="text-danger">*</span></label>
                             <input 
-                                type="number" 
+                                class="form-control" 
                                 id="amount" 
                                 name="amount" 
-                                class="form-control @error('amount') is-invalid @enderror" 
-                                placeholder="Enter the amount" 
+                                type="number" 
+                                placeholder="Enter amount" 
+                                min="1" 
                                 value="{{ old('amount') }}" 
                                 required>
                             @error('amount')
-                                <div class="invalid-feedback">{{ $message }}</div>
+                                <span class="text-danger">{{ $message }}</span>
                             @enderror
                         </div>
 
-                        <!-- Submit Button -->
-                        <div class="col-12 d-grid">
-                            <button type="submit" class="btn btn-primary">
-                                Submit Payment
-                            </button>
+                        <div class="col-md-6 form-group mb-3">
+                            <label for="shortcode">Shortcode <span class="text-danger">*</span></label>
+                            <select class="form-control" id="shortcode" name="shortcode" required>
+                                <option value="" selected disabled>-- Select Shortcode --</option>
+                                @foreach($configs as $config)
+                                    @if($config->api_type === 'mpesa_express')
+                                        <option value="{{ $config->shortcode }}" {{ old('shortcode') == $config->shortcode ? 'selected' : '' }}>
+                                            {{ $config->shortcode }}
+                                        </option>
+                                    @endif
+                                @endforeach
+                            </select>
+                            @error('shortcode')
+                                <span class="text-danger">{{ $message }}</span>
+                            @enderror
+                        </div>
+
+                        <div class="col-md-12">
+                            <button type="submit" class="btn btn-primary w-100">Send STK Push</button>
                         </div>
                     </div>
                 </form>
             </div>
-        </div>
-
-        <!-- Payment Instructions -->
-        <div class="alert alert-info mt-4 text-center">
-            <strong>What to Expect:</strong>
-            <ul class="list-unstyled mt-2">
-                <li>1. You will receive an M-Pesa prompt on your phone.</li>
-                <li>2. Enter your M-Pesa PIN to complete the payment.</li>
-                <li>3. Once completed, you will receive a confirmation message.</li>
-            </ul>
         </div>
     </div>
 </div>

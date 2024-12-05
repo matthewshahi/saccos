@@ -30,6 +30,7 @@ Route::get('/loans/calculator', [HomeController::class, 'loansCalculator'])->nam
 Route::get('/register', [PublicRegistrationController::class, 'showForm'])->name('register.form');
 Route::post('/register', [PublicRegistrationController::class, 'submit'])->name('register.submit');
 
+
 Route::get('/loans/types/list', [PublicLoansController::class, 'loansTypesList'])->name('loans.types.list');
     Route::get('/loans/types/list', [PublicLoansController::class, 'loansTypesList'])->name('loans.types.list');
     Route::get('/public/loans/types/list', [PublicLoansController::class, 'loansTypesList'])->name('loans.types.list');
@@ -68,32 +69,18 @@ Route::middleware(['auth'])->group(function () {
 
 });
 
+Route::prefix('mpesa')->group(function () {
+    Route::get('/stkpush', [MpesaController::class, 'showStkPushForm'])->name('stkpush.form');
+    Route::post('/stkpush', [MpesaController::class, 'storeStkPush'])->name('stkpush.store');
+    Route::post('/stkpush/callback', [MpesaController::class, 'handleStkPushCallback'])->name('stkpush.callback');
+});
  
 
-Route::prefix('mpesa')->group(function () {
-    // Route to display the form
-    Route::get('/form', [MpesaController::class, 'showSTKPushForm'])->name('mpesa_form');
-
-    // Route to handle STK Push submission
-    Route::post('/stkpush', [MpesaController::class, 'initiateSTKPush'])->name('mpesa_stkpush');
-});
-
-
-
 Route::prefix('mpesa/config')->middleware(['auth', 'check_member_position'])->group(function () {
-    // Route for listing all configurations
     Route::get('/', [MpesaConfigController::class, 'index'])->name('mpesa_config.index');
-
-    // Route for displaying the form to create a new configuration
     Route::get('/create', [MpesaConfigController::class, 'create'])->name('mpesa_config.create');
-
-    // Route for storing a new configuration
     Route::post('/store', [MpesaConfigController::class, 'store'])->name('mpesa_config.store');
-
-    // Route for displaying the form to edit a configuration
     Route::get('/edit/{id}', [MpesaConfigController::class, 'edit'])->name('mpesa_config.edit');
-
-    // Route for updating an existing configuration
     Route::post('/update/{id}', [MpesaConfigController::class, 'update'])->name('mpesa_config.update');
 });
 

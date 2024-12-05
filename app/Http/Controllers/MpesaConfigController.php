@@ -23,6 +23,7 @@ class MpesaConfigController extends Controller
     // Store a new configuration
     public function store(Request $request)
     {
+        // Validate the input data
         $request->validate([
             'shortcode' => 'required|string|max:255',
             'api_type' => 'required|string',
@@ -34,6 +35,7 @@ class MpesaConfigController extends Controller
             'passkey' => 'required|string',
         ]);
 
+        // Insert the data into the database
         DB::table('mpesa_configs')->insert([
             'shortcode' => $request->shortcode,
             'api_type' => $request->api_type,
@@ -47,7 +49,8 @@ class MpesaConfigController extends Controller
             'updated_at' => now(),
         ]);
 
-        return redirect()->route('mpesa_config.index')->with('success', 'M-Pesa configuration added successfully.');
+        // Redirect back to the list with a success message
+        return redirect()->route('mpesa_config.index')->with('success', 'Configuration added successfully.');
     }
 
     // Show form to edit an existing configuration
@@ -65,6 +68,7 @@ class MpesaConfigController extends Controller
     // Update an existing configuration
     public function update(Request $request, $id)
     {
+        // Validate the input data
         $request->validate([
             'shortcode' => 'required|string|max:255',
             'api_type' => 'required|string',
@@ -76,6 +80,7 @@ class MpesaConfigController extends Controller
             'passkey' => 'required|string',
         ]);
 
+        // Update the record in the database
         DB::table('mpesa_configs')->where('id', $id)->update([
             'shortcode' => $request->shortcode,
             'api_type' => $request->api_type,
@@ -88,6 +93,7 @@ class MpesaConfigController extends Controller
             'updated_at' => now(),
         ]);
 
-        return redirect()->route('mpesa_config.index')->with('success', 'M-Pesa configuration updated successfully.');
+        // Redirect back to the list with a success message
+        return redirect()->route('mpesa_config.index')->with('success', 'Configuration updated successfully.');
     }
 }
