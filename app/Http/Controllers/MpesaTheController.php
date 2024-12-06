@@ -401,6 +401,7 @@ function checkPayment(Request $request){
                 ->where('api_type', 'c2b')
                 ->first();
     
+                dd($config);
             if (!$config) {
                 throw new Exception('M-Pesa configuration for C2B not found.');
             }
@@ -413,7 +414,8 @@ function checkPayment(Request $request){
                 'ConfirmationURL' => $config->confirmation_url,
                 'ValidationURL' => $config->validation_url,
             ];
-    
+            
+           
             $accessToken = $this->getAccessToken();
     
             // Dynamic API URL based on environment
