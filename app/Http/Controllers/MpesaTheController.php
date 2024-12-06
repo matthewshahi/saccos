@@ -267,9 +267,9 @@ function checkPayment(Request $request){
      private function getAccessToken()
 {
     // Check if token is already stored and valid
-    if (Carbon::now()->lt(Carbon::parse($this->tokenExpiresAt))) {
-        return $this->accessToken; // Return valid token
-    }
+    // if (Carbon::now()->lt(Carbon::parse($this->tokenExpiresAt))) {
+    //     return $this->accessToken; // Return valid token
+    // }
 
     // Fetch a new token
     $url = env('MPESA_ENV') === 'live' 
@@ -296,19 +296,6 @@ function checkPayment(Request $request){
 
     return $accessToken;
 }
-
-
-    /**
-     * Initiate STK Push request to Safaricom API.
-     */
-
-
-
-
-
-     
-
-
 
 
     public function handleSTKPushCallback(Request $request)
@@ -475,42 +462,7 @@ function checkPayment(Request $request){
         }
     }
 
-    //  function registerurls(){  // RUN ONLY ONCE TO REGISTER VALIDATION AND CONFIRMATION CALL BACK URLS
-
-    //     $shortcode =670361;
-    //     $this->loadConfig($shortcode); 
-
-    //     [$password, $timestamp] = $this->generateMpesaPassword();
-    //     $accessToken = $this->getAccessToken();
-
-
-    //     $validationUrl="https://api.safaricom.co.ke/mpesa/c2b/v1/registerurl"; 
-    //     $ch = curl_init($validationUrl);
-    //     curl_setopt($ch, CURLOPT_HTTPHEADER, [
-    //         'Authorization: Bearer '.$accessToken,
-    //         'Content-Type: application/json'
-    //     ]);
-         
-    //     curl_setopt($ch, CURLOPT_POST, 1);
-    //     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-    //     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode(array(
-    //         "ShortCode"=>$shortcode,
-    //         "ResponseType"=>"Completed",
-    //         "ConfirmationURL"=>"https://epaper.nairobilawmonthly.com/api/pay/paybill/confirmation/callback", //REGISTER CONFIRMATION URL
-    //         "ValidationURL"=>"https://epaper.nairobilawmonthly.com/api/pay/paybill/validation/callback",  //REGISTER VALIDATION URL
-    //     )));
-    //     curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-    //     $response   = curl_exec($ch);
-    //     var_dump($response);
-    //     if (curl_errno($ch)) {
-    //         $error_msg = curl_error($ch);
-    //         echo $error_msg;
-    //     }
-    //     curl_close($ch);
-         
-    //      //$error_msg;
-        
-    //     }
+    
 
     
  
@@ -611,17 +563,7 @@ function checkPayment(Request $request){
      ]);
  }
 
- /**
- * Log the STK Push request details into the database.
- *
- * @param string $check_out_request_id
- * @param string $unique_number
- * @param string $phoneNumber
- * @param float $amount
- * @param string $accountReference
- * @param string $transactionDesc
- * @param int|null $package_id
- */
+ 
 private function logSTKPushRequest(
     $check_out_request_id,
     $unique_number,

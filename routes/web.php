@@ -72,10 +72,7 @@ Route::middleware(['auth'])->group(function () {
 
 
 Route::prefix('mpesa')->group(function () {
-    /**
-     * Public-facing routes (No authentication required)
-     * These routes are accessible by Safaricom servers for C2B operations.
-     */
+   
     Route::post('/pay/validation', [MpesaTheController::class, 'validationRequest'])->name('mpesa.pay.validation');
     Route::post('/pay/confirmation', [MpesaTheController::class, 'handleC2BPayment'])->name('mpesa.pay.confirmation');
     Route::post('/stkpush/callback', [MpesaController::class, 'handleSTKPushCallback'])->name('stkpush.callback');
