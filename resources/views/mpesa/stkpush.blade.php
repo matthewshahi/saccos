@@ -33,6 +33,7 @@
     </div>
 
     <div class="row justify-content-center">
+        <!-- Payment Form Section -->
         <div class="col-12 col-md-6 border-right">
             <p class="text-blackbold">STK Push Method</p>
             <p>
@@ -40,13 +41,13 @@
                 You will receive a payment request on your phone from Safaricom M-PESA.
             </p>
             <p>
-                <a href="" target="_blank" style="color:red; text-decoration:underline;">
+                <a href="#" style="color:red; text-decoration:underline;">
                     By proceeding, you agree to the terms and conditions.
                 </a>
             </p>
 
             <!-- Payment Form -->
-            <form method="POST" action="{{ route('stkpush.store') }}" id="form" class="mt-4">
+            <form id="stkForm" class="mt-4">
                 @csrf
                 <input type="hidden" id="uniq" name="uniq" value="{{ $unicode }}"/>
 
@@ -113,24 +114,29 @@
 </div>
 
 @endsection
-<script src="https://code.jquery.com/jquery-3.6.0.min.js" integrity="sha384-KyZXEAg3QhqLMpG8r+8fhAXLRlfA4IwUQlbNf5Y5iwPCSOm3tyYPs/lLnT86PlXg" crossorigin="anonymous"></script>
+
 @section('scripts')
+<!-- Load jQuery -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js" crossorigin="anonymous"></script>
+
 <script>
     $(document).ready(function () {
-        worker(); // Initiates periodic checking
+        let isWorkerStarted = false; // To prevent multiple worker instances
 
+        // Handle STK Push form submission
         $('#submitbtn').click(function () {
             var phone = $('#phone').val();
             var amount = $('#amount').val();
-            var data = $('#form').serialize();
+            var data = $('#stkForm').serialize();
 
-            // Input Validation
+            // Validate phone number
             if (!validatePhoneNumber(phone)) {
                 $('#msg').css("color", "red").text('Please provide a valid M-Pesa registered phone number (e.g., 2547XXXXXXXX).');
                 return;
             }
 
-            if (amount.length === 0 || parseFloat(amount) <= 0) {
+            // Validate amount
+            if (!amount || parseFloat(amount) <= 0) {
                 $('#msg').css("color", "red").text('Please enter a valid amount greater than 0.');
                 return;
             }
@@ -138,61 +144,59 @@
             // Disable button to prevent multiple clicks
             $(this).prop("disabled", true).html("Processing...");
 
-            // STK Push Request
+            // Make STK Push Request
             $.ajax({
                 type: 'POST',
-                url: '{{ route("stkpush.store") }}', // Dynamic route
-                data: data, // Our data object
+                url: '{{ route("stkpush.store") }}',
+                data: data,
                 headers: {
                     'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
                 },
-                success: function (data, status, xhr) {
+                success: function (response) {
                     $("#submitbtn").prop("disabled", false).html("Pay Now");
                     $('#msg').css("color", "green").text('Check your phone for a payment confirmation prompt.');
+
+                    if (!isWorkerStarted) {
+                        worker(); // Start polling payment status
+                        isWorkerStarted = true; // Prevent duplicate workers
+                    }
                 },
-                error: function (xhr, status, error) {
+                error: function (xhr) {
                     $("#submitbtn").prop("disabled", false).html("Pay Now");
-                    $('#msg').css("color", "red").text("Error occurred while processing. Please try again.");
+                    var errorMsg = xhr.responseJSON?.error || "Error occurred while processing. Please try again.";
+                    $('#msg').css("color", "red").text(errorMsg);
                 }
             });
         });
-    });
 
-    // Function to periodically check payment status
-    function worker() {
-        var id = $("#uniq").val(); // Unique document code
-        var contextPath = '{{ route("stkpush.check", ":id") }}'.replace(':id', id); // Dynamic URL
+        // Worker to poll payment status
+        function worker() {
+            var id = $("#uniq").val(); // Unique transaction code
+            var contextPath = '{{ route("stkpush.check", ":id") }}'.replace(':id', id);
 
-        $.ajax({
-            url: contextPath,
-            type: 'GET',
-            headers: {
-                'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
-            },
-            success: function (data) {
-                console.log(data);
-
-                if (data === 'good') {
-                    // Redirect to a success page
-                    window.location.href = '{{ route("payment.success") }}';
-                } else if (data === 'bad') {
-                    // Display a message if payment failed
-                    $('#msg').css("color", "red").text("Payment failed or not completed. Please try again.");
-                }
-            },
-            complete: function () {
-                // Stop polling once payment is successful
-                if ($('#msg').text() !== "Payment failed or not completed. Please try again.") {
+            $.ajax({
+                url: contextPath,
+                type: 'GET',
+                success: function (data) {
+                    if (data === 'good') {
+                        window.location.href = '{{ route("payment.success") }}'; // Redirect on success
+                    } else if (data === 'bad') {
+                        $('#msg').css("color", "red").text("Payment failed or not completed. Please try again.");
+                    }
+                },
+                error: function () {
+                    $('#msg').css("color", "red").text("Unable to check payment status. Please try again.");
+                },
+                complete: function () {
                     setTimeout(worker, 5000); // Retry every 5 seconds
                 }
-            }
-        });
-    }
+            });
+        }
 
-    // Function to validate phone numbers
-    function validatePhoneNumber(phone) {
-        return phone.length === 12 && phone.startsWith("254") && /^\d+$/.test(phone);
-    }
+        // Validate phone number
+        function validatePhoneNumber(phone) {
+            return phone.length === 12 && phone.startsWith("254") && /^\d+$/.test(phone);
+        }
+    });
 </script>
 @endsection
- 
