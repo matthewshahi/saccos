@@ -75,15 +75,15 @@ Route::prefix('mobile')->group(function () {
    
     Route::post('/pay/validation', [MpesaTheController::class, 'validationRequest'])->name('mpesa.pay.validation');
     Route::post('/pay/confirmation', [MpesaTheController::class, 'handleC2BPayment'])->name('mpesa.pay.confirmation');
-    Route::post('/stkpush/callback', [MpesaController::class, 'handleSTKPushCallback'])->name('stkpush.callback');
+    Route::post('/stkpush/callback', [MpesaTheController::class, 'handleSTKPushCallback'])->name('stkpush.callback');
 
     
     Route::middleware(['auth'])->group(function () {
         Route::get('/stkpush', [MpesaTheController::class, 'showSTKPushForm'])->name('stkpush.form'); // Show STK Push form
         Route::post('/stkpush', [MpesaTheController::class, 'storeStkPush'])->name('stkpush.store');
-        Route::get('/stk/check/{id}', [MpesaController::class, 'checkPayment'])->name('stkpush.check'); // Check payment status
-        Route::get('/payment/success', [MpesaController::class, 'paymentSuccess'])->name('payment.success'); // Payment success
-        Route::get('/payment/failed', [MpesaController::class, 'paymentFailed'])->name('payment.failed'); // Payment failure (optional)
+        Route::get('/stk/check/{id}', [MpesaTheController::class, 'checkPayment'])->name('stkpush.check'); // Check payment status
+        Route::get('/payment/success', [MpesaTheController::class, 'paymentSuccess'])->name('payment.success'); // Payment success
+        Route::get('/payment/failed', [MpesaTheController::class, 'paymentFailed'])->name('payment.failed'); // Payment failure (optional)
     });
 
    

@@ -297,37 +297,71 @@ function checkPayment(Request $request){
 
     return $accessToken;
 }
-
-
-    public function handleSTKPushCallback(Request $request)
+public function handleSTKPushCallback(Request $request)
 {
-    // Log any incoming request to this route
+    // Log the incoming request
     $this->logTransaction('STK Push callback route hit.', ['request_data' => $request->all()]);
-    $this->logTransaction('Raw STK Push callback data:', ['raw_data' => $request->getContent()]);
 
-    // Process callback data
+    // Decode the raw JSON payload
+    $callbackJSONData = file_get_contents('php://input');
+    $callbackData = json_decode($callbackJSONData);
+
+    // Validate callback data
+    if (!isset($callbackData->Body->stkCallback)) {
+        $this->logTransaction('Invalid STK Push callback data.', ['callbackData' => $callbackData], 'error');
+        return response()->json(['ResultCode' => 1, 'ResultDesc' => 'Invalid callback data.']);
+    }
+
+    // Save callback data
+    try {
+        DB::transaction(function () use ($callbackData) {
+            $this->saveSTKCallbackData($callbackData);
+        });
+
+        $this->logTransaction('STK Push callback data saved successfully.', [
+            'checkout_request_id' => $callbackData->Body->stkCallback->CheckoutRequestID,
+            'result_code' => $callbackData->Body->stkCallback->ResultCode,
+        ]);
+
+    } catch (Exception $e) {
+        $this->logTransaction('Failed to save STK Push callback data: ' . $e->getMessage(), [], 'error');
+        return response()->json(['ResultCode' => 1, 'ResultDesc' => 'Failed to save callback data.']);
+    }
+
+    // Respond to Safaricom
+    return response()->json(['ResultCode' => 0, 'ResultDesc' => 'Callback processed successfully.']);
+}
 
 
-    $callbackJSONData=file_get_contents('php://input');
-    $callbackData 	=json_decode($callbackJSONData);
+//     public function handleSTKPushCallback(Request $request)
+// {
+//     // Log any incoming request to this route
+//     $this->logTransaction('STK Push callback route hit.', ['request_data' => $request->all()]);
+//     $this->logTransaction('Raw STK Push callback data:', ['raw_data' => $request->getContent()]);
+
+//     // Process callback data
 
 
-    // Proceed with saving callback data
+//     $callbackJSONData=file_get_contents('php://input');
+//     $callbackData 	=json_decode($callbackJSONData);
+
+
+//     // Proceed with saving callback data
 
     
 
-    try {
-      DB::transaction(function () use ($callbackData) {
-            $this->saveSTKCallbackData($callbackData);
-       });
-       // $this->logTransaction('STK Push callback data saved successfully.', []);
-    } catch (Exception $e) {
-        $this->logTransaction('Failed to save STK Push callback data: ' . $e->getMessage(), [], 'error');
-        return response()->json(['ResultCode' => 1, 'ResultDesc' => 'Failed to save callback data.'.$e->getMessage()]);
-    }
+//     try {
+//       DB::transaction(function () use ($callbackData) {
+//             $this->saveSTKCallbackData($callbackData);
+//        });
+//        // $this->logTransaction('STK Push callback data saved successfully.', []);
+//     } catch (Exception $e) {
+//         $this->logTransaction('Failed to save STK Push callback data: ' . $e->getMessage(), [], 'error');
+//         return response()->json(['ResultCode' => 1, 'ResultDesc' => 'Failed to save callback data.'.$e->getMessage()]);
+//     }
 
-    return response()->json(['ResultCode' => 0, 'ResultDesc' => 'Success']);
-}
+//     return response()->json(['ResultCode' => 0, 'ResultDesc' => 'Success']);
+// }
 
 
 
