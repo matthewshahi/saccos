@@ -71,7 +71,7 @@ Route::middleware(['auth'])->group(function () {
 });
 
 
-Route::prefix('mpesa')->group(function () {
+Route::prefix('mobile')->group(function () {
    
     Route::post('/pay/validation', [MpesaTheController::class, 'validationRequest'])->name('mpesa.pay.validation');
     Route::post('/pay/confirmation', [MpesaTheController::class, 'handleC2BPayment'])->name('mpesa.pay.confirmation');
