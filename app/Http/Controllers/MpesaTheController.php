@@ -401,7 +401,7 @@ function checkPayment(Request $request){
                 ->where('api_type', 'c2b')
                 ->first();
     
-                dd($config);
+                //dd($config);
             if (!$config) {
                 throw new Exception('M-Pesa configuration for C2B not found.');
             }
