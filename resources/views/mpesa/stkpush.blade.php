@@ -113,9 +113,7 @@
     </div>
 </div>
 
-@endsection
 
-@section('scripts')
 <!-- Load jQuery -->
 <script src="https://code.jquery.com/jquery-3.6.0.min.js" crossorigin="anonymous"></script>
 
