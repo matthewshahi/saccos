@@ -396,136 +396,63 @@ function checkPayment(Request $request){
 
     return $accessToken;
 }
-public function handleSTKPushCallback(Request $request)
-{
-    // Log the incoming request
-    $this->logTransaction('STK Push callback route hit.', ['request_data' => $request->all()]);
 
-    // Decode the raw JSON payload
-    $callbackJSONData = file_get_contents('php://input');
-    $callbackData = json_decode($callbackJSONData);
-
-    // Validate callback data
-    if (!isset($callbackData->Body->stkCallback)) {
-        $this->logTransaction('Invalid STK Push callback data.', ['callbackData' => $callbackData], 'error');
-        return response()->json(['ResultCode' => 1, 'ResultDesc' => 'Invalid callback data.']);
-    }
-
-    // Save callback data
-    try {
-        DB::transaction(function () use ($callbackData) {
-            $this->saveSTKCallbackData($callbackData);
-        });
-
-        $this->logTransaction('STK Push callback data saved successfully.', [
-            'checkout_request_id' => $callbackData->Body->stkCallback->CheckoutRequestID,
-            'result_code' => $callbackData->Body->stkCallback->ResultCode,
+public function handleSTKPushCallback(Request $request, $unique_number = null)
+    {
+        Log::info('STK Push callback received.', [
+            'unique_number' => $unique_number,
+            'request_data' => $request->all(),
         ]);
 
-    } catch (Exception $e) {
-        $this->logTransaction('Failed to save STK Push callback data: ' . $e->getMessage(), [], 'error');
-        return response()->json(['ResultCode' => 1, 'ResultDesc' => 'Failed to save callback data.']);
+        // Process the callback data
+        try {
+            $callbackJSONData = $request->getContent();
+            $callbackData = json_decode($callbackJSONData);
+
+            if (!isset($callbackData->Body->stkCallback)) {
+                Log::error('Invalid STK Push callback data.', ['callbackData' => $callbackData]);
+                return response()->json(['ResultCode' => 1, 'ResultDesc' => 'Invalid callback data.']);
+            }
+
+            DB::transaction(function () use ($callbackData, $unique_number) {
+                $this->saveSTKCallbackData($callbackData, $unique_number);
+            });
+
+            Log::info('STK Push callback processed successfully.');
+            return response()->json(['ResultCode' => 0, 'ResultDesc' => 'Callback processed successfully.']);
+
+        } catch (Exception $e) {
+            Log::error('Error processing STK Push callback.', ['exception' => $e->getMessage()]);
+            return response()->json(['ResultCode' => 1, 'ResultDesc' => 'Error processing callback.']);
+        }
     }
 
-    // Respond to Safaricom
-    return response()->json(['ResultCode' => 0, 'ResultDesc' => 'Callback processed successfully.']);
-}
 
+    private function saveSTKCallbackData($callbackData, $unique_number = null)
+{
+    $merchantRequestID = $callbackData->Body->stkCallback->MerchantRequestID ?? null;
+    $checkoutRequestID = $callbackData->Body->stkCallback->CheckoutRequestID ?? null;
+    $resultCode = $callbackData->Body->stkCallback->ResultCode ?? null;
+    $resultDesc = $callbackData->Body->stkCallback->ResultDesc ?? null;
 
-//     public function handleSTKPushCallback(Request $request)
-// {
-//     // Log any incoming request to this route
-//     $this->logTransaction('STK Push callback route hit.', ['request_data' => $request->all()]);
-//     $this->logTransaction('Raw STK Push callback data:', ['raw_data' => $request->getContent()]);
+    $amount = $callbackData->Body->stkCallback->CallbackMetadata->Item[0]->Value ?? null;
+    $mpesaReceiptNumber = $callbackData->Body->stkCallback->CallbackMetadata->Item[1]->Value ?? null;
+    $transactionDate = $callbackData->Body->stkCallback->CallbackMetadata->Item[2]->Value ?? null;
+    $phoneNumber = $callbackData->Body->stkCallback->CallbackMetadata->Item[3]->Value ?? null;
 
-//     // Process callback data
-
-
-//     $callbackJSONData=file_get_contents('php://input');
-//     $callbackData 	=json_decode($callbackJSONData);
-
-
-//     // Proceed with saving callback data
-
-    
-
-//     try {
-//       DB::transaction(function () use ($callbackData) {
-//             $this->saveSTKCallbackData($callbackData);
-//        });
-//        // $this->logTransaction('STK Push callback data saved successfully.', []);
-//     } catch (Exception $e) {
-//         $this->logTransaction('Failed to save STK Push callback data: ' . $e->getMessage(), [], 'error');
-//         return response()->json(['ResultCode' => 1, 'ResultDesc' => 'Failed to save callback data.'.$e->getMessage()]);
-//     }
-
-//     return response()->json(['ResultCode' => 0, 'ResultDesc' => 'Success']);
-// }
-
-
-
-
-
-    /**
-     * Save STK Callback Data.
-     */
-    private function saveSTKCallbackData($callbackData)
-    {
-
-       
-        $merchantRequestID=$callbackData->Body->stkCallback->MerchantRequestID??null;
-        $checkoutRequestID = $callbackData->Body->stkCallback->CheckoutRequestID?? null;
-        $resultCode = $callbackData->Body->stkCallback->ResultCode?? null;
-        $resultDesc = $callbackData->Body->stkCallback->ResultDesc?? null;
-
-        $amount =$callbackData->Body->stkCallback->CallbackMetadata->Item[0]->Value?? null;
-        $mpesaReceiptNumber =$callbackData->Body->stkCallback->CallbackMetadata->Item[1]->Value??null;
-        $transactionDate = $callbackData->Body->stkCallback->CallbackMetadata->Item[2]->Value??null;
-        $phoneNumber =$callbackData->Body->stkCallback->CallbackMetadata->Item[3]->Value??null;
-          
-        DB::table('stk_push_logs')->where('checkout_request_id',$checkoutRequestID)->update([
+    DB::table('stk_push_logs')
+        ->where('checkout_request_id', $checkoutRequestID)
+        ->update([
             'merchant_request_id' => $merchantRequestID,
-           // 'checkout_request_id' => $checkoutRequestID,
             'result_code' => $resultCode,
             'result_description' => $resultDesc,
             'amount' => $amount,
             'transaction_id' => $mpesaReceiptNumber,
-            'transaction_time' =>Carbon::createFromFormat('YmdHis', $transactionDate),
+            'transaction_time' => $transactionDate ? Carbon::createFromFormat('YmdHis', $transactionDate) : null,
             'phone_number' => $phoneNumber,
             'updated_at' => now(),
         ]);
-
-
-
-        $packageData=DB::table('stk_push_logs')->where('checkout_request_id', $checkoutRequestID)->first();
-        $package_id=$packageData->package_id;
-        $user_id=$packageData->user_id;
-
-        $package=DB::table('packages')->where('id',$package_id)->first();
-        $publication=$package->name;
-        $duration=(int)$package->duration;
-
-        $publication_id=$package->publication_id;  
-        $start=Carbon::now();
-        $enddate=date('Y-m-d',strtotime($start->addDays($duration)));
-        $start=date('Y-m-d');
-        $paymode="MPESA";
-
-        
- $subscriber=DB::table('subscribers')->where('user_id',$user_id)->where('publication_id',$publication_id)->whereDate("end_date",">=",date('Y-m-d'))->orderBy("id","DESC")->first();
- 
- if($subscriber){   
-    $s=Carbon::createFromFormat('Y-m-d',$subscriber->end_date)->addDay();
-    $start=Carbon::createFromFormat('Y-m-d',$subscriber->end_date)->addDay();
-    $enddate= $s->addDays($duration+1);
- }
-        
-
-   $this->updateSubcribers($user_id,$publication_id, $package_id,$start,$enddate,$amount, $paymode,$mpesaReceiptNumber);
-
-
-
-    }
+}
 
     public function registerUrls()
     {
