@@ -325,8 +325,8 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
     Route::post('/admin/periods/store', [HomeController::class, 'adminPeriodsStore'])->name('admin.periods.store')->middleware('check_user_rights:add_period');
     Route::get('/admin/periods/activate/{id}', [HomeController::class, 'adminPeriodsActivate'])->name('admin.periods.activate')->middleware('check_user_rights:add_period');
 
-    Route::get('/admin/mpesa', [MpesaController::class, 'showMpesaConfig'])->name('admin.mpesa')->middleware('check_user_rights:add_mpesa_details');
-    Route::post('/admin/mpesa/store', [MpesaController::class, 'storeMpesaConfig'])->name('mpesa.config.store')->middleware('check_user_rights:add_mpesa_details');
+    // Route::get('/admin/mpesa', [MpesaController::class, 'showMpesaConfig'])->name('admin.mpesa')->middleware('check_user_rights:add_mpesa_details');
+    // Route::post('/admin/mpesa/store', [MpesaController::class, 'storeMpesaConfig'])->name('mpesa.config.store')->middleware('check_user_rights:add_mpesa_details');
 
     Route::post('/file-upload', [FileUploadController::class, 'upload'])->name('file.upload')->middleware('check_user_rights:file_upload');
     Route::get('/file-upload', [FileUploadController::class, 'showUploadForm'])->name('file.upload.form')->middleware('check_user_rights:file_upload');

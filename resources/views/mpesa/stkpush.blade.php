@@ -40,7 +40,7 @@
                 You will receive a payment request on your phone from Safaricom M-PESA.
             </p>
             <p>
-                <a href="https://epaper.nairobilawmonthly.com/privacy_terms_and_conditions" target="_blank" style="color:red; text-decoration:underline;">
+                <a href="" target="_blank" style="color:red; text-decoration:underline;">
                     By proceeding, you agree to the terms and conditions.
                 </a>
             </p>
@@ -113,6 +113,7 @@
 </div>
 
 @endsection
+<script src="https://code.jquery.com/jquery-3.6.0.min.js" integrity="sha384-KyZXEAg3QhqLMpG8r+8fhAXLRlfA4IwUQlbNf5Y5iwPCSOm3tyYPs/lLnT86PlXg" crossorigin="anonymous"></script>
 @section('scripts')
 <script>
     $(document).ready(function () {
