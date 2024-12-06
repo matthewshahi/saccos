@@ -80,7 +80,7 @@ Route::prefix('mobile')->group(function () {
     
     Route::middleware(['auth'])->group(function () {
         Route::get('/stkpush', [MpesaTheController::class, 'showSTKPushForm'])->name('stkpush.form'); // Show STK Push form
-        Route::post('/stkpush', [MpesaController::class, 'storeStkPush'])->name('stkpush.store'); // Initiate STK Push
+        Route::post('/stkpush', [MpesaTheController::class, 'storeStkPush'])->name('stkpush.store');
         Route::get('/stk/check/{id}', [MpesaController::class, 'checkPayment'])->name('stkpush.check'); // Check payment status
         Route::get('/payment/success', [MpesaController::class, 'paymentSuccess'])->name('payment.success'); // Payment success
         Route::get('/payment/failed', [MpesaController::class, 'paymentFailed'])->name('payment.failed'); // Payment failure (optional)
