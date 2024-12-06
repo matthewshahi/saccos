@@ -9,6 +9,10 @@
         font-weight: 700;
         color: red;
     }
+    .text-greenbold {
+        font-weight: 700;
+        color: green;
+    }
     #msg {
         margin-top: 20px;
     }
@@ -55,7 +59,7 @@
                     <input 
                         type="text" 
                         id="phone" 
-                        name="phone_number" 
+                        name="phone" 
                         class="form-control" 
                         placeholder="Enter your phone number (e.g., 2547XXXXXXXX)" 
                         required>
@@ -74,28 +78,32 @@
                         required>
                 </div>
 
-                <!-- Shortcode Field -->
-                <div class="form-group mb-3">
-                    <label for="shortcode" class="form-label">Shortcode</label>
-                    <input 
-                        type="text" 
-                        id="shortcode" 
-                        name="shortcode" 
-                        class="form-control" 
-                        value="{{ $shortcode }}" 
-                        readonly>
-                </div>
-
                 <!-- Submit Button -->
                 <button type="submit" id="submitbtn" class="btn btn-primary w-100">Pay Now</button>
             </form>
 
-            @if(session('error'))
-                <div id="msg" class="text-redbold mt-3">{{ session('error') }}</div>
+            <!-- Session Messages -->
+            @if (session('error'))
+                <div id="msg" class="text-redbold mt-3">
+                    {{ session('error') }}
+                </div>
             @endif
 
-            @if(session('success'))
-                <div id="msg" class="text-greenbold mt-3">{{ session('success') }}</div>
+            @if (session('success'))
+                <div id="msg" class="text-greenbold mt-3">
+                    {{ session('success') }}
+                </div>
+            @endif
+
+            <!-- Validation Errors -->
+            @if ($errors->any())
+                <div id="msg" class="text-redbold mt-3">
+                    <ul>
+                        @foreach ($errors->all() as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
+                </div>
             @endif
         </div>
 
