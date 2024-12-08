@@ -77,7 +77,7 @@ Route::prefix('mobile')->group(function () {
     Route::post('/pay/stk_confirmation', [MpesaTheController::class, 'handleC2BPayment'])->name('mpesa.pay.confirmation');
     // Route::post('/stkpush/callback', [MpesaTheController::class, 'handleSTKPushCallback'])->name('stkpush.callback');
     // Route::post('/stkpush/callback/{unique_number?}', [MpesaTheController::class, 'handleSTKPushCallback'])->name('stkpush.callback');
-    Route::match(['get', 'post'], '/stkpush/callback/{unique_number?}', [MpesaTheController::class, 'handleSTKPushCallback'])->name('stkpush.callback');
+    // Route::match(['get', 'post'], '/stkpush/callback/{unique_number?}', [MpesaTheController::class, 'handleSTKPushCallback'])->name('stkpush.callback');
     
     Route::middleware(['auth'])->group(function () {
         Route::get('/stkpush', [MpesaTheController::class, 'showSTKPushForm'])->name('stkpush.form'); // Show STK Push form
