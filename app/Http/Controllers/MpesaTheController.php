@@ -485,7 +485,7 @@ public function handleSTKPushCallback(Request $request, $unique_number = null)
                 : 'https://sandbox.safaricom.co.ke/mpesa/c2b/v1/registerurl';
     
             // CURL request to register URLs
-            dd($validationUrl );
+            
             $ch = curl_init($validationUrl);
             curl_setopt($ch, CURLOPT_HTTPHEADER, [
                 'Authorization: Bearer ' . $accessToken,
