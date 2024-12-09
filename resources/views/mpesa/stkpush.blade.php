@@ -20,6 +20,9 @@
         background-color: rgb(2, 50, 106);
         color: white;
     }
+    .modal-body p {
+        margin-bottom: 10px;
+    }
     @media (max-width: 768px) {
         .form-section {
             flex-direction: column !important;
@@ -36,7 +39,6 @@
     </div>
 
     <div class="row justify-content-center">
-        <!-- STK Push Form -->
         <div class="col-12 col-md-6 border-right">
             <p class="text-blackbold">STK Push Method</p>
             <p>
@@ -87,34 +89,16 @@
         <!-- Manual Payment Instructions -->
         <div class="col-12 col-md-6">
             <p class="text-blackbold">Manual Payment Instructions</p>
-            <div class="card shadow-sm p-3">
-                <p class="mb-2">Follow the steps below to complete your payment manually:</p>
-                <ul>
-                    <li>
-                        Go to the <span class="text-blackbold">Safaricom M-PESA Menu</span> on your phone, and select
-                        <span class="text-blackbold">Lipa Na Mpesa</span>.
-                    </li>
-                    <li>Select <span class="text-blackbold">Pay Bill</span>.</li>
-                    <li>
-                        Enter <span class="text-blackbold">{{ $shortcode }}</span> as the <span class="text-greenbold">Business Number</span> and press <span class="text-blackbold">"OK"</span>.
-                    </li>
-                    <li>
-                        Select <span class="text-blackbold">Enter Account Number</span>.
-                    </li>
-                    <li>
-                        Enter your <span class="text-redbold">Order Number: {{ $unicode }}</span> and press <span class="text-blackbold">"OK"</span>.
-                    </li>
-                    <li>
-                        Enter the <span class="text-blackbold">Amount</span> you wish to pay and press <span class="text-blackbold">"OK"</span>.
-                    </li>
-                    <li>
-                        Enter your <span class="text-blackbold">Mpesa PIN</span> and press <span class="text-blackbold">"OK"</span>.
-                    </li>
-                    <li>
-                        Confirm all the details displayed are correct and press <span class="text-blackbold">"OK"</span>.
-                    </li>
-                </ul>
-            </div>
+            <ul>
+                <li>Go to Safaricom M-PESA Menu, <span class="text-blackbold">Select Lipa Na Mpesa</span></li>
+                <li>Select <span class="text-blackbold">Pay Bill</span></li>
+                <li>Enter <span class="text-blackbold">{{ $shortcode }}</span> as the business number and press "OK"</li>
+                <li>Select <span class="text-blackbold">Enter Account Number</span></li>
+                <li>Enter your Order number <span class="text-redbold">{{ $unicode }}</span> and press "OK"</li>
+                <li>Enter <span class="text-blackbold">Your Amount</span> and press "OK"</li>
+                <li>Enter Your <span class="text-blackbold">Mpesa Pin</span> and press "OK"</li>
+                <li>Confirm all the details are correct and press "OK"</li>
+            </ul>
         </div>
     </div>
 </div>
@@ -127,8 +111,8 @@
                 <h5 class="modal-title" id="submittedModalLabel">Processing Payment</h5>
             </div>
             <div class="modal-body text-center">
-                <p id="responseMessage" class="text-greenbold">Please check your handset and enter your M-PESA PIN to complete the payment.</p>
-                <p id="responseTime" class="text-blackbold">Time Remaining: <span id="countdown">60</span> seconds</p>
+                <p id="modal-message">Please check your handset and enter your M-PESA PIN to complete the payment.</p>
+                <p id="timer" class="text-blackbold"><strong>Time Remaining:</strong> <span id="countdown">60</span> seconds</p>
             </div>
         </div>
     </div>
@@ -139,39 +123,65 @@
     document.addEventListener('DOMContentLoaded', function () {
         const form = document.getElementById('stkpush-form');
         const modal = new bootstrap.Modal(document.getElementById('submittedModal'));
+        const modalMessage = document.getElementById('modal-message');
+        const timerElement = document.getElementById('timer');
         const countdownElement = document.getElementById('countdown');
-        const responseMessage = document.getElementById('responseMessage');
         let countdown = 60;
 
-        form.addEventListener('submit', function (e) {
-            e.preventDefault(); // Prevent default form submission
-            modal.show();
-            startCountdown();
+        form.addEventListener('submit', async function (e) {
+            e.preventDefault(); // Prevent form submission
+            const formData = new FormData(form);
+
+            try {
+                // Show modal
+                modal.show();
+
+                // Submit form data
+                const response = await fetch(form.action, {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                if (!response.ok) throw new Error('Failed to submit STK Push request');
+
+                const result = await response.json();
+                if (result.status !== 'success') throw new Error('STK Push request failed');
+
+                // Start countdown
+                startCountdown(result.checkoutRequestId);
+            } catch (error) {
+                // Show error in modal
+                modalMessage.textContent = 'An error occurred while processing your request. Please try again.';
+                timerElement.style.display = 'none'; // Hide the timer
+            }
         });
 
-        function startCountdown() {
+        function startCountdown(checkoutRequestId) {
             const timer = setInterval(async () => {
                 countdown--;
                 countdownElement.textContent = countdown;
 
                 if (countdown <= 0) {
                     clearInterval(timer);
-                    const paymentStatus = await checkPaymentStatus();
+
+                    // Check payment status
+                    const paymentStatus = await checkPaymentStatus(checkoutRequestId);
                     handlePaymentResponse(paymentStatus);
                 }
             }, 1000);
         }
 
-        async function checkPaymentStatus() {
+        async function checkPaymentStatus(checkoutRequestId) {
             try {
                 const response = await fetch('{{ route("payment.status") }}', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
                     },
-                    body: JSON.stringify({ uniq: document.getElementById('uniq').value })
+                    body: JSON.stringify({ checkoutRequestId }),
                 });
+
                 return await response.json();
             } catch (error) {
                 console.error('Error checking payment status:', error);
@@ -183,9 +193,8 @@
             if (response.status === 'success') {
                 window.location.href = '{{ route("payment.success") }}';
             } else {
-                responseMessage.textContent = 'An error occurred while processing your request. Please try again.';
-                responseMessage.classList.replace('text-greenbold', 'text-redbold');
-                countdownElement.parentElement.remove(); // Remove countdown display
+                modalMessage.textContent = 'Payment failed. Please try again.';
+                timerElement.style.display = 'none'; // Hide the timer
             }
         }
     });
