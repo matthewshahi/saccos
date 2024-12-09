@@ -571,51 +571,64 @@ public function handleSTKPushCallback(Request $request, $unique_number = null)
             return response()->json(['ResultCode' => 1, 'ResultDesc' => 'Invalid callback data.']);
         }
 
-        DB::transaction(function () use ($callbackData, $unique_number) {
-            $stkCallback = $callbackData->Body->stkCallback;
+        $stkCallback = $callbackData->Body->stkCallback;
+        $merchantRequestId = $stkCallback->MerchantRequestID ?? null;
+        $checkoutRequestId = $stkCallback->CheckoutRequestID ?? null;
+        $resultCode = $stkCallback->ResultCode ?? null;
+        $resultDesc = $stkCallback->ResultDesc ?? null;
 
-            // Extract required fields
-            $merchantRequestId = $stkCallback->MerchantRequestID ?? null;
-            $checkoutRequestId = $stkCallback->CheckoutRequestID ?? null;
-            $resultCode = $stkCallback->ResultCode ?? null;
-            $resultDescription = $stkCallback->ResultDesc ?? null;
-            $amount = null;
-            $mpesaReceiptNumber = null;
-            $transactionDate = null;
-            $phoneNumber = null;
+        $amount = null;
+        $mpesaReceiptNumber = null;
+        $transactionDate = null;
+        $phoneNumber = null;
 
-            // Extract CallbackMetadata if available
-            if (isset($stkCallback->CallbackMetadata->Item)) {
-                foreach ($stkCallback->CallbackMetadata->Item as $item) {
-                    switch ($item->Name) {
-                        case 'Amount':
-                            $amount = $item->Value ?? null;
-                            break;
-                        case 'MpesaReceiptNumber':
-                            $mpesaReceiptNumber = $item->Value ?? null;
-                            break;
-                        case 'TransactionDate':
-                            $transactionDate = $item->Value ?? null;
-                            break;
-                        case 'PhoneNumber':
-                            $phoneNumber = $item->Value ?? null;
-                            break;
-                    }
+        // Extract CallbackMetadata items
+        if (isset($stkCallback->CallbackMetadata->Item)) {
+            foreach ($stkCallback->CallbackMetadata->Item as $item) {
+                switch ($item->Name) {
+                    case 'Amount':
+                        $amount = $item->Value ?? null;
+                        break;
+                    case 'MpesaReceiptNumber':
+                        $mpesaReceiptNumber = $item->Value ?? null;
+                        break;
+                    case 'TransactionDate':
+                        $transactionDate = $item->Value ?? null;
+                        break;
+                    case 'PhoneNumber':
+                        $phoneNumber = $item->Value ?? null;
+                        break;
                 }
             }
+        }
 
-            // Save data into the `stk_push_responses` table
+        // Convert transaction date to a proper format
+        $formattedTransactionDate = $transactionDate ? \Carbon\Carbon::createFromFormat('YmdHis', $transactionDate)->toDateTimeString() : null;
+
+        // Save the callback data in the database
+        DB::transaction(function () use (
+            $unique_number,
+            $checkoutRequestId,
+            $merchantRequestId,
+            $resultCode,
+            $resultDesc,
+            $amount,
+            $mpesaReceiptNumber,
+            $formattedTransactionDate,
+            $phoneNumber
+        ) {
             DB::table('stk_push_responses')->updateOrInsert(
-                ['checkout_request_id' => $checkoutRequestId], // Unique constraint for the record
+                ['checkout_request_id' => $checkoutRequestId],  
                 [
+                    'unique_number' => $unique_number,
                     'merchant_request_id' => $merchantRequestId,
                     'result_code' => $resultCode,
-                    'result_description' => $resultDescription,
+                    'result_description' => $resultDesc,
                     'mpesa_receipt_number' => $mpesaReceiptNumber,
-                    'transaction_date' => $transactionDate,
+                    'transaction_date' => $formattedTransactionDate,
                     'phone_number' => $phoneNumber,
                     'amount' => $amount,
-                    'created_at' => now(),
+                    'processed' => 'N', // Mark as processed
                     'updated_at' => now(),
                 ]
             );
@@ -624,7 +637,7 @@ public function handleSTKPushCallback(Request $request, $unique_number = null)
         Log::info('STK Push callback processed successfully.');
         return response()->json(['ResultCode' => 0, 'ResultDesc' => 'Callback processed successfully.']);
 
-    } catch (Exception $e) {
+    } catch (\Exception $e) {
         Log::error('Error processing STK Push callback.', ['exception' => $e->getMessage()]);
         return response()->json(['ResultCode' => 1, 'ResultDesc' => 'Error processing callback.']);
     }
