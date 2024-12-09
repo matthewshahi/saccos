@@ -300,9 +300,6 @@ function checkPayment(Request $request){
 }
 
 
-
-
-
     private function loadConfig($shortcode)
     {
         $config = DB::table('mpesa_configs')->where('shortcode', $shortcode)->where('api_type', 'mpesa_express')->first();
@@ -481,11 +478,11 @@ public function handleSTKPushCallback(Request $request, $unique_number = null)
     
             // Dynamic API URL based on environment
             $validationUrl = env('MPESA_ENV') === 'live'
-                ? 'https://api.safaricom.co.ke/mpesa/c2b/v1/registerurl'
+                ? 'https://api.safaricom.co.ke/mpesa/c2b/v2/registerurl'
                 : 'https://sandbox.safaricom.co.ke/mpesa/c2b/v1/registerurl';
+                   
     
             // CURL request to register URLs
-            
             $ch = curl_init($validationUrl);
             curl_setopt($ch, CURLOPT_HTTPHEADER, [
                 'Authorization: Bearer ' . $accessToken,

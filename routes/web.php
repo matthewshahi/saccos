@@ -18,8 +18,6 @@ use App\Http\Controllers\MpesaConfigController;
 use App\Http\Controllers\MpesaTheController;
 
 
-
-
 Route::get('/', [HomeController::class, 'redirectBasedOnAuth'])->name('home');
 Route::get('/home', [HomeController::class, 'redirectBasedOnAuth'])->name('home1');
  
