@@ -143,7 +143,10 @@ class MpesaTheController extends Controller
         Log::error('Failed to initiate STK Push', [
             'response' => $response->body(),
         ]);
-        return response()->json(['error' => 'Failed to initiate STK Push. Please try again later.'], 500);
+        //return response()->json(['error' => 'Failed to initiate STK Push. Please try again later.'], 500);
+        return view('mpesa.payment-failed', [
+            'message' => 'Unfortunately, Failed to initiate STK Push. Please try again later.',
+        ]);
     }
 
     $responseBody = $response->json();
@@ -173,13 +176,13 @@ class MpesaTheController extends Controller
         ]);
 
         // Return the successful response
-        return response()->json($responseBody);
+       // return response()->json($responseBody);
     } else {
         // Log failure details and return an error response
         Log::error('STK Push request failed', [
             'response' => $responseBody,
         ]);
-        return response()->json(['error' => 'Failed to initiate STK Push. Please try again later.'], 500);
+        //return response()->json(['error' => 'Failed to initiate STK Push. Please try again later.'], 500);
     }
 }
 
