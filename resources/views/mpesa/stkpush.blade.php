@@ -129,32 +129,33 @@
         let countdown = 60;
 
         form.addEventListener('submit', async function (e) {
-            e.preventDefault(); // Prevent form submission
-            const formData = new FormData(form);
+    e.preventDefault(); // Prevent form submission
+    const formData = new FormData(form);
 
-            try {
-                // Show modal
-                modal.show();
+    try {
+        // Show modal
+        modal.show();
 
-                // Submit form data
-                const response = await fetch(form.action, {
-                    method: 'POST',
-                    body: formData,
-                });
-
-                if (!response.ok) throw new Error('Failed to submit STK Push request');
-
-                const result = await response.json();
-                if (result.status !== 'success') throw new Error('STK Push request failed');
-
-                // Start countdown
-                startCountdown(result.checkoutRequestId);
-            } catch (error) {
-                // Show error in modal
-                modalMessage.textContent = 'An error occurred while processing your request. Please try again.';
-                timerElement.style.display = 'none'; // Hide the timer
-            }
+        // Submit form data
+        const response = await fetch(form.action, {
+            method: 'POST',
+            body: formData,
         });
+
+        const result = await response.json();
+
+        if (response.ok && result.status === 'success') {
+            // Start countdown with checkoutRequestId
+            startCountdown(result.checkoutRequestId);
+        } else {
+            throw new Error(result.message || 'An unknown error occurred.');
+        }
+    } catch (error) {
+        // Show error in modal
+        modalMessage.textContent = error.message || 'An error occurred while processing your request.';
+        timerElement.style.display = 'none'; // Hide the timer
+    }
+});
 
         function startCountdown(checkoutRequestId) {
             const timer = setInterval(async () => {

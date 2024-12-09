@@ -85,12 +85,11 @@ class MpesaTheController extends Controller
     }
     public function storeStkPush(Request $request)
 {
-    // Validate posted fields
     $request->validate([
         'phone' => 'required|string',
         'uniq' => 'required|string',
         'amount' => 'required|numeric|min:1',
-    ]); 
+    ]);
 
     $unique_number = $request->input('uniq');
     $phoneNumber = $this->formatPhoneNumber($request->input('phone'));
@@ -102,11 +101,9 @@ class MpesaTheController extends Controller
         ? 'https://api.safaricom.co.ke/mpesa/stkpush/v1/processrequest'
         : 'https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest';
 
-    // Generate password and access token
     [$password, $timestamp] = $this->generateMpesaPassword();
     $accessToken = $this->getAccessToken();
 
-    // Prepare the payload for the STK Push request
     $payload = [
         'BusinessShortCode' => $shortcode,
         'Password' => $password,
@@ -121,24 +118,22 @@ class MpesaTheController extends Controller
         'TransactionDesc' => "Online Transaction",
     ];
 
-    // Make the STK Push request
     $response = Http::withHeaders([
         'Authorization' => 'Bearer ' . $accessToken,
         'Content-Type' => 'application/json',
     ])->post($url, $payload);
 
     if ($response->failed()) {
-        // Log failure and return to payment failed page
         Log::error('Failed to initiate STK Push', ['response' => $response->body()]);
-        return view('mpesa.payment-failed', [
-            'message' => 'Unfortunately, your payment could not be completed. Please try again.',
-        ]);
+        return response()->json([
+            'status' => 'error',
+            'message' => 'Failed to initiate payment. Please try again.',
+        ], 500);
     }
 
     $responseBody = $response->json();
 
     if (isset($responseBody['ResponseCode']) && $responseBody['ResponseCode'] === "0") {
-        // Save the STK Push details
         DB::table('stk_push_logs')->insert([
             'unique_number' => $unique_number,
             'checkout_request_id' => $responseBody['CheckoutRequestID'],
@@ -152,16 +147,98 @@ class MpesaTheController extends Controller
             'updated_at' => now(),
         ]);
 
-        // Redirect the user to the waiting page
-        return redirect()->back()->with('checkoutRequestId', $responseBody['CheckoutRequestID']);
-        // return redirect()->route('stkpush.wait', ['checkoutRequestId' => $responseBody['CheckoutRequestID']]);
+        return response()->json([
+            'status' => 'success',
+            'checkoutRequestId' => $responseBody['CheckoutRequestID'],
+        ]);
     } else {
         Log::error('STK Push request failed', ['response' => $responseBody]);
-        return view('mpesa.payment-failed', [
+        return response()->json([
+            'status' => 'error',
             'message' => 'Failed to initiate payment. Please try again.',
         ]);
     }
 }
+
+//     public function storeStkPush(Request $request)
+// {
+//     // Validate posted fields
+//     $request->validate([
+//         'phone' => 'required|string',
+//         'uniq' => 'required|string',
+//         'amount' => 'required|numeric|min:1',
+//     ]); 
+
+//     $unique_number = $request->input('uniq');
+//     $phoneNumber = $this->formatPhoneNumber($request->input('phone'));
+//     $amount = $request->input('amount');
+//     $shortcode = $this->shortCode;
+
+//     // Define the environment-specific URL
+//     $url = env('MPESA_ENV') === 'live'
+//         ? 'https://api.safaricom.co.ke/mpesa/stkpush/v1/processrequest'
+//         : 'https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest';
+
+//     // Generate password and access token
+//     [$password, $timestamp] = $this->generateMpesaPassword();
+//     $accessToken = $this->getAccessToken();
+
+//     // Prepare the payload for the STK Push request
+//     $payload = [
+//         'BusinessShortCode' => $shortcode,
+//         'Password' => $password,
+//         'Timestamp' => $timestamp,
+//         'TransactionType' => 'CustomerPayBillOnline',
+//         'Amount' => $amount,
+//         'PartyA' => $phoneNumber,
+//         'PartyB' => $shortcode,
+//         'PhoneNumber' => $phoneNumber,
+//         'CallBackURL' => $this->callbackUrl . "/" . $unique_number,
+//         'AccountReference' => $unique_number,
+//         'TransactionDesc' => "Online Transaction",
+//     ];
+
+//     // Make the STK Push request
+//     $response = Http::withHeaders([
+//         'Authorization' => 'Bearer ' . $accessToken,
+//         'Content-Type' => 'application/json',
+//     ])->post($url, $payload);
+
+//     if ($response->failed()) {
+//         // Log failure and return to payment failed page
+//         Log::error('Failed to initiate STK Push', ['response' => $response->body()]);
+//         return view('mpesa.payment-failed', [
+//             'message' => 'Unfortunately, your payment could not be completed. Please try again.',
+//         ]);
+//     }
+
+//     $responseBody = $response->json();
+
+//     if (isset($responseBody['ResponseCode']) && $responseBody['ResponseCode'] === "0") {
+//         // Save the STK Push details
+//         DB::table('stk_push_logs')->insert([
+//             'unique_number' => $unique_number,
+//             'checkout_request_id' => $responseBody['CheckoutRequestID'],
+//             'phone_number' => $phoneNumber,
+//             'amount' => $amount,
+//             'account_reference' => $unique_number,
+//             'transaction_description' => "Online Transaction",
+//             'shortcode' => $shortcode,
+//             'status' => 'pending',
+//             'created_at' => now(),
+//             'updated_at' => now(),
+//         ]);
+
+//         // Redirect the user to the waiting page
+//         return redirect()->back()->with('checkoutRequestId', $responseBody['CheckoutRequestID']);
+//         // return redirect()->route('stkpush.wait', ['checkoutRequestId' => $responseBody['CheckoutRequestID']]);
+//     } else {
+//         Log::error('STK Push request failed', ['response' => $responseBody]);
+//         return view('mpesa.payment-failed', [
+//             'message' => 'Failed to initiate payment. Please try again.',
+//         ]);
+//     }
+// }
 
 //     public function storeStkPush(Request $request)
 // {
