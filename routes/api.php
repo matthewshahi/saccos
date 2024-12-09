@@ -21,3 +21,4 @@ Route::prefix('mobile')->group(function () {
         ->name('mpesa.pay.confirmation')
         ->middleware('safaricom.ip'); // Apply IP filtering middleware
 });
+ 

@@ -799,77 +799,146 @@ public function handleSTKPushCallback(Request $request, $unique_number = null)
         ]);
 }
 
-    public function registerUrls()
-    {
-        try {
-            // Retrieve the shortcode configuration from the database
-            $config = DB::table('mpesa_configs')
-                ->where('api_type', 'c2b')
-                ->first();
+public function registerUrls()
+{
+    try {
+        // Retrieve the shortcode configuration from the database
+        $config = DB::table('mpesa_configs')
+            ->where('api_type', 'c2b')
+            ->first();
+
+        if (!$config) {
+            throw new Exception('M-Pesa configuration for C2B not found.');
+        }
+
+        // Load dynamic configuration
+        $this->consumerKey = $config->consumer_key;
+        $this->consumerSecret = $config->consumer_secret;
+        $this->shortCode = $config->shortcode;
+        $this->callbackUrl = [
+            'ConfirmationURL' => $config->confirmation_url, // Use the new confirmation URL from the DB
+            'ValidationURL' => $config->validation_url,     // Use the new validation URL from the DB
+        ];
+
+        $accessToken = $this->getAccessToken();
+
+        // Dynamic API URL based on environment
+        $validationUrl = env('MPESA_ENV') === 'live'
+            ? 'https://api.safaricom.co.ke/mpesa/c2b/v2/registerurl'
+            : 'https://sandbox.safaricom.co.ke/mpesa/c2b/v1/registerurl';
+
+        // CURL request to register URLs
+        $ch = curl_init($validationUrl);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Authorization: Bearer ' . $accessToken,
+            'Content-Type: application/json',
+        ]);
+        curl_setopt($ch, CURLOPT_POST, 1);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
+            "ShortCode" => $this->shortCode,
+            "ResponseType" => $config->response_type, // Dynamically fetched ResponseType
+            "ConfirmationURL" => $this->callbackUrl['ConfirmationURL'],
+            "ValidationURL" => $this->callbackUrl['ValidationURL'],
+        ]));
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+
+        $response = curl_exec($ch);
+        if (curl_errno($ch)) {
+            throw new Exception('Curl error: ' . curl_error($ch));
+        }
+
+        curl_close($ch);
+
+        // Log response for debugging
+        Log::info('URL Registration Response:', [
+            'response' => $response,
+            'config' => $config,
+        ]);
+
+        return response()->json([
+            'message' => 'URLs registered successfully.',
+            'response' => json_decode($response, true),
+        ]);
+    } catch (Exception $e) {
+        Log::error('Error registering URLs:', ['error' => $e->getMessage()]);
+        return response()->json([
+            'error' => $e->getMessage(),
+        ], 500);
+    }
+}
+
+    // public function registerUrls()
+    // {
+    //     try {
+    //         // Retrieve the shortcode configuration from the database
+    //         $config = DB::table('mpesa_configs')
+    //             ->where('api_type', 'c2b')
+    //             ->first();
     
-                //dd($config);
-            if (!$config) {
-                throw new Exception('M-Pesa configuration for C2B not found.');
-            }
+    //             //dd($config);
+    //         if (!$config) {
+    //             throw new Exception('M-Pesa configuration for C2B not found.');
+    //         }
     
-            // Load dynamic configuration
-            $this->consumerKey = $config->consumer_key;
-            $this->consumerSecret = $config->consumer_secret;
-            $this->shortCode = $config->shortcode;
-            $this->callbackUrl = [
-                'ConfirmationURL' => $config->confirmation_url,
-                'ValidationURL' => $config->validation_url,
-            ];
+    //         // Load dynamic configuration
+    //         $this->consumerKey = $config->consumer_key;
+    //         $this->consumerSecret = $config->consumer_secret;
+    //         $this->shortCode = $config->shortcode;
+    //         $this->callbackUrl = [
+    //             'ConfirmationURL' => $config->confirmation_url,
+    //             'ValidationURL' => $config->validation_url,
+    //         ];
             
            
-            $accessToken = $this->getAccessToken();
+    //         $accessToken = $this->getAccessToken();
     
-            // Dynamic API URL based on environment
-            $validationUrl = env('MPESA_ENV') === 'live'
-                ? 'https://api.safaricom.co.ke/mpesa/c2b/v2/registerurl'
-                : 'https://sandbox.safaricom.co.ke/mpesa/c2b/v1/registerurl';
+    //         // Dynamic API URL based on environment
+    //         $validationUrl = env('MPESA_ENV') === 'live'
+    //             ? 'https://api.safaricom.co.ke/mpesa/c2b/v2/registerurl'
+    //             : 'https://sandbox.safaricom.co.ke/mpesa/c2b/v1/registerurl';
                    
     
-            // CURL request to register URLs
-            $ch = curl_init($validationUrl);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, [
-                'Authorization: Bearer ' . $accessToken,
-                'Content-Type: application/json',
-            ]);
-            curl_setopt($ch, CURLOPT_POST, 1);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
-                "ShortCode" => $this->shortCode,
-                "ResponseType" => $config->response_type, // Dynamically fetched ResponseType
-                "ConfirmationURL" => $this->callbackUrl['ConfirmationURL'],
-                "ValidationURL" => $this->callbackUrl['ValidationURL'],
-            ]));
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    //         // CURL request to register URLs
+    //         $ch = curl_init($validationUrl);
+    //         curl_setopt($ch, CURLOPT_HTTPHEADER, [
+    //             'Authorization: Bearer ' . $accessToken,
+    //             'Content-Type: application/json',
+    //         ]);
+    //         curl_setopt($ch, CURLOPT_POST, 1);
+    //         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    //         curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
+    //             "ShortCode" => $this->shortCode,
+    //             "ResponseType" => $config->response_type, // Dynamically fetched ResponseType
+    //             "ConfirmationURL" => $this->callbackUrl['ConfirmationURL'],
+    //             "ValidationURL" => $this->callbackUrl['ValidationURL'],
+    //         ]));
+    //         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     
-            $response = curl_exec($ch);
-            if (curl_errno($ch)) {
-                throw new Exception('Curl error: ' . curl_error($ch));
-            }
+    //         $response = curl_exec($ch);
+    //         if (curl_errno($ch)) {
+    //             throw new Exception('Curl error: ' . curl_error($ch));
+    //         }
     
-            curl_close($ch);
+    //         curl_close($ch);
     
-            // Log response for debugging
-            Log::info('URL Registration Response:', [
-                'response' => $response,
-                'config' => $config,
-            ]);
+    //         // Log response for debugging
+    //         Log::info('URL Registration Response:', [
+    //             'response' => $response,
+    //             'config' => $config,
+    //         ]);
     
-            return response()->json([
-                'message' => 'URLs registered successfully.',
-                'response' => json_decode($response, true),
-            ]);
-        } catch (Exception $e) {
-            Log::error('Error registering URLs:', ['error' => $e->getMessage()]);
-            return response()->json([
-                'error' => $e->getMessage(),
-            ], 500);
-        }
-    }
+    //         return response()->json([
+    //             'message' => 'URLs registered successfully.',
+    //             'response' => json_decode($response, true),
+    //         ]);
+    //     } catch (Exception $e) {
+    //         Log::error('Error registering URLs:', ['error' => $e->getMessage()]);
+    //         return response()->json([
+    //             'error' => $e->getMessage(),
+    //         ], 500);
+    //     }
+    // }
 
     
 
