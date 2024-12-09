@@ -81,8 +81,10 @@ Route::prefix('mobile')->group(function () {
         Route::get('/stkpush', [MpesaTheController::class, 'showSTKPushForm'])->name('stkpush.form'); // Show STK Push form
         Route::post('/stkpush', [MpesaTheController::class, 'storeStkPush'])->name('stkpush.store');
         Route::get('/stk/check/{id}', [MpesaTheController::class, 'checkPayment'])->name('stkpush.check'); // Check payment status
-        Route::get('/payment/success', [MpesaTheController::class, 'paymentSuccess'])->name('payment.success'); // Payment success
-        Route::get('/payment/failed', [MpesaTheController::class, 'paymentFailed'])->name('payment.failed'); // Payment failure (optional)
+        //Route::get('/payment/success', [MpesaTheController::class, 'paymentSuccess'])->name('payment.success'); // Payment success
+        Route::get('/payment/success/{unique_number?}', [MpesaTheController::class, 'paymentSuccess'])->name('payment.success');
+        Route::get('/payment/failed/{unique_number?}', [MpesaTheController::class, 'paymentFailed'])->name('payment.failed');
+        //Route::get('/payment/failed', [MpesaTheController::class, 'paymentFailed'])->name('payment.failed'); // Payment failure (optional)
         Route::post('/payment-status', [MpesaTheController::class, 'checkStatus'])->name('payment.status');
         Route::get('/stk/wait/{checkoutRequestId}', [MpesaTheController::class, 'waitForPayment'])->name('stkpush.wait');
         
