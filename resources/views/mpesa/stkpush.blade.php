@@ -20,6 +20,9 @@
         background-color: rgb(2, 50, 106);
         color: white;
     }
+    .modal-body p {
+        margin-bottom: 10px;
+    }
     @media (max-width: 768px) {
         .form-section {
             flex-direction: column !important;
@@ -108,8 +111,8 @@
                 <h5 class="modal-title" id="submittedModalLabel">Processing Payment</h5>
             </div>
             <div class="modal-body text-center">
-                <p>Please check your handset and enter your M-PESA PIN to complete the payment.</p>
-                <p>Confirm all details are correct before entering your PIN.</p>
+                <p id="modal-message">Please check your handset and enter your M-PESA PIN to complete the payment.</p>
+                <p id="timer"><strong>Time Remaining:</strong> <span id="countdown">60</span> seconds</p>
             </div>
         </div>
     </div>
@@ -120,10 +123,80 @@
     document.addEventListener('DOMContentLoaded', function () {
         const form = document.getElementById('stkpush-form');
         const modal = new bootstrap.Modal(document.getElementById('submittedModal'));
+        const modalMessage = document.getElementById('modal-message');
+        const timerElement = document.getElementById('timer');
+        const countdownElement = document.getElementById('countdown');
+        let countdown = 60;
 
-        form.addEventListener('submit', function () {
-            modal.show(); // Show the modal immediately after submission
+        form.addEventListener('submit', async function (e) {
+            e.preventDefault(); // Prevent form submission
+            const formData = new FormData(form);
+
+            try {
+                // Show modal
+                modal.show();
+
+                // Submit form data
+                const response = await fetch(form.action, {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                if (!response.ok) throw new Error('Failed to submit STK Push request');
+
+                const result = await response.json();
+                if (result.status !== 'success') throw new Error('STK Push request failed');
+
+                // Start countdown
+                startCountdown(result.checkoutRequestId);
+            } catch (error) {
+                // Show error in modal
+                modalMessage.textContent = 'An error occurred while processing your request. Please try again.';
+                timerElement.style.display = 'none'; // Hide the timer
+            }
         });
+
+        function startCountdown(checkoutRequestId) {
+            const timer = setInterval(async () => {
+                countdown--;
+                countdownElement.textContent = countdown;
+
+                if (countdown <= 0) {
+                    clearInterval(timer);
+
+                    // Check payment status
+                    const paymentStatus = await checkPaymentStatus(checkoutRequestId);
+                    handlePaymentResponse(paymentStatus);
+                }
+            }, 1000);
+        }
+
+        async function checkPaymentStatus(checkoutRequestId) {
+            try {
+                const response = await fetch('{{ route("payment.status") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    },
+                    body: JSON.stringify({ checkoutRequestId }),
+                });
+
+                return await response.json();
+            } catch (error) {
+                console.error('Error checking payment status:', error);
+                return { status: 'error' };
+            }
+        }
+
+        function handlePaymentResponse(response) {
+            if (response.status === 'success') {
+                window.location.href = '{{ route("payment.success") }}';
+            } else {
+                modalMessage.textContent = 'Payment failed. Please try again.';
+                timerElement.style.display = 'none'; // Hide the timer
+            }
+        }
     });
 </script>
 @endsection

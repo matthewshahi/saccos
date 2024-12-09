@@ -153,7 +153,8 @@ class MpesaTheController extends Controller
         ]);
 
         // Redirect the user to the waiting page
-        return redirect()->route('stkpush.wait', ['checkoutRequestId' => $responseBody['CheckoutRequestID']]);
+        return redirect()->back()->with('checkoutRequestId', $responseBody['CheckoutRequestID']);
+        // return redirect()->route('stkpush.wait', ['checkoutRequestId' => $responseBody['CheckoutRequestID']]);
     } else {
         Log::error('STK Push request failed', ['response' => $responseBody]);
         return view('mpesa.payment-failed', [
