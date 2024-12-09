@@ -554,36 +554,111 @@ function checkPayment(Request $request){
 
     return $accessToken;
 }
-
 public function handleSTKPushCallback(Request $request, $unique_number = null)
-    {
-        Log::info('STK Push callback received.', [
-            'unique_number' => $unique_number,
-            'request_data' => $request->all(),
-        ]);
+{
+    Log::info('STK Push callback received.', [
+        'unique_number' => $unique_number,
+        'request_data' => $request->all(),
+    ]);
 
-        // Process the callback data
-        try {
-            $callbackJSONData = $request->getContent();
-            $callbackData = json_decode($callbackJSONData);
+    // Process the callback data
+    try {
+        $callbackJSONData = $request->getContent();
+        $callbackData = json_decode($callbackJSONData);
 
-            if (!isset($callbackData->Body->stkCallback)) {
-                Log::error('Invalid STK Push callback data.', ['callbackData' => $callbackData]);
-                return response()->json(['ResultCode' => 1, 'ResultDesc' => 'Invalid callback data.']);
+        if (!isset($callbackData->Body->stkCallback)) {
+            Log::error('Invalid STK Push callback data.', ['callbackData' => $callbackData]);
+            return response()->json(['ResultCode' => 1, 'ResultDesc' => 'Invalid callback data.']);
+        }
+
+        DB::transaction(function () use ($callbackData, $unique_number) {
+            $stkCallback = $callbackData->Body->stkCallback;
+
+            // Extract required fields
+            $merchantRequestId = $stkCallback->MerchantRequestID ?? null;
+            $checkoutRequestId = $stkCallback->CheckoutRequestID ?? null;
+            $resultCode = $stkCallback->ResultCode ?? null;
+            $resultDescription = $stkCallback->ResultDesc ?? null;
+            $amount = null;
+            $mpesaReceiptNumber = null;
+            $transactionDate = null;
+            $phoneNumber = null;
+
+            // Extract CallbackMetadata if available
+            if (isset($stkCallback->CallbackMetadata->Item)) {
+                foreach ($stkCallback->CallbackMetadata->Item as $item) {
+                    switch ($item->Name) {
+                        case 'Amount':
+                            $amount = $item->Value ?? null;
+                            break;
+                        case 'MpesaReceiptNumber':
+                            $mpesaReceiptNumber = $item->Value ?? null;
+                            break;
+                        case 'TransactionDate':
+                            $transactionDate = $item->Value ?? null;
+                            break;
+                        case 'PhoneNumber':
+                            $phoneNumber = $item->Value ?? null;
+                            break;
+                    }
+                }
             }
 
-            DB::transaction(function () use ($callbackData, $unique_number) {
-                $this->saveSTKCallbackData($callbackData, $unique_number);
-            });
+            // Save data into the `stk_push_responses` table
+            DB::table('stk_push_responses')->updateOrInsert(
+                ['checkout_request_id' => $checkoutRequestId], // Unique constraint for the record
+                [
+                    'merchant_request_id' => $merchantRequestId,
+                    'result_code' => $resultCode,
+                    'result_description' => $resultDescription,
+                    'mpesa_receipt_number' => $mpesaReceiptNumber,
+                    'transaction_date' => $transactionDate,
+                    'phone_number' => $phoneNumber,
+                    'amount' => $amount,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]
+            );
+        });
 
-            Log::info('STK Push callback processed successfully.');
-            return response()->json(['ResultCode' => 0, 'ResultDesc' => 'Callback processed successfully.']);
+        Log::info('STK Push callback processed successfully.');
+        return response()->json(['ResultCode' => 0, 'ResultDesc' => 'Callback processed successfully.']);
 
-        } catch (Exception $e) {
-            Log::error('Error processing STK Push callback.', ['exception' => $e->getMessage()]);
-            return response()->json(['ResultCode' => 1, 'ResultDesc' => 'Error processing callback.']);
-        }
+    } catch (Exception $e) {
+        Log::error('Error processing STK Push callback.', ['exception' => $e->getMessage()]);
+        return response()->json(['ResultCode' => 1, 'ResultDesc' => 'Error processing callback.']);
     }
+}
+
+// public function handleSTKPushCallback(Request $request, $unique_number = null)
+//     {
+//         Log::info('STK Push callback received.', [
+//             'unique_number' => $unique_number,
+//             'request_data' => $request->all(),
+//         ]);
+
+//         // Process the callback data
+//         try {
+//             $callbackJSONData = $request->getContent();
+//             $callbackData = json_decode($callbackJSONData);
+
+//             if (!isset($callbackData->Body->stkCallback)) {
+//                 Log::error('Invalid STK Push callback data.', ['callbackData' => $callbackData]);
+//                 return response()->json(['ResultCode' => 1, 'ResultDesc' => 'Invalid callback data.']);
+//             }
+
+//             DB::transaction(function () use ($callbackData, $unique_number) {
+//                 $this->saveSTKCallbackData($callbackData, $unique_number);
+//             });
+
+//             Log::info('STK Push callback processed successfully.');
+//             return response()->json(['ResultCode' => 0, 'ResultDesc' => 'Callback processed successfully.']);
+
+//         } catch (Exception $e) {
+//             Log::error('Error processing STK Push callback.', ['exception' => $e->getMessage()]);
+//             return response()->json(['ResultCode' => 1, 'ResultDesc' => 'Error processing callback.']);
+//         }
+//     }
 
 
     private function saveSTKCallbackData($callbackData, $unique_number = null)
