@@ -40,7 +40,7 @@
             <p class="text-blackbold">STK Push Method</p>
             <p>
                 Enter your M-PESA registered phone number and the amount below, then click <strong>Pay Now</strong>.
-                You will receive a payment request on your phone from Safaricom M-PESA. Please confirm the details and enter your PIN.
+                You will receive a payment request on your phone from Safaricom M-PESA.
             </p>
             <p>
                 <a href="#" style="color:red; text-decoration:underline;">
@@ -81,6 +81,30 @@
                 <!-- Submit Button -->
                 <button type="submit" id="submitbtn" class="btn btn-primary w-100">Pay Now</button>
             </form>
+
+            <!-- Session Messages -->
+            @if (session('error'))
+                <div id="msg" class="text-redbold mt-3">
+                    {{ session('error') }}
+                </div>
+            @endif
+
+            @if (session('success'))
+                <div id="msg" class="text-greenbold mt-3">
+                    {{ session('success') }}
+                </div>
+            @endif
+
+            <!-- Validation Errors -->
+            @if ($errors->any())
+                <div id="msg" class="text-redbold mt-3">
+                    <ul>
+                        @foreach ($errors->all() as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
         </div>
 
         <!-- Manual Payment Instructions -->
@@ -99,80 +123,4 @@
         </div>
     </div>
 </div>
-
-<!-- Modal -->
-<div class="modal fade" id="submittedModal" tabindex="-1" aria-labelledby="submittedModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="submittedModalLabel">Processing Payment</h5>
-            </div>
-            <div class="modal-body text-center">
-                <p>Please check your handset and enter your M-PESA PIN to complete the payment.</p>
-                <p>Confirm all details are correct before entering your PIN.</p>
-                <p id="timer"><strong>Time Remaining:</strong> <span id="countdown">60</span> seconds</p>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" id="closeBtn" data-bs-dismiss="modal" disabled>Close</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-<script>
-    document.addEventListener('DOMContentLoaded', function () {
-        const form = document.getElementById('stkpush-form');
-        const modal = new bootstrap.Modal(document.getElementById('submittedModal'));
-        const countdownElement = document.getElementById('countdown');
-        const closeButton = document.getElementById('closeBtn');
-        let countdown = 60;
-
-        form.addEventListener('submit', function (e) {
-            e.preventDefault(); // Prevent form submission
-            modal.show();
-            closeButton.disabled = true;
-            startCountdown();
-        });
-
-        function startCountdown() {
-            const timer = setInterval(async () => {
-                countdown--;
-                countdownElement.textContent = countdown;
-
-                if (countdown <= 0) {
-                    clearInterval(timer);
-                    closeButton.disabled = false;
-                    const paymentStatus = await checkPaymentStatus();
-                    handlePaymentResponse(paymentStatus);
-                }
-            }, 1000);
-        }
-
-        async function checkPaymentStatus() {
-            try {
-                const response = await fetch('{{ route("payment.status") }}', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                    },
-                    body: JSON.stringify({ uniq: document.getElementById('uniq').value })
-                });
-                return await response.json();
-            } catch (error) {
-                console.error('Error checking payment status:', error);
-                return { status: 'error' };
-            }
-        }
-
-        function handlePaymentResponse(response) {
-            if (response.status === 'success') {
-                window.location.href = '{{ route("payment.success") }}';
-            } else {
-                window.location.href = '{{ route("payment.failed") }}';
-            }
-        }
-    });
-</script>
 @endsection

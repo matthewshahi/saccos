@@ -67,5 +67,6 @@ class Kernel extends HttpKernel
         'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
         'check_user_rights' => \App\Http\Middleware\CheckUserRights::class,
         'check_member_position' => \App\Http\Middleware\CheckMemberPosition::class,
+        'safaricom.ip' => \App\Http\Middleware\CheckSafaricomIP::class,
     ];
 }

@@ -91,7 +91,7 @@ class MpesaTheController extends Controller
         'phone' => 'required|string',
         'uniq' => 'required|string',
         'amount' => 'required|numeric|min:1', // Validate that the amount is a valid number greater than 0
-    ]);
+    ]); 
 
     $unique_number = $request->input('uniq');
     $phoneNumber = $this->formatPhoneNumber($request->input('phone'));
@@ -698,4 +698,22 @@ private function logSTKPushRequest(
         // Return the success view with the data
         return view('mpesa.payment-success', $data);
     }
+
+    public function checkStatus(Request $request)
+        {
+            $uniq = $request->input('uniq'); // The unique code sent in the request
+            $payment = DB::table('stk_push_logs')->where('unique_code', $uniq)->first();
+            if ($payment && $payment->result_code == 0) {
+                return response()->json(['status' => 'success', 'transaction_id' => $payment->transaction_id]);
+            }
+            return response()->json(['status' => 'failed']);
+        }
+     public function paymentFailed()
+        {
+            // Return a view for failed payment
+            return view('mpesa.payment-failed', [
+                'message' => 'Unfortunately, your payment could not be completed. Please try again.',
+            ]);
+        }
+        
 }
