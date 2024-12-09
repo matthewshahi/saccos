@@ -145,7 +145,7 @@ class MpesaTheController extends Controller
         ]);
         //return response()->json(['error' => 'Failed to initiate STK Push. Please try again later.'], 500);
         return view('mpesa.payment-failed', [
-            'message' => 'Unfortunately, Failed to initiate STK Push. Please try again later.',
+            'message' => 'Unfortunately, your payment could not be completed. Please try again.',
         ]);
     }
 
@@ -177,6 +177,8 @@ class MpesaTheController extends Controller
 
         // Return the successful response
        // return response()->json($responseBody);
+        =========what do i do here.....
+
     } else {
         // Log failure details and return an error response
         Log::error('STK Push request failed', [
@@ -718,5 +720,8 @@ private function logSTKPushRequest(
                 'message' => 'Unfortunately, your payment could not be completed. Please try again.',
             ]);
         }
-        
+        public function waitForPayment($checkoutRequestId)
+        {
+            return view('mpesa.waiting', ['checkoutRequestId' => $checkoutRequestId]);
+        }
 }

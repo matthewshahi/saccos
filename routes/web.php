@@ -84,6 +84,7 @@ Route::prefix('mobile')->group(function () {
         Route::get('/payment/success', [MpesaTheController::class, 'paymentSuccess'])->name('payment.success'); // Payment success
         Route::get('/payment/failed', [MpesaTheController::class, 'paymentFailed'])->name('payment.failed'); // Payment failure (optional)
         Route::post('/payment-status', [MpesaTheController::class, 'checkStatus'])->name('payment.status');
+        Route::get('/stk/wait/{checkoutRequestId}', [MpesaTheController::class, 'waitForPayment'])->name('stkpush.wait');
         
     });
 
