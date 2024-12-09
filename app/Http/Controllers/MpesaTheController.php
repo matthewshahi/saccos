@@ -816,8 +816,8 @@ public function registerUrls()
         $this->consumerSecret = $config->consumer_secret;
         $this->shortCode = $config->shortcode;
         $this->callbackUrl = [
-            'ConfirmationURL' => $config->confirmation_url, // Use the new confirmation URL from the DB
-            'ValidationURL' => $config->validation_url,     // Use the new validation URL from the DB
+            'ConfirmationURL' => $config->confirmation_url,
+            'ValidationURL' => $config->validation_url,
         ];
 
         $accessToken = $this->getAccessToken();
@@ -827,7 +827,21 @@ public function registerUrls()
             ? 'https://api.safaricom.co.ke/mpesa/c2b/v2/registerurl'
             : 'https://sandbox.safaricom.co.ke/mpesa/c2b/v1/registerurl';
 
-        // CURL request to register URLs
+        // First, fetch the current registered URLs
+        $currentUrls = $this->getRegisteredUrls($accessToken);
+
+        // Check if URLs are already registered and match
+        if (
+            $currentUrls['ConfirmationURL'] === $config->confirmation_url &&
+            $currentUrls['ValidationURL'] === $config->validation_url
+        ) {
+            Log::info('URLs are already registered and up to date.');
+            return response()->json([
+                'message' => 'URLs are already registered and up to date.',
+            ]);
+        }
+
+        // Register new URLs
         $ch = curl_init($validationUrl);
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
             'Authorization: Bearer ' . $accessToken,
@@ -837,7 +851,7 @@ public function registerUrls()
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
         curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
             "ShortCode" => $this->shortCode,
-            "ResponseType" => $config->response_type, // Dynamically fetched ResponseType
+            "ResponseType" => $config->response_type,
             "ConfirmationURL" => $this->callbackUrl['ConfirmationURL'],
             "ValidationURL" => $this->callbackUrl['ValidationURL'],
         ]));
@@ -850,15 +864,21 @@ public function registerUrls()
 
         curl_close($ch);
 
-        // Log response for debugging
+        $responseBody = json_decode($response, true);
+
+        // Log and return response
         Log::info('URL Registration Response:', [
-            'response' => $response,
+            'response' => $responseBody,
             'config' => $config,
         ]);
 
+        if (isset($responseBody['errorCode']) && $responseBody['errorCode'] === '500.003.1001') {
+            throw new Exception('URLs are already registered.');
+        }
+
         return response()->json([
             'message' => 'URLs registered successfully.',
-            'response' => json_decode($response, true),
+            'response' => $responseBody,
         ]);
     } catch (Exception $e) {
         Log::error('Error registering URLs:', ['error' => $e->getMessage()]);
@@ -868,6 +888,46 @@ public function registerUrls()
     }
 }
 
+/**
+ * Fetch the currently registered URLs for the shortcode.
+ *
+ * @param string $accessToken
+ * @return array
+ */
+private function getRegisteredUrls($accessToken)
+{
+    // Dynamic API URL based on environment
+    $queryUrl = env('MPESA_ENV') === 'live'
+        ? 'https://api.safaricom.co.ke/mpesa/c2b/v2/queryurl'
+        : 'https://sandbox.safaricom.co.ke/mpesa/c2b/v1/queryurl';
+
+    $ch = curl_init($queryUrl);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        'Authorization: Bearer ' . $accessToken,
+        'Content-Type: application/json',
+    ]);
+    curl_setopt($ch, CURLOPT_POST, 0); // Query existing URLs (GET request)
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+
+    $response = curl_exec($ch);
+
+    if (curl_errno($ch)) {
+        throw new Exception('Curl error: ' . curl_error($ch));
+    }
+
+    curl_close($ch);
+
+    $responseBody = json_decode($response, true);
+
+    // Log the fetched URLs for debugging
+    Log::info('Fetched registered URLs:', ['response' => $responseBody]);
+
+    return [
+        'ConfirmationURL' => $responseBody['ConfirmationURL'] ?? '',
+        'ValidationURL' => $responseBody['ValidationURL'] ?? '',
+    ];
+}
     // public function registerUrls()
     // {
     //     try {
