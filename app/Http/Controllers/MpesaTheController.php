@@ -628,7 +628,6 @@ public function handleSTKPushCallback(Request $request, $unique_number = null)
                     'transaction_date' => $formattedTransactionDate,
                     'phone_number' => $phoneNumber,
                     'amount' => $amount,
-                    'processed' => 'N', // Mark as processed
                     'updated_at' => now(),
                 ]
             );
