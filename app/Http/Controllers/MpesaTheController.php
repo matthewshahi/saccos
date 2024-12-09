@@ -948,14 +948,34 @@ private function logSTKPushRequest(
     }
 
     public function checkStatus(Request $request)
-        {
-            $uniq = $request->input('uniq'); // The unique code sent in the request
-            $payment = DB::table('stk_push_logs')->where('unique_code', $uniq)->first();
-            if ($payment && $payment->result_code == 0) {
-                return response()->json(['status' => 'success', 'transaction_id' => $payment->transaction_id]);
+    {
+        $uniq = $request->input('uniq'); // The unique code sent in the request
+    
+        // Retrieve the transaction details from the `stk_push_responses` table
+        $payment = DB::table('stk_push_responses')->where('unique_number', $uniq)->first();
+    
+        if ($payment) {
+            if ($payment->result_code == 0) {
+                // Successful transaction
+                return response()->json([
+                    'status' => 'success',
+                    'transaction_id' => $payment->mpesa_receipt_number,
+                    'amount' => $payment->amount,
+                    'phone_number' => $payment->phone_number,
+                    'transaction_date' => $payment->transaction_date,
+                ]);
+            } elseif ($payment->result_code != null) {
+                // Failed transaction (based on `result_code` other than 0)
+                return response()->json([
+                    'status' => 'failed',
+                    'result_description' => $payment->result_description,
+                ]);
             }
-            return response()->json(['status' => 'failed']);
         }
+    
+        // No record found or transaction not yet processed
+        return response()->json(['status' => 'pending']);
+    }
      public function paymentFailed()
         {
             // Return a view for failed payment
