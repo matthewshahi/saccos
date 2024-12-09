@@ -1060,34 +1060,26 @@ private function logSTKPushRequest(
     }
 
     public function checkStatus(Request $request)
-    {
-        $uniq = $request->input('uniq'); // The unique code sent in the request
-    
-        // Retrieve the transaction details from the `stk_push_responses` table
-        $payment = DB::table('stk_push_responses')->where('unique_number', $uniq)->first();
-    
-        if ($payment) {
-            if ($payment->result_code == 0) {
-                // Successful transaction
-                return response()->json([
-                    'status' => 'success',
-                    'transaction_id' => $payment->mpesa_receipt_number,
-                    'amount' => $payment->amount,
-                    'phone_number' => $payment->phone_number,
-                    'transaction_date' => $payment->transaction_date,
-                ]);
-            } elseif ($payment->result_code != null) {
-                // Failed transaction (based on `result_code` other than 0)
-                return response()->json([
-                    'status' => 'failed',
-                    'result_description' => $payment->result_description,
-                ]);
-            }
+{
+    $checkoutRequestId = $request->input('checkoutRequestId');
+
+    // Find the payment record
+    $payment = DB::table('stk_push_responses')->where('checkout_request_id', $checkoutRequestId)->first();
+
+    if ($payment) {
+        if ($payment->result_code == 0) {
+            // Payment successful
+            return response()->json(['status' => 'success', 'unique_number' => $payment->unique_number]);
+        } elseif ($payment->result_code != 0) {
+            // Payment failed
+            return response()->json(['status' => 'failed', 'unique_number' => $payment->unique_number]);
         }
-    
-        // No record found or transaction not yet processed
-        return response()->json(['status' => 'pending']);
     }
+
+    // Default response (e.g., still pending or not found)
+    return response()->json(['status' => 'pending']);
+}
+
 public function paymentFailed($unique_number = null)
 {
     if ($unique_number) {

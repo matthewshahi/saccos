@@ -121,83 +121,86 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        const form = document.getElementById('stkpush-form');
-        const modal = new bootstrap.Modal(document.getElementById('submittedModal'));
-        const modalMessage = document.getElementById('modal-message');
-        const timerElement = document.getElementById('timer');
-        const countdownElement = document.getElementById('countdown');
-        let countdown = 60;
+    const form = document.getElementById('stkpush-form');
+    const modal = new bootstrap.Modal(document.getElementById('submittedModal'));
+    const modalMessage = document.getElementById('modal-message');
+    const timerElement = document.getElementById('timer');
+    const countdownElement = document.getElementById('countdown');
+    let countdown = 60; // Total countdown duration
+    let pollingInterval = 5000; // 5 seconds
+    let pollTimer;
 
-        form.addEventListener('submit', async function (e) {
-    e.preventDefault(); // Prevent form submission
-    const formData = new FormData(form);
+    form.addEventListener('submit', async function (e) {
+        e.preventDefault(); // Prevent form submission
+        const formData = new FormData(form);
 
-    try {
-        // Show modal
-        modal.show();
+        try {
+            // Show modal
+            modal.show();
 
-        // Submit form data
-        const response = await fetch(form.action, {
-            method: 'POST',
-            body: formData,
-        });
+            // Submit form data
+            const response = await fetch(form.action, {
+                method: 'POST',
+                body: formData,
+            });
 
-        const result = await response.json();
+            const result = await response.json();
 
-        if (response.ok && result.status === 'success') {
-            // Start countdown with checkoutRequestId
-            startCountdown(result.checkoutRequestId);
-        } else {
-            throw new Error(result.message || 'An unknown error occurred.');
-        }
-    } catch (error) {
-        // Show error in modal
-        modalMessage.textContent = error.message || 'An error occurred while processing your request.';
-        timerElement.style.display = 'none'; // Hide the timer
-    }
-});
-
-        function startCountdown(checkoutRequestId) {
-            const timer = setInterval(async () => {
-                countdown--;
-                countdownElement.textContent = countdown;
-
-                if (countdown <= 0) {
-                    clearInterval(timer);
-
-                    // Check payment status
-                    const paymentStatus = await checkPaymentStatus(checkoutRequestId);
-                    handlePaymentResponse(paymentStatus);
-                }
-            }, 1000);
-        }
-
-        async function checkPaymentStatus(checkoutRequestId) {
-            try {
-                const response = await fetch('{{ route("payment.status") }}', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                    },
-                    body: JSON.stringify({ checkoutRequestId }),
-                });
-
-                return await response.json();
-            } catch (error) {
-                console.error('Error checking payment status:', error);
-                return { status: 'error' };
-            }
-        }
-
-        function handlePaymentResponse(response) {
-            if (response.status === 'success') {
-                window.location.href = '{{ route("payment.success") }}';
+            if (response.ok && result.status === 'success') {
+                // Start polling for payment status
+                startPolling(result.checkoutRequestId);
             } else {
-                modalMessage.textContent = 'Payment failed. Please try again.';
-                timerElement.style.display = 'none'; // Hide the timer
+                throw new Error(result.message || 'An unknown error occurred.');
             }
+        } catch (error) {
+            // Show error in modal
+            modalMessage.textContent = error.message || 'An error occurred while processing your request.';
+            timerElement.style.display = 'none'; // Hide the timer
         }
     });
+
+    function startPolling(checkoutRequestId) {
+        const timer = setInterval(() => {
+            countdown -= 5; // Decrease countdown by 5 seconds
+            countdownElement.textContent = countdown;
+
+            if (countdown <= 0) {
+                clearInterval(timer);
+                modalMessage.textContent = 'Payment timed out. Please try again.';
+                timerElement.style.display = 'none'; // Hide the timer
+                return;
+            }
+
+            // Check payment status
+            checkPaymentStatus(checkoutRequestId).then((paymentStatus) => {
+                if (paymentStatus.status === 'success') {
+                    clearInterval(timer);
+                    window.location.href = '{{ route("payment.success") }}?unique_number=' + paymentStatus.unique_number;
+                } else if (paymentStatus.status === 'failed') {
+                    clearInterval(timer);
+                    window.location.href = '{{ route("payment.failed") }}?unique_number=' + paymentStatus.unique_number;
+                }
+            });
+        }, pollingInterval); // Poll every 5 seconds
+    }
+
+    async function checkPaymentStatus(checkoutRequestId) {
+        try {
+            const response = await fetch('{{ route("payment.status") }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                },
+                body: JSON.stringify({ checkoutRequestId }),
+            });
+
+            return await response.json();
+        } catch (error) {
+            console.error('Error checking payment status:', error);
+            return { status: 'error' };
+        }
+    }
+});
 </script>
 @endsection
