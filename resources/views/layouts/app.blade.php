@@ -27,7 +27,7 @@
             @include('partials.menu_members')
         @else
             @include('partials.menu_public')
-        @endif
+        @endif 
 
         <div class="main-content-wrap mobile-menu-content bg-off-white m-0" style="padding: 3px;">
             

@@ -26,7 +26,7 @@
         </a>
         <div class="sidebar-compact-switch ms-auto"><span></span></div>
     </div>
-    <div class="scroll-nav ps ps--active-y" data-perfect-scrollbar="data-perfect-scrollbar" data-suppress-scroll-x="true">
+    <div class="scroll-nav ps ps--active-y" data-perfect-scrollbar="data-perfect-scrollbar" data-suppress-scroll-x="true" >
         <div class="side-nav">
             <div class="main-menu">
                 <ul class="metismenu" id="menu">
