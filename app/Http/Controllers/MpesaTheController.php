@@ -1011,96 +1011,56 @@ private function getRegisteredUrls($accessToken)
  }
 
  public function handleC2BPayment(Request $request)
- {
-     // Log the receipt of the C2B payment
-     $this->logTransaction('Received C2B Payment.', []);
-     $this->logTransaction('Raw C2B Payment data:', ['raw_data' => $request->getContent()]);
- 
-     // Extract required fields from the request
-     $paymentData = $request->only([
-         'TransactionType', 'TransID', 'TransTime', 'TransAmount', 
-         'BusinessShortCode', 'BillRefNumber', 'InvoiceNumber', 
-         'OrgAccountBalance', 'ThirdPartyTransID', 'MSISDN', 
-         'FirstName', 'MiddleName', 'LastName'
-     ]);
- 
-     // Format the transaction time
-     $paymentData['transaction_time'] = Carbon::createFromFormat('YmdHis', $paymentData['TransTime']);
- 
-     // Extract the order number from the BillRefNumber
-     $orderNumber = (int)substr($paymentData['BillRefNumber'], 3);
- 
-     // Payment amount
-     $amount = (double)$paymentData['TransAmount'];
- 
-     // Fetch the corresponding order from the database
-     $order = DB::table('paybill_orders')->where("id", $orderNumber)->first();
- 
-     if ($order) {
-         $order_amount = (double)$order->amount;
-         $balance = $order_amount - $amount;
- 
-         // Update the order as fully paid if the balance is zero or less
-         if ($balance <= 0) {
-             DB::table('paybill_orders')->where("id", $orderNumber)->update([
-                 'is_paid' => 'PAID',
-                 'amount_paid' => $amount,
-                 'balance' => $balance,
-                 'updated_at' => Carbon::now(),
-                 'TransID' => $paymentData['TransID']
-             ]);
-         } else {
-             // Otherwise, just update the amount paid and balance
-             DB::table('paybill_orders')->where("id", $orderNumber)->update([
-                 'amount_paid' => $amount,
-                 'balance' => $balance,
-                 'updated_at' => Carbon::now()
-             ]);
-         }
- 
-         // Save the payment details in the c2b_payments table
-         try {
-             DB::transaction(function () use ($paymentData) {
-                 DB::table('c2b_payments')->insert([
-                     'TransactionType' => $paymentData['TransactionType'],
-                     'TransID' => $paymentData['TransID'],
-                     'TransTime' => $paymentData['transaction_time'],
-                     'TransAmount' => $paymentData['TransAmount'],
-                     'BusinessShortCode' => $paymentData['BusinessShortCode'],
-                     'BillRefNumber' => $paymentData['BillRefNumber'],
-                     'InvoiceNumber' => $paymentData['InvoiceNumber'],
-                     'OrgAccountBalance' => $paymentData['OrgAccountBalance'],
-                     'ThirdPartyTransID' => $paymentData['ThirdPartyTransID'],
-                     'MSISDN' => $paymentData['MSISDN'],
-                     'FirstName' => $paymentData['FirstName'],
-                     'MiddleName' => $paymentData['MiddleName'],
-                     'LastName' => $paymentData['LastName'],
-                     'created_at' => now(),
-                     'updated_at' => now(),
-                 ]);
-             });
- 
-             // Log the successful processing of the C2B payment
-             $this->logTransaction('C2B Payment processed successfully.', []);
-         } catch (Exception $e) {
-             // Log any error that occurs during saving the payment data
-             $this->logTransaction('Failed to save C2B Payment data: ' . $e->getMessage(), [], 'error');
- 
-             // Return a failure response to Safaricom
-             return response()->json([
-                 'ResultCode' => 1, 
-                 'ResultDesc' => 'Failed to save payment data.'
-             ]);
-         }
-     }
- 
-     // Return a success response to Safaricom
-     return response()->json([
-         'ResultCode' => 0, 
-         'ResultDesc' => 'Success'
-     ]);
- }
+{
+    // Log the receipt of the C2B payment
+    $this->logTransaction('Received C2B Payment.', []);
+    $this->logTransaction('Raw C2B Payment data:', ['raw_data' => $request->getContent()]);
 
+    try {
+        // Extract required fields from the request
+        $paymentData = json_decode($request->getContent(), true);
+
+        // Format the transaction time
+        $transactionTime = Carbon::createFromFormat('YmdHis', $paymentData['TransTime'])->format('Y-m-d H:i:s');
+
+        // Ensure no duplicate entries
+        $existingTransaction = DB::table('c2b_payments')->where('transaction_id', $paymentData['TransID'])->first();
+        if ($existingTransaction) {
+            $this->logTransaction('Duplicate transaction detected.', ['transaction_id' => $paymentData['TransID']]);
+            return response()->json(['ResultCode' => 0, 'ResultDesc' => 'Duplicate transaction.']);
+        }
+
+        // Insert the payment record
+        DB::table('c2b_payments')->insert([
+            'transaction_type' => $paymentData['TransactionType'] ?? null,
+            'transaction_id' => $paymentData['TransID'] ?? null,
+            'transaction_time' => $transactionTime,
+            'transaction_amount' => $paymentData['TransAmount'] ?? 0.00,
+            'business_shortcode' => $paymentData['BusinessShortCode'] ?? null,
+            'bill_ref_number' => $paymentData['BillRefNumber'] ?? null,
+            'invoice_number' => $paymentData['InvoiceNumber'] ?? null,
+            'org_account_balance' => $paymentData['OrgAccountBalance'] ?? null,
+            'third_party_transaction_id' => $paymentData['ThirdPartyTransID'] ?? null,
+            'msisdn' => $paymentData['MSISDN'] ?? null,
+            'first_name' => $paymentData['FirstName'] ?? null,
+            'middle_name' => $paymentData['MiddleName'] ?? null,
+            'last_name' => $paymentData['LastName'] ?? null,
+            'ip_address' => $request->ip(),
+            'processed' => 'No',
+            'processed_date' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // Log the successful insertion
+        $this->logTransaction('C2B Payment inserted successfully.', ['transaction_id' => $paymentData['TransID']]);
+
+        return response()->json(['ResultCode' => 0, 'ResultDesc' => 'Success']);
+    } catch (Exception $e) {
+        $this->logTransaction('Error handling C2B payment: ' . $e->getMessage(), [], 'error');
+        return response()->json(['ResultCode' => 1, 'ResultDesc' => 'Failed to process payment.']);
+    }
+}
  
 private function logSTKPushRequest(
     $check_out_request_id,
