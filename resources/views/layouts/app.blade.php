@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta http-equiv="X-UA-Compatible" content="ie=edge" />
     <title>{{ $defaultCompanyName }} | v<?php echo(date('Y')) ?></title>
-    <link rel="stylesheet" href="{{ asset('dist-assets/css/themes/lite-purple.css') }}" />
+    <link rel="stylesheet" href="{{ asset('dist-assets/css/themes/lite-purple.css?123') }}" />
     <link rel="stylesheet" href="{{ asset('dist-assets/css/plugins/perfect-scrollbar.css') }}" />
     <link rel="stylesheet" href="{{ asset('dist-assets/css/plugins/fontawesome-5.css') }}" />
     <link rel="stylesheet" href="{{ asset('dist-assets/css/plugins/metisMenu.min.css') }}" />
