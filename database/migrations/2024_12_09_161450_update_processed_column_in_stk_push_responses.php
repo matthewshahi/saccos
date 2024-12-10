@@ -14,8 +14,13 @@ class UpdateProcessedColumnInStkPushResponses extends Migration
     public function up()
     {
         Schema::table('stk_push_responses', function (Blueprint $table) {
-            // Update 'processed' column to CHAR(1) with a default value of 'N'
-            $table->char('processed', 1)->default('N')->change();
+            // Drop the existing 'processed' column
+            $table->dropColumn('processed');
+        });
+
+        Schema::table('stk_push_responses', function (Blueprint $table) {
+            // Recreate the 'processed' column as CHAR(1) with a default value of 'N'
+            $table->char('processed', 1)->default('N'); // Replace 'some_column' with the correct column name where it should be positioned
         });
     }
 
@@ -27,8 +32,13 @@ class UpdateProcessedColumnInStkPushResponses extends Migration
     public function down()
     {
         Schema::table('stk_push_responses', function (Blueprint $table) {
-            // Revert 'processed' column to its original type (e.g., string)
-            $table->string('processed')->change();
+            // Drop the 'processed' column
+            $table->dropColumn('processed');
+        });
+
+        Schema::table('stk_push_responses', function (Blueprint $table) {
+            // Recreate the 'processed' column as a string (default behavior)
+            $table->string('processed'); // Replace 'some_column' with the correct column name where it should be positioned
         });
     }
 }
