@@ -16,6 +16,7 @@ use App\Http\Controllers\MemberDashboardController;
 use App\Http\Controllers\MemberImportController;
 use App\Http\Controllers\MpesaConfigController;
 use App\Http\Controllers\MpesaTheController;
+use App\Http\Controllers\MpesaReportController;
 
 
 Route::get('/', [HomeController::class, 'redirectBasedOnAuth'])->name('home');
@@ -92,15 +93,15 @@ Route::prefix('mobile')->group(function () {
 
    
     Route::middleware(['auth', 'check_member_position'])->group(function () {
-        Route::get('/register-urls', [MpesaTheController::class, 'registerUrls'])->name('mpesa.register.urls')->middleware('check_user_rights:add_new_sacco_member'); // Register URLs for validation/confirmation
+        Route::get('/register-urls', [MpesaTheController::class, 'registerUrls'])->name('mpesa.register.urls')->middleware('check_user_rights:mpesa_admin'); // Register URLs for validation/confirmation
 
          
         Route::prefix('config')->group(function () {
-            Route::get('/', [MpesaConfigController::class, 'index'])->name('mpesa_config.index'); // List all configurations
-            Route::get('/create', [MpesaConfigController::class, 'create'])->name('mpesa_config.create'); // Show create form
-            Route::post('/store', [MpesaConfigController::class, 'store'])->name('mpesa_config.store'); // Store new configuration
-            Route::get('/edit/{id}', [MpesaConfigController::class, 'edit'])->name('mpesa_config.edit'); // Show edit form
-            Route::post('/update/{id}', [MpesaConfigController::class, 'update'])->name('mpesa_config.update'); // Update configuration
+            Route::get('/', [MpesaConfigController::class, 'index'])->name('mpesa_config.index')->middleware('check_user_rights:mpesa_admin');; // List all configurations
+            Route::get('/create', [MpesaConfigController::class, 'create'])->name('mpesa_config.create')->middleware('check_user_rights:mpesa_admin');; // Show create form
+            Route::post('/store', [MpesaConfigController::class, 'store'])->name('mpesa_config.store')->middleware('check_user_rights:mpesa_admin');; // Store new configuration
+            Route::get('/edit/{id}', [MpesaConfigController::class, 'edit'])->name('mpesa_config.edit')->middleware('check_user_rights:mpesa_admin');; // Show edit form
+            Route::post('/update/{id}', [MpesaConfigController::class, 'update'])->name('mpesa_config.update')->middleware('check_user_rights:mpesa_admin');; // Update configuration
         });
     });
 });
@@ -184,6 +185,11 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
     Route::match(['get', 'post'], '/transfer/member/fosa', [HomeController::class, 'transferFosa'])->name('transfer.member.fosa')->middleware('check_user_rights:modify_member_shares_journal');
     Route::get('/proc/end/month/fosa', [HomeController::class, 'endMonthFosa'])->name('proc.end.month.fosa')->middleware('check_user_rights:modify_member_shares_journal');
 
+    Route::prefix('reports/mpesa')->middleware('check_user_rights:rpt_loans_issued')->group(function () {
+        Route::get('/', [MpesaReportController::class, 'paymentsReceived'])->name('reports.mpesa.paymentsreceived');
+        Route::get('/c2b', [MpesaReportController::class, 'c2bPayments'])->name('reports.mpesa.paymentsreceived.c2b');
+    });
+    
     Route::get('/reports/sasra/outstandingloans/{status}/{active?}', [HomeController::class, 'reportSasraLoans'])->name('reports.sasra.loans')->middleware('check_user_rights:rpt_loans_issued');
     Route::post('/reports/sasra/outstandingloans/{status}/{active?}', [HomeController::class, 'reportSasraLoans'])->name('reports.sasra.loans.post')->middleware('check_user_rights:rpt_loans_issued');
     Route::get('/reports/sasra/loans/data', [HomeController::class, 'fetchSasraLoansData'])->name('reports.sasra.loans.data')->middleware('check_user_rights:rpt_loans_issued');

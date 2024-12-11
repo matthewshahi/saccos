@@ -26,7 +26,7 @@
         </a>
         <div class="sidebar-compact-switch ms-auto"><span></span></div>
     </div>
-    <div class="scroll-nav ps ps--active-y" data-perfect-scrollbar="data-perfect-scrollbar" data-suppress-scroll-x="true" >
+    <div class="scroll-nav ps ps--active-y" data-perfect-scrollbar="data-perfect-scrollbar" data-suppress-scroll-x="true" style="height: 75%;">
         <div class="side-nav">
             <div class="main-menu">
                 <ul class="metismenu" id="menu">
@@ -233,11 +233,24 @@
                             <span class="item-name text-15 text-muted">Reports</span>
                         </a>
                         <ul class="mm-collapse">
-                            <li class="item-name">
-                                <a href="{{ url('/reports/members/status') }}">
-                                    <span class="text-muted">Full Consolidated report</span>
+                        <li class="Ul_li--hover">
+                                <a class="has-arrow" href="#">
+                                    <i class="i-Bar-Chart text-20 me-2" style="color: #663399;"></i>
+                                    <span class="item-name text-15 text-muted">General</span>
                                 </a>
-                            </li>
+                                <ul class="mm-collapse">
+                                <li class="item-name">
+                                        <a href="{{ url('/reports/mpesa') }}">
+                                            <span class="text-muted">mPesa</span>
+                                        </a>
+                                    </li>
+                                    <li class="item-name">
+                                        <a href="{{ url('/reports/members/status') }}">
+                                            <span class="text-muted">Consolidated (All in One)</span>
+                                        </a>
+                                    </li>
+                                </ul>
+                        </li>
                             <li class="Ul_li--hover">
                                 <a class="has-arrow" href="#">
                                     <i class="i-Bar-Chart text-20 me-2" style="color: #663399;"></i>

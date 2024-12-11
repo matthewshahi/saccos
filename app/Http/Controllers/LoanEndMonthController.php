@@ -1011,7 +1011,7 @@ private function updateSaccoAccountsTrans(array $data)
                 'accounts_trans_transdate' => now()
             ]);
         }
-
+ 
         // Update the `sacco_sub_account` balance for debit and credit separately
         DB::table('sacco_sub_account')
             ->where('sub_account_id', $data['sub_account'])

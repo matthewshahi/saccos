@@ -13,9 +13,9 @@
         </div>
     </div>
 
-    <div class="mt-4">
+    <!-- <div class="mt-4">
         <a href="{{ route('stkpush.form') }}" class="btn btn-primary">Make Another Payment</a>
         <a href="/" class="btn btn-secondary">Go to Dashboard</a>
-    </div>
+    </div> -->
 </div>
 @endsection
