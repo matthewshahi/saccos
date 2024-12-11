@@ -134,7 +134,7 @@
                                     {{ \Carbon\Carbon::createFromFormat('Ym', $loan->loan_taken_period)->format('M Y') }}
                                 </td>
                                 <td>
-                                <a href="{{ url('/mobile/stkpush/'.$loan->loan_id) }}">
+                                <a href="{{ url('/mobile/stkpush/LN'.$loan->loan_id) }}">
                                     LN{{ $loan->loan_id }}
                                 </a>
                                 </td>
