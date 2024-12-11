@@ -90,7 +90,7 @@
                     
                     
                     ?>
-                    <a href="{{ url('/mobile/stkpush/SH'.$data['member']->member_sacco_id) }}">
+                    <a href="{{ url('/mobile/stkpush/SH'.$data['member']->member_id) }}">
                         Deposit From mPesa
                     </a>
                     
