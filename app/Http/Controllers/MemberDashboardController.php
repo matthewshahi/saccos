@@ -11,6 +11,7 @@ class MemberDashboardController extends Controller
     {
         // Fetch the logged-in member's data
         $member = DB::table('sacco_members')
+            
             ->where('member_id', Auth::user()->id)
             ->where('member_active', 'Y')
             ->first();
@@ -39,7 +40,7 @@ class MemberDashboardController extends Controller
         $pendingLoans = DB::table('sacco_loans')
             ->join('sacco_loan_types', 'sacco_loans.loan_loan_type', '=', 'sacco_loan_types.loan_type_id')
             ->select(
-                'sacco_loans.loan_id',
+                'sacco_loans.loan_id', 
                 'sacco_loan_types.loan_type_name', // Fetch the loan type name
                 'sacco_loans.loan_amount',
                 'sacco_loans.loan_loan_paid',

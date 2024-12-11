@@ -85,7 +85,16 @@
     <div class="col-lg-6 col-md-12">
         <div class="card mb-4">
             <div class="card-body p-0">
-                <h5 class="card-title m-0 p-3">Share Payments</h5>
+                <h5 class="card-title m-0 p-3">Share Payments |
+                    <?php
+                    
+                    
+                    ?>
+                    <a href="{{ url('/mobile/stkpush/SH'.$data['member']->member_sacco_id) }}">
+                        Deposit From mPesa
+                    </a>
+                    
+                </h5>
                 <div id="echart4" style="height: 300px;"></div>
             </div>
         </div>
@@ -111,6 +120,7 @@
                             <th scope="col">Amount</th>
                             <th scope="col">Loan Balance</th>
                             <th scope="col">Period Taken</th>
+                            <th scope="col">Repay</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -122,6 +132,11 @@
                                 <td>Ksh {{ number_format($loan->loan_balance, 2) }}</td>
                                 <td>
                                     {{ \Carbon\Carbon::createFromFormat('Ym', $loan->loan_taken_period)->format('M Y') }}
+                                </td>
+                                <td>
+                                <a href="{{ url('/mobile/stkpush/'.$loan->loan_id) }}">
+                                    LN{{ $loan->loan_id }}
+                                </a>
                                 </td>
                             </tr>
                         @endforeach

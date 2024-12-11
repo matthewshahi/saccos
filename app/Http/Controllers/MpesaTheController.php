@@ -61,28 +61,29 @@ class MpesaTheController extends Controller
         }
     }
  
-    public function showSTKPushForm()
-    {
-        // Generate a unique document code
-        $unicode = uniqid('DOC_'); // Generates something like "DOC_64fc94b8d19f1"
+    public function showSTKPushForm(Request $request, $unique_number = null)
+        {
+            // Use the unique_number if provided, otherwise generate a new one
+            $unicode = $unique_number ?? uniqid('DOC_'); // Fallback to a new unique ID if not provided
 
-        // Example dynamic amount
-        $amount = 5; // Replace with dynamic value if needed
+            // Example dynamic amount
+            $amount = 0; // Replace with dynamic value if needed
 
-        // Log the generated values
-        Log::info('STK Push form loaded.', [
-            'unicode' => $unicode,
-            'amount' => $amount,
-            'shortcode' => $this->shortCode,
-        ]);
+            // Log the generated values
+            Log::info('STK Push form loaded.', [
+                'unicode' => $unicode,
+                'amount' => $amount,
+                'shortcode' => $this->shortCode,
+            ]);
 
-        // Return the form view with dynamic values
-        return view('mpesa.stkpush', [
-            'unicode' => $unicode,
-            'amount' => $amount,
-            'shortcode'=>$this->shortCode,
-        ]);
-    }
+            // Return the form view with dynamic values
+            return view('mpesa.stkpush', [
+                'unicode' => $unicode,
+                'amount' => $amount,
+                'shortcode' => $this->shortCode,
+            ]);
+        }
+
     public function storeStkPush(Request $request)
 {
     $request->validate([

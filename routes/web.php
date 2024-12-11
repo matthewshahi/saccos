@@ -78,8 +78,8 @@ Route::prefix('mobile')->group(function () {
     // Route::match(['get', 'post'], '/stkpush/callback/{unique_number?}', [MpesaTheController::class, 'handleSTKPushCallback'])->name('stkpush.callback');
     
     Route::middleware(['auth'])->group(function () {
-        Route::get('/stkpush', [MpesaTheController::class, 'showSTKPushForm'])->name('stkpush.form'); // Show STK Push form
-        Route::post('/stkpush', [MpesaTheController::class, 'storeStkPush'])->name('stkpush.store');
+        Route::get('/stkpush/{unique_number?}', [MpesaTheController::class, 'showSTKPushForm'])->name('stkpush.form'); // Show STK Push form
+        Route::post('/stkpush{unique_number?}', [MpesaTheController::class, 'storeStkPush'])->name('stkpush.store');
         Route::get('/stk/check/{id}', [MpesaTheController::class, 'checkPayment'])->name('stkpush.check'); // Check payment status
         //Route::get('/payment/success', [MpesaTheController::class, 'paymentSuccess'])->name('payment.success'); // Payment success
         Route::get('/payment/success/{unique_number?}', [MpesaTheController::class, 'paymentSuccess'])->name('payment.success');
