@@ -10,11 +10,18 @@ class Kernel extends ConsoleKernel
     /**
      * Define the application's command schedule.
      */
-    protected function schedule(Schedule $schedule): void
-    {
-        // $schedule->command('inspire')->hourly();
-        $schedule->job(new \App\Jobs\ProcessTransactionsJob)->everyTwoMinutes();
-    }
+  
+     protected function schedule(Schedule $schedule): void
+     {
+         // Log each time the scheduler runs
+         $schedule->call(function () {
+             \Log::info('Cron job executed at: ' . now());
+         })->everyTwoMinutes();
+     
+         // Schedule your ProcessTransactionsJob
+         $schedule->job(new \App\Jobs\ProcessTransactionsJob)->everyTwoMinutes();
+     }
+
 
     /**
      * Register the commands for the application.
@@ -25,4 +32,6 @@ class Kernel extends ConsoleKernel
 
         require base_path('routes/console.php');
     }
+
+    
 }
