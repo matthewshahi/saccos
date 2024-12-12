@@ -1124,32 +1124,33 @@ private function logSTKPushRequest(
     }
 
     public function paymentSuccess(Request $request)
-    {
-        // Retrieve the unique number from the request
-        $uniqueNumber = $request->input('unique_number'); // or pass this as a route parameter
-        
-        // Fetch payment details from the database
-        $payment = DB::table('stk_push_responses')
+{
+    // Retrieve the unique number from the request
+    $uniqueNumber = $request->input('unique_number');
+    
+    // Fetch payment details from the database
+    $payment = DB::table('stk_push_responses')
+        ->where('unique_number', $uniqueNumber)
         ->where('created_at', '<', now()->subMinute()) // Only consider records inserted more than one minute ago
-        ->where('unique_number', $uniqueNumber)       // Ensure the unique_number matches
-        ->orderBy('created_at', 'desc')              // Sort by the most recent created_at
+        ->orderBy('created_at', 'desc')
         ->first();
-    
-        // Check if payment exists
-        if (!$payment) {
-            return view('mpesa.payment-failed', [
-                'message' => 'Payment details could not be found. Please try again or contact support.',
-            ]);
-        }
-    
-        // Pass the payment details to the view
-        return view('mpesa.payment-success', [
-            'message' => 'Your payment was successful. Thank you!',
-            'transaction_id' => $payment->mpesa_receipt_number ?? 'N/A',
-            'amount' => $payment->amount ?? 0.00,
-            'phone_number' => $payment->phone_number ?? 'N/A',
+
+    // Check if payment exists
+    if (!$payment) {
+        return view('mpesa.payment-failed', [
+            'message' => 'Payment details could not be found. Please try again or contact support.',
+            'transaction_id' => 'N/A', // Provide a default value for transaction_id
         ]);
     }
+
+    // Pass the payment details to the view
+    return view('mpesa.payment-success', [
+        'message' => 'Your payment was successful. Thank you!',
+        'transaction_id' => $payment->mpesa_receipt_number ?? 'N/A',
+        'amount' => $payment->amount ?? 0.00,
+        'phone_number' => $payment->phone_number ?? 'N/A',
+    ]);
+}
 
     public function checkStatus(Request $request)
 {
