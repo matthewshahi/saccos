@@ -7,9 +7,9 @@
     <div class="card shadow p-4">
         <div class="card-body">
             <h4 class="mb-3">{{ $message }}</h4>
-            <p><strong>Transaction ID:</strong> {{ $transaction_id }}</p>
+            <!-- <p><strong>Transaction ID:</strong> {{ $transaction_id }}</p>
             <p><strong>Amount Paid:</strong> {{ number_format((float) $amount, 2) }} KES</p>
-            <p><strong>Phone Number:</strong> {{ $phone_number }}</p>
+            <p><strong>Phone Number:</strong> {{ $phone_number }}</p> -->
         </div>
     </div>
 
