@@ -1131,7 +1131,7 @@ private function logSTKPushRequest(
     // Fetch payment details from the database
     $payment = DB::table('stk_push_responses')
         ->where('unique_number', $uniqueNumber)
-        ->where('created_at', '<', now()->subMinute()) // Only consider records inserted more than one minute ago
+        // ->where('created_at', '<', now()->subMinute()) // Only consider records inserted more than one minute ago
         ->orderBy('created_at', 'desc')
         ->first();
 
