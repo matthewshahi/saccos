@@ -1,6 +1,7 @@
 <?php
 
 namespace App\Console;
+use Illuminate\Support\Facades\Log;
 
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
@@ -12,15 +13,10 @@ class Kernel extends ConsoleKernel
      */
   
      protected function schedule(Schedule $schedule): void
-     {
-         // Log each time the scheduler runs
-         $schedule->call(function () {
-             \Log::info('Cron job executed at: ' . now());
-         })->everyTwoMinutes();
-     
-         // Schedule your ProcessTransactionsJob
-         $schedule->job(new \App\Jobs\ProcessTransactionsJob)->everyTwoMinutes();
-     }
+    {
+        $schedule->job(new \App\Jobs\ProcessTransactionsJob())->everyTwoMinutes();
+    }
+ 
 
 
     /**

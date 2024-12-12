@@ -778,12 +778,63 @@ private function defaultProcEndMonthLoanUpdate($companyId, $loanTypeId, $loanDoc
 //         }
 //     }
 // }
+// private function updateGuarantorShares($loanId, $principalPaid)
+// {
+//     // Retrieve the loan's total amount guaranteed
+//     $loan = DB::table('sacco_loans')
+//         ->where('loan_id', $loanId)
+//         ->select('loan_amount_guaranteed')
+//         ->first();
+
+//     if (!$loan) {
+//         throw new \Exception("Loan not found for ID {$loanId}");
+//     }
+
+//     $totalLoanGuaranteed = $loan->loan_amount_guaranteed;
+
+//     // Check if the loan amount guaranteed is valid to avoid division by zero
+//     if ($totalLoanGuaranteed <= 0) {
+//         throw new \Exception("Invalid loan amount guaranteed for loan ID {$loanId}");
+//     }
+
+//     // Retrieve all guarantors for the specified loan
+//     $guarantors = DB::table('sacco_loan_guarantors')
+//         ->join('sacco_members', 'sacco_loan_guarantors.loan_guar_guarantor_id', '=', 'sacco_members.member_id')
+//         ->where('sacco_loan_guarantors.loan_guar_loan_id', $loanId)
+//         ->where('sacco_loan_guarantors.loan_guar_deleted', '!=', 'Y')
+//         ->select('sacco_loan_guarantors.*', 'sacco_members.member_tied_shares', 'sacco_members.member_tied_shares_self')
+//         ->get();
+
+//     foreach ($guarantors as $guarantor) {
+//         // Calculate the amount to free based on the prorated share of the guarantee
+//         $guaranteedShare = $guarantor->loan_guar_amount_guaranteed;
+//         $amountToFree = ($guaranteedShare / $totalLoanGuaranteed) * $principalPaid;
+
+//         // Check if the guarantor is self-guaranteeing or guaranteeing someone else
+//         if ($guarantor->loan_guar_guarantor_id == $loanId) {
+//             // Self-guaranteeing, decrement member_tied_shares_self only
+//             DB::table('sacco_members')
+//                 ->where('member_id', $guarantor->loan_guar_guarantor_id)
+//                 ->decrement('member_tied_shares_self', $amountToFree);
+//         } else {
+//             // Guaranteeing someone else, decrement member_tied_shares only
+//             DB::table('sacco_members')
+//                 ->where('member_id', $guarantor->loan_guar_guarantor_id)
+//                 ->decrement('member_tied_shares', $amountToFree);
+//         }
+
+//         // Update loan_guar_amount_freed in sacco_loan_guarantors table
+//         DB::table('sacco_loan_guarantors')
+//             ->where('loan_guar_id', $guarantor->loan_guar_id)
+//             ->increment('loan_guar_amount_freed', $amountToFree);
+//     }
+// }
 private function updateGuarantorShares($loanId, $principalPaid)
 {
-    // Retrieve the loan's total amount guaranteed
+    // Retrieve the loan's total amount guaranteed and loan member
     $loan = DB::table('sacco_loans')
         ->where('loan_id', $loanId)
-        ->select('loan_amount_guaranteed')
+        ->select('loan_amount_guaranteed', 'loan_member')
         ->first();
 
     if (!$loan) {
@@ -802,7 +853,14 @@ private function updateGuarantorShares($loanId, $principalPaid)
         ->join('sacco_members', 'sacco_loan_guarantors.loan_guar_guarantor_id', '=', 'sacco_members.member_id')
         ->where('sacco_loan_guarantors.loan_guar_loan_id', $loanId)
         ->where('sacco_loan_guarantors.loan_guar_deleted', '!=', 'Y')
-        ->select('sacco_loan_guarantors.*', 'sacco_members.member_tied_shares', 'sacco_members.member_tied_shares_self')
+        ->select(
+            'sacco_loan_guarantors.loan_guar_id',
+            'sacco_loan_guarantors.loan_guar_guarantor_id',
+            'sacco_loan_guarantors.loan_guar_amount_guaranteed',
+            'sacco_loan_guarantors.loan_guar_amount_freed',
+            'sacco_members.member_tied_shares',
+            'sacco_members.member_tied_shares_self'
+        )
         ->get();
 
     foreach ($guarantors as $guarantor) {
@@ -811,7 +869,7 @@ private function updateGuarantorShares($loanId, $principalPaid)
         $amountToFree = ($guaranteedShare / $totalLoanGuaranteed) * $principalPaid;
 
         // Check if the guarantor is self-guaranteeing or guaranteeing someone else
-        if ($guarantor->loan_guar_guarantor_id == $loanId) {
+        if ($guarantor->loan_guar_guarantor_id == $loan->loan_member) {
             // Self-guaranteeing, decrement member_tied_shares_self only
             DB::table('sacco_members')
                 ->where('member_id', $guarantor->loan_guar_guarantor_id)
@@ -827,6 +885,8 @@ private function updateGuarantorShares($loanId, $principalPaid)
         DB::table('sacco_loan_guarantors')
             ->where('loan_guar_id', $guarantor->loan_guar_id)
             ->increment('loan_guar_amount_freed', $amountToFree);
+
+        Log::info("Freed amount for guarantor ID {$guarantor->loan_guar_guarantor_id}: $amountToFree");
     }
 }
 private function recordAccountingTransactions($loan, $companyId, $principalPaid, $interest, $loanDocNo, $period, $loanDatePaid)
@@ -1011,7 +1071,7 @@ private function updateSaccoAccountsTrans(array $data)
                 'accounts_trans_transdate' => now()
             ]);
         }
- 
+
         // Update the `sacco_sub_account` balance for debit and credit separately
         DB::table('sacco_sub_account')
             ->where('sub_account_id', $data['sub_account'])

@@ -183,6 +183,8 @@ return [
 
     'aliases' => Facade::defaultAliases()->merge([
         // 'Example' => App\Facades\Example::class,
+        'Log' => Illuminate\Support\Facades\Log::class, // Add this line
+
     ])->toArray(),
 
     /*

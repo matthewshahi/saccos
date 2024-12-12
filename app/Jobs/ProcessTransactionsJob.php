@@ -17,140 +17,230 @@ class ProcessTransactionsJob implements ShouldQueue
 
     public function handle()
     {
-        // Fetch unprocessed transactions (limit to 100 records)
-        $stkTransactions = DB::table('stk_push_responses')
-            ->where('processed', 'N')
-            ->orderBy('created_at', 'asc')
-            ->limit(100)
-            ->get();
+        Log::info('Starting ProcessTransactionsJob at: ' . now());
 
+        $defaultMpesaIn = DB::table('sacco_defaults')
+            ->where('default_name', 'default_mpesa_in_account')
+            ->value('default_value');
+        $defaultShareAccount = DB::table('sacco_defaults')
+            ->where('default_name', 'default_share_account')
+            ->value('default_value');
+
+        if (!$defaultMpesaIn || !$defaultShareAccount) {
+            Log::error("Missing default accounts for processing transactions.");
+            return;
+        }
+
+        // Fetch unprocessed C2B transactions (limit to 100 records)
         $c2bTransactions = DB::table('c2b_payments')
             ->where('processed', 'No')
             ->orderBy('created_at', 'asc')
             ->limit(100)
             ->get();
-
-        // Process STK transactions
-        foreach ($stkTransactions as $transaction) {
-            $this->processTransaction($transaction, 'stk_push_responses');
-        }
+        Log::info('Fetched C2B Transactions', ['transactions' => $c2bTransactions->toArray()]);
 
         // Process C2B transactions
         foreach ($c2bTransactions as $transaction) {
-            $this->processTransaction($transaction, 'c2b_payments');
+            try {
+                Log::info("Processing C2B transaction ID: {$transaction->id}");
+                $this->processTransaction($transaction);
+            } catch (\Exception $e) {
+                Log::error("Failed to process transaction ID {$transaction->id}: {$e->getMessage()}");
+            }
         }
+
+        Log::info('Finished ProcessTransactionsJob at: ' . now());
     }
 
-    private function processTransaction($transaction, $table)
+    private function processTransaction($transaction)
     {
-        try {
-            // Determine if transaction is for shares or loans
-            $reference = strtoupper($transaction->unique_number ?? $transaction->bill_ref_number);
+        // Clean and normalize the reference
+        $reference = strtoupper(trim(str_replace(' ', '', $transaction->bill_ref_number)));
+        Log::info("Normalized transaction reference: $reference");
 
-            if (str_starts_with($reference, 'SH')) {
-                $this->processShares($reference, $transaction);
-            } elseif (str_starts_with($reference, 'LN')) {
-                $this->processLoans($reference, $transaction);
-            } else {
-                Log::error("Unknown transaction type for reference: $reference");
-                return;
-            }
-
-            // Mark transaction as processed
-            DB::table($table)
-                ->where('id', $transaction->id)
-                ->update([
-                    'processed' => 'Yes',
-                    'processed_date' => Carbon::now(),
-                ]);
-
-        } catch (\Exception $e) {
-            Log::error("Failed to process transaction ID {$transaction->id}: {$e->getMessage()}");
+        if (str_starts_with($reference, 'SH')) {
+            Log::info("Identified as a Share transaction for reference: $reference");
+            $this->processShares($reference, $transaction);
+        } elseif (str_starts_with($reference, 'LN')) {
+            Log::info("Identified as a Loan transaction for reference: $reference");
+            $this->processLoans($reference, $transaction);
+        } else {
+            Log::warning("Unknown transaction type for reference: $reference");
+            return;
         }
+
+        // Mark transaction as processed
+        DB::table('c2b_payments')
+            ->where('id', $transaction->id)
+            ->update([
+                'processed' => 'Yes',
+                'processed_date' => Carbon::now(),
+            ]);
+        Log::info("Transaction ID {$transaction->id} marked as processed.");
     }
 
     private function processShares($reference, $transaction)
     {
         $memberId = ltrim($reference, 'SH');
-        $defaultMpesaIn = DB::table('sacco_defaults')
-            ->where('default_name', 'default_mpesa_in_account')
-            ->value('default_value');
+        Log::info("Processing shares for Member ID: $memberId");
 
-        $defaultMpesaShareDeposits = DB::table('sacco_defaults')
-            ->where('default_name', 'default_mpesa_share_deposits')
-            ->value('default_value');
+        // Validate default accounts
+        $defaultMpesaIn = DB::table('sacco_defaults')->where('default_name', 'default_mpesa_in_account')->value('default_value');
+        $defaultShareAccount = DB::table('sacco_defaults')->where('default_name', 'default_share_account')->value('default_value');
 
-        if (!$defaultMpesaIn || !$defaultMpesaShareDeposits) {
+        if (!$defaultMpesaIn || !$defaultShareAccount) {
             Log::error("Missing default accounts for processing shares: Member ID {$memberId}");
             return;
         }
 
-        // Update shares
+        // Update member's shares
         DB::table('sacco_members')
             ->where('member_id', $memberId)
-            ->increment('member_total_share', $transaction->amount);
+            ->increment('member_total_share', $transaction->transaction_amount);
+        Log::info("Updated shares for Member ID: $memberId by Amount: {$transaction->transaction_amount}");
+
+        // Insert into sacco_shares
+        $currentPeriod = $this->getCurrentPeriod();
+        $description = "Mpesa By {$transaction->first_name} - {$transaction->bill_ref_number}";
+        $docNo = "Paybill {$transaction->business_shortcode} - {$transaction->transaction_id}";
+
+        DB::table('sacco_shares')->insert([
+            'share_member_id' => $memberId,
+            'share_amount_paying' => $transaction->transaction_amount,
+            'share_paid_by' => 'mPesa',
+            'share_period' => $currentPeriod->period_name,
+            'share_description' => $description,
+            'share_doc_no' => $docNo,
+            'share_date_paid' => Carbon::now(),
+            'share_end_month_proc' => 'N',
+            'share_by' => auth()->id() ?? null,
+            'share_ip' => request()->ip() ?? '127.0.0.1',
+        ]);
 
         // Update ledger entries
-        $this->updateSaccoAccountsTrans($defaultMpesaIn, 0, $transaction->amount, $transaction->transaction_id, "Shares Deposit - Member $memberId", $transaction->transaction_date);
-        $this->updateSaccoAccountsTrans($defaultMpesaShareDeposits, $transaction->amount, 0, $transaction->transaction_id, "Shares Deposit - Member $memberId", $transaction->transaction_date);
+        $this->updateSaccoAccountsTrans($defaultMpesaIn, $transaction->transaction_amount, 0, $docNo, "Shares Deposit - $description", $transaction->transaction_time);
+        $this->updateSaccoAccountsTrans($defaultShareAccount, 0, $transaction->transaction_amount, $docNo, "Shares Deposit - $description", $transaction->transaction_time);
     }
 
     private function processLoans($reference, $transaction)
-    {
-        $loanId = ltrim($reference, 'LN');
-        $defaultMpesaIn = DB::table('sacco_defaults')
-            ->where('default_name', 'default_mpesa_in_account')
-            ->value('default_value');
+{
+    $loanId = ltrim($reference, 'LN');
+    Log::info("Processing loan payment for Loan ID: $loanId");
 
-        if (!$defaultMpesaIn) {
-            Log::error("Missing default account for processing loan payments: Loan ID {$loanId}");
-            return;
-        }
+    $defaultMpesaIn = DB::table('sacco_defaults')->where('default_name', 'default_mpesa_in_account')->value('default_value');
 
-        // Update loans
-        DB::table('sacco_loans')
-            ->where('loan_id', $loanId)
-            ->increment('loan_loan_paid', $transaction->amount);
+    $loanDetails = DB::table('sacco_loans')
+        ->join('sacco_loan_types', 'sacco_loans.loan_loan_type', '=', 'sacco_loan_types.loan_type_id')
+        ->select('sacco_loans.*', 'sacco_loan_types.loan_type_acount', 'sacco_loan_types.loan_type_int_account', 'sacco_loan_types.loan_type_interest_type', 'sacco_loan_types.loan_type_interest')
+        ->where('sacco_loans.loan_id', $loanId)
+        ->first();
 
-        // Release guarantors if applicable
-        $this->releaseGuarantors($loanId, $transaction->amount);
-
-        // Update ledger entries
-        $this->updateSaccoAccountsTrans($defaultMpesaIn, 0, $transaction->amount, $transaction->transaction_id, "Loan Payment - Loan $loanId", $transaction->transaction_date);
+    if (!$defaultMpesaIn || !$loanDetails) {
+        Log::error("Missing default accounts or loan details for Loan ID {$loanId}");
+        return;
     }
+
+    // Calculate principal and interest
+    $principalPayment = $transaction->transaction_amount;
+    $interest = 0;
+    $currentPeriod = $this->getCurrentPeriod();
+
+    // Check if there are any payments for this loan in the current period with interest
+    $existingPayment = DB::table('sacco_loan_payments')
+        ->where('loan_payments_loan_id', $loanId)
+        ->where('loan_payments_period', $currentPeriod->period_name)
+        ->where('loan_payments_interest', '>', 0)
+        ->exists();
+
+    if ($loanDetails->loan_type_interest_type === "FIXED INTEREST") {
+        // Always charge interest for fixed interest
+        $interest = $principalPayment - ($principalPayment * 100 / ($loanDetails->loan_type_interest + 100));
+    } elseif (!$existingPayment) {
+        // Charge interest for reducing balance only if no interest has been paid in the current period
+        $interest = ($loanDetails->loan_amount - $loanDetails->loan_loan_paid) * $loanDetails->loan_type_interest / 12 / 100;
+    } else {
+        Log::info("Interest skipped for reducing balance loan ID: $loanId as interest has already been paid in the current period.");
+    }
+
+    $principalPaid = $principalPayment - $interest;
+
+    // Update loan balances
+    DB::table('sacco_loans')
+        ->where('loan_id', $loanId)
+        ->increment('loan_loan_paid', $principalPaid);
+    Log::info("Updated loan balance for Loan ID: $loanId by Principal: $principalPaid, Interest: $interest");
+
+    // Insert into sacco_loan_payments
+    $description = "Mpesa By {$transaction->first_name} - {$transaction->bill_ref_number}";
+    $docNo = "Paybill {$transaction->business_shortcode} - {$transaction->transaction_id}";
+
+    DB::table('sacco_loan_payments')->insert([
+        'loan_payments_amount' => $principalPaid,
+        'loan_payments_interest' => $interest,
+        'loan_payments_docno' => $docNo,
+        'loan_payments_paid_on' => Carbon::now(),
+        'loan_payments_loan_id' => $loanId,
+        'loan_payments_period' => $currentPeriod->period_name,
+        'loan_payments_description' => "Loan Payment - $description",
+        'loan_payments_paid_in_by' => "MPesa",
+        'loan_payments_ip' => request()->ip() ?? '127.0.0.1',
+    ]);
+
+    // Release guarantors
+    $this->releaseGuarantors($loanId, $principalPaid);
+
+    // Update ledger entries
+    $this->updateSaccoAccountsTrans($defaultMpesaIn, $principalPaid + $interest, 0, $docNo, "Loan Payment - $description", $transaction->transaction_time);
+    $this->updateSaccoAccountsTrans($loanDetails->loan_type_acount, 0, $principalPaid, $docNo, "Loan Principal - $description", $transaction->transaction_time);
+    $this->updateSaccoAccountsTrans($loanDetails->loan_type_int_account, 0, $interest, $docNo, "Loan Interest - $description", $transaction->transaction_time);
+}
 
     private function updateSaccoAccountsTrans($account, $debit, $credit, $docNo, $description, $date)
     {
         DB::table('sacco_accounts_trans')->insert([
-            'account_id' => $account,
-            'debit' => $debit,
-            'credit' => $credit,
-            'doc_no' => $docNo,
-            'description' => $description,
-            'trans_date' => $date,
-            'created_at' => now(),
-            'updated_at' => now(),
+            'accounts_trans_sub_account' => $account,
+            'accounts_trans_period' => $this->getCurrentPeriod()->period_name ?? 'Unknown Period', // Current period or default
+            'accounts_trans_debit' => $debit,
+            'accounts_trans_credit' => $credit,
+            'accounts_trans_doc_no' => $docNo,
+            'accounts_trans_decription' => $description,
+            'accounts_trans_source' => 'MPesa', // Source of the transaction
+            'accounts_trans_dat_date' => $date,
+            'accounts_trans_transdate' => now(),
+            'accounts_trans_user_id' => 999,
+            'accounts_trans_ip' => request()->ip() ?? '127.0.0.1', // Client IP or fallback to localhost
+            'accounts_trans_app_name' => 'mpesa', // Static value for app name
         ]);
+        Log::info("Ledger entry updated for Sub Account: $account, Debit: $debit, Credit: $credit, Description: $description");
     }
 
     private function releaseGuarantors($loanId, $amount)
     {
-        $guarantors = DB::table('sacco_loan_guarantors')
-            ->where('loan_id', $loanId)
-            ->where('loan_guar_amount_freed', '<', DB::raw('loan_guar_amount'))
-            ->get();
+        $loan = DB::table('sacco_loans')->where('loan_id', $loanId)->select('loan_amount_guaranteed', 'loan_member')->first();
+
+        if (!$loan || $loan->loan_amount_guaranteed <= 0) {
+            Log::error("Invalid loan guarantee details for Loan ID {$loanId}");
+            return;
+        }
+
+        $totalLoanGuaranteed = $loan->loan_amount_guaranteed;
+        $guarantors = DB::table('sacco_loan_guarantors')->where('loan_guar_loan_id', $loanId)->where('loan_guar_deleted', '!=', 'Y')->get();
 
         foreach ($guarantors as $guarantor) {
-            $releaseAmount = min($amount, $guarantor->loan_guar_amount - $guarantor->loan_guar_amount_freed);
-            $amount -= $releaseAmount;
+            $amountToFree = ($guarantor->loan_guar_amount_guaranteed / $totalLoanGuaranteed) * $amount;
 
-            DB::table('sacco_loan_guarantors')
-                ->where('id', $guarantor->id)
-                ->increment('loan_guar_amount_freed', $releaseAmount);
-
-            if ($amount <= 0) {
-                break;
+            if ($guarantor->loan_guar_guarantor_id == $loan->loan_member) {
+                DB::table('sacco_members')->where('member_id', $guarantor->loan_guar_guarantor_id)->decrement('member_tied_shares_self', $amountToFree);
+            } else {
+                DB::table('sacco_members')->where('member_id', $guarantor->loan_guar_guarantor_id)->decrement('member_tied_shares', $amountToFree);
             }
+
+            DB::table('sacco_loan_guarantors')->where('loan_guar_id', $guarantor->loan_guar_id)->increment('loan_guar_amount_freed', $amountToFree);
         }
+    }
+
+    private function getCurrentPeriod()
+    {
+        return DB::table('sacco_period')->where('period_active', 'Y')->where('period_deleted', '<>', 'Y')->first();
     }
 }
