@@ -1123,31 +1123,59 @@ private function logSTKPushRequest(
         file_put_contents($logFile, "[" . now() . "] " . strtoupper($level) . ": " . $message . ' ' . json_encode($context) . PHP_EOL, FILE_APPEND);
     }
 
-    public function paymentSuccess(Request $request)
-    {
-        // Retrieve the unique number from the request
-        $uniqueNumber = $request->input('unique_number'); // or pass this as a route parameter
+    // public function paymentSuccess(Request $request)
+    // {
+    //     // Retrieve the unique number from the request
+    //     $uniqueNumber = $request->input('unique_number'); // or pass this as a route parameter
         
-        // Fetch payment details from the database
-        $payment = DB::table('stk_push_responses')
-            ->where('unique_number', $uniqueNumber)
-            ->first();
+    //     // Fetch payment details from the database
+    //     $payment = DB::table('stk_push_responses')
+    //         ->where('unique_number', $uniqueNumber)
+    //         ->first();
     
-        // Check if payment exists
-        if (!$payment) {
-            return view('mpesa.payment-failed', [
-                'message' => 'Payment details could not be found. Please try again or contact support.',
-            ]);
-        }
+    //     // Check if payment exists
+    //     if (!$payment) {
+    //         return view('mpesa.payment-failed', [
+    //             'message' => 'Payment details could not be found. Please try again or contact support.',
+    //         ]);
+    //     }
     
-        // Pass the payment details to the view
-        return view('mpesa.payment-success', [
-            'message' => 'Your payment was successful. Thank you!',
-            'transaction_id' => $payment->mpesa_receipt_number ?? 'N/A',
-            'amount' => $payment->amount ?? 0.00,
-            'phone_number' => $payment->phone_number ?? 'N/A',
+    //     // Pass the payment details to the view
+    //     return view('mpesa.payment-success', [
+    //         'message' => 'Your payment was successful. Thank you!',
+    //         'transaction_id' => $payment->mpesa_receipt_number ?? 'N/A',
+    //         'amount' => $payment->amount ?? 0.00,
+    //         'phone_number' => $payment->phone_number ?? 'N/A',
+    //     ]);
+    // }
+
+    public function paymentSuccess(Request $request)
+{
+    // Retrieve the unique number from the request
+    $uniqueNumber = $request->input('unique_number'); // or pass this as a route parameter
+
+    // Fetch the latest payment details for the unique number and inserted more than one minute ago
+    $payment = DB::table('stk_push_responses')
+        ->where('unique_number', $uniqueNumber)
+        ->where('created_at', '<', now()->subMinute()) // Only consider records inserted more than one minute ago
+        ->orderBy('created_at', 'desc') // Ensure we get the latest transaction
+        ->first();
+
+    // Check if payment exists
+    if (!$payment) {
+        return view('mpesa.payment-failed', [
+            'message' => 'Payment details could not be found. Please try again or contact support.',
         ]);
     }
+
+    // Pass the payment details to the view
+    return view('mpesa.payment-success', [
+        'message' => 'Your payment was successful. Thank you!',
+        'transaction_id' => $payment->mpesa_receipt_number ?? 'N/A',
+        'amount' => $payment->amount ?? 0.00,
+        'phone_number' => $payment->phone_number ?? 'N/A',
+    ]);
+}
 
     public function checkStatus(Request $request)
 {
