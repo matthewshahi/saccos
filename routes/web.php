@@ -29,8 +29,8 @@ use Illuminate\Support\Facades\Mail;
 // });
 
 
-Route::get('/', [HomeController::class, 'redirectBasedOnAuth'])->name('home');
-Route::get('/home', [HomeController::class, 'redirectBasedOnAuth'])->name('home1');
+Route::get('/home', [HomeController::class, 'redirectBasedOnAuth'])->name('home');
+Route::get('/', [HomeController::class, 'redirectBasedOnAuth'])->name('home1');
  
 Route::get('login', [CustomAuthController::class, 'showLoginForm'])->name('login');
 Route::post('login', [CustomAuthController::class, 'login']);
