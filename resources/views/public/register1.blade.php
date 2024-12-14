@@ -32,7 +32,7 @@
     <div class="card-body">
         <h4 class="card-title text-primary">Register as a Member</h4>
         <p class="text-muted">
-        Please fill in the form below to apply for SACCO membership. Ensure all details are accurate. Once submitted, an email will be sent to you with a link to complete your registration. You will be required to upload additional documents, including your passport photo, signature, copies of your ID (front and back), and either payslips or bank statements.
+            Please fill in the form below to apply for SACCO membership. Ensure all details are accurate. Once submitted, our team will contact you for further details if required.
         </p>
         <form action="{{ route('register.submit') }}" method="POST" id="registration-form">
             @csrf
@@ -41,21 +41,21 @@
             <h5 class="mb-3 text-primary">Personal Details</h5>
             <div class="row">
                 <div class="col-md-6 form-group mb-3">
-                    <label for="first_name">First Name <span class="text-danger">*</span></label>
+                    <label for="first_name">First Name</label>
                     <input type="text" class="form-control" id="first_name" name="first_name" value="{{ old('first_name') }}" required>
                 </div>
                 <div class="col-md-6 form-group mb-3">
-                    <label for="last_name">Last Name <span class="text-danger">*</span></label>
+                    <label for="last_name">Last Name</label>
                     <input type="text" class="form-control" id="last_name" name="last_name" value="{{ old('last_name') }}" required>
                 </div>
                 
                 <div class="col-md-6 form-group mb-3">
-                    <label for="birth_date">Date of Birth <span class="text-danger">*</span></label>
+                    <label for="birth_date">Date of Birth</label>
                     <input type="date" class="form-control" id="birth_date" name="birth_date" value="{{ old('birth_date') }}" required>
                 </div>
 
                 <div class="col-md-6 form-group mb-3">
-                    <label for="national_id">National ID <span class="text-danger">*</span></label>
+                    <label for="national_id">National ID</label>
                     <input type="text" class="form-control" id="national_id" name="national_id" value="{{ old('national_id') }}" required>
                 </div>
                 <div class="col-md-6 form-group mb-3">
@@ -74,23 +74,25 @@
                         <option value="">Select</option>
                         <option value="Male" {{ old('gender') == 'Male' ? 'selected' : '' }}>Male</option>
                         <option value="Female" {{ old('gender') == 'Female' ? 'selected' : '' }}>Female</option>
+                        
                     </select>
                 </div>
+                 
             </div>
 
             <!-- Contact Details Section -->
             <h5 class="mt-4 mb-3 text-primary">Contact Details</h5>
             <div class="row">
                 <div class="col-md-6 form-group mb-3">
-                    <label for="email">Email Address <span class="text-danger">*</span></label>
+                    <label for="email">Email Address</label>
                     <input type="email" class="form-control" id="email" name="email" value="{{ old('email') }}" required>
                 </div>
                 <div class="col-md-6 form-group mb-3">
-                    <label for="phone">Phone Number <span class="text-danger">*</span></label>
+                    <label for="phone">Phone Number</label>
                     <input type="text" class="form-control" id="phone" name="phone" value="{{ old('phone') }}" required>
                 </div>
                 <div class="col-md-6 form-group mb-3">
-                    <label for="physical_location">Location <span class="text-danger">*</span></label>
+                    <label for="physical_location">Location</label>
                     <input type="text" class="form-control" id="physical_location" name="physical_location" value="{{ old('physical_location') }}" required>
                 </div>
             </div>
@@ -143,12 +145,12 @@
             <!-- Terms Section -->
             <div class="col-md-12 form-group mt-4">
                 <input type="checkbox" id="certification_statement" name="certification_statement" required>
-                <label for="certification_statement">I certify that the information provided is accurate to the best of my knowledge. <span class="text-danger">*</span></label>
+                <label for="certification_statement">I certify that the information provided is accurate to the best of my knowledge.</label>
             </div>
 
             <div class="col-md-12 form-group mt-3">
                 <input type="checkbox" id="terms" name="terms" required>
-                <label for="terms">I agree to the <a href="#">terms and conditions</a>. <span class="text-danger">*</span></label>
+                <label for="terms">I agree to the <a href="#">terms and conditions</a>.</label>
             </div>
             <input type="hidden" name="g-recaptcha-response" id="g-recaptcha-response">
 

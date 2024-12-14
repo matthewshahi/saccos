@@ -19,14 +19,14 @@ use App\Http\Controllers\MpesaTheController;
 use App\Http\Controllers\MpesaReportController;
 use Illuminate\Support\Facades\Mail;
 
-Route::get('/test-email', function () {
-    Mail::raw('This is a test email from Laravel!', function ($message) {
-        $message->to('matthewshahi@gmail.com')
-                ->subject('Test Email from iSacco');
-    });
+// Route::get('/test-email', function () {
+//     Mail::raw('This is a test email from Laravel!', function ($message) {
+//         $message->to('matthewshahi@gmail.com')
+//                 ->subject('Test Email from iSacco');
+//     });
 
-    return 'Test email sent!';
-});
+//     return 'Test email sent!';
+// });
 
 
 Route::get('/', [HomeController::class, 'redirectBasedOnAuth'])->name('home');
