@@ -75,20 +75,25 @@
 </div>
 
 <!-- Modal -->
+<!-- Modal -->
 <div class="modal fade" id="memberDetailsModal" tabindex="-1" aria-labelledby="memberDetailsModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
+        <div class="modal-content shadow-lg border-0">
+            <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title" id="memberDetailsModalLabel">Member Details</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close text-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body">
+            <div class="modal-body p-4" style="max-height: 70vh; overflow-y: auto;">
                 <div id="modal-content">
                     <p class="text-center text-muted">Loading details...</p>
                 </div>
             </div>
-            <div class="modal-footer">
+            <div class="modal-footer justify-content-between">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <div>
+                    <button type="button" class="btn btn-info" id="downloadDetails"><i class="bi bi-download"></i> Download</button>
+                    <button type="button" class="btn btn-success" id="printDetails"><i class="bi bi-printer"></i> Print</button>
+                </div>
             </div>
         </div>
     </div>
@@ -96,35 +101,8 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        // Auto-save functionality
-        const autoSaveElements = document.querySelectorAll('.auto-save');
-
-        autoSaveElements.forEach(element => {
-            element.addEventListener('change', function () {
-                const memberId = this.dataset.id;
-                const field = this.dataset.field;
-                const value = this.value;
-
-                fetch(`{{ url('/new_members/update') }}/${memberId}`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                    },
-                    body: JSON.stringify({ field, value })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.status !== 'success') {
-                        alert('Error updating field');
-                    }
-                })
-                .catch(error => console.error('Error:', error));
-            });
-        });
-
-        // View details button click
         const viewDetailsButtons = document.querySelectorAll('.view-details');
+
         viewDetailsButtons.forEach(button => {
             button.addEventListener('click', function () {
                 const memberId = this.dataset.id;
@@ -134,30 +112,113 @@
                     .then(data => {
                         const modalContent = document.getElementById('modal-content');
                         modalContent.innerHTML = `
-                            <p><strong>Name:</strong> ${data.first_name} ${data.last_name}</p>
-                            <p><strong>Email:</strong> ${data.email}</p>
-                            <p><strong>Phone:</strong> ${data.phone}</p>
-                            <p><strong>National ID:</strong> ${data.national_id}</p>
-                            <p><strong>Location:</strong> ${data.physical_location}</p>
-                            <p><strong>Marital Status:</strong> ${data.marital_status}</p>
-                            <p><strong>Gender:</strong> ${data.gender}</p>
-                            <p><strong>Dependents:</strong> ${data.dependents}</p>
-                            <p><strong>Next of Kin:</strong></p>
-                            <ul>
-                                ${JSON.parse(data.next_of_kin_name).map((name, index) => `
-                                    <li>
-                                        <strong>Name:</strong> ${name}, 
-                                        <strong>Relationship:</strong> ${JSON.parse(data.next_of_kin_relationship)[index]}, 
-                                        <strong>Phone:</strong> ${JSON.parse(data.next_of_kin_phone)[index]},
-                                        <strong>Share:</strong> ${JSON.parse(data.kin_share_percent)[index]}%
-                                    </li>
-                                `).join('')}
-                            </ul>
+                            <div class="container">
+                                <h4 class="text-primary mb-3">Personal Information</h4>
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <strong>Name:</strong> ${data.first_name} ${data.last_name || ''}
+                                    </div>
+                                    <div class="col-md-6">
+                                        <strong>Email:</strong> ${data.email || 'N/A'}
+                                    </div>
+                                    <div class="col-md-6 mt-2">
+                                        <strong>Phone:</strong> ${data.phone || 'N/A'}
+                                    </div>
+                                    <div class="col-md-6 mt-2">
+                                        <strong>National ID:</strong> ${data.national_id || 'N/A'}
+                                    </div>
+                                    <div class="col-md-6 mt-2">
+                                        <strong>Location:</strong> ${data.physical_location || 'N/A'}
+                                    </div>
+                                    <div class="col-md-6 mt-2">
+                                        <strong>Marital Status:</strong> ${data.marital_status || 'N/A'}
+                                    </div>
+                                    <div class="col-md-6 mt-2">
+                                        <strong>Gender:</strong> ${data.gender || 'N/A'}
+                                    </div>
+                                    <div class="col-md-6 mt-2">
+                                        <strong>Dependents:</strong> ${data.dependents || 'N/A'}
+                                    </div>
+                                </div>
+
+                                <h4 class="text-primary mb-3">Bank Details</h4>
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <strong>Bank Name:</strong> ${data.bank_name || 'N/A'}
+                                    </div>
+                                    <div class="col-md-6">
+                                        <strong>Branch:</strong> ${data.bank_branch || 'N/A'}
+                                    </div>
+                                    <div class="col-md-6 mt-2">
+                                        <strong>Account Number:</strong> ${data.bank_account_number || 'N/A'}
+                                    </div>
+                                </div>
+
+                                <h4 class="text-primary mb-3">Uploaded Files</h4>
+                                <div class="row mb-3">
+                                    <div class="col-md-12">
+                                        <ul class="list-group">
+                                            <li class="list-group-item">${data.passport_photo ? `<a href="{{ url('${data.passport_photo}') }}" target="_blank">Passport Photo</a>` : 'Passport Photo: Not Uploaded'}</li>
+                                            <li class="list-group-item">${data.signature ? `<a href="{{ url('${data.signature}') }}" target="_blank">Signature</a>` : 'Signature: Not Uploaded'}</li>
+                                            <li class="list-group-item">${data.id_copy_front ? `<a href="{{ url('${data.id_copy_front}') }}" target="_blank">ID Copy (Front)</a>` : 'ID Copy (Front): Not Uploaded'}</li>
+                                            <li class="list-group-item">${data.id_copy_back ? `<a href="{{ url('${data.id_copy_back}') }}" target="_blank">ID Copy (Back)</a>` : 'ID Copy (Back): Not Uploaded'}</li>
+                                            <li class="list-group-item">${data.payslips_bank_statements ? `<a href="{{ url('${data.payslips_bank_statements}') }}" target="_blank">Payslips/Bank Statements</a>` : 'Payslips/Bank Statements: Not Uploaded'}</li>
+                                        </ul>
+                                    </div>
+                                </div>
+
+                                <h4 class="text-primary mb-3">Next of Kin</h4>
+                                <div class="row">
+                                    <ul>
+                                        ${JSON.parse(data.next_of_kin_name).map((name, index) => `
+                                            <li>
+                                                <strong>Name:</strong> ${name || 'N/A'}, 
+                                                <strong>Relationship:</strong> ${JSON.parse(data.next_of_kin_relationship)[index] || 'N/A'}, 
+                                                <strong>Phone:</strong> ${JSON.parse(data.next_of_kin_phone)[index] || 'N/A'}, 
+                                                <strong>Share:</strong> ${JSON.parse(data.kin_share_percent)[index] || 'N/A'}%
+                                            </li>
+                                        `).join('')}
+                                    </ul>
+                                </div>
+                            </div>
                         `;
                         new bootstrap.Modal(document.getElementById('memberDetailsModal')).show();
                     })
                     .catch(error => console.error('Error fetching member details:', error));
             });
+        });
+
+        // Print functionality
+        document.getElementById('printDetails').addEventListener('click', function () {
+            const modalContent = document.getElementById('modal-content').innerHTML;
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write(`
+                <html>
+                    <head>
+                        <title>Member Details</title>
+                        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css">
+                    </head>
+                    <body>
+                        <div class="container mt-3">
+                            ${modalContent}
+                        </div>
+                    </body>
+                </html>
+            `);
+            printWindow.document.close();
+            printWindow.print();
+        });
+
+        // Download functionality
+        document.getElementById('downloadDetails').addEventListener('click', function () {
+            const modalContent = document.getElementById('modal-content').innerHTML;
+            const blob = new Blob([modalContent], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'Member_Details.html';
+            a.click();
+            URL.revokeObjectURL(url);
         });
     });
 </script>

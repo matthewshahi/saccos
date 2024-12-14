@@ -57,4 +57,5 @@ class PublicRegistrationActionsController extends Controller
 
             return response()->json($member);
         }
+    
 }
