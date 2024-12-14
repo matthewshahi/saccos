@@ -120,7 +120,7 @@
             @endfor
 
             <!-- Bank Details Section -->
-            <h5 class="mt-4 mb-3 text-primary">Bank Details</h5>
+            <h5 class="mt-4 mb-3 text-primary">Our Sacco Bank Details</h5>
             <div class="row">
                 <div class="col-md-6 form-group mb-3">
                     <label>Bank Name</label>

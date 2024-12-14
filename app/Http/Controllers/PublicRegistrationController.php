@@ -6,9 +6,10 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 
 class PublicRegistrationController extends Controller
-{
+{ 
     // Display the registration form
     public function showForm()
     {
@@ -30,7 +31,7 @@ class PublicRegistrationController extends Controller
         $validator = Validator::make($request->all(), [
             'first_name' => 'required|string|max:50',
             'last_name' => 'required|string|max:50',
-            'dob' => 'required|date|before:today',
+            'birth_date' => 'required|date|before:today',
             'national_id' => 'required|string|max:20',
             'email' => 'required|email|max:100|unique:sacco_members_new_applications,email', // Prevent duplicates
             'phone' => 'required|string|max:15',
@@ -76,12 +77,12 @@ class PublicRegistrationController extends Controller
         if (($recaptchaData['score'] ?? 0) < 0.5) {
             return redirect()->back()->withErrors(['captcha' => 'Suspicious activity detected. Try again.'])->withInput();
         }
-
+        $emailKeyUnique = Str::uuid();
         // Save the validated data to the database
         DB::table('sacco_members_new_applications')->insert([
             'first_name' => $request->input('first_name'),
             'last_name' => $request->input('last_name'),
-            'dob' => $request->input('dob'),
+            'birth_date' => $request->input('birth_date'),
             'national_id' => $request->input('national_id'),
             'email' => $request->input('email'),
             'phone' => $request->input('phone'),
@@ -91,6 +92,7 @@ class PublicRegistrationController extends Controller
             'next_of_kin_phone' => json_encode(array_column($request->next_of_kin, 'phone')),
             'next_of_kin_id' => json_encode(array_column($request->next_of_kin, 'id')),
             'kin_share_percent' => json_encode(array_column($request->next_of_kin, 'share_percent')),
+            'email_key_unique' => $emailKeyUnique,
             'created_at' => now(),
             'updated_at' => now(),
         ]);
