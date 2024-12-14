@@ -158,7 +158,9 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
 
     Route::get('/dashboard', [HomeController::class, 'index'])->name('dashboard')->middleware('auth');
 
-    Route::get('/members/list', [HomeController::class, 'membersList'])->name('members.list')->middleware('check_user_rights:list_sacco_member');
+    //Route::get('/members/list', [HomeController::class, 'membersList'])->name('members.list')->middleware('check_user_rights:list_sacco_member');
+    Route::get('/members/list', [HomeController::class, 'membersList'])->name('members.listing')->middleware('check_user_rights:list_sacco_member');
+
     Route::get('/members/add', [HomeController::class, 'addNewMember'])->name('members.add')->middleware('check_user_rights:add_new_sacco_member');
     Route::post('/members/store', [HomeController::class, 'storeNewMember'])->name('members.store')->middleware('check_user_rights:add_new_sacco_member');
     Route::get('/members/active/{status}', [HomeController::class, 'membersActive'])->name('members.active')->middleware('check_user_rights:list_sacco_member');
