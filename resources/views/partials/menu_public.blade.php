@@ -44,7 +44,7 @@
                                 </a>
                             </li>   
                             <li class="item-name">
-                                <a href="{{ url('/') }}">
+                                <a href="{{ url('/login') }}">
                                     <span class="text-muted">Login (Members Only)</span>
                                 </a>
                             </li>              
