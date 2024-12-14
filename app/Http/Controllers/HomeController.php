@@ -45,26 +45,25 @@ class HomeController extends Controller
     }
 
     public function redirectBasedOnAuth()
-{
-    dd("rrrr");
-    if (auth()->check()) {
-        $user = auth()->user();
+    {
+       
+        if (auth()->check()) {
+            $user = auth()->user();
+          
 
-        if ($user->member_position == 2) {
-            \Log::info('Redirecting to /dashboard for user: ' . $user->id);
-            return redirect('/dashboard');
-        } elseif ($user->member_position == 1) {
-            \Log::info('Redirecting to /dashboard/member_dashboard for user: ' . $user->id);
-            return redirect('/dashboard/member_dashboard');
-        } else {
-            \Log::info('Redirecting to /register for user: ' . $user->id);
-            return redirect('/register');
+            if ($user->member_position == 2) {
+                return redirect('/dashboard');
+            } elseif ($user->member_position == 1) {
+                return redirect('/dashboard/member_dashboard');
+            } else {
+                return redirect('/register');
+            }
+
         }
-    }
+       
 
-    \Log::info('No user authenticated, returning home view');
-    return view('home');
-}
+        return view('home'); 
+    }
 
     public function member_statement_self()
         {

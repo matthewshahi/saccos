@@ -29,6 +29,7 @@ use Illuminate\Support\Facades\Mail;
 // });
 
 
+
 Route::get('/home', [HomeController::class, 'redirectBasedOnAuth'])->name('home');
 Route::get('/', [HomeController::class, 'redirectBasedOnAuth'])->name('home1');
  

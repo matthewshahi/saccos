@@ -6,7 +6,7 @@
     <div class="header-part-right">
         <ul>
             <li><a href="{{ route('login') }}">Login</a></li>
-            <li><a href="{{ route('register') }}">Register</a></li>
+            <li><a href="{{ route('register.form') }}">Register</a></li>
         </ul>
     </div>
 </div>
