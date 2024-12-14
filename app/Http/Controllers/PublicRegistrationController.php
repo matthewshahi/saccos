@@ -10,40 +10,8 @@ use Illuminate\Support\Str;
 
 class PublicRegistrationController extends Controller
 { 
-    public function showForm()
-    {
-        // Fetch bank details from the database
-        $bankDetails = [
-            'bank_name' => DB::table('sacco_defaults')->where('default_name', 'BANK_NAME')->value('default_value'),
-            'branch_name' => DB::table('sacco_defaults')->where('default_name', 'BANK_BRANCH')->value('default_value'),
-            'account_name' => DB::table('sacco_defaults')->where('default_name', 'BANK_ACCOUNT_NAME')->value('default_value'),
-            'account_number' => DB::table('sacco_defaults')->where('default_name', 'BANK_ACCOUNT_NUMBER')->value('default_value'),
-        ];
-
-        // Fetch kin types (not deleted)
-        $kinTypes = DB::table('sacco_kin_type')
-            ->where('kin_type_deleted', 'N')
-            ->orderBy('kin_type_name')
-            ->get(['kin_type_id', 'kin_type_name']);
-
-        // Fetch minimum contribution value
-        $minContribution = DB::table('sacco_defaults')->where('default_name', 'min_share_contribution')->value('default_value');
-
-        return view('public.register', compact('bankDetails', 'kinTypes', 'minContribution'));
-    }
-
-    <?php
-
-    namespace App\Http\Controllers;
     
-    use Illuminate\Http\Request;
-    use Illuminate\Support\Facades\DB;
-    use Illuminate\Support\Facades\Validator;
-    use Illuminate\Support\Facades\Http;
-    use Illuminate\Support\Str;
-    
-    class PublicRegistrationController extends Controller
-    {
+  
         public function showForm()
         {
             // Fetch bank details from the database
