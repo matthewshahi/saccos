@@ -78,6 +78,32 @@
                 </div>
             </div>
 
+            <!-- Additional Information Section -->
+            <h5 class="mt-4 mb-3 text-primary">Additional Information</h5>
+            <div class="row">
+                <div class="col-md-6 form-group mb-3">
+                    <label for="monthly_income">Monthly Income (in Ksh) <span class="text-danger">*</span></label>
+                    <input type="number" class="form-control" id="monthly_income" name="monthly_income" value="{{ old('monthly_income') }}" required>
+                </div>
+                <div class="col-md-6 form-group mb-3">
+                    <label for="occupation">Occupation</label>
+                    <input type="text" class="form-control" id="occupation" name="occupation" value="{{ old('occupation') }}">
+                </div>
+                <div class="col-md-6 form-group mb-3">
+                    <label for="dependents">Number of Dependents</label>
+                    <input type="number" class="form-control" id="dependents" name="dependents" value="{{ old('dependents') }}">
+                </div>
+                <div class="col-md-6 form-group mb-3">
+                    <label for="preferred_monthly_contribution">Preferred Monthly Contribution (in Ksh) <span class="text-danger">*</span></label>
+                    <input type="number" class="form-control" id="preferred_monthly_contribution" name="preferred_monthly_contribution" value="{{ old('preferred_monthly_contribution') }}" required>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="reason_for_joining">Reason for Joining the SACCO</label>
+                <textarea class="form-control" id="reason_for_joining" name="reason_for_joining" rows="4">{{ old('reason_for_joining') }}</textarea>
+            </div>
+
             <!-- Contact Details Section -->
             <h5 class="mt-4 mb-3 text-primary">Contact Details</h5>
             <div class="row">
@@ -130,27 +156,6 @@
                     </div>
                 </div>
             @endfor
-
-            <!-- Bank Details Section -->
-            <h5 class="mt-4 mb-3 text-primary">Our Sacco Bank Details</h5>
-            <div class="row">
-                <div class="col-md-6 form-group mb-3">
-                    <label>Bank Name</label>
-                    <input type="text" class="form-control" value="{{ $bankDetails['bank_name'] }}" readonly>
-                </div>
-                <div class="col-md-6 form-group mb-3">
-                    <label>Branch Name</label>
-                    <input type="text" class="form-control" value="{{ $bankDetails['branch_name'] }}" readonly>
-                </div>
-                <div class="col-md-6 form-group mb-3">
-                    <label>Account Name</label>
-                    <input type="text" class="form-control" value="{{ $bankDetails['account_name'] }}" readonly>
-                </div>
-                <div class="col-md-6 form-group mb-3">
-                    <label>Account Number</label>
-                    <input type="text" class="form-control" value="{{ $bankDetails['account_number'] }}" readonly>
-                </div>
-            </div>
 
             <!-- Terms Section -->
             <div class="col-md-12 form-group mt-4">
