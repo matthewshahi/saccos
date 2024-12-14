@@ -86,7 +86,7 @@
                     <input type="email" class="form-control" id="email" name="email" value="{{ old('email') }}" required>
                 </div>
                 <div class="col-md-6 form-group mb-3">
-                    <label for="phone">Phone Number <span class="text-danger">*</span></label>
+                    <label for="phone">National ID/Phone Number <span class="text-danger">*</span></label>
                     <input type="text" class="form-control" id="phone" name="phone" value="{{ old('phone') }}" required>
                 </div>
                 <div class="col-md-6 form-group mb-3">
