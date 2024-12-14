@@ -113,8 +113,13 @@ return redirect()->route('register.form')->with('success', 'Registration success
         abort(404, 'Invalid or expired link.');
     }
 
-    return view('public.complete-registration', ['member' => $member]);
+    // Check if all required files are already uploaded
+    $isUpdated = $member->passport_photo && $member->signature && $member->id_copy_front &&
+                 $member->id_copy_back && $member->payslips_bank_statements;
+
+    return view('public.complete-registration', ['member' => $member, 'isUpdated' => $isUpdated]);
 }
+
 public function completeSubmit(Request $request)
 {
     $request->validate([
