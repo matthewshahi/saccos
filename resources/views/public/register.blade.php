@@ -96,37 +96,40 @@
             </div>
 
             <!-- Next of Kin Section -->
-            
-<h5 class="mt-4 mb-3 text-primary">Next of Kin Details</h5>
-<p class="text-muted">You may add up to 3 next of kin.</p>
-@for ($i = 0; $i < 3; $i++)
-    <div class="row border rounded p-3 mb-3">
-        <div class="col-md-3 form-group mb-3">
-            <label for="next_of_kin[{{ $i }}][name]">Name</label>
-            <input type="text" class="form-control" name="next_of_kin[{{ $i }}][name]" value="{{ old('next_of_kin.'.$i.'.name') }}">
-        </div>
-        <div class="col-md-3 form-group mb-3">
-            <label for="next_of_kin[{{ $i }}][relationship]">Relationship</label>
-            <select class="form-control" name="next_of_kin[{{ $i }}][relationship]">
-                <option value="">Select Relationship</option>
-                @foreach ($kinTypes as $kinType)
-                    <option value="{{ $kinType->kin_type_name }}" 
-                        {{ old('next_of_kin.'.$i.'.relationship') == $kinType->kin_type_name ? 'selected' : '' }}>
-                        {{ $kinType->kin_type_name }}
-                    </option>
-                @endforeach
-            </select>
-        </div>
-        <div class="col-md-3 form-group mb-3">
-            <label for="next_of_kin[{{ $i }}][phone]">Phone</label>
-            <input type="text" class="form-control" name="next_of_kin[{{ $i }}][phone]" value="{{ old('next_of_kin.'.$i.'.phone') }}">
-        </div>
-        <div class="col-md-3 form-group mb-3">
-            <label for="next_of_kin[{{ $i }}][share_percent]">Share (%)</label>
-            <input type="number" class="form-control" name="next_of_kin[{{ $i }}][share_percent]" value="{{ old('next_of_kin.'.$i.'.share_percent') }}" min="0" max="100">
-        </div>
-    </div>
-@endfor
+            <h5 class="mt-4 mb-3 text-primary">Next of Kin Details</h5>
+            <p class="text-muted">You may add up to 3 next of kin.</p>
+            @for ($i = 0; $i < 3; $i++)
+                <div class="row border rounded p-3 mb-3">
+                    <div class="col-md-3 form-group mb-3">
+                        <label for="next_of_kin[{{ $i }}][name]">Name</label>
+                        <input type="text" class="form-control" name="next_of_kin[{{ $i }}][name]" value="{{ old('next_of_kin.'.$i.'.name') }}">
+                    </div>
+                    <div class="col-md-3 form-group mb-3">
+                        <label for="next_of_kin[{{ $i }}][relationship]">Relationship</label>
+                        <select class="form-control" name="next_of_kin[{{ $i }}][relationship]">
+                            <option value="">Select Relationship</option>
+                            @foreach ($kinTypes as $kinType)
+                                <option value="{{ $kinType->kin_type_name }}" 
+                                    {{ old('next_of_kin.'.$i.'.relationship') == $kinType->kin_type_name ? 'selected' : '' }}>
+                                    {{ $kinType->kin_type_name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-md-3 form-group mb-3">
+                        <label for="next_of_kin[{{ $i }}][phone]">Phone</label>
+                        <input type="text" class="form-control" name="next_of_kin[{{ $i }}][phone]" value="{{ old('next_of_kin.'.$i.'.phone') }}">
+                    </div>
+                    <div class="col-md-3 form-group mb-3">
+                        <label for="next_of_kin[{{ $i }}][id_or_cert_no]">ID No / Birth Cert No</label>
+                        <input type="text" class="form-control" name="next_of_kin[{{ $i }}][id_or_cert_no]" value="{{ old('next_of_kin.'.$i.'.id_or_cert_no') }}">
+                    </div>
+                    <div class="col-md-3 form-group mb-3">
+                        <label for="next_of_kin[{{ $i }}][share_percent]">Share (%)</label>
+                        <input type="number" class="form-control" name="next_of_kin[{{ $i }}][share_percent]" value="{{ old('next_of_kin.'.$i.'.share_percent') }}" min="0" max="100">
+                    </div>
+                </div>
+            @endfor
 
             <!-- Bank Details Section -->
             <h5 class="mt-4 mb-3 text-primary">Our Sacco Bank Details</h5>
