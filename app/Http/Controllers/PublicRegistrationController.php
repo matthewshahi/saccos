@@ -115,4 +115,18 @@ return redirect()->route('register.form')->with('success', 'Registration success
 
     return view('public.complete-registration', ['member' => $member]);
 }
+public function completeSubmit(Request $request)
+{
+    $request->validate([
+        'member_id' => 'required|exists:sacco_members_new_applications,id',
+        'passport_photo' => 'required|mimes:jpeg,jpg,pdf|max:300',
+        'signature' => 'required|mimes:jpeg,jpg,pdf|max:300',
+        'id_copy_front' => 'required|mimes:jpeg,jpg,pdf|max:300',
+        'id_copy_back' => 'required|mimes:jpeg,jpg,pdf|max:300',
+        'payslips_bank_statements' => 'required|mimes:jpeg,jpg,pdf|max:300',
+    ]);
+
+    // Handle file uploads and save as earlier
+    // ...
+}
 }
