@@ -115,58 +115,38 @@
                                 <!-- Personal Information -->
                                 <h4 class="text-primary mb-3">Personal Information</h4>
                                 <div class="row mb-3">
-                                    <div class="col-md-6">
-                                        <strong>Name:</strong> ${data.first_name} ${data.last_name || ''}
-                                    </div>
-                                    <div class="col-md-6">
-                                        <strong>National ID:</strong> ${data.national_id || 'N/A'}
-                                    </div>
-                                    <div class="col-md-6 mt-2">
-                                        <strong>Email:</strong> ${data.email || 'N/A'}
-                                    </div>
-                                    <div class="col-md-6 mt-2">
-                                        <strong>Phone:</strong> ${data.phone || 'N/A'}
-                                    </div>
-                                    <div class="col-md-6 mt-2">
-                                        <strong>Gender:</strong> ${data.gender || 'N/A'}
-                                    </div>
-                                    <div class="col-md-6 mt-2">
-                                        <strong>Marital Status:</strong> ${data.marital_status || 'N/A'}
-                                    </div>
-                                    <div class="col-md-6 mt-2">
-                                        <strong>Location:</strong> ${data.physical_location || 'N/A'}
-                                    </div>
-                                    <div class="col-md-6 mt-2">
-                                        <strong>Occupation:</strong> ${data.occupation || 'N/A'}
-                                    </div>
+                                    <div class="col-md-6"><strong>First Name:</strong> ${data.first_name || 'N/A'}</div>
+                                    <div class="col-md-6"><strong>Last Name:</strong> ${data.last_name || 'N/A'}</div>
+                                    <div class="col-md-6 mt-2"><strong>Date of Birth:</strong> ${data.birth_date || 'N/A'}</div>
+                                    <div class="col-md-6 mt-2"><strong>National ID:</strong> ${data.national_id || 'N/A'}</div>
+                                    <div class="col-md-6 mt-2"><strong>Marital Status:</strong> ${data.marital_status || 'N/A'}</div>
+                                    <div class="col-md-6 mt-2"><strong>Gender:</strong> ${data.gender || 'N/A'}</div>
+                                    <div class="col-md-6 mt-2"><strong>Occupation:</strong> ${data.occupation || 'N/A'}</div>
                                 </div>
 
                                 <!-- Financial Information -->
                                 <h4 class="text-primary mb-3">Financial Information</h4>
                                 <div class="row mb-3">
-                                    <div class="col-md-6">
-                                        <strong>Monthly Income:</strong> Ksh. ${data.monthly_income || 'N/A'}
-                                    </div>
-                                    <div class="col-md-6">
-                                        <strong>Preferred Monthly Contribution:</strong> Ksh. ${data.preferred_monthly_contribution || 'N/A'}
-                                    </div>
-                                    <div class="col-md-6 mt-2">
-                                        <strong>Reason for Joining:</strong> ${data.reason_for_joining || 'N/A'}
-                                    </div>
+                                    <div class="col-md-6"><strong>Monthly Income:</strong> Ksh. ${data.monthly_income || 'N/A'}</div>
+                                    <div class="col-md-6"><strong>Preferred Monthly Contribution:</strong> Ksh. ${data.preferred_monthly_contribution || 'N/A'}</div>
+                                    <div class="col-md-6 mt-2"><strong>Number of Dependents:</strong> ${data.dependents || 'N/A'}</div>
+                                    <div class="col-md-6 mt-2"><strong>Reason for Joining:</strong> ${data.reason_for_joining || 'N/A'}</div>
+                                </div>
+
+                                <!-- Contact Details -->
+                                <h4 class="text-primary mb-3">Contact Details</h4>
+                                <div class="row mb-3">
+                                    <div class="col-md-6"><strong>Email:</strong> ${data.email || 'N/A'}</div>
+                                    <div class="col-md-6"><strong>Phone:</strong> ${data.phone || 'N/A'}</div>
+                                    <div class="col-md-6 mt-2"><strong>Location:</strong> ${data.physical_location || 'N/A'}</div>
                                 </div>
 
                                 <!-- Bank Details -->
                                 <h4 class="text-primary mb-3">Bank Details</h4>
                                 <div class="row mb-3">
-                                    <div class="col-md-6">
-                                        <strong>Bank Name:</strong> ${data.bank_name || 'N/A'}
-                                    </div>
-                                    <div class="col-md-6">
-                                        <strong>Branch:</strong> ${data.bank_branch || 'N/A'}
-                                    </div>
-                                    <div class="col-md-6 mt-2">
-                                        <strong>Account Number:</strong> ${data.bank_account_number || 'N/A'}
-                                    </div>
+                                    <div class="col-md-6"><strong>Bank Name:</strong> ${data.bank_name || 'N/A'}</div>
+                                    <div class="col-md-6"><strong>Branch:</strong> ${data.bank_branch || 'N/A'}</div>
+                                    <div class="col-md-6 mt-2"><strong>Account Number:</strong> ${data.bank_account_number || 'N/A'}</div>
                                 </div>
 
                                 <!-- Uploaded Files -->
