@@ -112,31 +112,50 @@
                         const modalContent = document.getElementById('modal-content');
                         modalContent.innerHTML = `
                             <div class="container">
+                                <!-- Personal Information -->
                                 <h4 class="text-primary mb-3">Personal Information</h4>
                                 <div class="row mb-3">
                                     <div class="col-md-6">
                                         <strong>Name:</strong> ${data.first_name} ${data.last_name || ''}
                                     </div>
                                     <div class="col-md-6">
+                                        <strong>National ID:</strong> ${data.national_id || 'N/A'}
+                                    </div>
+                                    <div class="col-md-6 mt-2">
                                         <strong>Email:</strong> ${data.email || 'N/A'}
                                     </div>
                                     <div class="col-md-6 mt-2">
                                         <strong>Phone:</strong> ${data.phone || 'N/A'}
                                     </div>
                                     <div class="col-md-6 mt-2">
-                                        <strong>National ID:</strong> ${data.national_id || 'N/A'}
-                                    </div>
-                                    <div class="col-md-6 mt-2">
-                                        <strong>Location:</strong> ${data.physical_location || 'N/A'}
+                                        <strong>Gender:</strong> ${data.gender || 'N/A'}
                                     </div>
                                     <div class="col-md-6 mt-2">
                                         <strong>Marital Status:</strong> ${data.marital_status || 'N/A'}
                                     </div>
                                     <div class="col-md-6 mt-2">
-                                        <strong>Gender:</strong> ${data.gender || 'N/A'}
+                                        <strong>Location:</strong> ${data.physical_location || 'N/A'}
+                                    </div>
+                                    <div class="col-md-6 mt-2">
+                                        <strong>Occupation:</strong> ${data.occupation || 'N/A'}
                                     </div>
                                 </div>
 
+                                <!-- Financial Information -->
+                                <h4 class="text-primary mb-3">Financial Information</h4>
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <strong>Monthly Income:</strong> Ksh. ${data.monthly_income || 'N/A'}
+                                    </div>
+                                    <div class="col-md-6">
+                                        <strong>Preferred Monthly Contribution:</strong> Ksh. ${data.preferred_monthly_contribution || 'N/A'}
+                                    </div>
+                                    <div class="col-md-6 mt-2">
+                                        <strong>Reason for Joining:</strong> ${data.reason_for_joining || 'N/A'}
+                                    </div>
+                                </div>
+
+                                <!-- Bank Details -->
                                 <h4 class="text-primary mb-3">Bank Details</h4>
                                 <div class="row mb-3">
                                     <div class="col-md-6">
@@ -150,6 +169,7 @@
                                     </div>
                                 </div>
 
+                                <!-- Uploaded Files -->
                                 <h4 class="text-primary mb-3">Uploaded Files</h4>
                                 <div class="row mb-3">
                                     <ul class="list-group">
@@ -161,6 +181,7 @@
                                     </ul>
                                 </div>
 
+                                <!-- Next of Kin -->
                                 <h4 class="text-primary mb-3">Next of Kin</h4>
                                 <div class="table-responsive">
                                     <table class="table table-bordered">
