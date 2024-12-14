@@ -109,7 +109,7 @@
                         <input type="text" class="form-control" name="next_of_kin[{{ $i }}][relationship]" value="{{ old('next_of_kin.'.$i.'.relationship') }}">
                     </div>
                     <div class="col-md-3 form-group mb-3">
-                        <label for="next_of_kin[{{ $i }}][phone]">Phone Number</label>
+                        <label for="next_of_kin[{{ $i }}][phone]">ID Number/Phone Number</label>
                         <input type="text" class="form-control" name="next_of_kin[{{ $i }}][phone]" value="{{ old('next_of_kin.'.$i.'.phone') }}">
                     </div>
                     <div class="col-md-3 form-group mb-3">
