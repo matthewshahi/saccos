@@ -152,30 +152,39 @@
 
                                 <h4 class="text-primary mb-3">Uploaded Files</h4>
                                 <div class="row mb-3">
-                                    <div class="col-md-12">
-                                        <ul class="list-group">
-                                            <li class="list-group-item">${data.passport_photo ? `<a href="{{ url('${data.passport_photo}') }}" target="_blank">Passport Photo</a>` : 'Passport Photo: Not Uploaded'}</li>
-                                            <li class="list-group-item">${data.signature ? `<a href="{{ url('${data.signature}') }}" target="_blank">Signature</a>` : 'Signature: Not Uploaded'}</li>
-                                            <li class="list-group-item">${data.id_copy_front ? `<a href="{{ url('${data.id_copy_front}') }}" target="_blank">ID Copy (Front)</a>` : 'ID Copy (Front): Not Uploaded'}</li>
-                                            <li class="list-group-item">${data.id_copy_back ? `<a href="{{ url('${data.id_copy_back}') }}" target="_blank">ID Copy (Back)</a>` : 'ID Copy (Back): Not Uploaded'}</li>
-                                            <li class="list-group-item">${data.payslips_bank_statements ? `<a href="{{ url('${data.payslips_bank_statements}') }}" target="_blank">Payslips/Bank Statements</a>` : 'Payslips/Bank Statements: Not Uploaded'}</li>
-                                        </ul>
-                                    </div>
+                                    <ul class="list-group">
+                                        <li class="list-group-item">${data.passport_photo ? `<a href="{{ url('${data.passport_photo}') }}" target="_blank">Passport Photo</a>` : 'Passport Photo: Not Uploaded'}</li>
+                                        <li class="list-group-item">${data.signature ? `<a href="{{ url('${data.signature}') }}" target="_blank">Signature</a>` : 'Signature: Not Uploaded'}</li>
+                                        <li class="list-group-item">${data.id_copy_front ? `<a href="{{ url('${data.id_copy_front}') }}" target="_blank">ID Copy (Front)</a>` : 'ID Copy (Front): Not Uploaded'}</li>
+                                        <li class="list-group-item">${data.id_copy_back ? `<a href="{{ url('${data.id_copy_back}') }}" target="_blank">ID Copy (Back)</a>` : 'ID Copy (Back): Not Uploaded'}</li>
+                                        <li class="list-group-item">${data.payslips_bank_statements ? `<a href="{{ url('${data.payslips_bank_statements}') }}" target="_blank">Payslips/Bank Statements</a>` : 'Payslips/Bank Statements: Not Uploaded'}</li>
+                                    </ul>
                                 </div>
 
                                 <h4 class="text-primary mb-3">Next of Kin</h4>
-                                <div class="row">
-                                    <ul>
-                                        ${JSON.parse(data.next_of_kin_name).map((name, index) => `
-                                            <li>
-                                                <strong>Name:</strong> ${name || 'N/A'}, 
-                                                <strong>Relationship:</strong> ${JSON.parse(data.next_of_kin_relationship)[index] || 'N/A'}, 
-                                                <strong>Phone:</strong> ${JSON.parse(data.next_of_kin_phone)[index] || 'N/A'}, 
-                                                <strong>ID/Cert No:</strong> ${JSON.parse(data.next_of_kin_id_or_cert_no)[index] || 'N/A'}, 
-                                                <strong>Share:</strong> ${JSON.parse(data.kin_share_percent)[index] || 'N/A'}%
-                                            </li>
-                                        `).join('')}
-                                    </ul>
+                                <div class="table-responsive">
+                                    <table class="table table-bordered">
+                                        <thead class="table-primary">
+                                            <tr>
+                                                <th>Name</th>
+                                                <th>Relationship</th>
+                                                <th>Phone</th>
+                                                <th>ID/Cert No</th>
+                                                <th>Share (%)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${JSON.parse(data.next_of_kin_name).map((name, index) => `
+                                                <tr>
+                                                    <td>${name || 'N/A'}</td>
+                                                    <td>${JSON.parse(data.next_of_kin_relationship)[index] || 'N/A'}</td>
+                                                    <td>${JSON.parse(data.next_of_kin_phone)[index] || 'N/A'}</td>
+                                                    <td>${JSON.parse(data.next_of_kin_id_or_cert_no)[index] || 'N/A'}</td>
+                                                    <td>${JSON.parse(data.kin_share_percent)[index] || 'N/A'}</td>
+                                                </tr>
+                                            `).join('')}
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
                         `;
