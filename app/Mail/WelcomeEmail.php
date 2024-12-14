@@ -38,6 +38,10 @@ class WelcomeEmail extends Mailable
 
         // Generate the unique registration link using the url() helper
         $uniqueLink = url('/register/' . $this->member->email_key_unique);
+        
+        Log::info('Generated route', [
+            'uniqueLink' => route('register.unique', ['code' => 'sample-code']),
+        ]);
 
         // Log the generated link for debugging
         Log::info('Generated unique link for WelcomeEmail', [
@@ -47,7 +51,7 @@ class WelcomeEmail extends Mailable
 
         // Build and return the email
         return $this->subject('Welcome to Our SACCO')
-            ->view('emails.welcome')
+            ->view('mails.welcome')
             ->with([
                 'name' => $this->member->first_name,
                 'uniqueLink' => $uniqueLink,
