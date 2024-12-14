@@ -61,8 +61,8 @@ class HomeController extends Controller
 
         }
        
-
-        return view('home'); 
+        return redirect('/register');
+        //return view('home'); 
     }
 
     public function member_statement_self()
