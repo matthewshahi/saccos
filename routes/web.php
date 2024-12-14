@@ -39,6 +39,7 @@ Route::get('/loans/calculator', [HomeController::class, 'loansCalculator'])->nam
  
 Route::get('/register', [PublicRegistrationController::class, 'showForm'])->name('register.form');
 Route::post('/register', [PublicRegistrationController::class, 'submit'])->name('register.submit');
+Route::get('/register/{code}', [PublicRegistrationController::class, 'completeRegistrationForm'])->name('register.unique');
 
 
 Route::get('/loans/types/list', [PublicLoansController::class, 'loansTypesList'])->name('loans.types.list');

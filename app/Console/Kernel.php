@@ -15,6 +15,7 @@ class Kernel extends ConsoleKernel
      protected function schedule(Schedule $schedule): void
     {
         $schedule->job(new \App\Jobs\ProcessTransactionsJob())->everyTwoMinutes();
+        $schedule->job(new \App\Jobs\SendWelcomeEmailJob)->everyTwoMinutes();
     }
  
 

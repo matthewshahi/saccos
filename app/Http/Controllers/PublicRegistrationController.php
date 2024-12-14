@@ -98,6 +98,21 @@ class PublicRegistrationController extends Controller
         ]);
 
         // Redirect with a success message
-        return redirect()->route('register.form')->with('success', 'Registration successful! We will get in touch with you soon.');
+        // Redirect with a success message
+return redirect()->route('register.form')->with('success', 'Registration successful! Please check your email and follow the link we’ve sent to upload additional required documents, including your passport photo, signature, copies of your ID (front and back), and payslips or bank statements. We will get in touch with you soon.');
+        // return redirect()->route('register.form')->with('success', 'Registration successful! We will get in touch with you soon.');
     }
+
+    public function completeRegistrationForm($code)
+{
+    $member = DB::table('sacco_members_new_applications')
+        ->where('email_key_unique', $code)
+        ->first();
+
+    if (!$member) {
+        abort(404, 'Invalid or expired link.');
+    }
+
+    return view('public.complete-registration', ['member' => $member]);
+}
 }
