@@ -27,7 +27,7 @@ class HomeController extends Controller
     public function __construct()
     {
         // dd(Route::currentRouteName());
-        $this->middleware('auth');
+        // $this->middleware('auth');
         $this->recordLimit = 3000;
         $this->minAge = 18; // Minimum age to join
         $this->minimumLoanThreshold = 1; // Minimum loan threshold
