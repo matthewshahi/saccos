@@ -46,6 +46,7 @@ class HomeController extends Controller
 
     public function redirectBasedOnAuth()
 {
+    dd("rrrr");
     if (auth()->check()) {
         $user = auth()->user();
 
