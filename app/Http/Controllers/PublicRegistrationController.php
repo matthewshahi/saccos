@@ -122,6 +122,7 @@ return redirect()->route('register.form')->with('success', 'Registration success
 
 public function completeSubmit(Request $request)
 {
+    // Validate the input
     $request->validate([
         'member_id' => 'required|exists:sacco_members_new_applications,id',
         'passport_photo' => 'required|mimes:jpeg,jpg,pdf|max:300',
@@ -129,8 +130,12 @@ public function completeSubmit(Request $request)
         'id_copy_front' => 'required|mimes:jpeg,jpg,pdf|max:300',
         'id_copy_back' => 'required|mimes:jpeg,jpg,pdf|max:300',
         'payslips_bank_statements' => 'required|mimes:jpeg,jpg,pdf|max:300',
+        'bank_name' => 'required|string|max:255',
+        'bank_branch' => 'required|string|max:255',
+        'bank_account_number' => 'required|string|max:50',
     ]);
 
+    // Handle file uploads
     $uploadedFiles = [];
     if ($request->hasFile('passport_photo')) {
         $uploadedFiles['passport_photo'] = $request->file('passport_photo')->store('passport_photos', 'member_files');
@@ -148,15 +153,19 @@ public function completeSubmit(Request $request)
         $uploadedFiles['payslips_bank_statements'] = $request->file('payslips_bank_statements')->store('bank_statements', 'member_files');
     }
 
+    // Update the member's record in the database
     DB::table('sacco_members_new_applications')->where('id', $request->input('member_id'))->update([
         'passport_photo' => $uploadedFiles['passport_photo'] ?? null,
         'signature' => $uploadedFiles['signature'] ?? null,
         'id_copy_front' => $uploadedFiles['id_copy_front'] ?? null,
         'id_copy_back' => $uploadedFiles['id_copy_back'] ?? null,
         'payslips_bank_statements' => $uploadedFiles['payslips_bank_statements'] ?? null,
+        'bank_name' => $request->input('bank_name'),
+        'bank_branch' => $request->input('bank_branch'),
+        'bank_account_number' => $request->input('bank_account_number'),
         'updated_at' => now(),
     ]);
 
-    return redirect()->route('register.form')->with('success', 'Your additional documents have been uploaded successfully!');
+    return redirect()->route('register.form')->with('success', 'Your documents and bank details have been uploaded successfully!');
 }
 }
