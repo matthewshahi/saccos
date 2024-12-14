@@ -43,6 +43,11 @@ return [
             'visibility' => 'public',
             'throw' => false,
         ],
+        'member_files' => [
+    'driver' => 'local',
+    'root' => storage_path('app/member_files'),
+    'visibility' => 'private',
+],
 
         's3' => [
             'driver' => 's3',

@@ -126,7 +126,32 @@ public function completeSubmit(Request $request)
         'payslips_bank_statements' => 'required|mimes:jpeg,jpg,pdf|max:300',
     ]);
 
-    // Handle file uploads and save as earlier
-    // ...
+    $uploadedFiles = [];
+    if ($request->hasFile('passport_photo')) {
+        $uploadedFiles['passport_photo'] = $request->file('passport_photo')->store('passport_photos', 'member_files');
+    }
+    if ($request->hasFile('signature')) {
+        $uploadedFiles['signature'] = $request->file('signature')->store('signatures', 'member_files');
+    }
+    if ($request->hasFile('id_copy_front')) {
+        $uploadedFiles['id_copy_front'] = $request->file('id_copy_front')->store('id_copies', 'member_files');
+    }
+    if ($request->hasFile('id_copy_back')) {
+        $uploadedFiles['id_copy_back'] = $request->file('id_copy_back')->store('id_copies', 'member_files');
+    }
+    if ($request->hasFile('payslips_bank_statements')) {
+        $uploadedFiles['payslips_bank_statements'] = $request->file('payslips_bank_statements')->store('bank_statements', 'member_files');
+    }
+
+    DB::table('sacco_members_new_applications')->where('id', $request->input('member_id'))->update([
+        'passport_photo' => $uploadedFiles['passport_photo'] ?? null,
+        'signature' => $uploadedFiles['signature'] ?? null,
+        'id_copy_front' => $uploadedFiles['id_copy_front'] ?? null,
+        'id_copy_back' => $uploadedFiles['id_copy_back'] ?? null,
+        'payslips_bank_statements' => $uploadedFiles['payslips_bank_statements'] ?? null,
+        'updated_at' => now(),
+    ]);
+
+    return redirect()->route('register.form')->with('success', 'Your additional documents have been uploaded successfully!');
 }
 }
