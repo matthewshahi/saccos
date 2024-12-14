@@ -75,7 +75,6 @@
 </div>
 
 <!-- Modal -->
-<!-- Modal -->
 <div class="modal fade" id="memberDetailsModal" tabindex="-1" aria-labelledby="memberDetailsModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content shadow-lg border-0">
@@ -136,9 +135,6 @@
                                     <div class="col-md-6 mt-2">
                                         <strong>Gender:</strong> ${data.gender || 'N/A'}
                                     </div>
-                                    <div class="col-md-6 mt-2">
-                                        <strong>Dependents:</strong> ${data.dependents || 'N/A'}
-                                    </div>
                                 </div>
 
                                 <h4 class="text-primary mb-3">Bank Details</h4>
@@ -175,6 +171,7 @@
                                                 <strong>Name:</strong> ${name || 'N/A'}, 
                                                 <strong>Relationship:</strong> ${JSON.parse(data.next_of_kin_relationship)[index] || 'N/A'}, 
                                                 <strong>Phone:</strong> ${JSON.parse(data.next_of_kin_phone)[index] || 'N/A'}, 
+                                                <strong>ID/Cert No:</strong> ${JSON.parse(data.next_of_kin_id_or_cert_no)[index] || 'N/A'}, 
                                                 <strong>Share:</strong> ${JSON.parse(data.kin_share_percent)[index] || 'N/A'}%
                                             </li>
                                         `).join('')}
