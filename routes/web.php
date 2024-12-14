@@ -17,6 +17,16 @@ use App\Http\Controllers\MemberImportController;
 use App\Http\Controllers\MpesaConfigController;
 use App\Http\Controllers\MpesaTheController;
 use App\Http\Controllers\MpesaReportController;
+use Illuminate\Support\Facades\Mail;
+
+Route::get('/test-email', function () {
+    Mail::raw('This is a test email from Laravel!', function ($message) {
+        $message->to('recipient_email@example.com')
+                ->subject('Test Email');
+    });
+
+    return 'Test email sent!';
+});
 
 
 Route::get('/', [HomeController::class, 'redirectBasedOnAuth'])->name('home');

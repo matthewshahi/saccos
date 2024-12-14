@@ -35,7 +35,7 @@ class ProcessTransactionsJob implements ShouldQueue
         $c2bTransactions = DB::table('c2b_payments')
             ->where('processed', 'No')
             ->orderBy('created_at', 'asc')
-            ->limit(100)
+            ->limit(60)
             ->get();
         Log::info('Fetched C2B Transactions', ['transactions' => $c2bTransactions->toArray()]);
 
