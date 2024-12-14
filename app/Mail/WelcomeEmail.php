@@ -29,8 +29,16 @@ class WelcomeEmail extends Mailable
      */
     public function build()
     {
+        // Ensure email_key_unique exists before generating the route
+        if (empty($this->member->email_key_unique)) {
+            logger()->error('Missing email_key_unique for member ID: ' . $this->member->id);
+            throw new \Exception('Missing email_key_unique for the WelcomeEmail.');
+        }
+
+        // Generate the unique registration link
         $uniqueLink = route('register.unique', ['code' => $this->member->email_key_unique]);
 
+        // Build and return the email
         return $this->subject('Welcome to Our SACCO')
             ->view('emails.welcome')
             ->with([
