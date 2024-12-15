@@ -111,14 +111,14 @@
                 .then(data => {
                     const modalContent = document.getElementById('modal-content');
 
-                    // Logo Logic
+                    // Dynamic Logo Path
                     const currentDomain = "{{ parse_url(url('/'), PHP_URL_HOST) }}";
                     const defaultLogo = "{{ asset('/image/logo.jpg') }}";
                     const domainLogo = "{{ asset('/image/') }}" + '/' + (currentDomain === 'localhost' || currentDomain === '127.0.0.1' ? 'default' : currentDomain) + '.jpg';
 
                     modalContent.innerHTML = `
                         <div class="container text-center mb-4">
-                            <img src="${domainLogo}" alt="Logo" onerror="this.src='${defaultLogo}'" style="height: 80px; margin-bottom: 10px;">
+                            <img src="${domainLogo}" alt="Logo" onerror="this.src='${defaultLogo}'" style="height: 80px; margin-bottom: 20px;">
                         </div>
 
                         <!-- Personal Information -->
@@ -128,6 +128,9 @@
                             <div class="col-md-6"><strong>Last Name:</strong> ${data.last_name || 'N/A'}</div>
                             <div class="col-md-6 mt-2"><strong>Date of Birth:</strong> ${data.birth_date || 'N/A'}</div>
                             <div class="col-md-6 mt-2"><strong>National ID:</strong> ${data.national_id || 'N/A'}</div>
+                            <div class="col-md-6 mt-2"><strong>Gender:</strong> ${data.gender || 'N/A'}</div>
+                            <div class="col-md-6 mt-2"><strong>Marital Status:</strong> ${data.marital_status || 'N/A'}</div>
+                            <div class="col-md-6 mt-2"><strong>Occupation:</strong> ${data.occupation || 'N/A'}</div>
                         </div>
 
                         <!-- Financial Information -->
@@ -135,23 +138,50 @@
                         <div class="row mb-3">
                             <div class="col-md-6"><strong>Monthly Income:</strong> Ksh. ${data.monthly_income || 'N/A'}</div>
                             <div class="col-md-6"><strong>Preferred Monthly Contribution:</strong> Ksh. ${data.preferred_monthly_contribution || 'N/A'}</div>
+                            <div class="col-md-6 mt-2"><strong>Number of Dependents:</strong> ${data.dependents || 'N/A'}</div>
+                            <div class="col-md-12 mt-2"><strong>Reason for Joining:</strong> ${data.reason_for_joining || 'N/A'}</div>
                         </div>
 
+                        <!-- Contact Information -->
+                        <h4 class="text-primary mb-3">Contact Information</h4>
+                        <div class="row mb-3">
+                            <div class="col-md-6"><strong>Email:</strong> ${data.email || 'N/A'}</div>
+                            <div class="col-md-6"><strong>Phone:</strong> ${data.phone || 'N/A'}</div>
+                            <div class="col-md-6 mt-2"><strong>Location:</strong> ${data.physical_location || 'N/A'}</div>
+                        </div>
+
+                        <!-- Bank Details -->
+                        <h4 class="text-primary mb-3">Bank Details</h4>
+                        <div class="row mb-3">
+                            <div class="col-md-6"><strong>Bank Name:</strong> ${data.bank_name || 'N/A'}</div>
+                            <div class="col-md-6"><strong>Branch:</strong> ${data.bank_branch || 'N/A'}</div>
+                            <div class="col-md-6 mt-2"><strong>Account Number:</strong> ${data.bank_account_number || 'N/A'}</div>
+                        </div>
+
+                        <!-- Uploaded Files -->
+                        <h4 class="text-primary mb-3">Uploaded Files</h4>
+                        <ul class="list-group">
+                            <li class="list-group-item">${data.passport_photo ? `<a href="{{ url('${data.passport_photo}') }}" target="_blank">Passport Photo</a>` : 'Passport Photo: Not Uploaded'}</li>
+                            <li class="list-group-item">${data.signature ? `<a href="{{ url('${data.signature}') }}" target="_blank">Signature</a>` : 'Signature: Not Uploaded'}</li>
+                            <li class="list-group-item">${data.id_copy_front ? `<a href="{{ url('${data.id_copy_front}') }}" target="_blank">ID Copy (Front)</a>` : 'ID Copy (Front): Not Uploaded'}</li>
+                            <li class="list-group-item">${data.id_copy_back ? `<a href="{{ url('${data.id_copy_back}') }}" target="_blank">ID Copy (Back)</a>` : 'ID Copy (Back): Not Uploaded'}</li>
+                            <li class="list-group-item">${data.payslips_bank_statements ? `<a href="{{ url('${data.payslips_bank_statements}') }}" target="_blank">Payslips/Bank Statements</a>` : 'Payslips/Bank Statements: Not Uploaded'}</li>
+                        </ul>
+
                         <!-- Certification Section -->
-                        <div class="mt-5">
-                            <p class="mt-4 text-primary"><strong>I certify that the information given here above is correct to the best of my knowledge.</strong></p>
+                        <div class="mt-5 text-center">
+                            <p class="text-primary"><strong>I certify that the information given here above is correct to the best of my knowledge.</strong></p>
                             <p>Signature of applicant: ____________________________</p>
                             <p>Date: ______________________________________________</p>
                         </div>
                     `;
-
                     new bootstrap.Modal(document.getElementById('memberDetailsModal')).show();
                 })
                 .catch(error => console.error('Error fetching member details:', error));
         });
     });
 
-    // Print Functionality
+    // Print functionality
     document.getElementById('printDetails').addEventListener('click', function () {
         const modalContent = document.getElementById('modal-content').innerHTML;
 
@@ -163,14 +193,15 @@
                     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css">
                     <style>
                         body { font-family: Arial, sans-serif; margin: 20px; }
-                        img { display: block; margin: 0 auto 20px; height: 80px; }
-                        h4 { color: #007bff; text-align: left; }
-                        p, div, table { margin-bottom: 10px; }
-                        .signature-line { margin-top: 40px; }
+                        img { display: block; margin: 0 auto; height: 80px; margin-bottom: 20px; }
+                        h4 { color: #007bff; margin-bottom: 10px; }
+                        table, th, td { border: 1px solid black; border-collapse: collapse; padding: 8px; }
                     </style>
                 </head>
                 <body>
-                    ${modalContent}
+                    <div class="container">
+                        ${modalContent}
+                    </div>
                 </body>
             </html>
         `);
@@ -178,7 +209,7 @@
         printWindow.print();
     });
 
-    // Download Functionality
+    // Download functionality
     document.getElementById('downloadDetails').addEventListener('click', function () {
         const modalContent = document.getElementById('modal-content').innerHTML;
         const blob = new Blob([modalContent], { type: 'text/html' });
