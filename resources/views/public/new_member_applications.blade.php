@@ -99,119 +99,114 @@
 </div>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function () {
-        const viewDetailsButtons = document.querySelectorAll('.view-details');
+   document.addEventListener('DOMContentLoaded', function () {
+    const viewDetailsButtons = document.querySelectorAll('.view-details');
 
-        viewDetailsButtons.forEach(button => {
-            button.addEventListener('click', function () {
-                const memberId = this.dataset.id;
+    viewDetailsButtons.forEach(button => {
+        button.addEventListener('click', function () {
+            const memberId = this.dataset.id;
 
-                fetch(`{{ url('/new_members/details') }}/${memberId}`)
-                    .then(response => response.json())
-                    .then(data => {
-                        const modalContent = document.getElementById('modal-content');
-                        modalContent.innerHTML = `
-                            <div class="text-center mb-4">
-                                <img src="{{ asset($domainLogoPath) }}" alt="Logo" style="max-height: 100px;">
-                            </div>
-                            <h4 class="text-primary mb-3">Personal Information</h4>
-                            <div class="row mb-3">
-                                <div class="col-md-6"><strong>First Name:</strong> ${data.first_name || 'N/A'}</div>
-                                <div class="col-md-6"><strong>Last Name:</strong> ${data.last_name || 'N/A'}</div>
-                                <div class="col-md-6"><strong>Date of Birth:</strong> ${data.birth_date || 'N/A'}</div>
-                                <div class="col-md-6"><strong>National ID:</strong> ${data.national_id || 'N/A'}</div>
-                                <div class="col-md-6"><strong>Gender:</strong> ${data.gender || 'N/A'}</div>
-                                <div class="col-md-6"><strong>Marital Status:</strong> ${data.marital_status || 'N/A'}</div>
-                                <div class="col-md-6"><strong>Occupation:</strong> ${data.occupation || 'N/A'}</div>
-                            </div>
+            fetch(`{{ url('/new_members/details') }}/${memberId}`)
+                .then(response => response.json())
+                .then(data => {
+                    const modalContent = document.getElementById('modal-content');
 
-                            <h4 class="text-primary mb-3">Financial Information</h4>
-                            <div class="row mb-3">
-                                <div class="col-md-6"><strong>Monthly Income:</strong> Ksh. ${data.monthly_income || 'N/A'}</div>
-                                <div class="col-md-6"><strong>Preferred Monthly Contribution:</strong> Ksh. ${data.preferred_monthly_contribution || 'N/A'}</div>
-                                <div class="col-md-6"><strong>Number of Dependents:</strong> ${data.dependents || 'N/A'}</div>
-                                <div class="col-md-6"><strong>Reason for Joining:</strong> ${data.reason_for_joining || 'N/A'}</div>
-                            </div>
+                    // Dynamic Logo Path
+                    const currentDomain = "{{ parse_url(url('/'), PHP_URL_HOST) }}";
+                    const defaultLogo = "{{ asset('/image/logo.jpg') }}";
+                    const domainLogo = "{{ asset('/image/') }}" + '/' + 
+                        (currentDomain === 'localhost' || currentDomain === '127.0.0.1' ? 'default' : currentDomain) + '.jpg';
 
-                            <h4 class="text-primary mb-3">Contact Information</h4>
-                            <div class="row mb-3">
-                                <div class="col-md-6"><strong>Email:</strong> ${data.email || 'N/A'}</div>
-                                <div class="col-md-6"><strong>Phone:</strong> ${data.phone || 'N/A'}</div>
-                                <div class="col-md-6"><strong>Location:</strong> ${data.physical_location || 'N/A'}</div>
-                            </div>
-
-                            <h4 class="text-primary mb-3">Bank Details</h4>
-                            <div class="row mb-3">
-                                <div class="col-md-6"><strong>Bank Name:</strong> ${data.bank_name || 'N/A'}</div>
-                                <div class="col-md-6"><strong>Branch:</strong> ${data.bank_branch || 'N/A'}</div>
-                                <div class="col-md-6"><strong>Account Number:</strong> ${data.bank_account_number || 'N/A'}</div>
-                            </div>
-
-                            <h4 class="text-primary mb-3">Next of Kin</h4>
-                            <table class="table table-bordered">
-                                <thead class="table-primary">
-                                    <tr>
-                                        <th>Name</th>
-                                        <th>Relationship</th>
-                                        <th>Phone</th>
-                                        <th>ID/Cert No</th>
-                                        <th>Share (%)</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${JSON.parse(data.next_of_kin_name).map((name, index) => `
-                                        <tr>
-                                            <td>${name || 'N/A'}</td>
-                                            <td>${JSON.parse(data.next_of_kin_relationship)[index] || 'N/A'}</td>
-                                            <td>${JSON.parse(data.next_of_kin_phone)[index] || 'N/A'}</td>
-                                            <td>${JSON.parse(data.next_of_kin_id_or_cert_no)[index] || 'N/A'}</td>
-                                            <td>${JSON.parse(data.kin_share_percent)[index] || 'N/A'}</td>
-                                        </tr>
-                                    `).join('')}
-                                </tbody>
-                            </table>
-
-                            <div class="mt-5 text-center">
-                                <p><strong>I certify that the information given here above is correct to the best of my knowledge.</strong></p>
-                                <p>Signature of applicant: ____________________________</p>
-                                <p>Date: ______________________________________________</p>
-                            </div>
-                        `;
-                        new bootstrap.Modal(document.getElementById('memberDetailsModal')).show();
-                    })
-                    .catch(error => console.error('Error fetching member details:', error));
-            });
-        });
-
-        // Print Functionality
-        document.getElementById('printDetails').addEventListener('click', function () {
-            const modalContent = document.getElementById('modal-content').innerHTML;
-            const printWindow = window.open('', '_blank');
-            printWindow.document.write(`
-                <html>
-                    <head>
-                        <title>Member Details</title>
-                        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css">
-                        <style>
-                            body { font-family: Arial, sans-serif; margin: 40px; }
-                            h4 { color: #007bff; margin-top: 20px; }
-                            table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-                            table, th, td { border: 1px solid #000; padding: 8px; text-align: left; }
-                            .text-primary { color: #007bff; }
-                            .text-center { text-align: center; }
-                            img { max-height: 100px; margin-bottom: 20px; }
-                        </style>
-                    </head>
-                    <body>
-                        <div class="container text-center">
-                            ${modalContent}
+                    // Layout Content
+                    const layoutContent = `
+                        <div class="container text-center mb-4">
+                            <img src="${domainLogo}" alt="Logo" onerror="this.src='${defaultLogo}'" style="height: 80px; margin-bottom: 20px;">
                         </div>
-                    </body>
-                </html>
-            `);
-            printWindow.document.close();
-            printWindow.print();
+
+                        <!-- Personal Information -->
+                        <h4 class="text-primary mb-3">Personal Information</h4>
+                        <div class="row mb-3">
+                            <div class="col-md-6"><strong>First Name:</strong> ${data.first_name || 'N/A'}</div>
+                            <div class="col-md-6"><strong>Last Name:</strong> ${data.last_name || 'N/A'}</div>
+                            <div class="col-md-6 mt-2"><strong>Date of Birth:</strong> ${data.birth_date || 'N/A'}</div>
+                            <div class="col-md-6 mt-2"><strong>National ID:</strong> ${data.national_id || 'N/A'}</div>
+                            <div class="col-md-6 mt-2"><strong>Gender:</strong> ${data.gender || 'N/A'}</div>
+                            <div class="col-md-6 mt-2"><strong>Marital Status:</strong> ${data.marital_status || 'N/A'}</div>
+                            <div class="col-md-6 mt-2"><strong>Occupation:</strong> ${data.occupation || 'N/A'}</div>
+                        </div>
+
+                        <!-- Financial Information -->
+                        <h4 class="text-primary mb-3">Financial Information</h4>
+                        <div class="row mb-3">
+                            <div class="col-md-6"><strong>Monthly Income:</strong> Ksh. ${data.monthly_income || 'N/A'}</div>
+                            <div class="col-md-6"><strong>Preferred Monthly Contribution:</strong> Ksh. ${data.preferred_monthly_contribution || 'N/A'}</div>
+                            <div class="col-md-6 mt-2"><strong>Number of Dependents:</strong> ${data.dependents || 'N/A'}</div>
+                            <div class="col-md-12 mt-2"><strong>Reason for Joining:</strong> ${data.reason_for_joining || 'N/A'}</div>
+                        </div>
+
+                        <!-- Contact Information -->
+                        <h4 class="text-primary mb-3">Contact Information</h4>
+                        <div class="row mb-3">
+                            <div class="col-md-6"><strong>Email:</strong> ${data.email || 'N/A'}</div>
+                            <div class="col-md-6"><strong>Phone:</strong> ${data.phone || 'N/A'}</div>
+                            <div class="col-md-6 mt-2"><strong>Location:</strong> ${data.physical_location || 'N/A'}</div>
+                        </div>
+
+                        <!-- Certification Section -->
+                        <div class="mt-5 text-center">
+                            <p class="text-primary"><strong>I certify that the information given here above is correct to the best of my knowledge.</strong></p>
+                            <p>Signature of applicant: ____________________________</p>
+                            <p>Date: ______________________________________________</p>
+                        </div>
+                    `;
+
+                    // Inject the layout into modal
+                    modalContent.innerHTML = layoutContent;
+
+                    // Show Modal
+                    new bootstrap.Modal(document.getElementById('memberDetailsModal')).show();
+
+                    // Print Functionality (Ensure Same Format)
+                    document.getElementById('printDetails').onclick = function () {
+                        const printWindow = window.open('', '_blank');
+                        printWindow.document.write(`
+                            <html>
+                                <head>
+                                    <title>Member Details</title>
+                                    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css">
+                                    <style>
+                                        body { font-family: Arial, sans-serif; margin: 20px; }
+                                        img { display: block; margin: 0 auto; height: 80px; margin-bottom: 20px; }
+                                        h4 { color: #007bff; margin-bottom: 10px; }
+                                        .row { margin-bottom: 10px; }
+                                        .text-primary { color: #007bff; }
+                                    </style>
+                                </head>
+                                <body>
+                                    <div class="container">
+                                        ${layoutContent}
+                                    </div>
+                                </body>
+                            </html>
+                        `);
+                        printWindow.document.close();
+                        printWindow.print();
+                    };
+
+                    // Download Functionality
+                    document.getElementById('downloadDetails').onclick = function () {
+                        const blob = new Blob([layoutContent], { type: 'text/html' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = 'Member_Details.html';
+                        a.click();
+                        URL.revokeObjectURL(url);
+                    };
+                })
+                .catch(error => console.error('Error fetching member details:', error));
         });
     });
+});
 </script>
 @endsection
