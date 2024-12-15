@@ -59,6 +59,10 @@
                     <input type="text" class="form-control" id="national_id" name="national_id" value="{{ old('national_id') }}" required>
                 </div>
                 <div class="col-md-6 form-group mb-3">
+                    <label for="kra_pin_no">KRA PIN No. <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" id="kra_pin_no" name="kra_pin_no" value="{{ old('kra_pin_no') }}" required>
+                </div>
+                <div class="col-md-6 form-group mb-3">
                     <label for="marital_status">Marital Status</label>
                     <select class="form-control" id="marital_status" name="marital_status">
                         <option value="">Select</option>
