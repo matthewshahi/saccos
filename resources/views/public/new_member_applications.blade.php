@@ -99,7 +99,7 @@
 </div>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function () {
+   document.addEventListener('DOMContentLoaded', function () {
     const viewDetailsButtons = document.querySelectorAll('.view-details');
 
     viewDetailsButtons.forEach(button => {
@@ -114,9 +114,10 @@
                     // Dynamic Logo Path
                     const currentDomain = "{{ parse_url(url('/'), PHP_URL_HOST) }}";
                     const defaultLogo = "{{ asset('/image/logo.jpg') }}";
-                    const domainLogo = "{{ asset('/image/') }}" + '/' + (currentDomain === 'localhost' || currentDomain === '127.0.0.1' ? 'default' : currentDomain) + '.jpg';
+                    const domainLogo = "{{ asset('/image/') }}" + '/' + (currentDomain === 'localhost' ? 'default' : currentDomain) + '.jpg';
 
-                    modalContent.innerHTML = `
+                    // Reusable Layout Content
+                    const layoutContent = `
                         <div class="container text-center mb-4">
                             <img src="${domainLogo}" alt="Logo" onerror="this.src='${defaultLogo}'" style="height: 80px; margin-bottom: 20px;">
                         </div>
@@ -175,6 +176,9 @@
                             <p>Date: ______________________________________________</p>
                         </div>
                     `;
+
+                    // Set modal content and show modal
+                    modalContent.innerHTML = layoutContent;
                     new bootstrap.Modal(document.getElementById('memberDetailsModal')).show();
                 })
                 .catch(error => console.error('Error fetching member details:', error));
