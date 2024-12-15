@@ -173,22 +173,34 @@
                                     `).join('')}
                                 </tbody>
                             </table>
+                            <h4 class="text-primary mt-5">Certification</h4>
+                            <p>I certify that the information given above is correct to the best of my knowledge.</p>
+                            <p>Signature of Applicant: ____________________________</p>
+                            <p>Date: ___________________________________________</p>
                         `;
                         new bootstrap.Modal(document.getElementById('memberDetailsModal')).show();
-                    })
-                    .catch(error => console.error('Error fetching member details:', error));
+                    });
             });
         });
 
-        // Print and Download Functions...
+        // Print Function
         document.getElementById('printDetails').addEventListener('click', function () {
             const modalContent = document.getElementById('modal-content').innerHTML;
+
             const printWindow = window.open('', '_blank');
             printWindow.document.write(`
                 <html>
                     <head>
-                        <title>Member Details</title>
-                        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css">
+                        <title>Print Member Details</title>
+                        <style>
+                            body { font-family: Arial, sans-serif; margin: 20px; }
+                            .container { width: 100%; max-width: 800px; margin: auto; }
+                            img { display: block; margin: 0 auto; height: 80px; }
+                            h4 { color: #007bff; margin-top: 20px; }
+                            p { margin: 10px 0; }
+                            table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+                            table, th, td { border: 1px solid black; padding: 8px; }
+                        </style>
                     </head>
                     <body>
                         <div class="container">
@@ -199,17 +211,6 @@
             `);
             printWindow.document.close();
             printWindow.print();
-        });
-
-        document.getElementById('downloadDetails').addEventListener('click', function () {
-            const modalContent = document.getElementById('modal-content').innerHTML;
-            const blob = new Blob([modalContent], { type: 'text/html' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'Member_Details.html';
-            a.click();
-            URL.revokeObjectURL(url);
         });
     });
 </script>
