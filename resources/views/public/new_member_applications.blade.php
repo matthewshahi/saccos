@@ -131,6 +131,11 @@
                             </div>
                             <h4 class="text-primary mb-3">Reason for Joining</h4>
                             <div class="mb-3">${data.reason_for_joining || 'N/A'}</div>
+                            <h4 class="text-primary mb-3">Financial Information</h4>
+                            <div class="row mb-3">
+                                <div class="col-md-6"><strong>Monthly Income:</strong> Ksh. ${data.monthly_income || 'N/A'}</div>
+                                <div class="col-md-6"><strong>Preferred Monthly Contribution:</strong> Ksh. ${data.preferred_monthly_contribution || 'N/A'}</div>
+                            </div>
                             <h4 class="text-primary mb-3">Bank Details</h4>
                             <div class="row mb-3">
                                 <div class="col-md-6"><strong>Bank Name:</strong> ${data.bank_name || 'N/A'}</div>
