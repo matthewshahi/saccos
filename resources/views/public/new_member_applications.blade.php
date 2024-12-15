@@ -126,35 +126,11 @@
                                 <div class="col-md-6"><strong>National ID:</strong> ${data.national_id || 'N/A'}</div>
                                 <div class="col-md-6"><strong>Gender:</strong> ${data.gender || 'N/A'}</div>
                                 <div class="col-md-6"><strong>Marital Status:</strong> ${data.marital_status || 'N/A'}</div>
-                                <div class="col-md-6"><strong>Occupation:</strong> ${data.occupation || 'N/A'}</div>
-                                <div class="col-md-6"><strong>KRA PIN:</strong> ${data.kra_pin_no || 'N/A'}</div>
                                 <div class="col-md-6"><strong>Dependents:</strong> ${data.dependents || 'N/A'}</div>
+                                <div class="col-md-6"><strong>KRA PIN:</strong> ${data.kra_pin_no || 'N/A'}</div>
                             </div>
-                            <h4 class="text-primary mb-3">Next of Kin</h4>
-                            <div class="table-responsive">
-                                <table class="table table-bordered">
-                                    <thead>
-                                        <tr>
-                                            <th>Name</th>
-                                            <th>Relationship</th>
-                                            <th>Phone</th>
-                                            <th>ID/Cert No</th>
-                                            <th>Share (%)</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        ${JSON.parse(data.next_of_kin_name || '[]').map((name, index) => `
-                                            <tr>
-                                                <td>${name}</td>
-                                                <td>${JSON.parse(data.next_of_kin_relationship || '[]')[index]}</td>
-                                                <td>${JSON.parse(data.next_of_kin_phone || '[]')[index]}</td>
-                                                <td>${JSON.parse(data.next_of_kin_id_or_cert_no || '[]')[index]}</td>
-                                                <td>${JSON.parse(data.kin_share_percent || '[]')[index]}</td>
-                                            </tr>
-                                        `).join('')}
-                                    </tbody>
-                                </table>
-                            </div>
+                            <h4 class="text-primary mb-3">Reason for Joining</h4>
+                            <div class="mb-3">${data.reason_for_joining || 'N/A'}</div>
                             <h4 class="text-primary mb-3">Bank Details</h4>
                             <div class="row mb-3">
                                 <div class="col-md-6"><strong>Bank Name:</strong> ${data.bank_name || 'N/A'}</div>
@@ -169,6 +145,29 @@
                                 <li class="list-group-item">${data.id_copy_back ? `<a href="${data.id_copy_back}" target="_blank">ID Copy (Back)</a>` : 'ID Copy (Back): Not Uploaded'}</li>
                                 <li class="list-group-item">${data.payslips_bank_statements ? `<a href="${data.payslips_bank_statements}" target="_blank">Payslips/Bank Statements</a>` : 'Payslips/Bank Statements: Not Uploaded'}</li>
                             </ul>
+                            <h4 class="text-primary mb-3">Next of Kin</h4>
+                            <table class="table table-bordered">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Relationship</th>
+                                        <th>Phone</th>
+                                        <th>ID/Cert No</th>
+                                        <th>Share (%)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${JSON.parse(data.next_of_kin_name || '[]').map((name, index) => `
+                                        <tr>
+                                            <td>${name}</td>
+                                            <td>${JSON.parse(data.next_of_kin_relationship || '[]')[index]}</td>
+                                            <td>${JSON.parse(data.next_of_kin_phone || '[]')[index]}</td>
+                                            <td>${JSON.parse(data.next_of_kin_id_or_cert_no || '[]')[index]}</td>
+                                            <td>${JSON.parse(data.kin_share_percent || '[]')[index]}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
                         `;
                         new bootstrap.Modal(document.getElementById('memberDetailsModal')).show();
                     })
@@ -176,6 +175,7 @@
             });
         });
 
+        // Print and Download Functions...
         document.getElementById('printDetails').addEventListener('click', function () {
             const modalContent = document.getElementById('modal-content').innerHTML;
             const printWindow = window.open('', '_blank');
@@ -186,7 +186,9 @@
                         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css">
                     </head>
                     <body>
-                        <div class="container">${modalContent}</div>
+                        <div class="container">
+                            ${modalContent}
+                        </div>
                     </body>
                 </html>
             `);
