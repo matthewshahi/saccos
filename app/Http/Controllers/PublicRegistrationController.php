@@ -150,18 +150,30 @@ class PublicRegistrationController extends Controller
         }
     }
 
-    // Validate reCAPTCHA
+   
+    
+
+
+
     $response = Http::asForm()->post('https://www.google.com/recaptcha/api/siteverify', [
         'secret' => env('RECAPTCHA_SECRET_KEY'),
         'response' => $request->input('g-recaptcha-response'),
         'remoteip' => $request->ip(),
     ]);
-
+    
     $recaptchaData = $response->json();
-
-    if (!($recaptchaData['success'] ?? false) || ($recaptchaData['score'] ?? 0) < 0.5) {
+    
+    // Log the reCAPTCHA response for debugging
+    logger()->info('reCAPTCHA Verification Response:', $recaptchaData);
+    
+    if (!($recaptchaData['success'] ?? false)) {
         return redirect()->back()->withErrors(['captcha' => 'reCAPTCHA verification failed.'])->withInput();
     }
+    
+    if (($recaptchaData['score'] ?? 0) < 0.5) {
+        return redirect()->back()->withErrors(['captcha' => 'Suspicious activity detected. Please try again.'])->withInput();
+    }
+
 
     // Handle file uploads
     $uploadedFiles = [];
