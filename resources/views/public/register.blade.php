@@ -34,8 +34,9 @@
         <p class="text-muted">
         Please fill in the form below to apply for SACCO membership. Ensure all details are accurate. Once submitted, an email will be sent to you with a link to complete your registration. You will be required to upload additional documents, including your passport photo, signature, copies of your ID (front and back), and either payslips or bank statements.
         </p>
-        <form action="{{ route('register.submit') }}" method="POST" id="registration-form">
-            @csrf
+        <form action="{{ route('register.submit') }}" method="POST" enctype="multipart/form-data" id="registration-form">
+    @csrf
+        
             
             <!-- Personal Details Section -->
             <h5 class="mb-3 text-primary">Personal Details</h5>
@@ -161,14 +162,67 @@
                 </div>
             @endfor
 
-            <!-- SECTION 5: File Uploads -->
-            <h5 class="mb-3 text-primary border-bottom pb-2">5. File Uploads</h5>
-                @foreach (['passport_photo', 'signature', 'id_copy_front', 'id_copy_back', 'payslips_bank_statements'] as $file)
-                    <div class="form-group mb-3">
-                        <label>{{ ucwords(str_replace('_', ' ', $file)) }} *</label>
-                        <input type="file" class="form-control" name="{{ $file }}" required>
-                    </div>
-                @endforeach
+            <div class="col-md-12">
+            <div class="row">
+                            <!-- File Uploads Section -->
+                            <div class="col-md-12">
+                            <h5 class="mt-4 mb-3 text-primary">File Uploads</h5>
+                                 
+                            </div>
+
+                            <div class="col-md-6 form-group mb-3">
+                                <label for="passport_photo">Passport Photo <span class="text-danger">*</span></label>
+                                <input class="form-control" id="passport_photo" type="file" name="passport_photo" accept=".jpeg,.jpg,.pdf" required>
+                                <small class="text-muted">JPEG/JPG or PDF only, max size: 300KB</small>
+                            </div>
+
+                            <div class="col-md-6 form-group mb-3">
+                                <label for="signature">Signature <span class="text-danger">*</span></label>
+                                <input class="form-control" id="signature" type="file" name="signature" accept=".jpeg,.jpg,.pdf" required>
+                                <small class="text-muted">JPEG/JPG or PDF only, max size: 300KB</small>
+                            </div>
+
+                            <div class="col-md-6 form-group mb-3">
+                                <label for="id_copy_front">ID Copy (Front) <span class="text-danger">*</span></label>
+                                <input class="form-control" id="id_copy_front" type="file" name="id_copy_front" accept=".jpeg,.jpg,.pdf" required>
+                                <small class="text-muted">JPEG/JPG or PDF only, max size: 300KB</small>
+                            </div>
+
+                            <div class="col-md-6 form-group mb-3">
+                                <label for="id_copy_back">ID Copy (Back) <span class="text-danger">*</span></label>
+                                <input class="form-control" id="id_copy_back" type="file" name="id_copy_back" accept=".jpeg,.jpg,.pdf" required>
+                                <small class="text-muted">JPEG/JPG or PDF only, max size: 300KB</small>
+                            </div>
+
+                            <div class="col-md-6 form-group mb-3">
+                                <label for="payslips_bank_statements">Payslips or Bank Statements <span class="text-danger">*</span></label>
+                                <input class="form-control" id="payslips_bank_statements" type="file" name="payslips_bank_statements" accept=".jpeg,.jpg,.pdf" required>
+                                <small class="text-muted">JPEG/JPG or PDF only, max size: 300KB</small>
+                            </div>
+
+                            <!-- Bank Details Section -->
+                            <div class="col-md-12">
+                            <h5 class="mt-4 mb-3 text-primary">Your Bank Details</h5>
+                               
+                            </div>
+
+                            <div class="col-md-6 form-group mb-3">
+                                <label for="bank_name">Bank Name <span class="text-danger">*</span></label>
+                                <input class="form-control" id="bank_name" type="text" name="bank_name" placeholder="Enter your bank name" value="{{ old('bank_name') }}" required>
+                            </div>
+
+                            <div class="col-md-6 form-group mb-3">
+                                <label for="bank_branch">Bank Branch <span class="text-danger">*</span></label>
+                                <input class="form-control" id="bank_branch" type="text" name="bank_branch" placeholder="Enter your bank branch" value="{{ old('bank_branch') }}" required>
+                            </div>
+
+                            <div class="col-md-6 form-group mb-3">
+                                <label for="bank_account_number">Bank Account Number <span class="text-danger">*</span></label>
+                                <input class="form-control" id="bank_account_number" type="text" name="bank_account_number" placeholder="Enter your bank account number" value="{{ old('bank_account_number') }}" required>
+                            </div>
+
+                     
+                        </div>
 
             <!-- Terms Section -->
             <div class="col-md-12 form-group mt-4">
