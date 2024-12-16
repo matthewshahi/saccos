@@ -224,6 +224,24 @@
                      
                         </div>
 
+                      <!-- SECTION 7: Complete Registration Instructions -->
+<h5 class="text-primary border-bottom pb-2 mt-4 mb-3">7. Complete Your Registration</h5>
+<div class="alert alert-info">
+    <p>To finalize your SACCO membership registration, kindly send the registration fee using the following details:</p>
+    <ul>
+        <li><strong>Paybill Number:</strong> {{ $paybillNumber }}</li>
+        <li><strong>Account Number:</strong> <span class="text-primary">REG[YOUR NATIONAL ID]</span></li>
+        <li><strong>Amount:</strong> Ksh {{ $membershipFee }}</li>
+    </ul>
+    <p>
+        <em>
+            Replace <strong>[YOUR NATIONAL ID]</strong> with your actual National ID number.
+            Example: If your ID is <strong>12345678</strong>, use <strong>REG12345678</strong> as the account number.
+        </em>
+    </p>
+</div>
+
+
             <!-- Terms Section -->
             <div class="col-md-12 form-group mt-4">
                 <input type="checkbox" id="certification_statement" name="certification_statement" required>

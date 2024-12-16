@@ -12,68 +12,90 @@ class PublicRegistrationController extends Controller
 { 
     
   
-        // public function showForm()
+    public function showForm()
+    {
+        // Fetch sacco_defaults in a single query to avoid multiple calls
+        $saccoDefaults = DB::table('sacco_defaults')
+            ->whereIn('default_name', [
+                'BANK_NAME',
+                'BANK_BRANCH',
+                'BANK_ACCOUNT_NAME',
+                'BANK_ACCOUNT_NUMBER',
+                'member_ship_fee',
+                'min_share_contribution'
+            ])
+            ->pluck('default_value', 'default_name');
+    
+        // Fetch the paybill number from mpesa_configs
+        $paybillNumber = DB::table('mpesa_configs')
+            ->where('api_type', 'c2b')
+            ->orderBy('id') // Ensure to pick the first value by order
+            ->value('shortcode');
+    
+        // Fetch kin types (not deleted)
+        $kinTypes = DB::table('sacco_kin_type')
+            ->where('kin_type_deleted', 'N')
+            ->orderBy('kin_type_name')
+            ->get(['kin_type_id', 'kin_type_name']);
+    
+        // Prepare data for view
+        $data = [
+            'bankDetails' => [
+                'bank_name' => $saccoDefaults['BANK_NAME'] ?? '',
+                'branch_name' => $saccoDefaults['BANK_BRANCH'] ?? '',
+                'account_name' => $saccoDefaults['BANK_ACCOUNT_NAME'] ?? '',
+                'account_number' => $saccoDefaults['BANK_ACCOUNT_NUMBER'] ?? '',
+            ],
+            'membershipFee' => $saccoDefaults['member_ship_fee'] ?? 1000, // Default to 1000 if missing
+            'minContribution' => $saccoDefaults['min_share_contribution'] ?? 0,
+            'paybillNumber' => $paybillNumber,
+            'kinTypes' => $kinTypes,
+        ];
+    
+        // Return the view with all required data
+        return view('public.register', $data);
+    }
+        // public function showForm(Request $request, $code = null)
         // {
-        //     // Fetch bank details from the database
-        //     $bankDetails = [
-        //         'bank_name' => DB::table('sacco_defaults')->where('default_name', 'BANK_NAME')->value('default_value'),
-        //         'branch_name' => DB::table('sacco_defaults')->where('default_name', 'BANK_BRANCH')->value('default_value'),
-        //         'account_name' => DB::table('sacco_defaults')->where('default_name', 'BANK_ACCOUNT_NAME')->value('default_value'),
-        //         'account_number' => DB::table('sacco_defaults')->where('default_name', 'BANK_ACCOUNT_NUMBER')->value('default_value'),
-        //     ];
-    
-        //     // Fetch kin types (not deleted)
-        //     $kinTypes = DB::table('sacco_kin_type')
-        //         ->where('kin_type_deleted', 'N')
-        //         ->orderBy('kin_type_name')
-        //         ->get(['kin_type_id', 'kin_type_name']);
-    
-        //     // Fetch minimum contribution value
-        //     $minContribution = DB::table('sacco_defaults')->where('default_name', 'min_share_contribution')->value('default_value');
-    
-        //     return view('public.register', compact('bankDetails', 'kinTypes', 'minContribution'));
+        //     if ($code) {
+        //         // Handle the "complete your registration" step
+        //         $member = DB::table('sacco_members_new_applications')
+        //             ->where('email_key_unique', $code)
+        //             ->first();
+        
+        //         if (!$member) {
+        //             abort(404, 'Invalid or expired link.');
+        //         }
+        
+        //         // Check if all required files are already uploaded
+        //         $isUpdated = $member->passport_photo && $member->signature && $member->id_copy_front &&
+        //                      $member->id_copy_back && $member->payslips_bank_statements;
+        
+        //         return view('public.register', [
+        //             'isCompleteStep' => true,
+        //             'member' => $member,
+        //             'isUpdated' => $isUpdated,
+        //         ]);
+        //     } else {
+        //         // Handle the initial registration form
+        //         $bankDetails = [
+        //             'bank_name' => DB::table('sacco_defaults')->where('default_name', 'BANK_NAME')->value('default_value'),
+        //             'branch_name' => DB::table('sacco_defaults')->where('default_name', 'BANK_BRANCH')->value('default_value'),
+        //             'account_name' => DB::table('sacco_defaults')->where('default_name', 'BANK_ACCOUNT_NAME')->value('default_value'),
+        //             'account_number' => DB::table('sacco_defaults')->where('default_name', 'BANK_ACCOUNT_NUMBER')->value('default_value'),
+        //         ];
+        
+        //         $kinTypes = DB::table('sacco_kin_type')
+        //             ->where('kin_type_deleted', 'N')
+        //             ->orderBy('kin_type_name')
+        //             ->get(['kin_type_id', 'kin_type_name']);
+        
+        //         $minContribution = DB::table('sacco_defaults')->where('default_name', 'min_share_contribution')->value('default_value');
+        
+        //         return view('public.register', compact('bankDetails', 'kinTypes', 'minContribution'))
+        //             ->with('isCompleteStep', false);
+        //     }
         // }
-        public function showForm(Request $request, $code = null)
-        {
-            if ($code) {
-                // Handle the "complete your registration" step
-                $member = DB::table('sacco_members_new_applications')
-                    ->where('email_key_unique', $code)
-                    ->first();
-        
-                if (!$member) {
-                    abort(404, 'Invalid or expired link.');
-                }
-        
-                // Check if all required files are already uploaded
-                $isUpdated = $member->passport_photo && $member->signature && $member->id_copy_front &&
-                             $member->id_copy_back && $member->payslips_bank_statements;
-        
-                return view('public.register', [
-                    'isCompleteStep' => true,
-                    'member' => $member,
-                    'isUpdated' => $isUpdated,
-                ]);
-            } else {
-                // Handle the initial registration form
-                $bankDetails = [
-                    'bank_name' => DB::table('sacco_defaults')->where('default_name', 'BANK_NAME')->value('default_value'),
-                    'branch_name' => DB::table('sacco_defaults')->where('default_name', 'BANK_BRANCH')->value('default_value'),
-                    'account_name' => DB::table('sacco_defaults')->where('default_name', 'BANK_ACCOUNT_NAME')->value('default_value'),
-                    'account_number' => DB::table('sacco_defaults')->where('default_name', 'BANK_ACCOUNT_NUMBER')->value('default_value'),
-                ];
-        
-                $kinTypes = DB::table('sacco_kin_type')
-                    ->where('kin_type_deleted', 'N')
-                    ->orderBy('kin_type_name')
-                    ->get(['kin_type_id', 'kin_type_name']);
-        
-                $minContribution = DB::table('sacco_defaults')->where('default_name', 'min_share_contribution')->value('default_value');
-        
-                return view('public.register', compact('bankDetails', 'kinTypes', 'minContribution'))
-                    ->with('isCompleteStep', false);
-            }
-        }
 
         public function submit(Request $request)
         {
