@@ -39,7 +39,7 @@
         
             
             <!-- Personal Details Section -->
-            <h5 class="mb-3 text-primary">1. Personal Details</h5>
+            <h5 class="text-primary border-bottom pb-2 mt-4 mb-3">1. Personal Details</h5>
             <div class="row">
                 <div class="col-md-6 form-group mb-3">
                     <label for="first_name">First Name <span class="text-danger">*</span></label>
@@ -84,7 +84,7 @@
             </div>
 
             <!-- Additional Information Section -->
-            <h5 class="mt-4 mb-3 text-primary">2. Additional Information</h5>
+            <h5 class="text-primary border-bottom pb-2 mt-4 mb-3">2. Additional Information</h5>
             <div class="row">
                 <!-- <div class="col-md-6 form-group mb-3">
                     <label for="monthly_income">Monthly Income (in Ksh) <span class="text-danger">*</span></label>
@@ -110,7 +110,7 @@
             </div>
 
             <!-- Contact Details Section -->
-            <h5 class="mt-4 mb-3 text-primary">3. Contact Details</h5>
+            <h5 class="text-primary border-bottom pb-2 mt-4 mb-3">3. Contact Details</h5>
             <div class="row">
                 <div class="col-md-6 form-group mb-3">
                     <label for="email">Email Address <span class="text-danger">*</span></label>
@@ -127,7 +127,7 @@
             </div>
 
             <!-- Next of Kin Section -->
-            <h5 class="mt-4 mb-3 text-primary">4. Next of Kin Details</h5>
+            <h5 class="text-primary border-bottom pb-2 mt-4 mb-3">4. Next of Kin Details</h5>
             <p class="text-muted">You may add up to 3 next of kin.</p>
             @for ($i = 0; $i < 3; $i++)
                 <div class="row border rounded p-3 mb-3">
@@ -166,7 +166,7 @@
             <div class="row">
                             <!-- File Uploads Section -->
                             <div class="col-md-12">
-                            <h5 class="mt-4 mb-3 text-primary">5. File Uploads</h5>
+                            <h5 class="text-primary border-bottom pb-2 mt-4 mb-3">5. File Uploads</h5>
                                  
                             </div>
 
@@ -202,7 +202,7 @@
 
                             <!-- Bank Details Section -->
                             <div class="col-md-12">
-                            <h5 class="mt-4 mb-3 text-primary">6. Your Bank Details</h5>
+                            <h5 class="text-primary border-bottom pb-2 mt-4 mb-3">6. Your Bank Details</h5>
                                
                             </div>
 
