@@ -100,7 +100,7 @@ class PublicRegistrationController extends Controller
                 'marital_status' => 'nullable|in:Single,Married,Divorced,Widowed',
                 
                 // Additional Information
-                'monthly_income' => 'required|numeric|min:0',
+                // 'monthly_income' => 'required|numeric|min:0',
                 'occupation' => 'nullable|string|max:255',
                 'dependents' => 'nullable|integer|min:0',
                 'preferred_monthly_contribution' => [
@@ -264,7 +264,7 @@ class PublicRegistrationController extends Controller
                 'kra_pin_no' => strtoupper($request->kra_pin_no),
                 'gender' => $request->gender,
                 'marital_status' => $request->marital_status,
-                'monthly_income' => $request->monthly_income,
+                // 'monthly_income' => $request->monthly_income,
                 'occupation' => $request->occupation,
                 'dependents' => $request->dependents,
                 'preferred_monthly_contribution' => $request->preferred_monthly_contribution,
