@@ -98,13 +98,9 @@
                 <p>Thank you for showing interest in joining our SACCO. We are thrilled to have you as part of our growing family!</p>
                 <p>To confirm your registration, kindly remember that your membership is predicated on the successful payment of the joining fee.</p>
                 <p>
-                    For your convenience, you can make the payment using the provided details:
+                    For your convenience, you can make the payment using the provided details on registration form.
                 </p>
-                <ul>
-                    <li><strong>Paybill Number:</strong> {{ $paybillNumber }}</li>
-                    <li><strong>Account Number:</strong> REG[YOUR NATIONAL ID]</li>
-                    
-                </ul>
+                
                 <p>
                     Example: If your National ID is <strong>12345678</strong>, use <strong>REG12345678</strong> as the account number.
                 </p>
