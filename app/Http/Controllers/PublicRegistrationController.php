@@ -217,43 +217,43 @@ class PublicRegistrationController extends Controller
             }
 
             // Prepare the data to save
-$data = [
-    'first_name' => strtoupper($request->first_name),
-    'last_name' => strtoupper($request->last_name),
-    'birth_date' => $request->birth_date,
-    'national_id' => strtoupper($request->national_id),
-    'kra_pin_no' => strtoupper($request->kra_pin_no),
-    'gender' => $request->gender,
-    'marital_status' => $request->marital_status,
-    'monthly_income' => $request->monthly_income,
-    'occupation' => $request->occupation,
-    'dependents' => $request->dependents,
-    'preferred_monthly_contribution' => $request->preferred_monthly_contribution,
-    'reason_for_joining' => strtoupper($request->reason_for_joining),
-    'email' => strtolower($request->email),
-    'phone' => $request->phone,
-    'physical_location' => strtoupper($request->physical_location),
-    'bank_name' => strtoupper($request->bank_name),
-    'bank_branch' => strtoupper($request->bank_branch),
-    'bank_account_number' => $request->bank_account_number,
-    'passport_photo' => $uploadedFiles['passport_photo'] ?? null,
-    'signature' => $uploadedFiles['signature'] ?? null,
-    'id_copy_front' => $uploadedFiles['id_copy_front'] ?? null,
-    'id_copy_back' => $uploadedFiles['id_copy_back'] ?? null,
-    'payslips_bank_statements' => $uploadedFiles['payslips_bank_statements'] ?? null,
-    'next_of_kin_name' => json_encode(array_column($request->next_of_kin ?? [], 'name')),
-    'next_of_kin_relationship' => json_encode(array_column($request->next_of_kin ?? [], 'relationship')),
-    'next_of_kin_phone' => json_encode(array_column($request->next_of_kin ?? [], 'phone')),
-    'next_of_kin_id_or_cert_no' => json_encode(array_column($request->next_of_kin ?? [], 'id_or_cert_no')),
-    'kin_share_percent' => json_encode(array_column($request->next_of_kin ?? [], 'share_percent')),
-    'certification_statement' => 1,
-    'email_key_unique' => Str::uuid(),
-    'created_at' => now(),
-    'updated_at' => now(),
-];
+// $data = [
+//     'first_name' => strtoupper($request->first_name),
+//     'last_name' => strtoupper($request->last_name),
+//     'birth_date' => $request->birth_date,
+//     'national_id' => strtoupper($request->national_id),
+//     'kra_pin_no' => strtoupper($request->kra_pin_no),
+//     'gender' => $request->gender,
+//     'marital_status' => $request->marital_status,
+//     'monthly_income' => $request->monthly_income,
+//     'occupation' => $request->occupation,
+//     'dependents' => $request->dependents,
+//     'preferred_monthly_contribution' => $request->preferred_monthly_contribution,
+//     'reason_for_joining' => strtoupper($request->reason_for_joining),
+//     'email' => strtolower($request->email),
+//     'phone' => $request->phone,
+//     'physical_location' => strtoupper($request->physical_location),
+//     'bank_name' => strtoupper($request->bank_name),
+//     'bank_branch' => strtoupper($request->bank_branch),
+//     'bank_account_number' => $request->bank_account_number,
+//     'passport_photo' => $uploadedFiles['passport_photo'] ?? null,
+//     'signature' => $uploadedFiles['signature'] ?? null,
+//     'id_copy_front' => $uploadedFiles['id_copy_front'] ?? null,
+//     'id_copy_back' => $uploadedFiles['id_copy_back'] ?? null,
+//     'payslips_bank_statements' => $uploadedFiles['payslips_bank_statements'] ?? null,
+//     'next_of_kin_name' => json_encode(array_column($request->next_of_kin ?? [], 'name')),
+//     'next_of_kin_relationship' => json_encode(array_column($request->next_of_kin ?? [], 'relationship')),
+//     'next_of_kin_phone' => json_encode(array_column($request->next_of_kin ?? [], 'phone')),
+//     'next_of_kin_id_or_cert_no' => json_encode(array_column($request->next_of_kin ?? [], 'id_or_cert_no')),
+//     'kin_share_percent' => json_encode(array_column($request->next_of_kin ?? [], 'share_percent')),
+//     'certification_statement' => 1,
+//     'email_key_unique' => Str::uuid(),
+//     'created_at' => now(),
+//     'updated_at' => now(),
+// ];
 
-// Dump and Die the Prepared Data
-dd($data);
+// // Dump and Die the Prepared Data
+// dd($data);
         
             // Save Data to Database
             DB::table('sacco_members_new_applications')->insert([
