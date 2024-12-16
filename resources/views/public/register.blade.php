@@ -119,31 +119,44 @@
                 </div>
 
                 <!-- SECTION 4: Next of Kin -->
-                <h5 class="mb-3 text-primary border-bottom pb-2">4. Next of Kin (Up to 3)</h5>
-                @for ($i = 0; $i < 3; $i++)
-                    <div class="row border rounded p-3 mb-3">
-                        <div class="col-md-3 form-group mb-3">
-                            <label>Name</label>
-                            <input type="text" class="form-control" name="next_of_kin[{{ $i }}][name]">
-                        </div>
-                        <div class="col-md-3 form-group mb-3">
-                            <label>Relationship</label>
-                            <input type="text" class="form-control" name="next_of_kin[{{ $i }}][relationship]">
-                        </div>
-                        <div class="col-md-3 form-group mb-3">
-                            <label>Phone</label>
-                            <input type="text" class="form-control" name="next_of_kin[{{ $i }}][phone]">
-                        </div>
-                        <div class="col-md-3 form-group mb-3">
-                            <label>ID or Cert No.</label>
-                            <input type="text" class="form-control" name="next_of_kin[{{ $i }}][id_or_cert_no]">
-                        </div>
-                        <div class="col-md-3 form-group mb-3">
-                            <label>Share (%)</label>
-                            <input type="number" class="form-control" name="next_of_kin[{{ $i }}][share_percent]" min="0" max="100">
-                        </div>
-                    </div>
-                @endfor
+<h5 class="mb-3 text-primary border-bottom pb-2">4. Next of Kin (Up to 3)</h5>
+@for ($i = 0; $i < 3; $i++)
+    <div class="row border rounded p-3 mb-3">
+        <div class="col-md-3 form-group mb-3">
+            <label>Name</label>
+            <input type="text" class="form-control" name="next_of_kin[{{ $i }}][name]" value="{{ old('next_of_kin.'.$i.'.name') }}">
+        </div>
+
+        <div class="col-md-3 form-group mb-3">
+            <label>Relationship</label>
+            <select class="form-control" name="next_of_kin[{{ $i }}][relationship]">
+                <option value="">Select Relationship</option>
+                @foreach ($kinTypes as $kinType)
+                    <option value="{{ $kinType->kin_type_name }}"
+                        {{ old('next_of_kin.'.$i.'.relationship') == $kinType->kin_type_name ? 'selected' : '' }}>
+                        {{ $kinType->kin_type_name }}
+                    </option>
+                @endforeach
+            </select>
+        </div>
+
+        <div class="col-md-3 form-group mb-3">
+            <label>Phone</label>
+            <input type="text" class="form-control" name="next_of_kin[{{ $i }}][phone]" value="{{ old('next_of_kin.'.$i.'.phone') }}">
+        </div>
+
+        <div class="col-md-3 form-group mb-3">
+            <label>ID or Cert No.</label>
+            <input type="text" class="form-control" name="next_of_kin[{{ $i }}][id_or_cert_no]" value="{{ old('next_of_kin.'.$i.'.id_or_cert_no') }}">
+        </div>
+
+        <div class="col-md-3 form-group mb-3">
+            <label>Share (%)</label>
+            <input type="number" class="form-control" name="next_of_kin[{{ $i }}][share_percent]"
+                value="{{ old('next_of_kin.'.$i.'.share_percent') }}" min="0" max="100">
+        </div>
+    </div>
+@endfor
 
                 <!-- SECTION 5: File Uploads -->
                 <h5 class="mb-3 text-primary border-bottom pb-2">5. File Uploads</h5>
