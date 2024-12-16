@@ -32,7 +32,7 @@
     <div class="card-body">
         <h4 class="card-title text-primary">Register as a Member</h4>
         <p class="text-muted">
-        Please fill in the form below to apply for SACCO membership. Ensure all details are accurate. Once submitted, an email will be sent to you with a link to complete your registration. You will be required to upload additional documents, including your passport photo, signature, copies of your ID (front and back), and either payslips or bank statements.
+        Please fill in the form below to apply for SACCO membership. Ensure all details are accurate. 
         </p>
         <form action="{{ route('register.submit') }}" method="POST" enctype="multipart/form-data" id="registration-form">
     @csrf
