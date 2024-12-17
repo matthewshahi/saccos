@@ -363,12 +363,12 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
     Route::delete('/files/delete/{file}', [FileUploadController::class, 'delete'])->name('file.delete');
 
    
-    Route::get('/randomize-members', [RandController::class, 'randomizeMembers'])->name('randomize.members')->middleware('check_user_rights:testing_randomize_members');
-    Route::get('/randomize-loan-payments', [RandController::class, 'randomizeLoanPayments'])->name('randomize.loan.payments')->middleware('check_user_rights:testing_randomize_members');
-    Route::get('/randomize-shares', [RandController::class, 'randomizeShares'])->name('randomize.shares')->middleware('check_user_rights:testing_randomize_members');
-    Route::get('/randomize-accounts-transactions', [RandController::class, 'randomizeAccountsTransactions'])->name('randomize.accounts.transactions')->middleware('check_user_rights:testing_randomize_members');
-    Route::post('/temp/import_capital', [TempCapitalImportController::class, 'importCapital'])->name('temp.import_capital')->middleware('check_user_rights:add_period');
-    Route::get('/test/test', function () {
-        return view('test.test');
-    })->name('test.view')->middleware('check_user_rights:add_period');
+    // Route::get('/randomize-members', [RandController::class, 'randomizeMembers'])->name('randomize.members')->middleware('check_user_rights:testing_randomize_members');
+    // Route::get('/randomize-loan-payments', [RandController::class, 'randomizeLoanPayments'])->name('randomize.loan.payments')->middleware('check_user_rights:testing_randomize_members');
+    // Route::get('/randomize-shares', [RandController::class, 'randomizeShares'])->name('randomize.shares')->middleware('check_user_rights:testing_randomize_members');
+    // Route::get('/randomize-accounts-transactions', [RandController::class, 'randomizeAccountsTransactions'])->name('randomize.accounts.transactions')->middleware('check_user_rights:testing_randomize_members');
+    // Route::post('/temp/import_capital', [TempCapitalImportController::class, 'importCapital'])->name('temp.import_capital')->middleware('check_user_rights:add_period');
+    // Route::get('/test/test', function () {
+    //     return view('test.test');
+    // })->name('test.view')->middleware('check_user_rights:add_period');
 });
