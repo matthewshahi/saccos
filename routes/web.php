@@ -18,6 +18,8 @@ use App\Http\Controllers\MpesaConfigController;
 use App\Http\Controllers\MpesaTheController;
 use App\Http\Controllers\MpesaReportController;
 use Illuminate\Support\Facades\Mail;
+use App\Http\Controllers\PublicRegistrationActionsImportController;
+use App\Http\Controllers\TempCapitalImportController;
 
 // Route::get('/test-email', function () {
 //     Mail::raw('This is a test email from Laravel!', function ($message) {
@@ -149,6 +151,7 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
     Route::get('/new_members/list', [PublicRegistrationActionsController::class, 'listMembers'])->name('members.list')->middleware('check_user_rights:new_member_applications_list');
     Route::post('/new_members/update/{id}', [PublicRegistrationActionsController::class, 'updateField'])->middleware('check_user_rights:new_member_applications_update');
     Route::get('/new_members/details/{id}', [PublicRegistrationActionsController::class, 'getMemberDetails'])->name('members.details')->middleware('check_user_rights:new_member_applications_update');
+    Route::post('/new_members/export/live', [PublicRegistrationActionsImportController::class, 'exportLiveData'])->name('members.exportLive')->middleware('check_user_rights:new_member_applications_update');
 
     
 
@@ -364,4 +367,8 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
     Route::get('/randomize-loan-payments', [RandController::class, 'randomizeLoanPayments'])->name('randomize.loan.payments')->middleware('check_user_rights:testing_randomize_members');
     Route::get('/randomize-shares', [RandController::class, 'randomizeShares'])->name('randomize.shares')->middleware('check_user_rights:testing_randomize_members');
     Route::get('/randomize-accounts-transactions', [RandController::class, 'randomizeAccountsTransactions'])->name('randomize.accounts.transactions')->middleware('check_user_rights:testing_randomize_members');
+    Route::post('/temp/import_capital', [TempCapitalImportController::class, 'importCapital'])->name('temp.import_capital')->middleware('check_user_rights:add_period');
+    Route::get('/test/test', function () {
+        return view('test.test');
+    })->name('test.view')->middleware('check_user_rights:add_period');
 });

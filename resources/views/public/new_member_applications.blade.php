@@ -92,6 +92,11 @@
                 <div>
                     <button type="button" class="btn btn-info" id="downloadDetails"><i class="bi bi-download"></i> Download</button>
                     <button type="button" class="btn btn-success" id="printDetails"><i class="bi bi-printer"></i> Print</button>
+                    <div class="d-flex justify-content-end mt-3">
+    <button type="button" class="btn btn-warning" id="exportLiveData">
+        <i class="bi bi-cloud-upload"></i> Export to Live Data
+    </button>
+</div>
                 </div>
             </div>
         </div>
@@ -212,6 +217,35 @@
             printWindow.document.close();
             printWindow.print();
         });
+    });
+</script>
+
+<script>
+    document.getElementById('exportLiveData').addEventListener('click', function () {
+        if (confirm("Are you sure you want to export this data to live?")) {
+            fetch("{{ route('members.exportLive') }}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                },
+                body: JSON.stringify({
+                    members: @json($members->items())
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert("Data successfully exported to live.");
+                } else {
+                    alert("Error exporting data: " + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert("An unexpected error occurred.");
+            });
+        }
     });
 </script>
 @endsection
