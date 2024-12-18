@@ -20,6 +20,7 @@ use App\Http\Controllers\MpesaReportController;
 use Illuminate\Support\Facades\Mail;
 use App\Http\Controllers\PublicRegistrationActionsImportController;
 use App\Http\Controllers\TempCapitalImportController;
+use App\Http\Controllers\LoanApplicationSelfServiceController;
 
 // Route::get('/test-email', function () {
 //     Mail::raw('This is a test email from Laravel!', function ($message) {
@@ -69,9 +70,14 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/members/status/{id}', [HomeController::class, 'memberStatus'])->name('members.status')->middleware('check_user_rights:rpt_loans_issued');
 
     Route::get('/loans/apply', [HomeController::class, 'loansApply'])->name('loans.apply');
+    Route::post('/loans/apply', [HomeController::class, 'submitLoanApplication'])->name('loans.application.submit');
+
     Route::get('/loans/guarantee/requests', [HomeController::class, 'listGuaranteeRequests'])->name('loans.guarantee.requests');
-    Route::get('/loans/pending/approval', [HomeController::class, 'listLoansPendingApproval'])->name('loans.pending.approval');
+    // Route::get('/loans/pending/approval', [HomeController::class, 'listLoansPendingApproval'])->name('loans.pending.approval')->middleware('check_user_rights:rpt_loans_issued');
     // Route::get('/loans/types/list', [HomeController::class, 'loansTypesList'])->name('loans.types.list');
+
+    
+
 
     Route::get('/profile/password', [HomeController::class, 'showChangeSelfPasswordForm'])->name('profile.password');
     Route::post('/profile/password', [HomeController::class, 'updateSelfPassword'])->name('profile.updatePassword');
@@ -232,12 +238,26 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
     Route::get('/list/contribution', [HomeController::class, 'listContribution'])->name('list.contribution')->middleware('check_user_rights:list_sacco_member_contributions');
     Route::get('/proc/end/month/loans', [LoanEndMonthController::class, 'endMonthLoans'])->name('proc.end.month.loans')->middleware('check_user_rights:end_month_processing_loans');
     Route::post('/proc/end/month/loans', [LoanEndMonthController::class, 'processEndMonthLoans'])->name('proc.end.month.loans.process')->middleware('check_user_rights:end_month_processing_loans');
-    Route::post('/loans/apply', [HomeController::class, 'submitLoanApplication'])->name('loans.application.submit')->middleware('check_user_rights:end_month_processing_loans');
     Route::get('/loans/approval', [HomeController::class, 'listLoansForApproval'])->name('loans.approval')->middleware('check_user_rights:end_month_processing_loans');
     Route::get('/loans/approve/{loanId}', [HomeController::class, 'approveLoan'])->name('loans.approve')->middleware('check_user_rights:end_month_processing_loans');
     Route::get('/loans/delete/{loanId}', [HomeController::class, 'deleteLoan'])->name('loans.delete')->middleware('check_user_rights:end_month_processing_loans');
 
-    Route::get('/admin/loans/pending/approval', [HomeController::class, 'adminListLoansPendingApproval'])->name('admin.loans.pending.approval')->middleware('check_user_rights:end_month_processing_loans');
+    // Route::get('/admin/loans/pending/approval', [HomeController::class, 'adminListLoansPendingApproval'])->name('admin.loans.pending.approval')->middleware('check_user_rights:end_month_processing_loans');
+    Route::get('admin/loans/pending/approval', [LoanApplicationSelfServiceController::class, 'listLoansPendingApproval'])
+    ->name('loans.pending.approval')
+    ->middleware('check_user_rights:end_month_processing_loans');
+
+    Route::post('admin/loans/approve/{id}', [LoanApplicationSelfServiceController::class, 'approveLoan'])
+        ->name('loans.approve')->middleware('check_user_rights:end_month_processing_loans');
+
+    Route::post('admin/loans/reject/{id}', [LoanApplicationSelfServiceController::class, 'rejectLoan'])
+        ->name('loans.reject')->middleware('check_user_rights:end_month_processing_loans');
+
+    // // Update loan status (Mark as Updated)
+    // Route::get('admin/loans/approve/{id}', [LoanApplicationSelfServiceController::class, 'updateLoan'])
+    //     ->name('loans.approve')
+    //     ->middleware('check_user_rights:end_month_processing_loans');
+
     Route::get('/admin/end-of-year-processing', [HomeController::class, 'showEndOfYearProcessingForm'])->name('admin.show-end-of-year-processing-form')->middleware('check_user_rights:end_of_year_processing');
     Route::post('/admin/end-of-year-processing', [HomeController::class, 'endOfYearProcessing'])->name('admin.end-of-year-processing')->middleware('check_user_rights:end_of_year_processing');
 

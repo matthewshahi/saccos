@@ -42,8 +42,7 @@
         
             <a href="{{ route('loans.guarantee.requests') }}">Guarantee requests</a>&nbsp;|| &nbsp;
             <a href="{{ route('loans.pending.approval') }}">List loans pending approval</a> &nbsp;|| &nbsp;
-            <a href="{{ route('admin.loans.pending.approval') }}">[ADMIN] List all loans pending approval</a>
-        
+         
     </div>
 
     <div class="col-md-12">

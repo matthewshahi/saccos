@@ -172,9 +172,16 @@
                                     <span class="text-muted">Loans issued</span>
                                 </a>
                             </li> -->
+                            
+                            <li class="item-name">
+                                <a href="{{ url('/admin/loans/pending/approval') }}">
+                                    <span class="text-muted">Approve Self Serve Loans</span>
+                                </a>
+                            </li>
+
                             <li class="item-name">
                                 <a href="{{ url('/loans/apply') }}">
-                                    <span class="text-muted">Apply for Loan (Self)</span>
+                                    <span class="text-muted">Apply for Loan - Self</span>
                                 </a>
                             </li>
                             <li class="item-name">

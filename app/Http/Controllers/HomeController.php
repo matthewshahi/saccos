@@ -3366,6 +3366,7 @@ public function loansApply()
 
 public function submitLoanApplication(Request $request)
 {
+    $logged_in_user = auth()->id();
     // Define validation rules
     $request->validate([
         'batch_trans_member_id' => 'required|exists:sacco_members,member_id',
@@ -3391,6 +3392,17 @@ public function submitLoanApplication(Request $request)
 
 //  dd( $data);
 
+
+
+    // Check if the current route matches 'loans.application.submit'
+    if ($request->route()->getName() === 'loans.application.submit') {
+        // Check if the member ID matches the logged-in user
+        if ($request->input('batch_trans_member_id') != $logged_in_user) {
+            return redirect()->back()->withErrors(['error' => 'Error: Wrong user trying to access the system.']);
+        }
+    }
+
+
     // Loan Category and Type validation
     $loanCategory = DB::table('sacco_loan_category')
         ->where('loan_category_id', $data['batch_trans_loan_category'])
@@ -3409,6 +3421,7 @@ public function submitLoanApplication(Request $request)
     }
 
     // Member validation
+    
     $member = DB::table('sacco_members')
         ->where('member_id', $data['batch_trans_member_id'])
         ->where('member_active', 'Y')
@@ -3848,7 +3861,7 @@ public function listLoansPendingApproval()
 
 
 public function adminListLoansPendingApproval(Request $request)
-{
+{ 
     $member_id = Auth::user()->member_id;
     $logged_in_user = Auth::id();
     $transdate = now();
@@ -3874,6 +3887,8 @@ public function adminListLoansPendingApproval(Request $request)
 
     // Fetching pending loans
     $loans = $this->getPendingLoans();
+
+
 
     return view('loans.self_applications_pending_approval', compact('loans', 'nmsg'));
 }
