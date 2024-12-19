@@ -22,10 +22,13 @@ class SendGuarantorEmailJob implements ShouldQueue
     public function handle()
     {
         // Fetch loans applied within the last 24 hours that are not deleted or approved
-        $loans = DB::table('sacco_loan_batch_trans_members AS loans')
+        
+
+            $loans = DB::table('sacco_loan_batch_trans_members AS loans')
             ->join('sacco_loan_types AS loan_types', 'loans.batch_trans_loan_type', '=', 'loan_types.loan_type_id')
-            ->join('sacco_members AS applicants', 'loans.batch_trans_member_id', '=', 'applicants.member_id')
-            ->join('sacco_loan_batch_guarantors_members AS guarantors', 'loans.batch_trans_id', '=', 'guarantors.guarantors_loan_batch_trans_id')
+            ->join('sacco_members AS applicants', 'loans.batch_trans_member_id', '=', 'applicants.member_id') // Applicant details
+            ->join('sacco_loan_batch_guarantors_members AS guarantors', 'loans.batch_trans_id', '=', 'guarantors.guarantors_loan_batch_trans_id') // Guarantors mapping
+            ->join('sacco_members AS guarantor_members', 'guarantors.guarantors_guarantor_id', '=', 'guarantor_members.member_id') // Fetch guarantors' details
             ->where('loans.batch_trans_deleted', 'N')
             ->where('loans.batch_trans_updated', 'N')
             ->where('guarantors.guarantors_email_sent', 'N')
@@ -40,8 +43,8 @@ class SendGuarantorEmailJob implements ShouldQueue
                 'guarantors.guarantors_amount_guaranteed',
                 'guarantors.guarantors_email_sent',
                 'guarantors.guarantors_description',
-                'guarantors.guarantors_email',
-                'guarantors.guarantors_id'
+                'guarantors.guarantors_id',
+                'guarantor_members.member_email AS guarantor_email' // Fetch email from guarantor's member record
             )
             ->get();
 
