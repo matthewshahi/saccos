@@ -22,14 +22,14 @@ use App\Http\Controllers\PublicRegistrationActionsImportController;
 use App\Http\Controllers\TempCapitalImportController;
 use App\Http\Controllers\LoanApplicationSelfServiceController;
 
-// Route::get('/test-email', function () {
-//     Mail::raw('This is a test email from Laravel!', function ($message) {
-//         $message->to('matthewshahi@gmail.com')
-//                 ->subject('Test Email from iSacco');
-//     });
+Route::get('/test-email', function () {
+    Mail::raw('This is a test email from Laravel!', function ($message) {
+        $message->to('matthewshahi@gmail.com')
+                ->subject('Test Email from iSacco');
+    });
 
-//     return 'Test email sent!';
-// });
+    return 'Test email sent!';
+});
 
 
 
