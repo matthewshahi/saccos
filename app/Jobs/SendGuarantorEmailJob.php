@@ -16,15 +16,13 @@ class SendGuarantorEmailJob implements ShouldQueue
 
     public function __construct()
     {
-        // Constructor can be used to pass data if needed in future
+        // Constructor can be used to pass data if needed in the future
     }
 
     public function handle()
     {
         // Fetch loans applied within the last 24 hours that are not deleted or approved
-        
-
-            $loans = DB::table('sacco_loan_batch_trans_members AS loans')
+        $loans = DB::table('sacco_loan_batch_trans_members AS loans')
             ->join('sacco_loan_types AS loan_types', 'loans.batch_trans_loan_type', '=', 'loan_types.loan_type_id')
             ->join('sacco_members AS applicants', 'loans.batch_trans_member_id', '=', 'applicants.member_id') // Applicant details
             ->join('sacco_loan_batch_guarantors_members AS guarantors', 'loans.batch_trans_id', '=', 'guarantors.guarantors_loan_batch_trans_id') // Guarantors mapping
@@ -51,14 +49,14 @@ class SendGuarantorEmailJob implements ShouldQueue
         foreach ($loans as $loan) {
             try {
                 // Validate email address
-                if (!filter_var($loan->guarantors_email, FILTER_VALIDATE_EMAIL)) {
+                if (!filter_var($loan->guarantor_email, FILTER_VALIDATE_EMAIL)) {
                     \Log::warning("Invalid email address for guarantor ID: {$loan->guarantors_guarantor_id}");
                     continue;
                 }
 
-                // Send email
+                // Send email using the Blade template
                 Mail::send('emails.guarantor_notification', ['loan' => $loan], function ($message) use ($loan) {
-                    $message->to($loan->guarantors_email)
+                    $message->to($loan->guarantor_email) // Use the corrected field name
                         ->subject("Loan Guarantee Request for {$loan->applicant_name}");
                 });
 
