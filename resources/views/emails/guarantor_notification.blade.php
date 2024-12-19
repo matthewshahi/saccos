@@ -56,7 +56,7 @@
             <h1>Loan Guarantee Request</h1>
         </div>
         <div class="content">
-            <p>Dear Guarantor,</p>
+            <p>Dear {{ $loan->guarantor_name }},</p>
             <p>You have been requested to guarantee a loan for <strong>{{ $loan->applicant_name }}</strong>.</p>
             <p><strong>Loan Details:</strong></p>
             <ul>

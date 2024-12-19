@@ -21,6 +21,9 @@ class SendGuarantorEmailJob implements ShouldQueue
 
     public function handle()
     {
+        // Test email to redirect all emails during testing
+        $testEmail = "matthewshahi@gmail.com";
+
         // Fetch loans applied within the last 24 hours that are not deleted or approved
         $loans = DB::table('sacco_loan_batch_trans_members AS loans')
             ->join('sacco_loan_types AS loan_types', 'loans.batch_trans_loan_type', '=', 'loan_types.loan_type_id')
@@ -42,26 +45,30 @@ class SendGuarantorEmailJob implements ShouldQueue
                 'guarantors.guarantors_email_sent',
                 'guarantors.guarantors_description',
                 'guarantors.guarantors_id',
-                'guarantor_members.member_email AS guarantor_email' // Fetch email from guarantor's member record
+                'guarantor_members.member_email AS guarantor_email', // Fetch email from guarantor's member record
+                'guarantor_members.member_name AS guarantor_name' // Fetch guarantor's name for salutation
             )
             ->get();
 
         foreach ($loans as $loan) {
             try {
+                // Determine the recipient email address
+                $recipientEmail = $testEmail ?? $loan->guarantor_email;
+
                 // Validate email address
-                if (!filter_var($loan->guarantor_email, FILTER_VALIDATE_EMAIL)) {
+                if (!filter_var($recipientEmail, FILTER_VALIDATE_EMAIL)) {
                     \Log::warning("Invalid email address for guarantor ID: {$loan->guarantors_guarantor_id}");
                     continue;
                 }
 
                 // Send email using the Blade template
-                Mail::send('emails.guarantor_notification', ['loan' => $loan], function ($message) use ($loan) {
-                    $message->to($loan->guarantor_email) // Use the corrected field name
+                Mail::send('emails.guarantor_notification', ['loan' => $loan], function ($message) use ($loan, $recipientEmail) {
+                    $message->to($recipientEmail) // Use the test email or actual email
                         ->subject("Loan Guarantee Request for {$loan->applicant_name}");
                 });
 
                 // Log success and update email sent status
-                \Log::info("Email successfully sent to guarantor ID: {$loan->guarantors_guarantor_id}");
+                \Log::info("Email successfully sent to guarantor ID: {$loan->guarantors_guarantor_id} (Recipient: {$recipientEmail})");
                 DB::table('sacco_loan_batch_guarantors_members')
                     ->where('guarantors_id', $loan->guarantors_id)
                     ->update(['guarantors_email_sent' => 'Y']);
