@@ -154,26 +154,28 @@
                             </tr>
                         </thead>
                         <tbody>
-                            @php
-                                $guarantors_names = explode('|', $loan->guarantors_names ?? '');
-                                $guarantors_amounts = explode('|', $loan->guarantors_amounts ?? '');
-                                $guarantors_statuses = explode('|', $loan->guarantors_approved ?? '');
-                            @endphp
-                            @foreach ($guarantors_names as $index => $name)
-                                <tr>
-                                    <td>{{ $index + 1 }}</td>
-                                    <td>{{ $name }}</td>
-                                     <td class="text-end">
-    {{ is_numeric($guarantors_amounts[$index] ?? null) ? number_format((float)$guarantors_amounts[$index], 2) : '0.00' }}
-</td>
+                        @php
+    $guarantors_names = explode('|', $loan->guarantors_names ?? '');
+    $guarantors_amounts = explode('|', $loan->guarantors_amounts ?? '');
+    $guarantors_statuses = explode('|', $loan->guarantors_approval_status ?? '');
+@endphp
 
-                                    <td>
-                                        <span class="badge {{ isset($guarantors_statuses[$index]) && $guarantors_statuses[$index] == 'Y' ? 'bg-success' : 'bg-warning' }}">
-                                            {{ isset($guarantors_statuses[$index]) && $guarantors_statuses[$index] == 'Y' ? 'Approved' : 'Pending' }}
-                                        </span>
-                                    </td>
-                                </tr>
-                            @endforeach
+@foreach ($guarantors_names as $index => $name)
+<tr>
+    <td>{{ $index + 1 }}</td>
+    <td>{{ $name }}</td>
+    <td class="text-end">
+        {{ is_numeric($guarantors_amounts[$index] ?? null) ? number_format((float)$guarantors_amounts[$index], 2) : '0.00' }}
+    </td>
+    <td>
+        <span class="badge {{ isset($guarantors_statuses[$index]) && $guarantors_statuses[$index] == 'Y' ? 'bg-success' : 'bg-warning' }}">
+            {{ isset($guarantors_statuses[$index]) && $guarantors_statuses[$index] == 'Y' ? 'Accepted' : 'Pending' }}
+        </span>
+    </td>
+</tr>
+@endforeach
+
+ 
                             @if (empty($guarantors_names[0]))
                                 <tr>
                                     <td colspan="4" class="text-center text-muted">No guarantors available.</td>

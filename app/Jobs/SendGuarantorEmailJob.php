@@ -22,7 +22,7 @@ class SendGuarantorEmailJob implements ShouldQueue
     public function handle()
     {
         // Test email to redirect all emails during testing
-        $testEmail = "matthewshahi@gmail.com";
+        // $testEmail = "matthewshahi@gmail.com";
 
         // Fetch loans applied within the last 24 hours that are not deleted or approved
         $loans = DB::table('sacco_loan_batch_trans_members AS loans')

@@ -10,8 +10,6 @@ class LoanApplicationSelfServiceController extends Controller
     public function listLoansPendingApproval(Request $request)
     {
 
-        // Main Query
-
         $query = DB::table('sacco_loan_batch_trans_members AS trans')
     ->join('sacco_members AS members', 'trans.batch_trans_member_id', '=', 'members.member_id') // Loan applicant
     ->join('sacco_loan_types AS types', 'trans.batch_trans_loan_type', '=', 'types.loan_type_id') // Loan type
@@ -26,12 +24,35 @@ class LoanApplicationSelfServiceController extends Controller
         'members.member_phone_no', 
         'members.member_national_id',
         'types.loan_type_name',
-        DB::raw('GROUP_CONCAT(DISTINCT g_members.member_name SEPARATOR "|") AS guarantors_names'), // Use "|" as separator
-        DB::raw('GROUP_CONCAT(DISTINCT guarantors.guarantors_amount_guaranteed SEPARATOR "|") AS guarantors_amounts'), // Use "|" as separator
-        DB::raw('GROUP_CONCAT(DISTINCT guarantors.guarantors_approved SEPARATOR "|") AS guarantors_approved') // Use "|" as separator
+        DB::raw('GROUP_CONCAT(g_members.member_name ORDER BY guarantors.guarantors_id ASC SEPARATOR "|") AS guarantors_names'), // Ordered by guarantors_id
+        DB::raw('GROUP_CONCAT(guarantors.guarantors_amount_guaranteed ORDER BY guarantors.guarantors_id ASC SEPARATOR "|") AS guarantors_amounts'), // Ordered by guarantors_id
+        DB::raw('GROUP_CONCAT(guarantors.guarantors_approved ORDER BY guarantors.guarantors_id ASC SEPARATOR "|") AS guarantors_approval_status') // Ordered by guarantors_id
     )
-    // ->where('trans.batch_trans_deleted', 'N') // Exclude deleted loan applications
+     
     ->groupBy('trans.batch_trans_id');
+     
+
+
+    //     $query = DB::table('sacco_loan_batch_trans_members AS trans')
+    // ->join('sacco_members AS members', 'trans.batch_trans_member_id', '=', 'members.member_id') // Loan applicant
+    // ->join('sacco_loan_types AS types', 'trans.batch_trans_loan_type', '=', 'types.loan_type_id') // Loan type
+    // ->leftJoin('sacco_loan_batch_guarantors_members AS guarantors', function ($join) {
+    //     $join->on('trans.batch_trans_id', '=', 'guarantors.guarantors_loan_batch_trans_id')
+    //          ->where('guarantors.guarantors_deleted', 'N'); // Exclude deleted guarantors
+    // })
+    // ->leftJoin('sacco_members AS g_members', 'guarantors.guarantors_guarantor_id', '=', 'g_members.member_id') // Guarantors' details
+    // ->select(
+    //     'trans.*',
+    //     'members.member_name', 
+    //     'members.member_phone_no', 
+    //     'members.member_national_id',
+    //     'types.loan_type_name',
+    //     DB::raw('GROUP_CONCAT(DISTINCT g_members.member_name SEPARATOR "|") AS guarantors_names'), // Use "|" as separator
+    //     DB::raw('GROUP_CONCAT(DISTINCT guarantors.guarantors_amount_guaranteed SEPARATOR "|") AS guarantors_amounts'), // Use "|" as separator
+    //     DB::raw('GROUP_CONCAT(DISTINCT guarantors.guarantors_approved SEPARATOR "|") AS guarantors_approved') // Use "|" as separator
+    // )
+    // // ->where('trans.batch_trans_deleted', 'N') // Exclude deleted loan applications
+    // ->groupBy('trans.batch_trans_id');
 
      
     
@@ -51,6 +72,7 @@ class LoanApplicationSelfServiceController extends Controller
                        ->limit(300)
                        ->paginate(20);
         
+                       
         // Return the view with loans
         return view('loans.selfservice.pending_approval', compact('loans'));
     }
@@ -95,7 +117,36 @@ class LoanApplicationSelfServiceController extends Controller
             if (!$default_bank_account || !$default_insurance_account || !$default_loan_commission_account) {
                 throw new \Exception('Missing default bank, insurance, or commission accounts.');
             }
-    
+
+
+            if ($loan->loan_type_guaranteable_percent > 0) {
+                $guaranteeCheck = $this->isSufficientlyGuaranteed($loan, $loan->batch_trans_loan_amount);
+            
+                
+                if (!$guaranteeCheck['is_fully_guaranteed']) {
+                    $errorMessage = "Error: This loan application by <strong>{$loan->member_name}</strong> "
+                                  . "is under-guaranteed.<br>"
+                                  . "Total Guaranteed: <strong>" . number_format($guaranteeCheck['total_guaranteed'], 2) . "</strong><br>"
+                                  . "Required Guarantee: <strong>" . number_format($guaranteeCheck['required_guarantee'], 2) . "</strong><br>"
+                                  . "Deficit: <strong>" . number_format($guaranteeCheck['difference'], 2) . "</strong>";
+            
+                    return redirect()->back()->withErrors(['error' => $errorMessage]);
+                }
+            }
+    if ($loan->loan_type_guaranteable_percent > 0) {
+    $guaranteeCheck = $this->isSufficientlyGuaranteed($loan, $loan->batch_trans_loan_amount);
+
+    if (!$guaranteeCheck['is_fully_guaranteed']) {
+        $errorMessage = "Error: This loan application by <strong>{$loan->member_name}</strong> "
+                      . "is under-guaranteed.<br>"
+                      . "Total Guaranteed: <strong>" . number_format($guaranteeCheck['total_guaranteed'], 2) . "</strong><br>"
+                      . "Required Guarantee: <strong>" . number_format($guaranteeCheck['required_guarantee'], 2) . "</strong><br>"
+                      . "Deficit: <strong>" . number_format($guaranteeCheck['difference'], 2) . "</strong>";
+
+        return redirect()->back()->withErrors(['error' => $errorMessage]);
+    }
+}
+
             // Check for sufficient guarantors
 if ($loan->loan_type_guaranteable_percent > 0) {
     $guaranteeCheck = $this->isSufficientlyGuaranteed($loan, $loan->batch_trans_loan_amount);
@@ -253,13 +304,35 @@ private function isSufficientlyGuaranteed($loan, $loan_amount)
     // Calculate the required guaranteed amount
     $required_guarantee = ($loan->loan_type_guaranteable_percent / 100) * $loan_amount;
 
+    // Check if the variance is within the range of ±1
+    $is_fully_guaranteed = abs($total_guaranteed - $required_guarantee) <= 1;
+
     return [
-        'is_fully_guaranteed' => $total_guaranteed >= $required_guarantee,
+        'is_fully_guaranteed' => $is_fully_guaranteed,
         'total_guaranteed' => $total_guaranteed,
         'required_guarantee' => $required_guarantee,
         'difference' => max(0, $required_guarantee - $total_guaranteed),
     ];
 }
+// private function isSufficientlyGuaranteed($loan, $loan_amount)
+// {
+//     // Fetch total amount guaranteed by all approved guarantors
+//     $total_guaranteed = DB::table('sacco_loan_batch_guarantors_members')
+//         ->where('guarantors_loan_batch_trans_id', $loan->batch_trans_id)
+//         ->where('guarantors_deleted', 'N') // Active guarantors
+//         ->where('guarantors_approved', 'Y') // Approved guarantors
+//         ->sum('guarantors_amount_guaranteed');
+
+//     // Calculate the required guaranteed amount
+//     $required_guarantee = ($loan->loan_type_guaranteable_percent / 100) * $loan_amount;
+
+//     return [
+//         'is_fully_guaranteed' => $total_guaranteed >= $required_guarantee,
+//         'total_guaranteed' => $total_guaranteed,
+//         'required_guarantee' => $required_guarantee,
+//         'difference' => max(0, $required_guarantee - $total_guaranteed),
+//     ];
+// }
 private function updateLedgerEntries($loan, $default_bank_account, $default_insurance_account, $default_loan_commission_account, $new_batch_no, $total_loan, $logged_in_user, $myIP, $transdate, $currentPeriod)
 {
     $this->updateSaccoAccountsTrans($default_bank_account, 0, $loan->batch_trans_loan_amount - $loan->batch_trans_commission, $new_batch_no, $loan->batch_trans_description, $transdate, $currentPeriod, "Loan Approved");
