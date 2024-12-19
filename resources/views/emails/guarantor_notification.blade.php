@@ -61,7 +61,7 @@
             <p><strong>Loan Details:</strong></p>
             <ul>
                 <li>Loan Type: {{ $loan->loan_type_name }}</li>
-                <li>Amount: {{ number_format($loan->batch_trans_loan_amount, 2) }}</li>
+                <li>Loan Amount: {{ number_format($loan->batch_trans_loan_amount, 2) }}</li>
                 <li>Amount Guaranteed: {{ number_format($loan->guarantors_amount_guaranteed, 2) }}</li>
             </ul>
             <p>Please log in to your account to review and approve the guarantor request.</p>

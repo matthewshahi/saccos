@@ -26,29 +26,29 @@ class SendGuarantorEmailJob implements ShouldQueue
 
         // Fetch loans applied within the last 24 hours that are not deleted or approved
         $loans = DB::table('sacco_loan_batch_trans_members AS loans')
-            ->join('sacco_loan_types AS loan_types', 'loans.batch_trans_loan_type', '=', 'loan_types.loan_type_id')
-            ->join('sacco_members AS applicants', 'loans.batch_trans_member_id', '=', 'applicants.member_id') // Applicant details
-            ->join('sacco_loan_batch_guarantors_members AS guarantors', 'loans.batch_trans_id', '=', 'guarantors.guarantors_loan_batch_trans_id') // Guarantors mapping
-            ->join('sacco_members AS guarantor_members', 'guarantors.guarantors_guarantor_id', '=', 'guarantor_members.member_id') // Fetch guarantors' details
-            ->where('loans.batch_trans_deleted', 'N')
-            ->where('loans.batch_trans_updated', 'N')
-            ->where('guarantors.guarantors_email_sent', 'N')
-            ->where('guarantors.guarantors_deleted', 'N')
-            ->whereDate('loans.batch_trans_on', '>=', now()->subDay())
-            ->select(
-                'loans.batch_trans_id',
-                'loans.batch_trans_loan_amount',
-                'loan_types.loan_type_name',
-                'applicants.member_name AS applicant_name',
-                'guarantors.guarantors_guarantor_id',
-                'guarantors.guarantors_amount_guaranteed',
-                'guarantors.guarantors_email_sent',
-                'guarantors.guarantors_description',
-                'guarantors.guarantors_id',
-                'guarantor_members.member_email AS guarantor_email', // Fetch email from guarantor's member record
-                'guarantor_members.member_name AS guarantor_name' // Fetch guarantor's name for salutation
-            )
-            ->get();
+    ->join('sacco_loan_types AS loan_types', 'loans.batch_trans_loan_type', '=', 'loan_types.loan_type_id')
+    ->join('sacco_members AS applicants', 'loans.batch_trans_member_id', '=', 'applicants.member_id')
+    ->join('sacco_loan_batch_guarantors_members AS guarantors', 'loans.batch_trans_id', '=', 'guarantors.guarantors_loan_batch_trans_id')
+    ->join('sacco_members AS guarantor_members', 'guarantors.guarantors_guarantor_id', '=', 'guarantor_members.member_id')
+    ->where('loans.batch_trans_deleted', 'N')
+    ->where('loans.batch_trans_updated', 'N')
+    ->where('guarantors.guarantors_email_sent', 'N')
+    ->where('guarantors.guarantors_deleted', 'N')
+    ->whereDate('loans.batch_trans_on', '>=', now()->subDay())
+    ->select(
+        'loans.batch_trans_id',
+        'loans.batch_trans_loan_amount',
+        'loan_types.loan_type_name',
+        'applicants.member_name AS applicant_name',
+        'guarantors.guarantors_guarantor_id',
+        'guarantors.guarantors_amount_guaranteed',
+        'guarantors.guarantors_email_sent',
+        'guarantors.guarantors_description',
+        'guarantors.guarantors_id',
+        'guarantor_members.member_email AS guarantor_email',
+        'guarantor_members.member_name AS guarantor_name' // Fetch name for the email
+    )
+    ->get();
 
         foreach ($loans as $loan) {
             try {
