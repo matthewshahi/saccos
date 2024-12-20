@@ -1,25 +1,31 @@
 <?php
+
+namespace App\Console\Commands;
+
 use Illuminate\Console\Command;
-use App\Models\SaccoLoan;
-use App\Jobs\SendLoanApprovalEmail;
 
 class ProcessLoanEmails extends Command
 {
+    /**
+     * The name and signature of the console command.
+     *
+     * @var string
+     */
     protected $signature = 'process:loan-emails';
-    protected $description = 'Process loan emails in batches';
 
+    /**
+     * The console command description.
+     *
+     * @var string
+     */
+    protected $description = 'Process loan approval emails';
+
+    /**
+     * Execute the console command.
+     */
     public function handle()
     {
-        $loans = SaccoLoan::where('loan_email_sent', 'N')
-                          ->whereNotNull('loan_on')
-                          ->orderBy('loan_on')
-                          ->limit(5)
-                          ->get();
-
-        foreach ($loans as $loan) {
-            dispatch(new SendLoanApprovalEmail($loan));
-        }
-
-        $this->info('Processed loan emails.');
+        // Add your logic for processing loan emails
+        $this->info('Processing loan emails...');
     }
 }
