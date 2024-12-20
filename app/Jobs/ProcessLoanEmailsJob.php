@@ -25,6 +25,7 @@ class ProcessLoanEmailsJob implements ShouldQueue
 
         // Hardcoded test email (can be commented out)
         $testEmail = "matthewshahi@gmail.com";
+        Log::info('Using test email: ' . $testEmail);
 
         // Fetch sacco_mail from sacco_defaults table
         Log::info('Fetching sacco_mail from sacco_defaults table.');
@@ -69,20 +70,24 @@ class ProcessLoanEmailsJob implements ShouldQueue
 
         foreach ($loans as $loan) {
             try {
-                // Update loan_email_sent to 'Y' to avoid processing the same loan again
+                Log::info('Processing loan ID: ' . $loan->loan_id);
+
+                // Determine recipient email
+                $recipientEmail = !empty($testEmail) ? $testEmail : $loan->member_email;
+                Log::info('Email will be sent to: ' . $recipientEmail);
+
+                // Send the email
+                Mail::to($recipientEmail)->send(new LoanApprovalEmail($loan, $saccoMail));
+                Log::info('Email successfully sent for loan ID: ' . $loan->loan_id);
+
+                // Update loan_email_sent to 'Y' after successful email
                 Log::info('Marking loan ID ' . $loan->loan_id . ' as processed.');
                 DB::table('sacco_loans')
                     ->where('loan_id', $loan->loan_id)
                     ->update(['loan_email_sent' => 'Y']);
 
-                // Determine recipient email
-                $recipientEmail = isset($testEmail) ? $testEmail : $loan->member_email;
-                Log::info('Sending email to: ' . $recipientEmail);
-
-                // Send the email
-                Mail::to($recipientEmail)->send(new LoanApprovalEmail($loan, $saccoMail));
-                Log::info('Email sent for loan ID ' . $loan->loan_id);
             } catch (\Exception $e) {
+                // Log error details
                 Log::error('Failed to send loan approval email for Loan ID ' . $loan->loan_id . ': ' . $e->getMessage());
             }
         }
