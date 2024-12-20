@@ -49,9 +49,9 @@
             <p>If you have any questions or need support, feel free to contact us at <a href="mailto:{{ $saccoMail }}">{{ $saccoMail }}</a>.</p>
         @endif
 
-        <p>Thank you for choosing iSave Sacco!</p>
+        <p>Thank you for choosing {{ config('app.name') }}!</p>
         <div class="footer">
-            <p>&copy; 2024 iSave Sacco. All rights reserved.</p>
+            <p>&copy; {{ now()->year }} {{ config('app.name') }}. All rights reserved.</p>
         </div>
     </div>
 </body>
