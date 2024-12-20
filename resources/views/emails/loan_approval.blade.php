@@ -41,7 +41,7 @@
         <ul>
             <li><strong>Loan Type:</strong> {{ $loan->loan_type }}</li>
             <li><strong>Loan Amount:</strong> Ksh {{ number_format($loan->loan_amount, 2) }}</li>
-            <li><strong>Repayment Period:</strong> {{ $loan->loan_taken_period }} months</li>
+            <li><strong>Repayment Period:</strong> {{ $loan->loan_payment_period }} months</li>
             <li><strong>Monthly Repayment:</strong> Ksh {{ number_format($loan->loan_monthly_repayment_amount, 2) }}</li>
         </ul>
 
