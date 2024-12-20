@@ -44,7 +44,11 @@
             <li><strong>Repayment Period:</strong> {{ $loan->loan_taken_period }} months</li>
             <li><strong>Monthly Repayment:</strong> {{ number_format($loan->loan_monthly_repayment_amount, 2) }}</li>
         </ul>
-        <p>We are here to support you every step of the way. For any queries, please contact us at {{ $loan->sacco_mail }}.</p>
+
+        @if (!empty($saccoMail) && filter_var($saccoMail, FILTER_VALIDATE_EMAIL))
+            <p>If you have any questions or need support, feel free to contact us at <a href="mailto:{{ $saccoMail }}">{{ $saccoMail }}</a>.</p>
+        @endif
+
         <p>Thank you for choosing iSave Sacco!</p>
         <div class="footer">
             <p>&copy; 2024 iSave Sacco. All rights reserved.</p>

@@ -11,19 +11,25 @@ class Kernel extends ConsoleKernel
      * Define the application's command schedule.
      */
     protected function schedule(Schedule $schedule): void
-    {
-        $schedule->job(new \App\Jobs\ProcessTransactionsJob())->everyMinute()->withoutOverlapping();
-        $schedule->job(new \App\Jobs\SendWelcomeEmailJob())->everyMinute()->withoutOverlapping();
-    
-        $schedule->job(new \App\Jobs\SendGuarantorEmailJob())
-                ->everyMinute()
-                ->withoutOverlapping();
-        
-        $schedule->command('process:loan-emails')->everyMinute()->withoutOverlapping();
+{
+    $schedule->job(new \App\Jobs\ProcessTransactionsJob())
+        ->everyMinute()
+        ->withoutOverlapping();
 
+    $schedule->job(new \App\Jobs\SendWelcomeEmailJob())
+        ->everyMinute()
+        ->withoutOverlapping();
 
-        \Log::info('Scheduled jobs have been set.');
-    }
+    $schedule->job(new \App\Jobs\SendGuarantorEmailJob())
+        ->everyMinute()
+        ->withoutOverlapping();
+
+    $schedule->job(new \App\Jobs\ProcessLoanEmailsJob())
+        ->everyMinute()
+        ->withoutOverlapping();
+
+    \Log::info('Scheduled jobs have been set.');
+}
 
     /**
      * Register the commands for the application.
