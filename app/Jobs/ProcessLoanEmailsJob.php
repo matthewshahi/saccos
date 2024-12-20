@@ -21,15 +21,25 @@ class ProcessLoanEmailsJob implements ShouldQueue
      */
     public function handle()
     {
+        Log::info('ProcessLoanEmailsJob started.');
+
         // Hardcoded test email (can be commented out)
         $testEmail = "matthewshahi@gmail.com";
 
         // Fetch sacco_mail from sacco_defaults table
+        Log::info('Fetching sacco_mail from sacco_defaults table.');
         $saccoMail = DB::table('sacco_defaults')
             ->where('default_name', 'sacco_mail')
             ->value('default_value');
 
+        if (empty($saccoMail)) {
+            Log::warning('No sacco_mail found in sacco_defaults table.');
+        } else {
+            Log::info('Fetched sacco_mail: ' . $saccoMail);
+        }
+
         // Fetch loans where loan_email_sent = 'N' and updated in the last 24 hours
+        Log::info('Fetching loans where loan_email_sent = N.');
         $loans = DB::table('sacco_loans as loans')
             ->join('sacco_members as members', 'loans.loan_member', '=', 'members.member_id')
             ->join('sacco_loan_types as loan_types', 'loans.loan_loan_type', '=', 'loan_types.loan_type_id')
@@ -50,23 +60,33 @@ class ProcessLoanEmailsJob implements ShouldQueue
             ->lockForUpdate() // Prevent other processes from selecting the same loans
             ->get();
 
+        if ($loans->isEmpty()) {
+            Log::info('No loans found to process.');
+            return;
+        }
+
+        Log::info('Found ' . $loans->count() . ' loans to process.');
+
         foreach ($loans as $loan) {
             try {
                 // Update loan_email_sent to 'Y' to avoid processing the same loan again
+                Log::info('Marking loan ID ' . $loan->loan_id . ' as processed.');
                 DB::table('sacco_loans')
                     ->where('loan_id', $loan->loan_id)
                     ->update(['loan_email_sent' => 'Y']);
 
                 // Determine recipient email
                 $recipientEmail = isset($testEmail) ? $testEmail : $loan->member_email;
+                Log::info('Sending email to: ' . $recipientEmail);
 
                 // Send the email
                 Mail::to($recipientEmail)->send(new LoanApprovalEmail($loan, $saccoMail));
+                Log::info('Email sent for loan ID ' . $loan->loan_id);
             } catch (\Exception $e) {
                 Log::error('Failed to send loan approval email for Loan ID ' . $loan->loan_id . ': ' . $e->getMessage());
             }
         }
 
-        Log::info('Processed loan emails.');
+        Log::info('ProcessLoanEmailsJob completed.');
     }
 }

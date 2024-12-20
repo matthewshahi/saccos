@@ -13,16 +13,25 @@ class LoanApprovalEmail extends Mailable
     public $loan;
     public $saccoMail;
 
+    /**
+     * Create a new message instance.
+     *
+     * @param $loan
+     * @param $saccoMail
+     */
     public function __construct($loan, $saccoMail)
     {
         $this->loan = $loan;
         $this->saccoMail = $saccoMail;
     }
 
+    /**
+     * Build the message.
+     */
     public function build()
     {
         return $this->view('emails.loan_approval')
-            ->subject('Loan Approved')
+            ->subject('Congratulations! Your Loan Has Been Approved')
             ->with([
                 'loan' => $this->loan,
                 'saccoMail' => $this->saccoMail,
