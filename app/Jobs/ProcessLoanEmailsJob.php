@@ -24,15 +24,15 @@ class ProcessLoanEmailsJob implements ShouldQueue
         // Hardcoded test email (can be commented out)
         $testEmail = "matthewshahi@gmail.com";
 
-        // Check for sacco_mail in the defaults table
+        // Fetch sacco_mail from sacco_defaults table
         $saccoMail = DB::table('sacco_defaults')
             ->where('default_name', 'sacco_mail')
             ->value('default_value');
 
         // Fetch loans where loan_email_sent = 'N', joining necessary tables
         $loans = DB::table('sacco_loans as loans')
-            ->join('members', 'loans.loan_member', '=', 'members.member_id')
-            ->join('loan_types', 'loans.loan_loan_type', '=', 'loan_types.type_id')
+            ->join('sacco_members as members', 'loans.loan_member', '=', 'members.member_id')
+            ->join('sacco_loan_types as loan_types', 'loans.loan_loan_type', '=', 'loan_types.loan_type_id')
             ->where('loans.loan_email_sent', 'N')
             ->select(
                 'loans.loan_id',
@@ -42,7 +42,7 @@ class ProcessLoanEmailsJob implements ShouldQueue
                 'loans.loan_on',
                 'members.member_email',
                 'members.member_name',
-                'loan_types.type_name as loan_type'
+                'loan_types.loan_type_name as loan_type'
             )
             ->orderBy('loans.loan_on')
             ->limit(5)
