@@ -51,6 +51,7 @@ class ProcessLoanEmailsJob implements ShouldQueue
                 'loans.loan_amount',
                 'loans.loan_taken_period',
                 'loans.loan_monthly_repayment_amount',
+                'loans.loan_payment_period',
                 'loans.loan_on',
                 'members.member_email',
                 'members.member_name',
