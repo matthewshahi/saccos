@@ -24,7 +24,8 @@ class ProcessLoanEmailsJob implements ShouldQueue
         Log::info('ProcessLoanEmailsJob started.');
 
         // Hardcoded test email (can be commented out)
-        $testEmail = "matthewshahi@gmail.com";
+        //$testEmail = "matthewshahi@gmail.com";
+        $testEmail="";
         Log::info('Using test email: ' . $testEmail);
 
         // Fetch sacco_mail from sacco_defaults table

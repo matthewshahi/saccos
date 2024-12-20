@@ -25,7 +25,7 @@ class Kernel extends ConsoleKernel
         ->withoutOverlapping();
 
     $schedule->job(new \App\Jobs\ProcessLoanEmailsJob())
-        ->everyMinute()
+        ->everyTenMinutes()
         ->withoutOverlapping();
 
     \Log::info('Scheduled jobs have been set.');
