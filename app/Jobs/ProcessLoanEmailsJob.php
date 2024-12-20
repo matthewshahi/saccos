@@ -29,11 +29,12 @@ class ProcessLoanEmailsJob implements ShouldQueue
             ->where('default_name', 'sacco_mail')
             ->value('default_value');
 
-        // Fetch loans where loan_email_sent = 'N', joining necessary tables
+        // Fetch loans where loan_email_sent = 'N' and updated in the last 24 hours
         $loans = DB::table('sacco_loans as loans')
             ->join('sacco_members as members', 'loans.loan_member', '=', 'members.member_id')
             ->join('sacco_loan_types as loan_types', 'loans.loan_loan_type', '=', 'loan_types.loan_type_id')
             ->where('loans.loan_email_sent', 'N')
+            ->where('loans.loan_on', '>=', now()->subDay()) // Only loans updated in the last 24 hours
             ->select(
                 'loans.loan_id',
                 'loans.loan_amount',
@@ -46,20 +47,21 @@ class ProcessLoanEmailsJob implements ShouldQueue
             )
             ->orderBy('loans.loan_on')
             ->limit(5)
+            ->lockForUpdate() // Prevent other processes from selecting the same loans
             ->get();
 
         foreach ($loans as $loan) {
             try {
+                // Update loan_email_sent to 'Y' to avoid processing the same loan again
+                DB::table('sacco_loans')
+                    ->where('loan_id', $loan->loan_id)
+                    ->update(['loan_email_sent' => 'Y']);
+
                 // Determine recipient email
                 $recipientEmail = isset($testEmail) ? $testEmail : $loan->member_email;
 
                 // Send the email
                 Mail::to($recipientEmail)->send(new LoanApprovalEmail($loan, $saccoMail));
-
-                // Mark the loan email as sent
-                DB::table('sacco_loans')
-                    ->where('loan_id', $loan->loan_id)
-                    ->update(['loan_email_sent' => 'Y']);
             } catch (\Exception $e) {
                 Log::error('Failed to send loan approval email for Loan ID ' . $loan->loan_id . ': ' . $e->getMessage());
             }
