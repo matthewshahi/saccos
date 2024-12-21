@@ -13,6 +13,17 @@
     <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
     <link href="https://fonts.googleapis.com/css?family=Nunito:300,400,400i,600,700,800,900" rel="stylesheet" />
 
+    <!-- Google tag (gtag.js) -->
+    @if(env('GA_ANALYTICS'))
+    <script async src="https://www.googletagmanager.com/gtag/js?id={{ env('GA_ANALYTICS') }}"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+
+        gtag('config', "{{ env('GA_ANALYTICS') }}");
+    </script>
+    @endif
 
     
 </head>
