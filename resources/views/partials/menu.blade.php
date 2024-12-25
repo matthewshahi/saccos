@@ -172,6 +172,11 @@
                                     <span class="text-muted">Loans issued</span>
                                 </a>
                             </li> -->
+                            <li class="item-name">
+                                <a href="{{ url('/modify/member/loans') }}">
+                                    <span class="text-muted">Increase/Reduce Loans</span>
+                                </a>
+                            </li>
                             
                             <li class="item-name">
                                 <a href="{{ url('/admin/loans/pending/approval') }}">
@@ -194,6 +199,7 @@
                                     <span class="text-muted">Loan categories</span>
                                 </a>
                             </li>
+                            
                         </ul>
                     </li>
                     <li class="Ul_li--hover">

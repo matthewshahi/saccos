@@ -19,8 +19,10 @@ use App\Http\Controllers\MpesaTheController;
 use App\Http\Controllers\MpesaReportController;
 use Illuminate\Support\Facades\Mail;
 use App\Http\Controllers\PublicRegistrationActionsImportController;
-use App\Http\Controllers\TempCapitalImportController;
+// use App\Http\Controllers\TempCapitalImportController;
 use App\Http\Controllers\LoanApplicationSelfServiceController;
+use App\Http\Controllers\ReportLedgerController;
+use App\Http\Controllers\LoanPaymentController;
 
 // Route::get('/test-email', function () {
 //     Mail::raw('This is a test email from Laravel!', function ($message) {
@@ -205,8 +207,8 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
     Route::post('/institutions/store', [HomeController::class, 'storeInstitution'])->name('institutions.store')->middleware('check_user_rights:add_company');
     Route::get('/institutions/list', [HomeController::class, 'listInstitutions'])->name('institutions.list')->middleware('check_user_rights:edit_company');
 
-    Route::get('/modify/member/shares', [HomeController::class, 'modifyShares'])->name('modify.member.shares')->middleware('check_user_rights:edit_member_share_contribution');
-    Route::post('/modify/member/shares', [HomeController::class, 'modifyShares'])->middleware('check_user_rights:edit_member_share_contribution');
+    Route::get('/modify/member/shares', [HomeController::class, 'modifyShares'])->name('modify.member.shares')->middleware('check_user_rights:modify_member_shares_journal');
+    Route::post('/modify/member/shares', [HomeController::class, 'modifyShares'])->middleware('check_user_rights:modify_member_shares_journal');
     Route::get('/search/members', [HomeController::class, 'searchMembers'])->name('search.members')->middleware('check_user_rights:list_sacco_member');
     Route::get('/search/accounts', [HomeController::class, 'searchAccounts'])->name('search.accounts')->middleware('check_user_rights:modify_member_shares_journal');
 
@@ -310,6 +312,32 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
     Route::post('/loans/categories/update/{id}', [HomeController::class, 'updateLoanCategory'])->name('loans.categories.update')->middleware('check_user_rights:add_loan_type');
     Route::delete('/loans/categories/delete/{id}', [HomeController::class, 'deleteLoanCategory'])->name('loans.categories.delete')->middleware('check_user_rights:add_loan_type');
 
+   
+
+    Route::get('/modify/member/loans', [LoanPaymentController::class, 'index'])
+    ->name('modify.member.loans')
+    ->middleware('check_user_rights:modify_member_loan_journal');
+
+    Route::post('/modify/member/loans/update', [LoanPaymentController::class, 'updateLoanPayment'])
+        ->name('modify.member.loans.update')
+        ->middleware('check_user_rights:modify_member_loan_journal');
+
+    // Additional Routes
+    Route::post('/modify/member/loans/pay', [LoanPaymentController::class, 'payLoan'])
+        ->name('modify.member.loans.pay')
+        ->middleware('check_user_rights:modify_member_loan_journal');
+
+    Route::post('/modify/member/loans/reduce', [LoanPaymentController::class, 'reduceLoan'])
+        ->name('modify.member.loans.reduce')
+        ->middleware('check_user_rights:modify_member_loan_journal');
+    
+
+    
+    Route::get('/modify/member/loans/asset-accounts', [LoanPaymentController::class, 'getAssetAccounts'])
+        ->name('modify.member.loans.asset.accounts')
+        ->middleware('check_user_rights:modify_member_loan_journal');
+        
+
 
     Route::get('/guarantors/deduction', [HomeController::class, 'guarantorsDeduction'])->name('guarantors.deduction')->name('loans.categories.delete')->middleware('check_user_rights:loan_guarantors_change');
     Route::get('/guarantors/reset', [HomeController::class, 'guarantorsReset'])->name('guarantors.reset')->name('loans.categories.delete')->middleware('check_user_rights:loan_guarantors_change');
@@ -338,7 +366,10 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
     Route::get('/reports/loans/repayments', [HomeController::class, 'reportsLoansRepayments'])->name('reports.loans.repayments')->middleware('check_user_rights:rpt_reports');
     Route::get('/reports/loans/balances/period', [HomeController::class, 'reportsLoansBalancesPeriod'])->name('reports.loans.balances.period')->middleware('check_user_rights:rpt_reports');
 
-    Route::get('/reports/accounts/ledger', [HomeController::class, 'reportsAccountsLedger'])->name('reports.accounts.ledger')->middleware('check_user_rights:rpt_acc_trans');
+    Route::get('/reports/accounts/ledger', [ReportLedgerController::class, 'reportsAccountsLedger'])->name('reports.accounts.ledger')->middleware('check_user_rights:rpt_acc_trans');
+    Route::put('/reports/accounts/ledger/update/{id}', [ReportLedgerController::class, 'updateTransaction'])->name('reports.accounts.update')->middleware('check_user_rights:rpt_acc_trans');
+    Route::put('/reports/accounts/ledger/update/{id}', [ReportLedgerController::class, 'updateTransaction'])->name('reports.accounts.update')->middleware('check_user_rights:modify_member_shares_journal');
+
     Route::get('/reports/accounts/trial-balance', [HomeController::class, 'reportsAccountsTrialBalance'])->name('reports.accounts.trial-balance')->middleware('check_user_rights:rpt_trial_balance');
     Route::get('/reports/accounts/profit-loss', [HomeController::class, 'reportsAccountsTrialBalance'])->name('reports.accounts.profit-loss')->middleware('check_user_rights:rpt_profit_loss');
     Route::get('/reports/accounts/profit-loss/budget', [HomeController::class, 'reportsAccountsTrialBalanceBudget'])->name('reports.accounts.profit-loss.budget')->middleware('check_user_rights:rpt_profit_loss');
