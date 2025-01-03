@@ -84,6 +84,8 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/loans/apply', [HomeController::class, 'loansApply'])->name('loans.apply');
     Route::post('/loans/apply', [HomeController::class, 'submitLoanApplication'])->name('loans.application.submit');
+    Route::get('/search/members', [HomeController::class, 'searchMembers'])->name('search.members');
+
 
     Route::get('/loans/guarantee/requests', [HomeController::class, 'listGuaranteeRequests'])->name('loans.guarantee.requests');
     // Route::get('/loans/pending/approval', [HomeController::class, 'listLoansPendingApproval'])->name('loans.pending.approval')->middleware('check_user_rights:rpt_loans_issued');
@@ -209,7 +211,6 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
 
     Route::get('/modify/member/shares', [HomeController::class, 'modifyShares'])->name('modify.member.shares')->middleware('check_user_rights:modify_member_shares_journal');
     Route::post('/modify/member/shares', [HomeController::class, 'modifyShares'])->middleware('check_user_rights:modify_member_shares_journal');
-    Route::get('/search/members', [HomeController::class, 'searchMembers'])->name('search.members')->middleware('check_user_rights:list_sacco_member');
     Route::get('/search/accounts', [HomeController::class, 'searchAccounts'])->name('search.accounts')->middleware('check_user_rights:modify_member_shares_journal');
 
     Route::match(['get', 'post'], '/transfer/member/shares', [HomeController::class, 'transferShares'])->name('transfer.member.shares')->middleware('check_user_rights:transfer_member_shares');
