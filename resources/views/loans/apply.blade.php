@@ -223,7 +223,11 @@
                 document.getElementById(suggestionsBox).innerHTML = suggestions;
             }
         };
-        xmlhttp.open("GET", "/search/members?query=" + str, true);
+        const baseURL = "{{ url('/') }}";
+
+    // Use the base URL in your AJAX call
+         xmlhttp.open("GET", baseURL + "/search/members?query=" + str, true);
+        // xmlhttp.open("GET", "/search/members?query=" + str, true);
         xmlhttp.send();
     }
 
