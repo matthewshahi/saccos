@@ -24,14 +24,14 @@ use App\Http\Controllers\LoanApplicationSelfServiceController;
 use App\Http\Controllers\ReportLedgerController;
 use App\Http\Controllers\LoanPaymentController;
 
-// Route::get('/test-email', function () {
-//     Mail::raw('This is a test email from Laravel!', function ($message) {
-//         $message->to('matthewshahi@gmail.com')
-//                 ->subject('Test Email from iSacco');
-//     });
+Route::get('/test-email', function () {
+    Mail::raw('This is a test email from Laravel!', function ($message) {
+        $message->to('matthewshahi@gmail.com')
+                ->subject('Test Email from iSacco 3');
+    });
 
-//     return 'Test email sent!';
-// });
+    return 'Test email sent!';
+});
 
 Route::get('/preview-loan-email', function () {
     $loan = (object) [

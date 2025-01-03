@@ -126,3 +126,33 @@
 @endsection
 
 
+@section('scripts')
+<script>
+    $(document).ready(function () {
+        $('#multicolumn_ordering_table').DataTable({
+            dom: 'Bfrtip',
+            buttons: [
+                {
+                    extend: 'excelHtml5',
+                    title: 'Member Contributions',
+                    text: 'Export to Excel',
+                    className: 'btn btn-primary'
+                },
+                {
+                    extend: 'csvHtml5',
+                    title: 'Member Contributions',
+                    text: 'Export to CSV',
+                    className: 'btn btn-secondary'
+                },
+                {
+                    extend: 'print',
+                    title: 'Member Contributions',
+                    text: 'Print',
+                    className: 'btn btn-info'
+                }
+            ],
+            responsive: true
+        });
+    });
+</script>
+@endsection
