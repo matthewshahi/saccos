@@ -42,7 +42,7 @@
                 </div>
             </form>
             <div class="table-responsive">
-                <table class="display table table-striped table-bordered" id="multicolumn_ordering_table" style="width: 100%">
+                <table id="memberContributionsTable" class="display table table-striped table-bordered"  style="width: 100%">
                     <thead>
                         <tr>
                             <th nowrap>#</th>
@@ -109,50 +109,54 @@
             </div>
         </div>
     </div>
-@endsection
 
-@section('styles')
     <style>
-        .custom-search-form {
-            margin-bottom: 20px;
-        }
-        .custom-search-form .form-control {
-            border-radius: 0.25rem;
-        }
-        .custom-search-form .btn {
-            border-radius: 0.25rem;
-        }
-    </style>
-@endsection
+    .form-group {
+        margin-bottom: 1.5rem;
+    }
+    .col-form-label {
+        font-weight: bold;
+    }
+    .btn-primary {
+        background-color: #4e73df;
+        border-color: #4e73df;
+    }
+    .btn-primary:hover {
+        background-color: #2e59d9;
+        border-color: #2653d4;
+    }
+    h5 {
+        border-bottom: 1px solid #e0e0e0;
+        padding-bottom: 0.5rem;
+        margin-bottom: 1.5rem;
+        color: #4e73df;
+    }
+</style>
+<link href="https://cdn.datatables.net/1.11.5/css/jquery.dataTables.min.css" rel="stylesheet">
+<link href="https://cdn.datatables.net/buttons/2.2.2/css/buttons.dataTables.min.css" rel="stylesheet">
 
-
-@section('scripts')
+<script src="https://code.jquery.com/jquery-3.5.1.js"></script>
+<script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.2.2/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.2.2/js/buttons.flash.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.2.2/js/buttons.html5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.2.2/js/buttons.print.min.js"></script>
+ 
 <script>
-    $(document).ready(function () {
-        $('#multicolumn_ordering_table').DataTable({
-            dom: 'Bfrtip',
+    $(document).ready(function() {
+        $('#memberContributionsTable').DataTable({
+            dom: 'Bfrtip', // Allows the buttons to be displayed
             buttons: [
-                {
-                    extend: 'excelHtml5',
-                    title: 'Member Contributions',
-                    text: 'Export to Excel',
-                    className: 'btn btn-primary'
-                },
-                {
-                    extend: 'csvHtml5',
-                    title: 'Member Contributions',
-                    text: 'Export to CSV',
-                    className: 'btn btn-secondary'
-                },
-                {
-                    extend: 'print',
-                    title: 'Member Contributions',
-                    text: 'Print',
-                    className: 'btn btn-info'
-                }
+                'copy', 'csv', 'excel', 'pdf', 'print'
             ],
-            responsive: true
+            searching: false, // Disables the default search box
+            pageLength: 150, // Sets the number of rows per page to 150
+            lengthChange: false, // Disables the ability to change the number of rows per page
+            order: [[0, 'asc']] // Optional: Orders by the first column
         });
     });
 </script>
 @endsection
+
+
