@@ -1908,14 +1908,15 @@ public function searchMembers(Request $request)
         ->where(function($q) use ($query) {
             $q->where('member_name', 'LIKE', '%' . $query . '%')
                 ->orWhere('member_phone_no', 'LIKE', '%' . $query . '%')
-                ->orWhere('member_sacco_id', 'LIKE', '%' . $query . '%');
+                ->orWhere('member_sacco_id', 'LIKE', '%' . $query . '%')
+                ->orWhere('member_national_id', 'LIKE', '%' . $query . '%');
         })
         ->where('member_active', 'Y')
         ->where('member_deleted', '<>', 'Y')
         ->orderBy('member_name')
         ->limit(5)
         ->get();
-
+ 
     $results = [];
     foreach ($members as $member) {
         $results[] = [
