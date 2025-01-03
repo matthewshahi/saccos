@@ -1916,7 +1916,7 @@ public function searchMembers(Request $request)
         ->orderBy('member_name')
         ->limit(5)
         ->get();
- 
+
     $results = [];
     foreach ($members as $member) {
         $results[] = [

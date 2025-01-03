@@ -29,15 +29,30 @@
 
     <!-- Search Bar -->
     <div class="row mb-3">
-        <div class="col-md-6 offset-md-3">
-            <form method="GET" action="{{ route('loans.pending.approval') }}">
-                <div class="input-group">
-                    <input type="text" name="search" class="form-control" placeholder="Search..." value="{{ request()->search }}">
-                    <button class="btn btn-primary" type="submit">Search</button>
+    <div class="col-md-12">
+        <form method="GET" action="{{ route('loans.pending.approval') }}">
+            <div class="row align-items-center">
+                <!-- Search Input -->
+                <div class="col-md-6 mb-2 mb-md-0">
+                    <div class="input-group">
+                        <input type="text" name="search" class="form-control" placeholder="Search..." value="{{ request()->search }}">
+                    </div>
                 </div>
-            </form>
-        </div>
+                <!-- Pending Loans Checkbox -->
+                <div class="col-md-4 mb-2 mb-md-0">
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" id="pendingLoansOnly" name="pending" value="1" {{ request()->pending ? 'checked' : '' }}>
+                        <label class="form-check-label" for="pendingLoansOnly">Pending Loans Only</label>
+                    </div>
+                </div>
+                <!-- Submit Button -->
+                <div class="col-md-2 text-md-end">
+                    <button class="btn btn-primary w-100" type="submit">Search</button>
+                </div>
+            </div>
+        </form>
     </div>
+</div>
 
     <!-- Table Section -->
     <div class="card">

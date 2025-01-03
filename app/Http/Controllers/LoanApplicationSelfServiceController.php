@@ -10,6 +10,8 @@ class LoanApplicationSelfServiceController extends Controller
     public function listLoansPendingApproval(Request $request)
     {
 
+        $pendingLoansOnly = $request->has('pending') && $request->input('pending') == '1' ? 'Y' : null;
+
         $query = DB::table('sacco_loan_batch_trans_members AS trans')
     ->join('sacco_members AS members', 'trans.batch_trans_member_id', '=', 'members.member_id') // Loan applicant
     ->join('sacco_loan_types AS types', 'trans.batch_trans_loan_type', '=', 'types.loan_type_id') // Loan type
@@ -17,6 +19,7 @@ class LoanApplicationSelfServiceController extends Controller
         $join->on('trans.batch_trans_id', '=', 'guarantors.guarantors_loan_batch_trans_id')
              ->where('guarantors.guarantors_deleted', 'N'); // Exclude deleted guarantors
     })
+ 
     ->leftJoin('sacco_members AS g_members', 'guarantors.guarantors_guarantor_id', '=', 'g_members.member_id') // Guarantors' details
     ->select(
         'trans.*',
@@ -66,6 +69,13 @@ class LoanApplicationSelfServiceController extends Controller
                   ->orWhere('types.loan_type_name', 'LIKE', "%$search%");
             });
         }
+
+        if ($pendingLoansOnly) {
+            $query->where('batch_trans_updated', 'N')
+                       ->where('batch_trans_deleted', '!=', 'Y'); // Exclude rejected loans
+        }
+        
+
     
         // Fetch paginated loans (max 300 records, 20 per page)
         $loans = $query->orderBy('trans.batch_trans_on', 'desc')
