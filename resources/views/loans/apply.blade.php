@@ -49,6 +49,8 @@
         <div class="card mb-4">
             <div class="card-body">
                 <div class="card-title mb-3">Loan Application Form</div>
+                
+
                 <form action="{{ route('loans.application.submit') }}" method="post" enctype="multipart/form-data">
                     @csrf
                     <div class="row">
