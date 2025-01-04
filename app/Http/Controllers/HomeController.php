@@ -3535,7 +3535,6 @@ public function submitLoanApplication(Request $request)
                     ->where('guarantors_deleted', '<>', 'Y')
                     ->sum('guarantors_amount_guaranteed') ?? 0;
 
-                    $nmsg .= "Error, guarantor {$guarantorName}, in row " . ($i + 1) . " has over guaranteed. ".($guarantor->member_total_share * $max_guarantor_factor - $guarantor->member_tied_shares)."-- ".($guarantorAmount);
                   
                 if (($guarantor->member_total_share * $max_guarantor_factor - $guarantor->member_tied_shares) < ($guarantorAmount)) {
                     $nmsg .= "Error, guarantor {$guarantorName}, in row " . ($i + 1) . " has over guaranteed. ";
