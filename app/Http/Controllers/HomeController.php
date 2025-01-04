@@ -3537,6 +3537,7 @@ public function submitLoanApplication(Request $request)
 
                 if (($guarantor->member_total_share * $max_guarantor_factor - $guarantor->member_tied_shares) < ($guarantorAmount)) {
                     $nmsg .= "Error, guarantor {$guarantorName}, in row " . ($i + 1) . " has over guaranteed. ".($guarantor->member_total_share * $max_guarantor_factor - $guarantor->member_tied_shares)."-- ".($guarantorAmount);
+                    dd($nmsg);
                 }
             } else { 
                 // if (($guarantor->member_total_share * $max_guarantor_factor - $guarantor->member_tied_shares_self) < $guarantorAmount) {
