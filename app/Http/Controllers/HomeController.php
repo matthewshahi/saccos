@@ -3349,7 +3349,7 @@ public function loansApply()
     $maximumNoOfGuarantors = DB::table('sacco_defaults')
         ->where('default_name', 'maximum_no_of_guarantors')
         ->value('default_value');
-
+ 
     $memberLoans = DB::table('sacco_loans')
         ->join('sacco_loan_types', 'sacco_loans.loan_loan_type', '=', 'sacco_loan_types.loan_type_id')
         ->select('sacco_loans.*', 'sacco_loan_types.loan_type_name', DB::raw('(sacco_loans.loan_amount - sacco_loans.loan_loan_paid) as loan_balance'))

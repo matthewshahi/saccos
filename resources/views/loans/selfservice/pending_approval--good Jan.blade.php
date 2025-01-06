@@ -8,7 +8,6 @@
             <h3 class="text-center">Loans Pending Approval</h3>
         </div>
     </div>
-   
 <!-- Success and Error Messages -->
 @if (session('success'))
         <div class="alert alert-success alert-dismissible fade show" role="alert">
@@ -70,7 +69,6 @@
         <th>Loan Type</th>
         <th>Date Applied</th> <!-- Added Column -->
         <th>Updated</th>
-        <th>Edit</th>
         <th>Actions</th>
     </tr>
 </thead>
@@ -93,12 +91,6 @@
         <span class="badge bg-warning">Pending</span>
     @endif
 </td>
-<td>
-    <a href="{{ route('loans.pending.approval.selfedit', ['id' => $loan->batch_trans_id]) }}" class="btn btn-primary btn-sm">
-        Edit
-    </a>
-</td>
-
             <td>
                 <!-- View Details Button -->
                 <button class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#loanModal{{ $loan->batch_trans_id }}">

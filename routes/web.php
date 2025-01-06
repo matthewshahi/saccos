@@ -86,6 +86,16 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/loans/apply', [HomeController::class, 'submitLoanApplication'])->name('loans.application.submit');
     Route::get('loans/pending/approval/self', [LoanApplicationSelfServiceController::class, 'listLoansPendingApprovalSelf'])
     ->name('loans.pending.approval.self');
+    Route::get('loans/pending/approval/selfedit/{id}', [LoanApplicationSelfServiceController::class, 'listLoansPendingApprovalSelfedit'])
+    ->name('loans.pending.approval.selfedit');
+    Route::post('/loans/process-application', [LoanApplicationSelfServiceController::class, 'processLoanApplication'])
+    ->name('loans.process.application');
+    Route::put('loans/application/update/{id}', [LoanApplicationSelfServiceController::class, 'updateLoanApplication'])
+    ->name('loans.application.update');
+    Route::delete('/loans/delete-guarantor/{id}', [LoanApplicationSelfServiceController::class, 'deleteGuarantor'])->name('loans.delete.guarantor');
+    Route::post('/loans/add-guarantor/{id}', [LoanApplicationSelfServiceController::class, 'addGuarantor'])->name('loans.add.guarantor');
+    Route::get('/search/guarantors', [LoanApplicationSelfServiceController::class, 'search'])->name('search.guarantors');
+
     Route::get('/search/members', [HomeController::class, 'searchMembers'])->name('search.members');
 
 
