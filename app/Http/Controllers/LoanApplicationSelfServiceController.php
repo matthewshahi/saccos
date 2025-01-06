@@ -971,6 +971,7 @@ private function validateAndProcessGuarantors($data, $loanType, $batch_trans_id,
                 'guarantors_ip' => request()->ip(),
                 'guarantors_deleted' => 'N',
                 'guarantors_approved' => 'N', // Set all as 'N'
+                'guarantors_email_sent'=> 'N', // Set all as 'N'
             ]
         );
     }

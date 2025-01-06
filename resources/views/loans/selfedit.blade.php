@@ -24,6 +24,11 @@
         {!! nl2br(e(session('error'))) !!} <!-- Converts line breaks in error message -->
     </div>
 @endif
+<!-- Warning message -->
+<div class="alert alert-warning">
+        <strong>Warning:</strong> Editing an already existing loan application will restart the loan application process. 
+        This includes requesting members who had guaranteed your loan to make fresh approvals.
+    </div>
     <div class="row">
         <div class="col-md-12">
             <h3>Edit Loan Application</h3>
