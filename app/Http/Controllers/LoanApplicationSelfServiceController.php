@@ -4,11 +4,16 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
+
+
 
 class LoanApplicationSelfServiceController extends Controller
 {
     public function listLoansPendingApproval(Request $request)
     {
+
+       
 
         $pendingLoansOnly = $request->has('pending') && $request->input('pending') == '1' ? 'Y' : null;
 
@@ -87,6 +92,60 @@ class LoanApplicationSelfServiceController extends Controller
         return view('loans.selfservice.pending_approval', compact('loans'));
     }
     
+
+    public function listLoansPendingApprovalSelf(Request $request)
+        {
+            $pendingLoansOnly = $request->has('pending') && $request->input('pending') == '1' ? 'Y' : null;
+
+            $loggedInMemberId = Auth::user()->member_id; // Get the logged-in user's member_id
+
+            $query = DB::table('sacco_loan_batch_trans_members AS trans')
+                ->join('sacco_members AS members', 'trans.batch_trans_member_id', '=', 'members.member_id') // Loan applicant
+                ->join('sacco_loan_types AS types', 'trans.batch_trans_loan_type', '=', 'types.loan_type_id') // Loan type
+                ->leftJoin('sacco_loan_batch_guarantors_members AS guarantors', function ($join) {
+                    $join->on('trans.batch_trans_id', '=', 'guarantors.guarantors_loan_batch_trans_id')
+                        ->where('guarantors.guarantors_deleted', 'N'); // Exclude deleted guarantors
+                })
+                ->leftJoin('sacco_members AS g_members', 'guarantors.guarantors_guarantor_id', '=', 'g_members.member_id') // Guarantors' details
+                ->select(
+                    'trans.*',
+                    'members.member_name', 
+                    'members.member_phone_no', 
+                    'members.member_national_id',
+                    'types.loan_type_name',
+                    DB::raw('GROUP_CONCAT(g_members.member_name ORDER BY guarantors.guarantors_id ASC SEPARATOR "|") AS guarantors_names'), // Ordered by guarantors_id
+                    DB::raw('GROUP_CONCAT(guarantors.guarantors_amount_guaranteed ORDER BY guarantors.guarantors_id ASC SEPARATOR "|") AS guarantors_amounts'), // Ordered by guarantors_id
+                    DB::raw('GROUP_CONCAT(guarantors.guarantors_approved ORDER BY guarantors.guarantors_id ASC SEPARATOR "|") AS guarantors_approval_status') // Ordered by guarantors_id
+                )
+                ->where('members.member_id', $loggedInMemberId) // Filter by logged-in user's member_id
+                ->groupBy('trans.batch_trans_id');
+
+            // Search functionality
+            if ($request->has('search')) {
+                $search = $request->input('search');
+                $query->where(function ($q) use ($search) {
+                    $q->where('members.member_name', 'LIKE', "%$search%")
+                    ->orWhere('members.member_phone_no', 'LIKE', "%$search%")
+                    ->orWhere('members.member_national_id', 'LIKE', "%$search%")
+                    ->orWhere('types.loan_type_name', 'LIKE', "%$search%");
+                });
+            }
+
+            // Filter pending loans
+            if ($pendingLoansOnly) {
+                $query->where('batch_trans_updated', 'N')
+                    ->where('batch_trans_deleted', '!=', 'Y'); // Exclude rejected loans
+            }
+
+            // Apply ordering and paginate
+            $loans = $query->orderBy('trans.batch_trans_on', 'desc') // Ensure orderBy is before paginate
+                        ->paginate(20); // Fetch paginated results
+
+            // Return the view with loans
+            return view('loans.selfservice.pending_approval', compact('loans'));
+        }
+    
+
     public function approveLoan($id)
     {
         $logged_in_user = auth()->id();

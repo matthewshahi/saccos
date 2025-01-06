@@ -84,6 +84,8 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/loans/apply', [HomeController::class, 'loansApply'])->name('loans.apply');
     Route::post('/loans/apply', [HomeController::class, 'submitLoanApplication'])->name('loans.application.submit');
+    Route::get('loans/pending/approval/self', [LoanApplicationSelfServiceController::class, 'listLoansPendingApprovalSelf'])
+    ->name('loans.pending.approval.self');
     Route::get('/search/members', [HomeController::class, 'searchMembers'])->name('search.members');
 
 

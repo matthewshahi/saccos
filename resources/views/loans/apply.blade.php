@@ -36,13 +36,15 @@
                 @endforeach
             </ul>
         </div>
-    @endif
+    @endif 
 
     <div class="col-md-12 mb-3 d-flex justify-content-center">
         
             <a href="{{ route('loans.guarantee.requests') }}">Guarantee requests</a>&nbsp;|| &nbsp;
-            <a href="{{ route('loans.pending.approval') }}">List loans pending approval</a> &nbsp;|| &nbsp;
-         
+            <a href="{{ Auth::user()->member_position == 2 ? route('loans.pending.approval') : route('loans.pending.approval.self') }}">
+    List loans pending approval
+</a> &nbsp;|| &nbsp;
+            
     </div>
 
     <div class="col-md-12">
