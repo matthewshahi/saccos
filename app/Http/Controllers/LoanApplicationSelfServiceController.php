@@ -25,9 +25,7 @@ class LoanApplicationSelfServiceController extends Controller
         ->leftJoin('sacco_members AS g_members', 'guarantors.guarantors_guarantor_id', '=', 'g_members.member_id') // Guarantors' details
         ->select(
             'trans.*',
-            'members.member_name', 
-            'members.member_phone_no', 
-            'members.member_national_id',
+            'members.*', 
             'types.loan_type_name',
             'category.loan_category_name', // Loan category added
             DB::raw('GROUP_CONCAT(g_members.member_name ORDER BY guarantors.guarantors_id ASC SEPARATOR "|") AS guarantors_names'), // Ordered by guarantors_id

@@ -64,6 +64,7 @@
     <tr>
         <th>#</th>
         <th class="text-start">Applicant Name</th>
+        <th class="text-start">Member Number</th>
         <th class="text-start">Phone</th>
         <th class="text-start">National ID</th>
         <th class="text-end">Loan Amount</th>
@@ -87,6 +88,7 @@
         <tr>
             <td>{{ $loans->firstItem() + $index }}</td>
             <td class="text-start">{{ $loan->member_name }}</td>
+            <td class="text-start">{{ $loan->member_sacco_id }}</td>
             <td class="text-start">{{ $loan->member_phone_no }}</td>
             <td class="text-start">{{ $loan->member_national_id }}</td>
             <td class="text-end">{{ number_format($loan->batch_trans_loan_amount, 2) }}</td>
