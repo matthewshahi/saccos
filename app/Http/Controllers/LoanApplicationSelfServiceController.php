@@ -599,7 +599,7 @@ public function listLoansPendingApprovalSelfedit($id)
         ->where('guarantors.guarantors_loan_batch_trans_id', $id)
         ->where('guarantors.guarantors_deleted', '<>', 'Y') // Exclude deleted guarantors
         ->get();
-
+ 
 
     // Return the self-edit view with the fetched data
     
@@ -680,7 +680,7 @@ public function deleteGuarantor($id)
 
     return redirect()->back()->with('success', 'Guarantor marked as deleted successfully.');
 }
-
+ 
 public function processLoanApplication(Request $request)
 {
     $logged_in_user = auth()->id();
@@ -706,6 +706,50 @@ public function processLoanApplication(Request $request)
     
     $batch_trans_id = $data['batch_trans_id']; // Extract the batch_trans_id
     $loanAmount = floatval($data['batch_trans_loan_amount']);
+    $loanDuration = $data['batch_trans_loan_duration'];
+
+    // Get loan type and member details
+    $loanType = DB::table('sacco_loan_types')->where('loan_type_id', $data['batch_trans_loan_type'])->first();
+    $member = DB::table('sacco_members')->where('member_id', $data['batch_trans_member_id'])->first();
+ 
+
+// Check for top-up loan if applicable
+$topUpLoan = null;
+if (!empty($data['batch_trans_loan_to_top_up'])) {
+    $topUpLoan = DB::table('sacco_loans')
+        ->where('loan_id', $data['batch_trans_loan_to_top_up'])
+        ->where('loan_member', $data['batch_trans_member_id'])
+        ->first();
+}
+// Validate loan parameters
+$nmsg .= $this->validateLoanParameters($loanAmount, $loanType, $loanDuration, $topUpLoan);
+
+// Validate member eligibility
+$nmsg .= $this->validateMemberEligibility($member, $loanType);
+
+// Calculate insurance, EMI, and interest
+$insuranceAndInterest = $this->calculateInsuranceAndInterest(
+    $data['batch_trans_loan_type'], 
+    $loanAmount, 
+    $loanDuration
+);
+
+// Extract calculated values
+$insurance = $insuranceAndInterest['insurance'];
+$emi = $insuranceAndInterest['emi'];
+$interestAmountPayable = $insuranceAndInterest['interestAmountPayable'];
+$monthlyRepaymentPrincipal = $insuranceAndInterest['monthlyRepaymentPrincipal'];
+
+// Add calculated values to loan record
+$loanUpdateData['batch_trans_insurance'] = $insurance; // Map insurance to 'batch_trans_insurance'
+$loanUpdateData['batch_trans_monthly_payment'] = $emi; // Map EMI to 'batch_trans_monthly_payment'
+$loanUpdateData['batch_trans_monthly_payment_principal'] = $monthlyRepaymentPrincipal; // Map monthly repayment principal to 'batch_trans_monthly_payment_principal'
+$loanUpdateData['batch_trans_expected_interest'] = $interestAmountPayable; // Map interest payable to 'batch_trans_expected_interest'
+
+
+
+
+
     
 
     // Check if the member ID matches the logged-in user
@@ -769,7 +813,6 @@ public function processLoanApplication(Request $request)
 
     
     
- 
 
 
     // Check for errors
@@ -810,10 +853,16 @@ $loanUpdateData = [
     'batch_trans_loan_amount' => $data['batch_trans_loan_amount'],
     'batch_trans_loan_duration' => $data['batch_trans_loan_duration'],
     'batch_trans_description' => $data['batch_trans_description'],
-    'batch_trans_updated' => 'N',
-    'batch_trans_by' => $logged_in_user,
-    'batch_trans_ip' => $request->ip(),
+    'batch_trans_insurance' => $insurance, // Add calculated insurance
+    'batch_trans_monthly_payment' => $emi, // Add calculated EMI
+    'batch_trans_monthly_payment_principal' => $monthlyRepaymentPrincipal, // Add calculated monthly repayment principal
+    'batch_trans_expected_interest' => $interestAmountPayable, // Add calculated interest payable
+    'batch_trans_updated' => 'N', // Mark as not updated yet
+    'batch_trans_by' => $logged_in_user, // Current user
+    'batch_trans_ip' => $request->ip(), // User IP
 ];
+
+
 
 // Add file paths to the update data if files were uploaded
 if ($payslip1Path) {
@@ -827,11 +876,7 @@ if ($payslip2Path) {
 DB::table('sacco_loan_batch_trans_members')
     ->where('batch_trans_id', $data['batch_trans_id'])
     ->update($loanUpdateData);
-
-// Update guarantors
-
-
-
+ 
 
     return redirect()->route('loans.apply')->with('success', 'Loan application submitted successfully.');
 }
@@ -978,5 +1023,85 @@ private function validateAndProcessGuarantors($data, $loanType, $batch_trans_id,
 
     return ['success' => true, 'message' => 'Guarantors validated and updated successfully.'];
 }
+
+private function validateLoanParameters($loanAmount, $loanType, $loanDuration, $topUpLoan = null)
+{
+    $errors = "";
+
+    // Validate loan amount
+    if ($loanAmount < 1 || $loanAmount > $loanType->loan_type_max_amount) {
+        $errors .= "Error: Loan amount must be between 1 and {$loanType->loan_type_max_amount}. ";
+    }
+
+    // Validate repayment period
+    if ($loanDuration > $loanType->loan_type_duration) {
+        $errors .= "Error: Loan repayment period cannot exceed {$loanType->loan_type_duration} months. ";
+    }
+
+    // Validate top-up loan if provided
+    if ($topUpLoan) {
+        if (!$topUpLoan) {
+            $errors .= "Error: Invalid top-up loan. ";
+        } elseif ($loanAmount <= ($topUpLoan->loan_amount - $topUpLoan->loan_loan_paid)) {
+            $errors .= "Error: New loan amount must exceed the balance of the top-up loan. ";
+        }
+    }
+
+    return $errors;
+}
+
+private function validateMemberEligibility($member, $loanType)
+{
+    if (!$member) {
+        return "Error: Member not found in the database.";
+    }
+
+    $membershipDurationRequired = $loanType->loan_type_qualification_period;
+
+    if (strtotime($member->member_date_joined) > strtotime("-{$membershipDurationRequired} months")) {
+        return "Error: Member must be {$membershipDurationRequired} months old in the SACCO to take this loan.";
+    }
+
+    return null; // No errors
+}
+
+ 
+
+private function calculateInsuranceAndInterest($loanTypeId, $loanAmount, $repaymentPeriod)
+{
+    $insu = $loanAmount * 1 / 100; // Default insurance calculation
+
+    $loanType = DB::table('sacco_loan_types')->where('loan_type_id', $loanTypeId)->first();
+
+    // If the loan is not insurable, set insurance to 0
+    if ($loanType->loan_type_insurable != "Y") {
+        $insu = 0;
+    }
+
+    // Fixed interest calculation
+    if ($loanType->loan_type_interest_type == "FIXED INTEREST") {
+        $interestAmountPayable = round(($loanAmount + $insu) * $loanType->loan_type_interest / 100, 0);
+        $emi = ceil(($loanAmount + $interestAmountPayable + $insu) / $repaymentPeriod);
+        $monthlyRepaymentPrincipal = ($loanAmount + $insu) / $repaymentPeriod;
+    } else {
+        // Reducing balance interest calculation
+        $loanAmountWithInsurance = $loanAmount + $insu;
+        $interestRate = $loanType->loan_type_interest / 12 / 100;
+
+        $emi = ($loanAmountWithInsurance * $interestRate) * pow(1 + $interestRate, $repaymentPeriod) / (pow(1 + $interestRate, $repaymentPeriod) - 1);
+        $interestAmountPayable = ($emi * $repaymentPeriod) - $loanAmountWithInsurance;
+        $monthlyRepaymentPrincipal = $emi - ($loanAmountWithInsurance * $interestRate);
+        $emi = ceil($emi);
+        $monthlyRepaymentPrincipal = ceil($monthlyRepaymentPrincipal);
+    }
+
+    return [
+        'insurance' => $insu,
+        'emi' => $emi,
+        'interestAmountPayable' => $interestAmountPayable,
+        'monthlyRepaymentPrincipal' => $monthlyRepaymentPrincipal,
+    ];
+}
+
 }
 

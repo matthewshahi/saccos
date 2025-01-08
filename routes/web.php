@@ -87,7 +87,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('loans/pending/approval/self', [LoanApplicationSelfServiceController::class, 'listLoansPendingApprovalSelf'])
     ->name('loans.pending.approval.self');
     Route::get('loans/pending/approval/selfedit/{id}', [LoanApplicationSelfServiceController::class, 'listLoansPendingApprovalSelfedit'])
-    ->name('loans.pending.approval.selfedit');
+    ->name('loans.pending.approval.selfedit'); 
     Route::post('/loans/process-application', [LoanApplicationSelfServiceController::class, 'processLoanApplication'])
     ->name('loans.process.application');
     Route::put('loans/application/update/{id}', [LoanApplicationSelfServiceController::class, 'updateLoanApplication'])
@@ -359,7 +359,7 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
     Route::get('/reports/loans/issued', [HomeController::class, 'reportsLoansIssued'])->name('reports.loans.issued')->middleware('check_user_rights:rpt_loans_issued');
     Route::get('/reports/loans/issued/data', [HomeController::class, 'getLoansIssued'])->name('reports.loans.issued.data')->middleware('check_user_rights:rpt_loans_issued');
     Route::get('/reports/loans/issued/download', [HomeController::class, 'downloadLoansIssuedReport'])->name('reports.loans.issued.download')->middleware('check_user_rights:rpt_loans_issued');
-    Route::get('/reports/loans/repayments', [HomeController::class, 'reportsLoansRepayments'])->name('reports.loans.repayments')->middleware('check_user_rights:rpt_loans_repayments');
+    Route::get('/reports/loans/repayments', [HomeController::class, 'reportsLoansRepayments'])->name('reports.loans.repayments')->middleware('check_user_rights:rpt_reports');
     Route::get('/reports/loans/repayments/data', [HomeController::class, 'getLoansRepayments'])->name('reports.loans.repayments.data')->middleware('check_user_rights:rpt_loans_issued');
     Route::get('/reports/loans/repayments/download', [HomeController::class, 'downloadLoansRepaymentsReport'])->name('reports.loans.repayments.download')->middleware('check_user_rights:rpt_loans_issued');
 
@@ -376,7 +376,9 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
     Route::get('/reports/guarantors', [HomeController::class, 'reportsGuarantors'])->name('reports.guarantors')->middleware('check_user_rights:rpt_reports');
     Route::get('/reports/contributions', [HomeController::class, 'reportsContributions'])->name('reports.contributions')->middleware('check_user_rights:rpt_reports');
     Route::get('/reports/contributions/principal', [HomeController::class, 'reportsContributionsPrincipal'])->name('reports.contributions.principal')->middleware('check_user_rights:rpt_reports');
-    Route::get('/reports/loans/repayments', [HomeController::class, 'reportsLoansRepayments'])->name('reports.loans.repayments')->middleware('check_user_rights:rpt_reports');
+    // Route::get('/reports/loans/repayments', [HomeController::class, 'reportsLoansRepayments'])->name('reports.loans.repayments')->middleware('check_user_rights:rpt_reports');
+    // Route::get('/reports/loans/repayments', [HomeController::class, 'reportsLoansRepayments'])->name('reports.loans.repayments')->middleware('check_user_rights:rpt_loans_repayments');
+
     Route::get('/reports/loans/balances/period', [HomeController::class, 'reportsLoansBalancesPeriod'])->name('reports.loans.balances.period')->middleware('check_user_rights:rpt_reports');
 
     Route::get('/reports/accounts/ledger', [ReportLedgerController::class, 'reportsAccountsLedger'])->name('reports.accounts.ledger')->middleware('check_user_rights:rpt_acc_trans');

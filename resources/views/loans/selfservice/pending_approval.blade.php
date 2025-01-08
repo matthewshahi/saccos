@@ -68,7 +68,12 @@
         <th class="text-start">National ID</th>
         <th class="text-end">Loan Amount</th>
         <th>Loan Type</th>
-        <th>Date Applied</th> <!-- Added Column -->
+        <th>Loan Category</th> <!-- Added Column -->
+        <th class="text-end">EMI</th> <!-- Added Column -->
+        <th class="text-end">Insurance</th> <!-- Added Column -->
+        <th class="text-end">Commission</th> <!-- Added Column -->
+        <th>Period to Pay</th> <!-- Added Column -->
+        <th>Date Applied</th>
         <th>Updated</th>
         <th>Edit</th>
         <th>Actions</th>
@@ -83,24 +88,27 @@
             <td class="text-start">{{ $loan->member_national_id }}</td>
             <td class="text-end">{{ number_format($loan->batch_trans_loan_amount, 2) }}</td>
             <td>{{ $loan->loan_type_name }}</td>
-            <td>{{ \Carbon\Carbon::parse($loan->batch_trans_on)->format('d/m/Y') }}</td> <!-- UK Date Format -->
+            <td>{{ $loan->batch_trans_loan_category }}</td> <!-- Added Field -->
+            <td class="text-end">{{ number_format($loan->batch_trans_monthly_payment, 2) }}</td> <!-- EMI -->
+            <td class="text-end">{{ number_format($loan->batch_trans_insurance, 2) }}</td> <!-- Insurance -->
+            <td class="text-end">{{ number_format($loan->batch_trans_commission, 2) }}</td> <!-- Commission -->
+            <td>{{ $loan->batch_trans_loan_duration }} months</td> <!-- Period to Pay -->
+            <td>{{ \Carbon\Carbon::parse($loan->batch_trans_on)->format('d/m/Y') }}</td>
             <td>
-    @if ($loan->batch_trans_deleted == 'Y')
-        <span class="badge bg-danger">Rejected</span>
-    @elseif ($loan->batch_trans_updated == 'Y')
-        <span class="badge bg-success">Updated</span>
-    @else
-        <span class="badge bg-warning">Pending</span>
-    @endif
-</td>
-<td>
-    <a href="{{ route('loans.pending.approval.selfedit', ['id' => $loan->batch_trans_id]) }}" class="btn btn-primary btn-sm">
-        Edit
-    </a>
-</td>
-
+                @if ($loan->batch_trans_deleted == 'Y')
+                    <span class="badge bg-danger">Rejected</span>
+                @elseif ($loan->batch_trans_updated == 'Y')
+                    <span class="badge bg-success">Updated</span>
+                @else
+                    <span class="badge bg-warning">Pending</span>
+                @endif
+            </td>
             <td>
-                <!-- View Details Button -->
+                <a href="{{ route('loans.pending.approval.selfedit', ['id' => $loan->batch_trans_id]) }}" class="btn btn-primary btn-sm">
+                    Edit
+                </a>
+            </td>
+            <td>
                 <button class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#loanModal{{ $loan->batch_trans_id }}">
                     Details
                 </button>
@@ -108,7 +116,7 @@
         </tr>
     @empty
         <tr>
-            <td colspan="9" class="text-center">No loans pending approval.</td>
+            <td colspan="15" class="text-center">No loans pending approval.</td>
         </tr>
     @endforelse
 </tbody>
@@ -246,7 +254,7 @@ function confirmAction(action, loanId) {
             document.getElementById(`rejectForm${loanId}`).submit();
         }
     }
-}
+} 
 </script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
