@@ -3945,6 +3945,7 @@ private function updateLoanBatchTransMember($id, $member_id, $logged_in_user, $t
 // Function to get pending loans
 private function getPendingLoans()
 {
+   
     return DB::table('sacco_loan_batch_trans_members')
         ->join('sacco_loan_category', 'sacco_loan_batch_trans_members.batch_trans_loan_category', '=', 'sacco_loan_category.loan_category_id')
         ->join('sacco_loan_types', 'sacco_loan_batch_trans_members.batch_trans_loan_type', '=', 'sacco_loan_types.loan_type_id')
@@ -6120,21 +6121,15 @@ public function reportsLoansRepayments(Request $request)
         ->join('sacco_department', 'sacco_members.member_dept', '=', 'sacco_department.department_id')
         ->join('sacco_company', 'sacco_department.department_company_id', '=', 'sacco_company.company_id')
         ->join('sacco_loan_types', 'sacco_loans.loan_loan_type', '=', 'sacco_loan_types.loan_type_id')
-        ->leftJoin('sacco_loan_category', 'sacco_loans.loan_loan_category', '=', 'sacco_loan_category.loan_category_id') // Join loan category
         ->select(
             'sacco_loan_payments.loan_payments_id',
             'sacco_members.member_name',
             'sacco_members.member_phone_no',
             'sacco_members.member_sacco_id',
             'sacco_loan_types.loan_type_name',
-            'sacco_loan_category.loan_category_name', // Loan category
             'sacco_loans.loan_amount',
-            'sacco_loans.loan_insurance', // Insurance
-            'sacco_loans.loan_commision', // Commission
-            'sacco_loans.loan_monthly_repayment_amount', // EMI
-            'sacco_loans.loan_payment_period', // Period of payment
             'sacco_loans.loan_loan_paid',
-            'sacco_loans.loan_doc_no',
+            'sacco_loan_payments.loan_payments_amount',
             'sacco_loan_payments.loan_payments_period',
             'sacco_loan_payments.loan_payments_paid_on',
             'sacco_loan_payments.loan_payments_docno'

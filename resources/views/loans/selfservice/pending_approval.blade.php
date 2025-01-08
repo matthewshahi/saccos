@@ -80,6 +80,9 @@
     </tr>
 </thead>
 <tbody>
+    <?php
+    // dd($loans);
+    ?>
     @forelse ($loans as $index => $loan)
         <tr>
             <td>{{ $loans->firstItem() + $index }}</td>
@@ -88,7 +91,7 @@
             <td class="text-start">{{ $loan->member_national_id }}</td>
             <td class="text-end">{{ number_format($loan->batch_trans_loan_amount, 2) }}</td>
             <td>{{ $loan->loan_type_name }}</td>
-            <td>{{ $loan->batch_trans_loan_category }}</td> <!-- Added Field -->
+            <td>{{ $loan->loan_category_name }}</td>
             <td class="text-end">{{ number_format($loan->batch_trans_monthly_payment, 2) }}</td> <!-- EMI -->
             <td class="text-end">{{ number_format($loan->batch_trans_insurance, 2) }}</td> <!-- Insurance -->
             <td class="text-end">{{ number_format($loan->batch_trans_commission, 2) }}</td> <!-- Commission -->

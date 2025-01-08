@@ -11,86 +11,55 @@ use Illuminate\Support\Facades\Auth;
 class LoanApplicationSelfServiceController extends Controller
 {
     public function listLoansPendingApproval(Request $request)
-    {
+{
+    $pendingLoansOnly = $request->has('pending') && $request->input('pending') == '1' ? 'Y' : null;
 
-       
+    $query = DB::table('sacco_loan_batch_trans_members AS trans')
+        ->join('sacco_members AS members', 'trans.batch_trans_member_id', '=', 'members.member_id') // Loan applicant
+        ->join('sacco_loan_types AS types', 'trans.batch_trans_loan_type', '=', 'types.loan_type_id') // Loan type
+        ->join('sacco_loan_category AS category', 'trans.batch_trans_loan_category', '=', 'category.loan_category_id') // Loan category
+        ->leftJoin('sacco_loan_batch_guarantors_members AS guarantors', function ($join) {
+            $join->on('trans.batch_trans_id', '=', 'guarantors.guarantors_loan_batch_trans_id')
+                ->where('guarantors.guarantors_deleted', 'N'); // Exclude deleted guarantors
+        })
+        ->leftJoin('sacco_members AS g_members', 'guarantors.guarantors_guarantor_id', '=', 'g_members.member_id') // Guarantors' details
+        ->select(
+            'trans.*',
+            'members.member_name', 
+            'members.member_phone_no', 
+            'members.member_national_id',
+            'types.loan_type_name',
+            'category.loan_category_name', // Loan category added
+            DB::raw('GROUP_CONCAT(g_members.member_name ORDER BY guarantors.guarantors_id ASC SEPARATOR "|") AS guarantors_names'), // Ordered by guarantors_id
+            DB::raw('GROUP_CONCAT(guarantors.guarantors_amount_guaranteed ORDER BY guarantors.guarantors_id ASC SEPARATOR "|") AS guarantors_amounts'), // Ordered by guarantors_id
+            DB::raw('GROUP_CONCAT(guarantors.guarantors_approved ORDER BY guarantors.guarantors_id ASC SEPARATOR "|") AS guarantors_approval_status') // Ordered by guarantors_id
+        )
+        ->groupBy('trans.batch_trans_id');
 
-        $pendingLoansOnly = $request->has('pending') && $request->input('pending') == '1' ? 'Y' : null;
-
-        $query = DB::table('sacco_loan_batch_trans_members AS trans')
-    ->join('sacco_members AS members', 'trans.batch_trans_member_id', '=', 'members.member_id') // Loan applicant
-    ->join('sacco_loan_types AS types', 'trans.batch_trans_loan_type', '=', 'types.loan_type_id') // Loan type
-    ->leftJoin('sacco_loan_batch_guarantors_members AS guarantors', function ($join) {
-        $join->on('trans.batch_trans_id', '=', 'guarantors.guarantors_loan_batch_trans_id')
-             ->where('guarantors.guarantors_deleted', 'N'); // Exclude deleted guarantors
-    })
- 
-    ->leftJoin('sacco_members AS g_members', 'guarantors.guarantors_guarantor_id', '=', 'g_members.member_id') // Guarantors' details
-    ->select(
-        'trans.*',
-        'members.member_name', 
-        'members.member_phone_no', 
-        'members.member_national_id',
-        'types.loan_type_name',
-        DB::raw('GROUP_CONCAT(g_members.member_name ORDER BY guarantors.guarantors_id ASC SEPARATOR "|") AS guarantors_names'), // Ordered by guarantors_id
-        DB::raw('GROUP_CONCAT(guarantors.guarantors_amount_guaranteed ORDER BY guarantors.guarantors_id ASC SEPARATOR "|") AS guarantors_amounts'), // Ordered by guarantors_id
-        DB::raw('GROUP_CONCAT(guarantors.guarantors_approved ORDER BY guarantors.guarantors_id ASC SEPARATOR "|") AS guarantors_approval_status') // Ordered by guarantors_id
-    )
-     
-    ->groupBy('trans.batch_trans_id');
-     
-
-
-    //     $query = DB::table('sacco_loan_batch_trans_members AS trans')
-    // ->join('sacco_members AS members', 'trans.batch_trans_member_id', '=', 'members.member_id') // Loan applicant
-    // ->join('sacco_loan_types AS types', 'trans.batch_trans_loan_type', '=', 'types.loan_type_id') // Loan type
-    // ->leftJoin('sacco_loan_batch_guarantors_members AS guarantors', function ($join) {
-    //     $join->on('trans.batch_trans_id', '=', 'guarantors.guarantors_loan_batch_trans_id')
-    //          ->where('guarantors.guarantors_deleted', 'N'); // Exclude deleted guarantors
-    // })
-    // ->leftJoin('sacco_members AS g_members', 'guarantors.guarantors_guarantor_id', '=', 'g_members.member_id') // Guarantors' details
-    // ->select(
-    //     'trans.*',
-    //     'members.member_name', 
-    //     'members.member_phone_no', 
-    //     'members.member_national_id',
-    //     'types.loan_type_name',
-    //     DB::raw('GROUP_CONCAT(DISTINCT g_members.member_name SEPARATOR "|") AS guarantors_names'), // Use "|" as separator
-    //     DB::raw('GROUP_CONCAT(DISTINCT guarantors.guarantors_amount_guaranteed SEPARATOR "|") AS guarantors_amounts'), // Use "|" as separator
-    //     DB::raw('GROUP_CONCAT(DISTINCT guarantors.guarantors_approved SEPARATOR "|") AS guarantors_approved') // Use "|" as separator
-    // )
-    // // ->where('trans.batch_trans_deleted', 'N') // Exclude deleted loan applications
-    // ->groupBy('trans.batch_trans_id');
-
-     
-    
-        // Search functionality
-        if ($request->has('search')) {
-            $search = $request->input('search');
-            $query->where(function ($q) use ($search) {
-                $q->where('members.member_name', 'LIKE', "%$search%")
-                  ->orWhere('members.member_phone_no', 'LIKE', "%$search%")
-                  ->orWhere('members.member_national_id', 'LIKE', "%$search%")
-                  ->orWhere('types.loan_type_name', 'LIKE', "%$search%");
-            });
-        }
-
-        if ($pendingLoansOnly) {
-            $query->where('batch_trans_updated', 'N')
-                       ->where('batch_trans_deleted', '!=', 'Y'); // Exclude rejected loans
-        }
-        
-
-    
-        // Fetch paginated loans (max 300 records, 20 per page)
-        $loans = $query->orderBy('trans.batch_trans_on', 'desc')
-                       ->limit(300)
-                       ->paginate(20);
-        
-                       
-        // Return the view with loans
-        return view('loans.selfservice.pending_approval', compact('loans'));
+    // Search functionality
+    if ($request->has('search')) {
+        $search = $request->input('search');
+        $query->where(function ($q) use ($search) {
+            $q->where('members.member_name', 'LIKE', "%$search%")
+              ->orWhere('members.member_phone_no', 'LIKE', "%$search%")
+              ->orWhere('members.member_national_id', 'LIKE', "%$search%")
+              ->orWhere('types.loan_type_name', 'LIKE', "%$search%");
+        });
     }
+
+    if ($pendingLoansOnly) {
+        $query->where('batch_trans_updated', 'N')
+              ->where('batch_trans_deleted', '!=', 'Y'); // Exclude rejected loans
+    }
+
+    // Fetch paginated loans (max 300 records, 20 per page)
+    $loans = $query->orderBy('trans.batch_trans_on', 'desc')
+                   ->limit(300)
+                   ->paginate(20);
+
+    // Return the view with loans
+    return view('loans.selfservice.pending_approval', compact('loans'));
+}
     
 
     public function listLoansPendingApprovalSelf(Request $request)
@@ -102,6 +71,7 @@ class LoanApplicationSelfServiceController extends Controller
             $query = DB::table('sacco_loan_batch_trans_members AS trans')
                 ->join('sacco_members AS members', 'trans.batch_trans_member_id', '=', 'members.member_id') // Loan applicant
                 ->join('sacco_loan_types AS types', 'trans.batch_trans_loan_type', '=', 'types.loan_type_id') // Loan type
+                ->join('sacco_loan_category AS categories', 'trans.batch_trans_loan_category', '=', 'categories.loan_category_id') // Loan category
                 ->leftJoin('sacco_loan_batch_guarantors_members AS guarantors', function ($join) {
                     $join->on('trans.batch_trans_id', '=', 'guarantors.guarantors_loan_batch_trans_id')
                         ->where('guarantors.guarantors_deleted', 'N'); // Exclude deleted guarantors
@@ -112,7 +82,9 @@ class LoanApplicationSelfServiceController extends Controller
                     'members.member_name', 
                     'members.member_phone_no', 
                     'members.member_national_id',
+                    'sacco_loan_category.loan_category_name' ,
                     'types.loan_type_name',
+                    'categories.loan_category_name', // Fetch category name
                     DB::raw('GROUP_CONCAT(g_members.member_name ORDER BY guarantors.guarantors_id ASC SEPARATOR "|") AS guarantors_names'), // Ordered by guarantors_id
                     DB::raw('GROUP_CONCAT(guarantors.guarantors_amount_guaranteed ORDER BY guarantors.guarantors_id ASC SEPARATOR "|") AS guarantors_amounts'), // Ordered by guarantors_id
                     DB::raw('GROUP_CONCAT(guarantors.guarantors_approved ORDER BY guarantors.guarantors_id ASC SEPARATOR "|") AS guarantors_approval_status') // Ordered by guarantors_id
