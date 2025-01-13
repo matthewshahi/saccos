@@ -81,6 +81,7 @@
             .then(response => {
                 const { loanTypes, data, totals, hasMoreData: moreDataAvailable } = response.data;
 
+                // Append headers dynamically for loan types
                 const headersRow = document.getElementById('report-headers');
                 if (!headersRow.querySelectorAll('th.loan-type').length) {
                     Object.values(loanTypes).forEach(loanTypeName => {
@@ -92,6 +93,7 @@
                     });
                 }
 
+                // Append member rows
                 const tbody = document.getElementById('report-body');
                 data.forEach(member => {
                     const row = document.createElement('tr');
@@ -116,6 +118,7 @@
                     tbody.appendChild(row);
                 });
 
+                // Append totals row if all data is loaded
                 if (!moreDataAvailable) {
                     const tfoot = document.getElementById('report-totals');
                     tfoot.innerHTML = `
