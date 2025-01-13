@@ -23,6 +23,7 @@ use App\Http\Controllers\PublicRegistrationActionsImportController;
 use App\Http\Controllers\LoanApplicationSelfServiceController;
 use App\Http\Controllers\ReportLedgerController;
 use App\Http\Controllers\LoanPaymentController;
+use App\Http\Controllers\MemberReportController;
 
 Route::get('/test-email', function () {
     Mail::raw('This is a test email from Laravel!', function ($message) {
@@ -376,6 +377,12 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
     Route::get('/reports/guarantors', [HomeController::class, 'reportsGuarantors'])->name('reports.guarantors')->middleware('check_user_rights:rpt_reports');
     Route::get('/reports/contributions', [HomeController::class, 'reportsContributions'])->name('reports.contributions')->middleware('check_user_rights:rpt_reports');
     Route::get('/reports/contributions/principal', [HomeController::class, 'reportsContributionsPrincipal'])->name('reports.contributions.principal')->middleware('check_user_rights:rpt_reports');
+
+    
+
+    Route::get('/members/report', [MemberReportController::class, 'index'])->name('members.report')->middleware('check_user_rights:rpt_reports');
+    Route::post('/members/report/data', [MemberReportController::class, 'fetchReportData'])->name('members.report.data')->middleware('check_user_rights:rpt_reports');
+
     // Route::get('/reports/loans/repayments', [HomeController::class, 'reportsLoansRepayments'])->name('reports.loans.repayments')->middleware('check_user_rights:rpt_reports');
     // Route::get('/reports/loans/repayments', [HomeController::class, 'reportsLoansRepayments'])->name('reports.loans.repayments')->middleware('check_user_rights:rpt_loans_repayments');
 
