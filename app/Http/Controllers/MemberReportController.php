@@ -26,7 +26,7 @@ class MemberReportController extends Controller
         $page = $filters['page'] ?? 1;
         $memberActive = $filters['member_active'] ?? 'Y';
 
-        $limit = 100; // Fetch 100 records per page
+        $limit = 30; // Fetch 100 records per page
         $offset = ($page - 1) * $limit;
 
         // Fetch loan types

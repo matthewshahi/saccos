@@ -77,14 +77,12 @@
 
         document.getElementById('loading-indicator').style.display = 'block';
 
-        // Use the Laravel `url()` helper to ensure the correct endpoint
         const fullUrl = "{{ url('/members/report/data') }}";
 
         axios.post(fullUrl, { search, period, page, member_active: memberActive })
             .then(response => {
                 const { loanTypes, data, totals, hasMoreData: moreDataAvailable } = response.data;
 
-                // Append headers dynamically for loan types
                 const headersRow = document.getElementById('report-headers');
                 if (!headersRow.querySelectorAll('th.loan-type').length) {
                     Object.values(loanTypes).forEach(loanTypeName => {
@@ -96,8 +94,14 @@
                     });
                 }
 
-                // Append member rows
                 const tbody = document.getElementById('report-body');
+                if (data.length === 0 && currentPage === 1) {
+                    tbody.innerHTML = '<tr><td colspan="10">No data available</td></tr>';
+                    document.getElementById('loading-indicator').style.display = 'none';
+                    hasMoreData = false;
+                    return;
+                }
+
                 data.forEach(member => {
                     const row = document.createElement('tr');
                     row.innerHTML = `
@@ -135,8 +139,6 @@
                             <td style="text-align: right;">${Number(totals.total_loans).toLocaleString()}</td>
                         </tr>
                     `;
-                    document.getElementById('loading-text').innerText = "All records loaded.";
-                    document.getElementById('loading-indicator').style.display = 'none';
                 }
 
                 hasMoreData = moreDataAvailable;
