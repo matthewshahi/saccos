@@ -62,11 +62,57 @@
 </div>
 
 <script>
-   
-   let currentPage = 1;
+let currentPage = 1;
 let loading = false;
 let hasMoreData = true;
 let serialNumber = 1;
+let cumulativeTotals = {
+    total_shares: 0,
+    total_capital: 0,
+    total_fosa: 0,
+    total_loans: 0,
+    loan_type_totals: {}, // Store totals for each loan type
+};
+
+const resetCumulativeTotals = () => {
+    cumulativeTotals = {
+        total_shares: 0,
+        total_capital: 0,
+        total_fosa: 0,
+        total_loans: 0,
+        loan_type_totals: {},
+    };
+};
+
+const updateCumulativeTotals = (totals, loanTypes) => {
+    cumulativeTotals.total_shares += totals.total_shares;
+    cumulativeTotals.total_capital += totals.total_capital;
+    cumulativeTotals.total_fosa += totals.total_fosa;
+    cumulativeTotals.total_loans += totals.total_loans;
+
+    Object.keys(loanTypes).forEach(loanType => {
+        if (!cumulativeTotals.loan_type_totals[loanTypes[loanType]]) {
+            cumulativeTotals.loan_type_totals[loanTypes[loanType]] = 0;
+        }
+        cumulativeTotals.loan_type_totals[loanTypes[loanType]] += totals.loan_type_totals[loanTypes[loanType]] || 0;
+    });
+};
+
+const renderTotalsRow = (loanTypes) => {
+    const tfoot = document.getElementById('report-totals');
+    tfoot.innerHTML = `
+        <tr>
+            <td colspan="6" style="text-align: right;"><strong>TOTALS</strong></td>
+            <td style="text-align: right;">${Number(cumulativeTotals.total_shares).toLocaleString()}</td>
+            <td style="text-align: right;">${Number(cumulativeTotals.total_capital).toLocaleString()}</td>
+            <td style="text-align: right;">${Number(cumulativeTotals.total_fosa).toLocaleString()}</td>
+            ${Object.values(loanTypes).map(loanTypeName => `
+                <td style="text-align: right;">${Number(cumulativeTotals.loan_type_totals[loanTypeName] || 0).toLocaleString()}</td>
+            `).join('')}
+            <td style="text-align: right;">${Number(cumulativeTotals.total_loans).toLocaleString()}</td>
+        </tr>
+    `;
+};
 
 const fetchData = (page = 1) => {
     const search = document.getElementById('search').value;
@@ -85,50 +131,54 @@ const fetchData = (page = 1) => {
             const { loanTypes, data, totals, hasMoreData: moreDataAvailable } = response.data;
 
             const tbody = document.getElementById('report-body');
-            const tfoot = document.getElementById('report-totals');
+            const headersRow = document.getElementById('report-headers');
 
-            if (data.length === 0 && currentPage === 1) {
-                tbody.innerHTML = '<tr><td colspan="10">No data available</td></tr>';
-                document.getElementById('loading-indicator').style.display = 'none';
-                hasMoreData = false;
-                return;
+            // Dynamically add loan type headers
+            if (!headersRow.querySelectorAll('th.loan-type').length) {
+                Object.values(loanTypes).forEach(loanTypeName => {
+                    const th = document.createElement('th');
+                    th.classList.add('loan-type');
+                    th.innerText = loanTypeName.toUpperCase();
+                    th.style.textAlign = 'right';
+                    headersRow.insertBefore(th, headersRow.lastElementChild);
+                });
             }
 
+            // Populate the table rows
             data.forEach(member => {
                 const row = document.createElement('tr');
                 row.innerHTML = `
                     <td>${serialNumber++}</td>
-                    <td>${member.member_id}</td>
-                    <td>${member.name}</td>
-                    <td>${member.phone}</td>
-                    <td>${member.kra_pin || '-'}</td>
-                    <td>${member.active}</td>
-                    <td>${Number(member.total_shares).toLocaleString()}</td>
-                    <td>${Number(member.total_capital).toLocaleString()}</td>
-                    <td>${Number(member.total_fosa).toLocaleString()}</td>
-                    ${Object.values(loanTypes).map(type => `<td>${Number(member[type] || 0).toLocaleString()}</td>`).join('')}
-                    <td>${Number(member.total_loans).toLocaleString()}</td>
+                    <td style="text-align: left; white-space: nowrap;">${member.member_id}</td>
+                    <td style="text-align: left; white-space: nowrap;">${member.name}</td>
+                    <td style="text-align: left; white-space: nowrap;">${member.phone}</td>
+                    <td style="text-align: left;">${member.kra_pin || '-'}</td>
+                    <td style="text-align: center;">${member.active}</td>
+                    <td style="text-align: right;">${Number(member.total_shares).toLocaleString()}</td>
+                    <td style="text-align: right;">${Number(member.total_capital).toLocaleString()}</td>
+                    <td style="text-align: right;">${Number(member.total_fosa).toLocaleString()}</td>
                 `;
+                Object.values(loanTypes).forEach(loanTypeName => {
+                    const td = document.createElement('td');
+                    td.style.textAlign = 'right';
+                    td.innerText = Number(member[loanTypeName] || 0).toLocaleString();
+                    row.appendChild(td);
+                });
+                row.innerHTML += `<td style="text-align: right;">${Number(member.total_loans).toLocaleString()}</td>`;
                 tbody.appendChild(row);
             });
 
-            if (!moreDataAvailable) {
-                tfoot.innerHTML = `
-                    <tr>
-                        <td colspan="6">TOTALS</td>
-                        <td>${Number(totals.total_shares).toLocaleString()}</td>
-                        <td>${Number(totals.total_capital).toLocaleString()}</td>
-                        <td>${Number(totals.total_fosa).toLocaleString()}</td>
-                        ${Object.values(loanTypes).map(type => `<td>${Number(totals.loan_type_totals[type] || 0).toLocaleString()}</td>`).join('')}
-                        <td>${Number(totals.total_loans).toLocaleString()}</td>
-                    </tr>
-                `;
-                document.getElementById('loading-text').innerText = 'All records loaded.';
-            }
+            // Update cumulative totals and render footer
+            updateCumulativeTotals(totals, loanTypes);
+            renderTotalsRow(loanTypes);
 
             hasMoreData = moreDataAvailable;
             loading = false;
-            if (!hasMoreData) document.getElementById('loading-indicator').style.display = 'none';
+
+            if (!hasMoreData) {
+                document.getElementById('loading-text').innerText = "All records loaded.";
+                document.getElementById('loading-indicator').style.display = 'none';
+            }
         })
         .catch(error => {
             console.error(error);
@@ -137,14 +187,15 @@ const fetchData = (page = 1) => {
         });
 };
 
-document.getElementById('filter-form').addEventListener('submit', e => {
+document.getElementById('filter-form').addEventListener('submit', function (e) {
     e.preventDefault();
     currentPage = 1;
     hasMoreData = true;
     serialNumber = 1;
+    resetCumulativeTotals();
     document.getElementById('report-body').innerHTML = '';
     document.getElementById('report-totals').innerHTML = '';
-    document.getElementById('loading-text').innerText = 'Loading more records...';
+    document.getElementById('loading-text').innerText = "Loading more records...";
     fetchData(currentPage);
 });
 
@@ -156,6 +207,5 @@ window.addEventListener('scroll', () => {
 });
 
 fetchData(currentPage);
-
 </script>
 @endsection
