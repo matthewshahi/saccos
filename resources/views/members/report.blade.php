@@ -77,7 +77,10 @@
 
         document.getElementById('loading-indicator').style.display = 'block';
 
-        axios.post('/members/report/data', { search, period, page, member_active: memberActive })
+        // Use the Laravel `url()` helper to ensure the correct endpoint
+        const fullUrl = "{{ url('/members/report/data') }}";
+
+        axios.post(fullUrl, { search, period, page, member_active: memberActive })
             .then(response => {
                 const { loanTypes, data, totals, hasMoreData: moreDataAvailable } = response.data;
 
@@ -118,7 +121,6 @@
                     tbody.appendChild(row);
                 });
 
-                // Append totals row if all data is loaded
                 if (!moreDataAvailable) {
                     const tfoot = document.getElementById('report-totals');
                     tfoot.innerHTML = `
