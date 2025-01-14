@@ -1,4 +1,4 @@
-@extends('layouts.app')
+ @extends('layouts.app')
 
 @section('content')
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
@@ -114,6 +114,24 @@ const renderTotalsRow = (loanTypes) => {
     `;
 };
 
+const initializeDataTable = () => {
+    if (!$.fn.DataTable.isDataTable('#report-table')) {
+        $('#report-table').DataTable({
+            dom: 'Bfrtip', // Allows the buttons to be displayed
+            buttons: [
+                'copy', 'csv', 'excel', 'pdf', 'print'
+            ],
+            paging: false,
+            searching: false,
+            ordering: true,
+            info: true,
+            autoWidth: false,
+        });
+    }
+};
+
+ 
+
 const fetchData = (page = 1) => {
     const search = document.getElementById('search').value;
     const period = document.getElementById('period').value;
@@ -178,6 +196,9 @@ const fetchData = (page = 1) => {
             if (!hasMoreData) {
                 document.getElementById('loading-text').innerText = "All records loaded.";
                 document.getElementById('loading-indicator').style.display = 'none';
+
+                // Initialize DataTables after all data is loaded
+                initializeDataTable();
             }
         })
         .catch(error => {
@@ -187,6 +208,7 @@ const fetchData = (page = 1) => {
         });
 };
 
+// Event listener for filter form submission
 document.getElementById('filter-form').addEventListener('submit', function (e) {
     e.preventDefault();
     currentPage = 1;
@@ -199,6 +221,7 @@ document.getElementById('filter-form').addEventListener('submit', function (e) {
     fetchData(currentPage);
 });
 
+// Infinite scrolling
 window.addEventListener('scroll', () => {
     if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 100 && !loading) {
         currentPage++;
@@ -206,6 +229,9 @@ window.addEventListener('scroll', () => {
     }
 });
 
+// Initial data fetch
 fetchData(currentPage);
 </script>
+
+
 @endsection
