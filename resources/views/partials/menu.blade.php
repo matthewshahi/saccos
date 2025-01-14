@@ -276,6 +276,9 @@
                                     <li class="item-name">
                                         <a href="{{url('/reports/loans/repayments')}}">Loan Repayments</a>
                                     </li>
+                                    <li class="item-name">
+                                        <a href="{{url('/members/report')}}">Member Contributions and Loan Balances Report</a>
+                                    </li>
                                     <!-- <li class="item-name">
                                         <a href="{{url('/reports/loans/repayments/data')}}">Loans Given</a>
                                     </li>

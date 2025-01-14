@@ -382,6 +382,7 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
 
     Route::get('/members/report', [MemberReportController::class, 'index'])->name('members.report')->middleware('check_user_rights:rpt_reports');
     Route::post('/members/report/data', [MemberReportController::class, 'fetchReportData'])->name('members.report.data')->middleware('check_user_rights:rpt_reports');
+    Route::get('/members/report/export', [MemberReportController::class, 'exportReport'])->name('members.report.export')->middleware('check_user_rights:rpt_reports');
 
     // Route::get('/reports/loans/repayments', [HomeController::class, 'reportsLoansRepayments'])->name('reports.loans.repayments')->middleware('check_user_rights:rpt_reports');
     // Route::get('/reports/loans/repayments', [HomeController::class, 'reportsLoansRepayments'])->name('reports.loans.repayments')->middleware('check_user_rights:rpt_loans_repayments');
