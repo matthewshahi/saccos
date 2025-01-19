@@ -1047,17 +1047,6 @@ private function updateSaccoAccountsTrans(array $data)
             ->where('accounts_trans_user_id', $userId)
             ->first();
 
-        if ($existingTrans) {
-            // Update existing transaction if it exists
-            DB::table('sacco_accounts_trans')
-                ->where('accounts_trans_id', $existingTrans->accounts_trans_id)
-                ->update([
-                    'accounts_trans_debit' => $existingTrans->accounts_trans_debit + $data['debit'],
-                    'accounts_trans_credit' => $existingTrans->accounts_trans_credit + $data['credit'],
-                    'updated_at' => now(),
-                ]);
-        } else {
-            // Insert a new transaction if it doesn't exist
             DB::table('sacco_accounts_trans')->insert([
                 'accounts_trans_sub_account' => $data['sub_account'],
                 'accounts_trans_period' => $data['period'],
@@ -1070,7 +1059,31 @@ private function updateSaccoAccountsTrans(array $data)
                 'accounts_trans_ip' => $userIp,
                 'accounts_trans_transdate' => now()
             ]);
-        }
+            
+        // if ($existingTrans) {
+        //     // Update existing transaction if it exists
+        //     DB::table('sacco_accounts_trans')
+        //         ->where('accounts_trans_id', $existingTrans->accounts_trans_id)
+        //         ->update([
+        //             'accounts_trans_debit' => $existingTrans->accounts_trans_debit + $data['debit'],
+        //             'accounts_trans_credit' => $existingTrans->accounts_trans_credit + $data['credit'],
+        //             //'updated_at' => now(),
+        //         ]);
+        // } else {
+        //     // Insert a new transaction if it doesn't exist
+        //     DB::table('sacco_accounts_trans')->insert([
+        //         'accounts_trans_sub_account' => $data['sub_account'],
+        //         'accounts_trans_period' => $data['period'],
+        //         'accounts_trans_debit' => $data['debit'],
+        //         'accounts_trans_credit' => $data['credit'],
+        //         'accounts_trans_doc_no' => $data['doc_no'],
+        //         'accounts_trans_decription' => $description,
+        //         'accounts_trans_dat_date' => $data['date'],
+        //         'accounts_trans_user_id' => $userId,
+        //         'accounts_trans_ip' => $userIp,
+        //         'accounts_trans_transdate' => now()
+        //     ]);
+        // }
 
         // Update the `sacco_sub_account` balance for debit and credit separately
         DB::table('sacco_sub_account')
