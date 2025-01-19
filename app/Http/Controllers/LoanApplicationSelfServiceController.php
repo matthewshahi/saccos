@@ -77,10 +77,8 @@ class LoanApplicationSelfServiceController extends Controller
                 ->leftJoin('sacco_members AS g_members', 'guarantors.guarantors_guarantor_id', '=', 'g_members.member_id') // Guarantors' details
                 ->select(
                     'trans.*',
-                    'members.member_name', 
-                    'members.member_phone_no', 
-                    'members.member_national_id',
-                    'sacco_loan_category.loan_category_name' ,
+                    'members.*',
+                   // 'sacco_loan_category.loan_category_name' ,
                     'types.loan_type_name',
                     'categories.loan_category_name', // Fetch category name
                     DB::raw('GROUP_CONCAT(g_members.member_name ORDER BY guarantors.guarantors_id ASC SEPARATOR "|") AS guarantors_names'), // Ordered by guarantors_id
@@ -519,7 +517,8 @@ public function listLoansPendingApprovalSelfedit($id)
         ->where('trans.batch_trans_member_id', $loggedInMemberId) // Restrict to the logged-in user's loan
         ->first();
 
-      
+    //   dd($loan);
+
     // Check if loan exists and belongs to the user
     if (!$loan) {
         return redirect()->route('loans.pending.approval')->with('error', 'Loan not found or unauthorized access.');
