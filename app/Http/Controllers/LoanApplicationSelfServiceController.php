@@ -129,8 +129,15 @@ class LoanApplicationSelfServiceController extends Controller
                 ->value('period_name');
     
             if (!$currentPeriod) {
-                throw new \Exception('Active period not found.');
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Active period not found.',
+                ], 400);
+
+                
+              
             }
+             
     
             // Fetch the loan details
             $loan = DB::table('sacco_loan_batch_trans_members')
@@ -143,8 +150,13 @@ class LoanApplicationSelfServiceController extends Controller
                 ->first();
     
             if (!$loan) {
-                throw new \Exception('Loan not found or already processed.');
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Loan not found or already processed',
+                ], 400);
+                 
             }
+       
     
             // Check for default accounts
             $default_bank_account = $this->getDefaultAccount('default_bank_account');
@@ -152,7 +164,12 @@ class LoanApplicationSelfServiceController extends Controller
             $default_loan_commission_account = $this->getDefaultAccount('default_loan_commission_account');
     
             if (!$default_bank_account || !$default_insurance_account || !$default_loan_commission_account) {
-                throw new \Exception('Missing default bank, insurance, or commission accounts.');
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Missing default bank, insurance, or commission accounts',
+                ], 400);
+
+                 
             }
 
 

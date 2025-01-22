@@ -3,12 +3,12 @@
 @section('content')
 <div class="container">
     <!-- Page Title -->
-    <div class="row mb-4">
+    <div class="row mb-4"> 
         <div class="col-md-12">
             <h3 class="text-center">Loans Pending Approval</h3>
         </div>
     </div>
-   
+    
 <!-- Success and Error Messages -->
 @if (session('success'))
         <div class="alert alert-success alert-dismissible fade show" role="alert">

@@ -40,7 +40,7 @@
 
                     <!-- Reports Section -->
                     <li class="menu-section-title text-muted mt-3 mb-1">Reports</li>
-                    
+                     
                     <li class="Ul_li--hover">
                         <a href="{{ url('members/status/self') }}">
                             <i class="i-Files text-20 me-2 text-muted"></i>
