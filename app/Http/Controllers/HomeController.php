@@ -5452,58 +5452,304 @@ public function storeAccountsTransfer(Request $request)
     return redirect()->route('accounts.transfer')->with('success', 'Accounts transfer completed successfully.');
 }
 
-
-
-
-
-
-
-
 public function reportsAccountsTrialBalance(Request $request)
 {
     $currentPeriod = $this->currentPeriod->period_name;
-    $startPeriod = $request->input('start_period', date('Ym', strtotime('-11 months')));
-    $endPeriod = $request->input('end_period', date('Ym'));
 
-    // Validate the periods
-    if (!ctype_digit($startPeriod) || !ctype_digit($endPeriod)) {
+    // Default start and end dates
+    $startDate = $request->input('start_date', date('Y-m-01')); // Start of the current month
+    $endDate = $request->input('end_date', date('Y-m-d')); // Today's date
+
+    // Validate the dates
+    if (!strtotime($startDate) || !strtotime($endDate)) {
         return redirect()->route('reports.accounts.trial-balance')
-                         ->withErrors(['period' => 'Periods must be numeric and in the format YYYYmm.']);
+                         ->withErrors(['date' => 'Invalid date format.']);
     }
 
-    if ($startPeriod > $endPeriod) {
+    if ($startDate > $endDate) {
         return redirect()->route('reports.accounts.trial-balance')
-                         ->withErrors(['period' => 'Start period cannot be greater than end period.']);
+                         ->withErrors(['date' => 'Start date cannot be greater than end date.']);
     }
 
-    if ($startPeriod < date('Ym', strtotime('-11 months', strtotime($endPeriod . '01')))) {
-        return redirect()->route('reports.accounts.trial-balance')
-                         ->withErrors(['period' => 'The selected period range should not exceed 12 months.']);
-    }
-
-    $accounts = $this->fetchAccountsForTrialBalance($startPeriod, $endPeriod);
-
+    // Determine the view and account types based on the route
     $view = 'reports.accounts.trial_balance'; // Default view
+    $accountTypes = []; // Default: No filtering (include all account types)
+
     if ($request->route()->named('reports.accounts.profit-loss')) {
         $view = 'reports.accounts.profit_loss';
+        $accountTypes = ['INCOME', 'EXPENSE']; // P&L includes only INCOME and EXPENSE
     } elseif ($request->route()->named('reports.accounts.balance-sheet')) {
         $view = 'reports.accounts.balance_sheet';
-    } elseif ($request->route()->named('reports.accounts.trial-balance-horizontal')) {
-        $view = 'reports.accounts.trial_balance_horizontal';
-    } elseif ($request->route()->named('reports.accounts.profit-loss-horizontal')) {
-        $view = 'reports.accounts.profit_loss_horizontal';
-    } elseif ($request->route()->named('reports.accounts.balance-sheet-horizontal')) {
-        $view = 'reports.accounts.balance_sheet_horizontal';
+        $accountTypes = ['ASSETS', 'LIABILITIES', 'CAPITAL']; // Balance sheet types
     }
+
+    // Fetch the Opening Balance (independent)
+    $openingBalance = $this->fetchOpeningBalance($startDate, $accountTypes);
+
+    // Fetch accounts and transactions for the given period
+    $accounts = $this->fetchAccountsForTrialBalance($startDate, $endDate, $accountTypes);
 
     return view($view, [
         'accounts' => $accounts,
-        'startPeriod' => $startPeriod,
-        'endPeriod' => $endPeriod,
+        'startDate' => $startDate,
+        'endDate' => $endDate,
         'currentPeriod' => $currentPeriod,
+        'openingBalance' => $openingBalance, // Pass opening balance as independent value
     ]);
 }
 
+private function fetchOpeningBalance($startDate, $accountTypes = [])
+{
+    // Build the query to fetch opening balance
+    $query = DB::table('sacco_accounts_trans')
+        ->where('accounts_trans_dat_date', '<', $startDate)
+        ->select(
+            DB::raw('SUM(accounts_trans_debit) as total_debit'),
+            DB::raw('SUM(accounts_trans_credit) as total_credit')
+        );
+
+    // Filter by account types if provided
+    if (!empty($accountTypes)) {
+        $query->join('sacco_sub_account', 'sacco_accounts_trans.accounts_trans_sub_account', '=', 'sacco_sub_account.sub_account_id')
+            ->join('sacco_main_account', 'sacco_sub_account.sub_account_main_account', '=', 'sacco_main_account.main_account_id')
+            ->where(function ($subQuery) use ($accountTypes) {
+                foreach ($accountTypes as $type) {
+                    $subQuery->orWhere('sacco_main_account.main_account_type', 'LIKE', "%$type%");
+                }
+            });
+    }
+
+    // Execute the query
+    $openingData = $query->first();
+
+    // Handle null data (no transactions)
+    if (!$openingData) {
+        return (object) [
+            'balance' => 0,
+            'type' => 'Debit', // Default to Debit if no data
+        ];
+    }
+
+    // Calculate the net opening balance
+    $totalDebit = $openingData->total_debit ?? 0;
+    $totalCredit = $openingData->total_credit ?? 0;
+
+    // Net Opening Balance (Debit - Credit)
+    $openingBalance = $totalDebit - $totalCredit;
+
+    // Return as a single independent value
+    return (object) [
+        'balance' => abs($openingBalance), // Always positive
+        'type' => $openingBalance >= 0 ? 'Debit' : 'Credit', // Determine if Debit or Credit
+    ];
+}
+
+private function fetchAccountsForTrialBalance($startDate, $endDate, $accountTypes = [])
+{
+    $accounts = [];
+
+    // Chunk through transactions for the given date range to avoid memory issues
+    DB::table('sacco_accounts_trans')
+        ->whereBetween('accounts_trans_dat_date', [$startDate, $endDate]) // Filter by date
+        ->orderBy('accounts_trans_id', 'asc')
+        ->chunk(10000, function ($transactions) use (&$accounts, $accountTypes) {
+            foreach ($transactions as $transaction) {
+                $subAccountQuery = DB::table('sacco_sub_account')
+                    ->join('sacco_main_account', 'sacco_sub_account.sub_account_main_account', '=', 'sacco_main_account.main_account_id')
+                    ->where('sacco_sub_account.sub_account_id', $transaction->accounts_trans_sub_account);
+
+                // Apply account type filtering using LIKE for partial matches
+                if (!empty($accountTypes)) {
+                    $subAccountQuery->where(function ($query) use ($accountTypes) {
+                        foreach ($accountTypes as $type) {
+                            $query->orWhere('sacco_main_account.main_account_type', 'LIKE', "%$type%");
+                        }
+                    });
+                }
+
+                $subAccount = $subAccountQuery->select(
+                    'sacco_sub_account.sub_account_id',
+                    'sacco_sub_account.sub_account_name',
+                    'sacco_sub_account.sub_account_code',
+                    'sacco_main_account.main_account_code',
+                    'sacco_main_account.main_account_type'
+                )->first();
+
+                if ($subAccount) {
+                    $key = trim($subAccount->sub_account_id);
+
+                    if (!isset($accounts[$key])) {
+                        $accounts[$key] = (object) [
+                            'sub_account_id' => trim($subAccount->sub_account_id),
+                            'sub_account_name' => trim($subAccount->sub_account_name),
+                            'sub_account_code' => trim($subAccount->sub_account_code),
+                            'main_account_code' => trim($subAccount->main_account_code),
+                            'main_account_type' => trim($subAccount->main_account_type),
+                            'total_debit' => 0,
+                            'total_credit' => 0,
+                        ];
+                    }
+
+                    $accounts[$key]->total_debit += $transaction->accounts_trans_debit;
+                    $accounts[$key]->total_credit += $transaction->accounts_trans_credit;
+                }
+            }
+        });
+
+    // Handle empty accounts
+    if (empty($accounts)) {
+        return collect([]); // Return an empty collection
+    }
+
+    // Convert array to a collection
+    $accountsCollection = collect($accounts);
+
+    // Group the accounts by main account type
+    return $accountsCollection->groupBy('main_account_type');
+}
+
+// public function reportsAccountsTrialBalance(Request $request)
+// {
+//     $currentPeriod = $this->currentPeriod->period_name;
+
+//     // Default start and end dates
+//     $startDate = $request->input('start_date', date('Y-m-01')); // Start of the current month
+//     $endDate = $request->input('end_date', date('Y-m-d')); // Today's date
+
+//     // Validate the dates
+//     if (!strtotime($startDate) || !strtotime($endDate)) {
+//         return redirect()->route('reports.accounts.trial-balance')
+//                          ->withErrors(['date' => 'Invalid date format.']);
+//     }
+
+//     if ($startDate > $endDate) {
+//         return redirect()->route('reports.accounts.trial-balance')
+//                          ->withErrors(['date' => 'Start date cannot be greater than end date.']);
+//     }
+
+//     $accounts = $this->fetchAccountsForTrialBalance($startDate, $endDate);
+
+//     // Determine the view based on the route name
+//     $view = 'reports.accounts.trial_balance'; // Default view
+//     if ($request->route()->named('reports.accounts.profit-loss')) {
+//         $view = 'reports.accounts.profit_loss';
+//     } elseif ($request->route()->named('reports.accounts.balance-sheet')) {
+//         $view = 'reports.accounts.balance_sheet';
+//     } elseif ($request->route()->named('reports.accounts.trial-balance-horizontal')) {
+//         $view = 'reports.accounts.trial_balance_horizontal';
+//     } elseif ($request->route()->named('reports.accounts.profit-loss-horizontal')) {
+//         $view = 'reports.accounts.profit_loss_horizontal';
+//     } elseif ($request->route()->named('reports.accounts.balance-sheet-horizontal')) {
+//         $view = 'reports.accounts.balance_sheet_horizontal';
+//     }
+
+//     return view($view, [
+//         'accounts' => $accounts,
+//         'startDate' => $startDate,
+//         'endDate' => $endDate,
+//         'currentPeriod' => $currentPeriod,
+//     ]);
+// }
+
+// private function fetchAccountsForTrialBalance($startDate, $endDate)
+// {
+//     $accounts = [];
+
+//     // Chunk through transactions to avoid memory issues
+//     DB::table('sacco_accounts_trans')
+//         ->whereBetween('accounts_trans_dat_date', [$startDate, $endDate]) // Filtering by accounts_trans_dat_date
+//         ->orderBy('accounts_trans_id', 'asc')
+//         ->chunk(10000, function ($transactions) use (&$accounts) {
+//             foreach ($transactions as $transaction) {
+//                 $subAccount = DB::table('sacco_sub_account')
+//                     ->join('sacco_main_account', 'sacco_sub_account.sub_account_main_account', '=', 'sacco_main_account.main_account_id')
+//                     ->where('sacco_sub_account.sub_account_id', $transaction->accounts_trans_sub_account)
+//                     ->select(
+//                         'sacco_sub_account.sub_account_id',
+//                         'sacco_sub_account.sub_account_name',
+//                         'sacco_sub_account.sub_account_code',
+//                         'sacco_main_account.main_account_code',
+//                         'sacco_main_account.main_account_type'
+//                     )
+//                     ->first();
+
+//                 if ($subAccount) {
+//                     $key = trim($subAccount->sub_account_id);
+
+//                     if (!isset($accounts[$key])) {
+//                         $accounts[$key] = (object) [
+//                             'sub_account_id' => trim($subAccount->sub_account_id),
+//                             'sub_account_name' => trim($subAccount->sub_account_name),
+//                             'sub_account_code' => trim($subAccount->sub_account_code),
+//                             'main_account_code' => trim($subAccount->main_account_code),
+//                             'main_account_type' => trim($subAccount->main_account_type),
+//                             'total_debit' => 0,
+//                             'total_credit' => 0
+//                         ];
+//                     }
+
+//                     $accounts[$key]->total_debit += $transaction->accounts_trans_debit;
+//                     $accounts[$key]->total_credit += $transaction->accounts_trans_credit;
+//                 }
+//             }
+//         });
+
+//     // Convert array to a collection
+//     $accountsCollection = collect($accounts);
+
+//     // Group the accounts by main account type
+//     $groupedAccounts = $accountsCollection->groupBy('main_account_type');
+
+//     return $groupedAccounts;
+// }
+
+
+
+ 
+// public function reportsAccountsTrialBalance(Request $request)
+// {
+//     $currentPeriod = $this->currentPeriod->period_name;
+//     $startPeriod = $request->input('start_period', date('Ym', strtotime('-11 months')));
+//     $endPeriod = $request->input('end_period', date('Ym'));
+
+//     // Validate the periods
+//     if (!ctype_digit($startPeriod) || !ctype_digit($endPeriod)) {
+//         return redirect()->route('reports.accounts.trial-balance')
+//                          ->withErrors(['period' => 'Periods must be numeric and in the format YYYYmm.']);
+//     }
+
+//     if ($startPeriod > $endPeriod) {
+//         return redirect()->route('reports.accounts.trial-balance')
+//                          ->withErrors(['period' => 'Start period cannot be greater than end period.']);
+//     }
+
+//     if ($startPeriod < date('Ym', strtotime('-11 months', strtotime($endPeriod . '01')))) {
+//         return redirect()->route('reports.accounts.trial-balance')
+//                          ->withErrors(['period' => 'The selected period range should not exceed 12 months.']);
+//     }
+
+//     $accounts = $this->fetchAccountsForTrialBalance($startPeriod, $endPeriod);
+
+//     $view = 'reports.accounts.trial_balance'; // Default view
+//     if ($request->route()->named('reports.accounts.profit-loss')) {
+//         $view = 'reports.accounts.profit_loss';
+//     } elseif ($request->route()->named('reports.accounts.balance-sheet')) {
+//         $view = 'reports.accounts.balance_sheet';
+//     } elseif ($request->route()->named('reports.accounts.trial-balance-horizontal')) {
+//         $view = 'reports.accounts.trial_balance_horizontal';
+//     } elseif ($request->route()->named('reports.accounts.profit-loss-horizontal')) {
+//         $view = 'reports.accounts.profit_loss_horizontal';
+//     } elseif ($request->route()->named('reports.accounts.balance-sheet-horizontal')) {
+//         $view = 'reports.accounts.balance_sheet_horizontal';
+//     }
+
+//     return view($view, [
+//         'accounts' => $accounts,
+//         'startPeriod' => $startPeriod,
+//         'endPeriod' => $endPeriod,
+//         'currentPeriod' => $currentPeriod,
+//     ]);
+// }
 
 
 // private function fetchAccountsForTrialBalance($startPeriod, $endPeriod)
@@ -5529,15 +5775,15 @@ public function reportsAccountsTrialBalance(Request $request)
 //                     ->first();
 
 //                 if ($subAccount) {
-//                     $key = $subAccount->sub_account_id;
+//                     $key = trim($subAccount->sub_account_id);
 
 //                     if (!isset($accounts[$key])) {
 //                         $accounts[$key] = (object) [
-//                             'sub_account_id' => $subAccount->sub_account_id,
-//                             'sub_account_name' => $subAccount->sub_account_name,
-//                             'sub_account_code' => $subAccount->sub_account_code,
-//                             'main_account_code' => $subAccount->main_account_code,
-//                             'main_account_type' => $subAccount->main_account_type,
+//                             'sub_account_id' => trim($subAccount->sub_account_id),
+//                             'sub_account_name' => trim($subAccount->sub_account_name),
+//                             'sub_account_code' => trim($subAccount->sub_account_code),
+//                             'main_account_code' => trim($subAccount->main_account_code),
+//                             'main_account_type' => trim($subAccount->main_account_type),
 //                             'total_debit' => 0,
 //                             'total_credit' => 0
 //                         ];
@@ -5557,59 +5803,6 @@ public function reportsAccountsTrialBalance(Request $request)
 
 //     return $groupedAccounts;
 // }
-
-
-private function fetchAccountsForTrialBalance($startPeriod, $endPeriod)
-{
-    $accounts = [];
-
-    // Chunk through transactions to avoid memory issues
-    DB::table('sacco_accounts_trans')
-        ->whereBetween('accounts_trans_period', [$startPeriod, $endPeriod])
-        ->orderBy('accounts_trans_id', 'asc')
-        ->chunk(10000, function ($transactions) use (&$accounts) {
-            foreach ($transactions as $transaction) {
-                $subAccount = DB::table('sacco_sub_account')
-                    ->join('sacco_main_account', 'sacco_sub_account.sub_account_main_account', '=', 'sacco_main_account.main_account_id')
-                    ->where('sacco_sub_account.sub_account_id', $transaction->accounts_trans_sub_account)
-                    ->select(
-                        'sacco_sub_account.sub_account_id',
-                        'sacco_sub_account.sub_account_name',
-                        'sacco_sub_account.sub_account_code',
-                        'sacco_main_account.main_account_code',
-                        'sacco_main_account.main_account_type'
-                    )
-                    ->first();
-
-                if ($subAccount) {
-                    $key = trim($subAccount->sub_account_id);
-
-                    if (!isset($accounts[$key])) {
-                        $accounts[$key] = (object) [
-                            'sub_account_id' => trim($subAccount->sub_account_id),
-                            'sub_account_name' => trim($subAccount->sub_account_name),
-                            'sub_account_code' => trim($subAccount->sub_account_code),
-                            'main_account_code' => trim($subAccount->main_account_code),
-                            'main_account_type' => trim($subAccount->main_account_type),
-                            'total_debit' => 0,
-                            'total_credit' => 0
-                        ];
-                    }
-
-                    $accounts[$key]->total_debit += $transaction->accounts_trans_debit;
-                    $accounts[$key]->total_credit += $transaction->accounts_trans_credit;
-                }
-            }
-        });
-
-    // Convert array to a collection
-    $accountsCollection = collect($accounts);
-
-    // Group the accounts by main account type
-    $groupedAccounts = $accountsCollection->groupBy('main_account_type');
-
-    return $groupedAccounts;
-}
 
 
 

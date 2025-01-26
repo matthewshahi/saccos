@@ -43,10 +43,10 @@
                     <form action="{{ route('reports.accounts.balance-sheet') }}" method="GET">
                         <div class="row row-xs">
                             <div class="col-md-5">
-                                <input type="text" id="start_period" name="start_period" class="form-control" placeholder="Start Period (YYYYmm)" value="{{ $startPeriod }}">
+                                <input type="date" id="start_date" name="start_date" class="form-control" placeholder="Start Date" value="{{ $startDate }}">
                             </div>
                             <div class="col-md-5 mt-3 mt-md-0">
-                                <input type="text" id="end_period" name="end_period" class="form-control" placeholder="End Period (YYYYmm)" value="{{ $endPeriod }}">
+                                <input type="date" id="end_date" name="end_date" class="form-control" placeholder="End Date" value="{{ $endDate }}">
                             </div>
                             <div class="col-md-2 mt-3 mt-md-0">
                                 <button type="submit" class="btn btn-primary w-100">Filter</button>
@@ -60,11 +60,25 @@
                                 <tr>
                                     <th>Account</th>
                                     <th>Account Name</th>
-                                    <th style="text-align: right;">Total Debit</th>
-                                    <th style="text-align: right;">Total Credit</th>
+                                    <th style="text-align: right;">Debit</th>
+                                    <th style="text-align: right;">Credit</th>
                                 </tr>
                             </thead>
                             <tbody>
+                                {{-- Opening Balance --}}
+                                @if(isset($openingBalance))
+                                    <tr>
+                                        <td colspan="2"><strong>Opening Balance</strong></td>
+                                        <td style="text-align: right;">
+                                            <strong>{{ $openingBalance->type == 'Debit' ? number_format($openingBalance->balance, 2) : '' }}</strong>
+                                        </td>
+                                        <td style="text-align: right;">
+                                            <strong>{{ $openingBalance->type == 'Credit' ? number_format($openingBalance->balance, 2) : '' }}</strong>
+                                        </td>
+                                    </tr>
+                                @endif
+
+                                {{-- Initialize totals --}}
                                 @php
                                     $assetTotalDebit = 0;
                                     $assetTotalCredit = 0;
@@ -73,16 +87,20 @@
                                     $capitalTotalDebit = 0;
                                     $capitalTotalCredit = 0;
                                 @endphp
+
+                                {{-- Fixed Assets --}}
                                 @foreach($accounts['ASSET - FIXED'] ?? [] as $account)
                                     @php
-                                        $assetTotalDebit += $account->total_debit;
-                                        $assetTotalCredit += $account->total_credit;
+                                        $debit = max($account->total_debit - $account->total_credit, 0);
+                                        $credit = max($account->total_credit - $account->total_debit, 0);
+                                        $assetTotalDebit += $debit;
+                                        $assetTotalCredit += $credit;
                                     @endphp
                                     <tr>
                                         <td>{{ $account->main_account_code . '/' . $account->sub_account_code }}</td>
                                         <td>{{ $account->sub_account_name }}</td>
-                                        <td style="text-align: right;">{{ number_format($account->total_debit, 2) }}</td>
-                                        <td style="text-align: right;">{{ number_format($account->total_credit, 2) }}</td>
+                                        <td style="text-align: right;">{{ $debit > 0 ? number_format($debit, 2) : '' }}</td>
+                                        <td style="text-align: right;">{{ $credit > 0 ? number_format($credit, 2) : '' }}</td>
                                     </tr>
                                 @endforeach
                                 <tr>
@@ -90,16 +108,20 @@
                                     <td style="text-align: right;"><strong>{{ number_format($assetTotalDebit, 2) }}</strong></td>
                                     <td style="text-align: right;"><strong>{{ number_format($assetTotalCredit, 2) }}</strong></td>
                                 </tr>
+
+                                {{-- Current Assets --}}
                                 @foreach($accounts['ASSETS - CURRENT'] ?? [] as $account)
                                     @php
-                                        $assetTotalDebit += $account->total_debit;
-                                        $assetTotalCredit += $account->total_credit;
+                                        $debit = max($account->total_debit - $account->total_credit, 0);
+                                        $credit = max($account->total_credit - $account->total_debit, 0);
+                                        $assetTotalDebit += $debit;
+                                        $assetTotalCredit += $credit;
                                     @endphp
                                     <tr>
                                         <td>{{ $account->main_account_code . '/' . $account->sub_account_code }}</td>
                                         <td>{{ $account->sub_account_name }}</td>
-                                        <td style="text-align: right;">{{ number_format($account->total_debit, 2) }}</td>
-                                        <td style="text-align: right;">{{ number_format($account->total_credit, 2) }}</td>
+                                        <td style="text-align: right;">{{ $debit > 0 ? number_format($debit, 2) : '' }}</td>
+                                        <td style="text-align: right;">{{ $credit > 0 ? number_format($credit, 2) : '' }}</td>
                                     </tr>
                                 @endforeach
                                 <tr>
@@ -107,16 +129,20 @@
                                     <td style="text-align: right;"><strong>{{ number_format($assetTotalDebit, 2) }}</strong></td>
                                     <td style="text-align: right;"><strong>{{ number_format($assetTotalCredit, 2) }}</strong></td>
                                 </tr>
+
+                                {{-- Liabilities --}}
                                 @foreach($accounts['LIABILITIES - SHORT'] ?? [] as $account)
                                     @php
-                                        $liabilityTotalDebit += $account->total_debit;
-                                        $liabilityTotalCredit += $account->total_credit;
+                                        $debit = max($account->total_debit - $account->total_credit, 0);
+                                        $credit = max($account->total_credit - $account->total_debit, 0);
+                                        $liabilityTotalDebit += $debit;
+                                        $liabilityTotalCredit += $credit;
                                     @endphp
                                     <tr>
                                         <td>{{ $account->main_account_code . '/' . $account->sub_account_code }}</td>
                                         <td>{{ $account->sub_account_name }}</td>
-                                        <td style="text-align: right;">{{ number_format($account->total_debit, 2) }}</td>
-                                        <td style="text-align: right;">{{ number_format($account->total_credit, 2) }}</td>
+                                        <td style="text-align: right;">{{ $debit > 0 ? number_format($debit, 2) : '' }}</td>
+                                        <td style="text-align: right;">{{ $credit > 0 ? number_format($credit, 2) : '' }}</td>
                                     </tr>
                                 @endforeach
                                 <tr>
@@ -124,16 +150,20 @@
                                     <td style="text-align: right;"><strong>{{ number_format($liabilityTotalDebit, 2) }}</strong></td>
                                     <td style="text-align: right;"><strong>{{ number_format($liabilityTotalCredit, 2) }}</strong></td>
                                 </tr>
+
+                                {{-- Capital --}}
                                 @foreach($accounts['CAPITAL'] ?? [] as $account)
                                     @php
-                                        $capitalTotalDebit += $account->total_debit;
-                                        $capitalTotalCredit += $account->total_credit;
+                                        $debit = max($account->total_debit - $account->total_credit, 0);
+                                        $credit = max($account->total_credit - $account->total_debit, 0);
+                                        $capitalTotalDebit += $debit;
+                                        $capitalTotalCredit += $credit;
                                     @endphp
                                     <tr>
                                         <td>{{ $account->main_account_code . '/' . $account->sub_account_code }}</td>
                                         <td>{{ $account->sub_account_name }}</td>
-                                        <td style="text-align: right;">{{ number_format($account->total_debit, 2) }}</td>
-                                        <td style="text-align: right;">{{ number_format($account->total_credit, 2) }}</td>
+                                        <td style="text-align: right;">{{ $debit > 0 ? number_format($debit, 2) : '' }}</td>
+                                        <td style="text-align: right;">{{ $credit > 0 ? number_format($credit, 2) : '' }}</td>
                                     </tr>
                                 @endforeach
                                 <tr>
@@ -143,13 +173,23 @@
                                 </tr>
                             </tbody>
                             <tfoot>
+                                {{-- Net Assets --}}
+                                @php
+                                    $netAssets = ($assetTotalDebit - $assetTotalCredit) - ($liabilityTotalCredit - $liabilityTotalDebit) - ($capitalTotalCredit - $capitalTotalDebit);
+                                @endphp
                                 <tr>
                                     <th colspan="2">Net Assets</th>
-                                    @php
-                                        $netAssets = ($assetTotalDebit - $assetTotalCredit) - ($liabilityTotalCredit - $liabilityTotalDebit) - ($capitalTotalCredit - $capitalTotalDebit);
-                                    @endphp
                                     <th style="text-align: right;">{{ number_format($netAssets > 0 ? $netAssets : 0, 2) }}</th>
                                     <th style="text-align: right;">{{ number_format($netAssets < 0 ? abs($netAssets) : 0, 2) }}</th>
+                                </tr>
+                                {{-- Closing Balance --}}
+                                @php
+                                    $closingBalance = $netAssets + ($openingBalance->type == 'Debit' ? $openingBalance->balance : -$openingBalance->balance);
+                                @endphp
+                                <tr>
+                                    <th colspan="2">Closing Balance</th>
+                                    <th style="text-align: right;">{{ $closingBalance > 0 ? number_format($closingBalance, 2) : '' }}</th>
+                                    <th style="text-align: right;">{{ $closingBalance < 0 ? number_format(abs($closingBalance), 2) : '' }}</th>
                                 </tr>
                             </tfoot>
                         </table>

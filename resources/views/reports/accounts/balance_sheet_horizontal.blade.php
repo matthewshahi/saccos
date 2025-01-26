@@ -43,10 +43,10 @@
                 <form action="{{ route('reports.accounts.balance-sheet-horizontal') }}" method="GET">
                     <div class="row row-xs">
                         <div class="col-md-5">
-                            <input type="text" id="start_period" name="start_period" class="form-control" placeholder="Start Period (YYYYmm)" value="{{ $startPeriod }}">
+                            <input type="date" id="start_date" name="start_date" class="form-control" placeholder="Start Date" value="{{ $startDate }}">
                         </div>
                         <div class="col-md-5 mt-3 mt-md-0">
-                            <input type="text" id="end_period" name="end_period" class="form-control" placeholder="End Period (YYYYmm)" value="{{ $endPeriod }}">
+                            <input type="date" id="end_date" name="end_date" class="form-control" placeholder="End Date" value="{{ $endDate }}">
                         </div>
                         <div class="col-md-2 mt-3 mt-md-0">
                             <button type="submit" class="btn btn-primary w-100">Filter</button>

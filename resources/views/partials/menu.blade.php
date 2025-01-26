@@ -323,23 +323,8 @@
                                         </a>
                                     </li>
 
-                                    <li class="item-name">
-                                        <a href="{{ url('/reports/accounts/accounts/alltimetrialbalance') }}">
-                                            <span class="text-muted">Trial Balance - V3</span>
-                                        </a>
-                                    </li>
+                        
 
-                                    <li class="item-name">
-                                        <a href="{{ url('/reports/accounts/accounts/alltimetprofitandloss') }}">
-                                            <span class="text-muted">Profit and Loss - V3</span>
-                                        </a>
-                                    </li>
-
-                                    <li class="item-name">
-                                        <a href="{{ url('/reports/accounts/accounts/alltimetbalancesheet') }}">
-                                            <span class="text-muted">Balance sheet - V3</span>
-                                        </a>
-                                    </li>
 
                                 </ul>
                             </li>

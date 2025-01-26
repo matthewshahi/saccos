@@ -40,22 +40,25 @@
                             </ul>
                         </div>
                     @endif
+
                     <form action="{{ route('reports.accounts.trial-balance') }}" method="GET">
                         <div class="row row-xs">
                             <div class="col-md-5">
-                                <input type="text" id="start_period" name="start_period" class="form-control" placeholder="Start Period (YYYYmm)" value="{{ $startPeriod }}">
+                                <input type="date" id="start_date" name="start_date" class="form-control" placeholder="Start Date" value="{{ $startDate }}">
                             </div>
                             <div class="col-md-5 mt-3 mt-md-0">
-                                <input type="text" id="end_period" name="end_period" class="form-control" placeholder="End Period (YYYYmm)" value="{{ $endPeriod }}">
+                                <input type="date" id="end_date" name="end_date" class="form-control" placeholder="End Date" value="{{ $endDate }}">
                             </div>
                             <div class="col-md-2 mt-3 mt-md-0">
                                 <button type="submit" class="btn btn-primary w-100">Filter</button>
                             </div>
                         </div>
                     </form>
+
                     <button id="downloadExcel" class="btn btn-success mb-3">
                         <i class="i-Download"></i> Download Excel
                     </button>
+
                     <div class="table-responsive mt-4">
                         <table id="trialBalanceTable" class="display table table-striped table-bordered" style="width: 100%">
                             <thead>
@@ -67,6 +70,32 @@
                                 </tr>
                             </thead>
                             <tbody>
+                                @php
+                                    $netOpeningBalance = 0;
+                                    $netClosingBalance = 0;
+
+                                    // Calculate net opening balance
+                                    foreach ($accounts as $accountGroup) {
+                                        foreach ($accountGroup as $account) {
+                                            $openingBalance = $account->opening_balance ?? 0;
+                                            $netOpeningBalance += $openingBalance;
+                                            $netClosingBalance += $openingBalance + $account->total_debit - $account->total_credit;
+                                        }
+                                    }
+                                @endphp
+
+                                {{-- Opening Balance Row --}}
+                                <tr>
+                                    <td colspan="2"><strong>Opening Balance</strong></td>
+                                    <td style="text-align: right;">
+                                        <strong>{{ $netOpeningBalance > 0 ? number_format($netOpeningBalance, 2) : '0.00' }}</strong>
+                                    </td>
+                                    <td style="text-align: right;">
+                                        <strong>{{ $netOpeningBalance < 0 ? number_format(abs($netOpeningBalance), 2) : '0.00' }}</strong>
+                                    </td>
+                                </tr>
+
+                                {{-- Account Data --}}
                                 @php
                                     $groupTotals = [
                                         'ASSET - FIXED' => ['total_debit' => 0, 'total_credit' => 0],
@@ -81,8 +110,6 @@
                                     <tr>
                                         <td colspan="4"><strong>{{ $mainAccountType }}</strong></td>
                                     </tr>
-
-                                   
                                     @foreach($accountGroup as $account)
                                         @php
                                             $debit = (float) $account->total_debit;
@@ -108,6 +135,17 @@
                                         <td style="text-align: right;"><strong>{{ number_format($groupTotals[$mainAccountType]['total_credit'], 2) }}</strong></td>
                                     </tr>
                                 @endforeach
+
+                                {{-- Closing Balance Row --}}
+                                <tr>
+                                    <td colspan="2"><strong>Closing Balance</strong></td>
+                                    <td style="text-align: right;">
+                                        <strong>{{ $netClosingBalance > 0 ? number_format($netClosingBalance, 2) : '0.00' }}</strong>
+                                    </td>
+                                    <td style="text-align: right;">
+                                        <strong>{{ $netClosingBalance < 0 ? number_format(abs($netClosingBalance), 2) : '0.00' }}</strong>
+                                    </td>
+                                </tr>
                             </tbody>
                             <tfoot>
                                 <tr>
