@@ -176,6 +176,7 @@ class LoanApplicationSelfServiceController extends Controller
             if ($loan->loan_type_guaranteable_percent > 0) {
                 $guaranteeCheck = $this->isSufficientlyGuaranteed($loan, $loan->batch_trans_loan_amount);
             
+            
                 
                 if (!$guaranteeCheck['is_fully_guaranteed']) {
                     $errorMessage = "Error: This loan application by <strong>{$loan->member_name}</strong> "
@@ -289,12 +290,17 @@ if ($loan->loan_type_guaranteable_percent > 0) {
                 ->update(['batch_trans_updated' => 'Y']);
     
             DB::commit();
+            
+            $this->updateLedgerEntries($loan, $default_bank_account, $default_insurance_account, $default_loan_commission_account, $new_batch_no, $total_loan, $logged_in_user, $myIP, $transdate, $currentPeriod);
+
+
     
             session()->flash('success', 'Loan successfully approved.');
         } catch (\Exception $e) {
             DB::rollBack();
             return redirect()->back()->withErrors(['error' => 'Error: ' . $e->getMessage()]);
         }
+
     
         return redirect()->back();
     }
