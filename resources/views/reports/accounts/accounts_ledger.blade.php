@@ -25,57 +25,71 @@
 
     <!-- Search and Filter Form -->
     <form method="GET" action="{{ route('reports.accounts.ledger') }}" class="mb-3">
-    <div class="row align-items-end">
-        <!-- Start Period -->
-        <div class="col-lg-2 col-md-3 col-sm-6 mb-2">
-            <label for="start_period" class="form-label">Start Period</label>
-            <input type="text" id="start_period" name="start_period" class="form-control" placeholder="YYYYmm"
-                value="{{ request('start_period', '000000') }}">
+        <div class="row align-items-end">
+            <!-- Start Period -->
+            <div class="col-lg-2 col-md-3 col-sm-6 mb-2">
+                <label for="start_period" class="form-label">Start Period</label>
+                <input type="text" id="start_period" name="start_period" class="form-control" placeholder="YYYYmm"
+                    value="{{ request('start_period', '000000') }}">
+            </div>
+    
+            <!-- End Period -->
+            <div class="col-lg-2 col-md-3 col-sm-6 mb-2">
+                <label for="end_period" class="form-label">End Period</label>
+                <input type="text" id="end_period" name="end_period" class="form-control" placeholder="YYYYmm"
+                    value="{{ request('end_period', '999999') }}">
+            </div>
+    
+            <!-- Start Date -->
+            <div class="col-lg-2 col-md-3 col-sm-6 mb-2">
+                <label for="start_date" class="form-label">Start Date</label>
+                <input type="date" id="start_date" name="start_date" class="form-control" 
+                    value="{{ request('start_date', now()->startOfMonth()->format('Y-m-d')) }}">
+            </div>
+    
+            <!-- End Date -->
+            <div class="col-lg-2 col-md-3 col-sm-6 mb-2">
+                <label for="end_date" class="form-label">End Date</label>
+                <input type="date" id="end_date" name="end_date" class="form-control" 
+                    value="{{ request('end_date', now()->format('Y-m-d')) }}">
+            </div>
+    
+            <!-- Search -->
+            <div class="col-lg-3 col-md-4 col-sm-6 mb-2">
+                <label for="search" class="form-label">Search</label>
+                <input type="text" id="search" name="search" class="form-control" placeholder="Search..."
+                    value="{{ request('search', '') }}">
+            </div>
+    
+            <!-- Order By -->
+            <div class="col-lg-2 col-md-3 col-sm-6 mb-2">
+                <label for="order_field" class="form-label">Order By</label>
+                <select id="order_field" name="order_field" class="form-select">
+                    <option value="accounts_trans_period" {{ request('order_field') == 'accounts_trans_period' ? 'selected' : '' }}>Period</option>
+                    <option value="accounts_trans_dat_date" {{ request('order_field') == 'accounts_trans_dat_date' ? 'selected' : '' }}>Date</option>
+                    <option value="main_account_code" {{ request('order_field') == 'main_account_code' ? 'selected' : '' }}>Account</option>
+                    <option value="sub_account_name" {{ request('order_field') == 'sub_account_name' ? 'selected' : '' }}>Account Name</option>
+                    <option value="accounts_trans_doc_no" {{ request('order_field') == 'accounts_trans_doc_no' ? 'selected' : '' }}>Doc No</option>
+                    <option value="accounts_trans_debit" {{ request('order_field') == 'accounts_trans_debit' ? 'selected' : '' }}>Debit</option>
+                    <option value="accounts_trans_credit" {{ request('order_field') == 'accounts_trans_credit' ? 'selected' : '' }}>Credit</option>
+                </select>
+            </div>
+    
+            <!-- Order Direction -->
+            <div class="col-lg-2 col-md-3 col-sm-6 mb-2">
+                <label for="order_direction" class="form-label">Order Direction</label>
+                <select id="order_direction" name="order_direction" class="form-select">
+                    <option value="asc" {{ request('order_direction') == 'asc' ? 'selected' : '' }}>Ascending</option>
+                    <option value="desc" {{ request('order_direction') == 'desc' ? 'selected' : '' }}>Descending</option>
+                </select>
+            </div>
+    
+            <!-- Submit Button -->
+            <div class="col-lg-1 col-md-2 col-sm-6 mb-2">
+                <button type="submit" class="btn btn-primary w-100">Filter</button>
+            </div>
         </div>
-
-        <!-- End Period -->
-        <div class="col-lg-2 col-md-3 col-sm-6 mb-2">
-            <label for="end_period" class="form-label">End Period</label>
-            <input type="text" id="end_period" name="end_period" class="form-control" placeholder="YYYYmm"
-                value="{{ request('end_period', '999999') }}">
-        </div>
-
-        <!-- Search -->
-        <div class="col-lg-3 col-md-4 col-sm-6 mb-2">
-            <label for="search" class="form-label">Search</label>
-            <input type="text" id="search" name="search" class="form-control" placeholder="Search..."
-                value="{{ request('search', '') }}">
-        </div>
-
-        <!-- Order By -->
-        <div class="col-lg-2 col-md-3 col-sm-6 mb-2">
-            <label for="order_field" class="form-label">Order By</label>
-            <select id="order_field" name="order_field" class="form-select">
-                <option value="accounts_trans_period" {{ request('order_field') == 'accounts_trans_period' ? 'selected' : '' }}>Period</option>
-                <option value="accounts_trans_dat_date" {{ request('order_field') == 'accounts_trans_dat_date' ? 'selected' : '' }}>Date</option>
-                <option value="main_account_code" {{ request('order_field') == 'main_account_code' ? 'selected' : '' }}>Account</option>
-                <option value="sub_account_name" {{ request('order_field') == 'sub_account_name' ? 'selected' : '' }}>Account Name</option>
-                <option value="accounts_trans_doc_no" {{ request('order_field') == 'accounts_trans_doc_no' ? 'selected' : '' }}>Doc No</option>
-                <option value="accounts_trans_debit" {{ request('order_field') == 'accounts_trans_debit' ? 'selected' : '' }}>Debit</option>
-                <option value="accounts_trans_credit" {{ request('order_field') == 'accounts_trans_credit' ? 'selected' : '' }}>Credit</option>
-            </select>
-        </div>
-
-        <!-- Order Direction -->
-        <div class="col-lg-2 col-md-3 col-sm-6 mb-2">
-            <label for="order_direction" class="form-label">Order Direction</label>
-            <select id="order_direction" name="order_direction" class="form-select">
-                <option value="asc" {{ request('order_direction') == 'asc' ? 'selected' : '' }}>Ascending</option>
-                <option value="desc" {{ request('order_direction') == 'desc' ? 'selected' : '' }}>Descending</option>
-            </select>
-        </div>
-
-        <!-- Submit Button -->
-        <div class="col-lg-1 col-md-2 col-sm-6 mb-2">
-            <button type="submit" class="btn btn-primary w-100">Filter</button>
-        </div>
-    </div>
-</form>
+    </form>
 
     <!-- Ledger Table -->
     <div class="card text-start">
@@ -99,6 +113,15 @@
                         </tr>
                     </thead>
                     <tbody>
+                        <!-- Opening Balance -->
+                        @if(isset($openingBalance))
+                        <tr>
+                            <td colspan="7" class="text-end"><strong>Opening Balance:</strong></td>
+                            <td><strong>{{ $openingBalance->type === 'Debit' ? number_format($openingBalance->balance, 2) : '' }}</strong></td>
+                            <td><strong>{{ $openingBalance->type === 'Credit' ? number_format($openingBalance->balance, 2) : '' }}</strong></td>
+                            <td colspan="2"></td>
+                        </tr>
+                        @endif
                         @forelse ($transactions as $index => $transaction)
                         <tr>
                             <th>{{ $transactions->firstItem() + $index }}</th>
@@ -214,7 +237,7 @@
                         </tr>
                         @endforelse
                     </tbody>
-                    <tfoot>
+                    <tfoot> 
                         <tr>
                             <td colspan="7" class="text-end"><strong>Total for Selected Range:</strong></td>
                             <td><strong>{{ number_format($totals->total_debit, 2) }}</strong></td>
