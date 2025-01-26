@@ -91,6 +91,7 @@
         </div>
     </form>
 
+    <a href="{{ route('reports.accounts.ledger.export', request()->all()) }}" class="btn btn-success">Download Excel</a>
     <!-- Ledger Table -->
     <div class="card text-start">
         <div class="card-body">

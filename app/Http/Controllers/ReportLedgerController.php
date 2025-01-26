@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Exports\LedgerExport; // Import the LedgerExport class
+use Maatwebsite\Excel\Facades\Excel; // Import the Laravel Excel facade
 
 class ReportLedgerController extends Controller
 {
@@ -80,7 +82,7 @@ class ReportLedgerController extends Controller
         ->orderBy($orderField, $orderDirection);
     
         // Paginate results
-        $transactions = $transactionsQuery->paginate(50);
+        $transactions = $transactionsQuery->paginate(2000);
     
         // Determine active period
         $activePeriod = DB::table('sacco_period')
@@ -260,5 +262,10 @@ public function updateTransaction(Request $request, $id)
         'order_field' => $request->input('order_field', 'accounts_trans_period'),
         'order_direction' => $request->input('order_direction', 'asc'),
     ])->with('success', 'Transaction updated successfully.');
+}
+public function export(Request $request)
+{
+    $data = $this->reportsAccountsLedger($request); // Fetch the filtered data
+    return Excel::download(new LedgerExport($data->getData()), 'accounts_ledger.xlsx');
 }
 }

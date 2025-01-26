@@ -24,6 +24,10 @@ use App\Http\Controllers\LoanApplicationSelfServiceController;
 use App\Http\Controllers\ReportLedgerController;
 use App\Http\Controllers\LoanPaymentController;
 use App\Http\Controllers\MemberReportController;
+use App\Http\Controllers\LoanLedgerController;
+
+
+Route::get('/import-loans-to-ledger', [LoanLedgerController::class, 'importLoansToLedger']);
 
 Route::get('/test-email', function () {
     Mail::raw('This is a test email from Laravel!', function ($message) {
@@ -392,6 +396,7 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
     Route::get('/reports/accounts/ledger', [ReportLedgerController::class, 'reportsAccountsLedger'])->name('reports.accounts.ledger')->middleware('check_user_rights:rpt_acc_trans');
     Route::put('/reports/accounts/ledger/update/{id}', [ReportLedgerController::class, 'updateTransaction'])->name('reports.accounts.update')->middleware('check_user_rights:rpt_acc_trans');
     Route::put('/reports/accounts/ledger/update/{id}', [ReportLedgerController::class, 'updateTransaction'])->name('reports.accounts.update')->middleware('check_user_rights:modify_member_shares_journal');
+    Route::get('/reports/accounts/ledger/export', [ReportLedgerController::class, 'export'])->name('reports.accounts.ledger.export');
 
     Route::get('/reports/accounts/trial-balance', [HomeController::class, 'reportsAccountsTrialBalance'])->name('reports.accounts.trial-balance')->middleware('check_user_rights:rpt_trial_balance');
     Route::get('/reports/accounts/profit-loss', [HomeController::class, 'reportsAccountsTrialBalance'])->name('reports.accounts.profit-loss')->middleware('check_user_rights:rpt_profit_loss');
