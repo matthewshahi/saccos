@@ -24,10 +24,10 @@ use App\Http\Controllers\LoanApplicationSelfServiceController;
 use App\Http\Controllers\ReportLedgerController;
 use App\Http\Controllers\LoanPaymentController;
 use App\Http\Controllers\MemberReportController;
-// use App\Http\Controllers\LoanLedgerController;
+use App\Http\Controllers\LoanLedgerController;
 
 
-// Route::get('/import-loans-to-ledger', [LoanLedgerController::class, 'importLoansToLedger']);
+Route::get('/import-loans-to-ledger', [LoanLedgerController::class, 'importLoansToLedger']);
 
 Route::get('/test-email', function () {
     Mail::raw('This is a test email from Laravel!', function ($message) {
