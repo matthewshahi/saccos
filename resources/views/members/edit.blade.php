@@ -55,6 +55,10 @@
                                 </select>
                             </div>
                         </div>
+                        <?php
+                        // dd($data['member']->member_dob);
+                        $data['member']->member_dob = substr($data['member']->member_dob,0,10);
+                         ?>
                         <div class="form-group row">
                             <label for="member_dob" class="col-sm-2 col-form-label">Date of Birth</label>
                             <div class="col-sm-10">

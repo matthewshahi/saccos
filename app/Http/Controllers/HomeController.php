@@ -535,7 +535,7 @@ private function dashboard_showProfitabilityThisMonth()
             'departments' => $departments,
             'positions' => $positions
         ];
-
+ 
         return view('members.edit', compact('data'));
     }
 
@@ -563,6 +563,7 @@ private function dashboard_showProfitabilityThisMonth()
             return redirect()->back()->withErrors($validator)->withInput();
         }
 
+        // dd($request->input('member_dob'));
         DB::table('sacco_members')
             ->where('member_id', $id)
             ->update([
