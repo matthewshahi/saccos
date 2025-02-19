@@ -108,7 +108,7 @@
         <table class="table table-sm table-hover">
             <thead>
                 <tr>
-                    <th colspan="8"><strong>Member Share Statement</strong></th>
+                    <th colspan="8"><strong>Member Deposit Statement</strong></th>
                 </tr>
                 <tr>
                     <th>&nbsp;</th>
