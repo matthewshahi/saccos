@@ -103,7 +103,7 @@
     </div>
 
     <!-- Share Statement -->
-    <h2>Doposit Statement</h2>
+    <h2>Deposit Statement</h2>
     <div class="table-responsive">
         <table class="table table-sm table-hover">
             <thead>
