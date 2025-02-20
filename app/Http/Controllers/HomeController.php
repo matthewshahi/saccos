@@ -1510,7 +1510,11 @@ public function updatePassword(Request $request, $id)
 
         $user = Auth::user();
 
-        if (md5($request->current_password) !== $user->getAuthPassword()) {
+        // if (md5($request->current_password) !== $user->getAuthPassword()) {
+        //     return redirect()->back()->withErrors(['current_password' => 'Current password is incorrect']);
+        // }
+
+        if (md5($request->current_password) !== $user->member_password) {
             return redirect()->back()->withErrors(['current_password' => 'Current password is incorrect']);
         }
 
