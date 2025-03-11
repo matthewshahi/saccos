@@ -192,7 +192,7 @@ class LoanEndMonthController extends Controller
     {
         return DB::table('sacco_defaults')
             ->where('default_name', $accountName)
-            ->value('default_value');
+            ->value('default_value'); 
     }
 
     // Update monthly loan repayments for specified loans

@@ -193,8 +193,8 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
 
     
 
-    Route::get('/import/members', [MemberImportController::class, 'showForm'])->name('import.members.form')->middleware('check_user_rights:new_member_applications_updateXXX');
-    Route::post('/import/members', [MemberImportController::class, 'import'])->name('import.members.process')->middleware('check_user_rights:new_member_applications_updateXXX');
+    Route::get('/import/members', [MemberImportController::class, 'showForm'])->name('import.members.form');//->middleware('check_user_rights:new_member_applications_updateXXX');
+    Route::post('/import/members', [MemberImportController::class, 'import'])->name('import.members.process');//->middleware('check_user_rights:new_member_applications_updateXXX');
     Route::get('/update/ledgers', [MemberImportController::class, 'updatefLedgers'])->name('update.ledgers');
 
 
@@ -453,7 +453,7 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
     Route::delete('/files/delete/{file}', [FileUploadController::class, 'delete'])->name('file.delete');
 
    
-    // Route::get('/randomize-members', [RandController::class, 'randomizeMembers'])->name('randomize.members')->middleware('check_user_rights:testing_randomize_members');
+    //Route::get('/randomize-members', [RandController::class, 'randomizeMembers'])->name('randomize.members')->middleware('check_user_rights:testing_randomize_members');
     // Route::get('/randomize-loan-payments', [RandController::class, 'randomizeLoanPayments'])->name('randomize.loan.payments')->middleware('check_user_rights:testing_randomize_members');
     // Route::get('/randomize-shares', [RandController::class, 'randomizeShares'])->name('randomize.shares')->middleware('check_user_rights:testing_randomize_members');
     // Route::get('/randomize-accounts-transactions', [RandController::class, 'randomizeAccountsTransactions'])->name('randomize.accounts.transactions')->middleware('check_user_rights:testing_randomize_members');
