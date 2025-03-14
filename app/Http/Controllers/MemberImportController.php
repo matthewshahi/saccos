@@ -74,7 +74,7 @@ class MemberImportController extends Controller
         }
 
         // Generate email from member name
-        $email = strtolower(str_replace(' ', '.', $memberName)) . '@adomsacco.com';
+        $email = strtolower(str_replace(' ', '.', $memberName)) . '@noemail.com';
 
         // Check if the `member_sacco_id` already exists
         $existingMember = DB::table('sacco_members')->where('member_sacco_id', $memberSaccoId)->exists();
@@ -87,7 +87,7 @@ class MemberImportController extends Controller
         // Insert member data into `sacco_members`
         DB::table('sacco_members')->insert([
             'member_sacco_id' => $memberSaccoId,
-            'member_name' => $memberName,
+            'member_name' => strtoupper(trim($memberName)),
             'member_date_joined' => $dateJoined,
             'member_email' => $email,
             'member_dept' => 1, // Hardcoded

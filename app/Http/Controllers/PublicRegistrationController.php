@@ -168,12 +168,12 @@ class PublicRegistrationController extends Controller
                 'signature' => 'required|mimes:jpeg,jpg,pdf|max:300',
                 'id_copy_front' => 'required|mimes:jpeg,jpg,pdf|max:300',
                 'id_copy_back' => 'required|mimes:jpeg,jpg,pdf|max:300',
-                'payslips_bank_statements' => 'required|mimes:jpeg,jpg,pdf|max:300',
+                'payslips_bank_statements' => 'mimes:jpeg,jpg,pdf|max:300',
                 
                 // Bank Details
-                'bank_name' => 'required|string|max:255',
-                'bank_branch' => 'required|string|max:255',
-                'bank_account_number' => 'required|string|max:50',
+                'bank_name' => 'string|max:255',
+                'bank_branch' => 'string|max:255',
+                'bank_account_number' => 'string|max:50',
                 
                 // Next of Kin
                 'next_of_kin' => 'nullable|array|max:3',
