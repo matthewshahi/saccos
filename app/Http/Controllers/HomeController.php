@@ -4801,7 +4801,7 @@ public function loansTypes()
         $loanTypes = DB::table('sacco_loan_types')
             ->where('loan_type_deleted', '<>', 'Y')
             ->orderBy('loan_type_name')
-            ->get();
+            ->get(); 
 
         // Fetch sub-account details ordered by name
         $subAccountDetails = DB::table('sacco_sub_account')
