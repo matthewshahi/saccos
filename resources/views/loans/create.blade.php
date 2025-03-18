@@ -46,7 +46,7 @@
                             <select class="form-control" id="loan_type_interest_type" name="loan_type_interest_type" required>
                                 <option value="REDUCING BALANCE">REDUCING BALANCE</option>
                                 <option value="FIXED INTEREST">FIXED INTEREST</option>
-                            </select>
+                            </select> 
                         </div>
                         <div class="form-group">
                             <label for="loan_type_duration">Duration (Months)</label>
@@ -70,7 +70,8 @@
                         </div>
                         <div class="form-group">
                             <label for="loan_type_acount">Loan Account</label>
-                            <select class="form-control" id="loan_type_acount" name="loan_type_acount" required>
+                            <select class="form-control" id="loan_type_acount" name="loan_type_acount" required style="min-width: 300px;">
+                            @foreach($subAccounts as $subAccount)
                                 @foreach($subAccounts as $subAccount)
                                     <option value="{{ $subAccount->sub_account_id }}">
                                         {{ $subAccount->sub_account_name }} ({{ $subAccount->main_account_code }}/{{ $subAccount->sub_account_code }})
@@ -80,7 +81,8 @@
                         </div>
                         <div class="form-group">
                             <label for="loan_type_int_account">Interest Account</label>
-                            <select class="form-control" id="loan_type_int_account" name="loan_type_int_account" required>
+                            <select class="form-control" id="loan_type_int_account" name="loan_type_int_account" required style="min-width: 300px;">
+                            @foreach($subAccounts as $subAccount)
                                 @foreach($subAccounts as $subAccount)
                                     <option value="{{ $subAccount->sub_account_id }}">
                                         {{ $subAccount->sub_account_name }} ({{ $subAccount->main_account_code }}/{{ $subAccount->sub_account_code }})
@@ -90,7 +92,7 @@
                         </div>
                         <div class="form-group">
                             <label for="loan_type_comm_account">Commission Account</label>
-                            <select class="form-control" id="loan_type_comm_account" name="loan_type_comm_account" required>
+                            <select class="form-control" id="loan_type_comm_account" name="loan_type_comm_account" required style="min-width: 300px;">
                                 @foreach($subAccounts as $subAccount)
                                     <option value="{{ $subAccount->sub_account_id }}">
                                         {{ $subAccount->sub_account_name }} ({{ $subAccount->main_account_code }}/{{ $subAccount->sub_account_code }})
@@ -100,7 +102,8 @@
                         </div>
                         <div class="form-group">
                             <label for="loan_type_insurable">Insurable</label>
-                            <select class="form-control" id="loan_type_insurable" name="loan_type_insurable" required>
+                            <select class="form-control" id="loan_type_insurable" name="loan_type_insurable" required style="min-width: 300px;">
+                            @foreach($subAccounts as $subAccount)
                                 <option value="Y">Yes</option>
                                 <option value="N">No</option>
                             </select>
