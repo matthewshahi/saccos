@@ -47,7 +47,7 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                @foreach($loanTypes as $loanType)
+                                <!-- @foreach($loanTypes as $loanType)
                                     <tr>
                                         <td>{{ $loanType->loan_type_name }}</td>
                                         <td>{{ number_format($loanType->loan_type_interest, 2) }}</td>
@@ -70,7 +70,53 @@
                                             </form>
                                         </td>
                                     </tr>
-                                @endforeach
+                                @endforeach -->
+
+                                @foreach($loanTypes as $loanType)
+    <tr>
+        <td>{{ $loanType->loan_type_name }}</td>
+        <td>{{ number_format($loanType->loan_type_interest, 2) }}</td>
+        <td>{{ $loanType->loan_type_interest_type }}</td>
+        <td>{{ $loanType->loan_type_duration }}</td>
+        <td>{{ $loanType->loan_type_guaranteable_percent }}%</td>
+        <td>{{ $loanType->loan_type_code }}</td>
+        <td>{{ number_format($loanType->loan_type_max_amount, 2) }}</td>
+        <td>{{ $loanType->loan_type_qualification_period }} months</td>
+        <td>
+            @if(isset($subAccountDetails[$loanType->loan_type_acount]))
+                {{ $subAccountDetails[$loanType->loan_type_acount]->sub_account_name }}
+                ({{ $subAccountDetails[$loanType->loan_type_acount]->main_account_code }}/{{ $subAccountDetails[$loanType->loan_type_acount]->sub_account_code }})
+            @else
+                No Account Set
+            @endif
+        </td>
+        <td>
+            @if(isset($subAccountDetails[$loanType->loan_type_int_account]))
+                {{ $subAccountDetails[$loanType->loan_type_int_account]->sub_account_name }}
+                ({{ $subAccountDetails[$loanType->loan_type_int_account]->main_account_code }}/{{ $subAccountDetails[$loanType->loan_type_int_account]->sub_account_code }})
+            @else
+                No Account Set
+            @endif
+        </td>
+        <td>
+            @if(isset($subAccountDetails[$loanType->loan_type_comm_account]))
+                {{ $subAccountDetails[$loanType->loan_type_comm_account]->sub_account_name }}
+                ({{ $subAccountDetails[$loanType->loan_type_comm_account]->main_account_code }}/{{ $subAccountDetails[$loanType->loan_type_comm_account]->sub_account_code }})
+            @else
+                No Account Set
+            @endif
+        </td>
+        <td>{{ $loanType->loan_type_insurable == 'Y' ? 'Yes' : 'No' }}</td>
+        <td>
+            <a href="{{ url('/loans/types/edit/' . $loanType->loan_type_id) }}" class="btn btn-warning">Edit</a>
+            <form action="{{ url('/loans/types/delete/' . $loanType->loan_type_id) }}" method="POST" style="display:inline;">
+                @csrf
+                @method('DELETE')
+                <button type="submit" class="btn btn-danger">Delete</button>
+            </form>
+        </td>
+    </tr>
+@endforeach
                             </tbody>
                         </table>
                     </div>
