@@ -6303,8 +6303,6 @@ public function downloadLoansIssuedReport(Request $request)
 
 
  
-
- 
 public function reportsLoansRepayments(Request $request)
 {
     $startPeriod = $request->input('startPeriod', date('Ym', strtotime('-3 months')));
@@ -6319,19 +6317,8 @@ public function reportsLoansRepayments(Request $request)
         ->join('sacco_department', 'sacco_members.member_dept', '=', 'sacco_department.department_id')
         ->join('sacco_company', 'sacco_department.department_company_id', '=', 'sacco_company.company_id')
         ->join('sacco_loan_types', 'sacco_loans.loan_loan_type', '=', 'sacco_loan_types.loan_type_id')
-        ->select(
-            'sacco_loan_payments.loan_payments_id',
-            'sacco_members.member_name',
-            'sacco_members.member_phone_no',
-            'sacco_members.member_sacco_id',
-            'sacco_loan_types.loan_type_name',
-            'sacco_loans.loan_amount',
-            'sacco_loans.loan_loan_paid',
-            'sacco_loan_payments.loan_payments_amount',
-            'sacco_loan_payments.loan_payments_period',
-            'sacco_loan_payments.loan_payments_paid_on',
-            'sacco_loan_payments.loan_payments_docno'
-        );
+        ->join('sacco_loan_category', 'sacco_loans.loan_loan_category', '=', 'sacco_loan_category.loan_category_id') // Fixed join condition
+        ->select('*'); // Select all fields
 
     // Apply search filters if any
     if (!empty($searchName) || !empty($searchCompany) || !empty($searchLoanType)) {
