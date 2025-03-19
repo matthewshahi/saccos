@@ -330,9 +330,9 @@ if (!function_exists('formatAmount')) {
                                 <div class="ul-widget1">
                                     @foreach($latestMembers as $index => $member)
                                     <div class="ul-widget4__item ul-widget4__users">
-                                        <div class="ul-widget4__img">
-                                            <img src="{{ asset('dist-assets/images/faces/' . ($index % 2 == 0 ? '1' : '2') . '.jpg') }}" alt="" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                                        </div>
+                                    <div class="ul-widget4__img">
+    <i class="i-Business-Man text-20" style="color: #663399;"></i>
+</div>
                                         <div class="ul-widget2__info ul-widget4__users-info">
                                             <a class="ul-widget2__title" href="#">{{ $member->member_name }}</a>
                                             <span class="ul-widget2__username">{{ $member->company_name }}, Joined: {{ date('d/m/Y', strtotime($member->member_date_joined)) }}</span>
@@ -348,9 +348,9 @@ if (!function_exists('formatAmount')) {
                                 <div class="ul-widget1">
                                     @foreach($saccoOfficials as $index => $member)
                                     <div class="ul-widget4__item ul-widget4__users">
-                                        <div class="ul-widget4__img">
-                                            <img src="{{ asset('dist-assets/images/faces/' . ($index % 2 == 0 ? '1' : '2') . '.jpg') }}" alt="" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                                        </div>
+                                    <div class="ul-widget4__img">
+    <i class="i-Business-Man text-20" style="color: #663399;"></i>
+</div>
                                         <div class="ul-widget2__info ul-widget4__users-info">
                                             <a class="ul-widget2__title" href="#">{{ $member->member_name }}</a>
                                             <span class="ul-widget2__username">{{ $member->company_name }}, Joined: {{ date('d/m/Y', strtotime($member->member_date_joined)) }}</span>
