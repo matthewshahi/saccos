@@ -500,19 +500,7 @@ private function dashboard_showProfitabilityThisMonth()
         }
 
         return $query->orderBy($orderby, $sort_order)
-            ->select(
-                'sacco_members.member_id',
-                'sacco_members.member_name',
-                'sacco_members.member_sacco_id',
-                'sacco_members.member_date_joined',
-                'sacco_members.member_national_id',
-                'sacco_members.member_phone_no',
-                'sacco_members.member_email',
-                'sacco_department.department_name',
-                'sacco_position.position_name',
-                'sacco_company.company_name',
-                'sacco_members.member_active'
-            )
+            ->select('*')
             ->limit($limit)
             ->get();
     }
