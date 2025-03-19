@@ -1,17 +1,20 @@
 @extends('layouts.app')
 
 @section('content')
-
 <?php
 if (!function_exists('formatAmount')) {
     function formatAmount($amount)
     {
+        $isNegative = $amount < 0; // Check if the number is negative
+        $amount = abs($amount); // Work with the absolute value
+
         if ($amount >= 1000000) {
-            return number_format($amount / 1000000, 1) . 'M'; // Converts to '14.6M' for 14,563,333.88545
-        } elseif ($amount >= 1000) {
-            return number_format($amount, 0, '.', ','); // Regular comma formatting (e.g., 1,234,567)
+            $formatted = number_format($amount / 1000000, 1, '.', ',') . 'M'; // Example: 14.6M
+        } else {
+            $formatted = number_format($amount, 2, '.', ','); // Example: -51,037.70
         }
-        return number_format($amount, 2); // Default decimal places for small amounts
+
+        return $isNegative ? '-' . ltrim($formatted, '-') : $formatted; // Ensure negative sign is properly formatted
     }
 }
 ?>
@@ -105,8 +108,8 @@ if (!function_exists('formatAmount')) {
                     <div class="d-flex justify-content-center align-items-center">
                         <i class="i-Money-Bag text-success" style="font-size: 2rem; margin-right: 0.5rem;"></i>
                         <p class="card-text mb-0" id="repaymentsTotal" style="font-size: 1.5rem;">
-                                KES {{ formatAmount($repaymentsTotal) }}
-                            </p>
+                             KES {{ formatAmount($repaymentsTotal) }}
+                             </p>
                     </div>
                 </div>
             </div>
@@ -144,22 +147,26 @@ if (!function_exists('formatAmount')) {
 <script>
     $(document).ready(function() {
         function formatNumber(num) {
+            let isNegative = num < 0;
+            num = Math.abs(num);
+
             if (num >= 1000000) {
-                return (num / 1000000).toFixed(1) + 'M';
-            } else if (num >= 1000) {
-                return (num / 1000).toFixed(1) + 'K';
+                formatted = (num / 1000000).toFixed(1) + 'M';
+            } else {
+                formatted = num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             }
-            return num;
+
+            return isNegative ? '-' + formatted : formatted;
         }
 
-        $('#activeMembersCount').text(formatNumber({{ $activeMembersCount }}));
-        $('#newMembersCount').text(formatNumber({{ $newMembersCount }}));
-        $('#pendingAppsCount').text(formatNumber({{ $pendingAppsCount }}));
-        $('#savingsDepositsTotal').text('KES ' + formatNumber({{ $savingsDepositsTotal }}));
-        $('#loansIssuedTotal').text('KES ' + formatNumber({{ $loansIssuedTotal }}));
-        $('#repaymentsTotal').text('KES ' + formatNumber({{ $repaymentsTotal }}));
-        $('#activeLoansCount').text(formatNumber({{ $activeLoansCount }}));
-        $('#delinquentLoansCount').text(formatNumber({{ $delinquentLoansCount }}));
+        $('#activeMembersCount').text(formatNumber(@json($activeMembersCount)));
+        $('#newMembersCount').text(formatNumber(@json($newMembersCount)));
+        $('#pendingAppsCount').text(formatNumber(@json($pendingAppsCount)));
+        $('#savingsDepositsTotal').text('KES ' + formatNumber(@json($savingsDepositsTotal)));
+        $('#loansIssuedTotal').text('KES ' + formatNumber(@json($loansIssuedTotal)));
+        $('#repaymentsTotal').text('KES ' + formatNumber(@json($repaymentsTotal)));
+        $('#activeLoansCount').text(formatNumber(@json($activeLoansCount)));
+        $('#delinquentLoansCount').text(formatNumber(@json($delinquentLoansCount)));
     });
 </script>
 
