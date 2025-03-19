@@ -1,13 +1,22 @@
 @extends('layouts.app')
 
 @section('content')
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+<div class="custom_text-right mb-3">
+    <button id="downloadPDF" class="custom_btn-primary">
+        <i class="fas fa-file-pdf"></i> Download Statement (PDF)
+    </button>
+    <span id="loadingIndicator" class="custom_loading-indicator">
+        <i class="fas fa-spinner fa-spin"></i> Generating PDF...
+    </span>
+</div>
 <div class="statement-container">
     <div class="breadcrumb d-flex justify-content-between align-items-center">
         <h1>Member Statement for {{ $data['member']->member_name }}</h1>
         <div class="header-part-right">
             <ul>
                 @if(Auth::check())
-                <li class="d-none d-sm-inline-block">{{ Auth::user()->member_name }}</li>
+                <!-- <li class="d-none d-sm-inline-block">{{ Auth::user()->member_name }}</li> -->
                 @endif
                 @if(isset($currentPeriod))
                 <li class="d-none d-sm-inline-block"><a href="{{ route('admin.periods') }}">{{ $currentPeriod->period_name }}</a></li>
@@ -302,12 +311,125 @@
  
     <style>
         .statement-container {
-            margin: 20px;
+            margin: 20px auto;
             padding: 20px;
             background: #fff;
             border-radius: 8px;
-            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
-        .table th, .table td { white-space: nowrap; }
+
+        /* Table Styling */
+        .table {
+            border-collapse: separate;
+            border-spacing: 0 5px; /* Adds spacing between rows */
+        }
+        .table th, .table td {
+            white-space: nowrap;
+            vertical-align: middle;
+            padding: 12px 15px; /* Ensures good spacing */
+        }
+        .table th {
+            background-color: #f8f9fa; /* Light background for headers */
+            font-weight: 600;
+            text-align: left;
+        }
+        .table-hover tbody tr:hover {
+            background-color: rgba(0, 0, 0, 0.05);
+        }
+        .table-responsive {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        /* Mobile Adjustments */
+        @media (max-width: 768px) {
+            .table-responsive {
+                margin-bottom: 20px;
+            }
+            .table th, .table td {
+                padding: 10px;
+                font-size: 14px; /* Reduce font size for smaller screens */
+            }
+            .statement-container {
+                padding: 15px; /* Reduce padding on smaller screens */
+            }
+        }
+        .custom_btn-primary {
+    background-color: #663399 !important;
+    border-color: #663399 !important;
+    color: #fff !important;
+    font-weight: bold;
+    padding: 10px 20px;
+    border-radius: 6px;
+    transition: 0.3s;
+}
+
+.custom_btn-primary:hover {
+    background-color: #562a77 !important;
+    border-color: #562a77 !important;
+}
+
+.custom_text-right {
+    text-align: right;
+}
+
+.custom_loading-indicator {
+    display: none;
+    margin-left: 10px;
+    font-weight: bold;
+    color: #663399;
+}
     </style>
+ <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+ <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+ <script>
+   document.getElementById("downloadPDF").addEventListener("click", function () {
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF('l', 'mm', 'a4'); // 'l' -> Landscape, 'mm' -> Millimeters, 'a4' -> A4 Size
+
+    let container = document.querySelector(".statement-container");
+    let downloadButton = document.getElementById("downloadPDF");
+    let loadingIndicator = document.getElementById("loadingIndicator");
+
+    // Show Loading Indicator & Disable Button
+    downloadButton.disabled = true;
+    loadingIndicator.style.display = "inline-block";
+
+    html2canvas(container, {
+        scale: 2, // Keeps text sharp but avoids excessive size
+        useCORS: true,
+        willReadFrequently: true
+    }).then(canvas => {
+        let imgData = canvas.toDataURL("image/jpeg", 0.5); // 50% compression to reduce file size
+
+        let imgWidth = 297; // A4 landscape width (mm)
+        let pageHeight = 210; // A4 landscape height (mm)
+        let imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+        let heightLeft = imgHeight;
+        let position = 10;
+
+        pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+
+        // Add pages if content exceeds one A4 page
+        while (heightLeft > pageHeight) {
+            position -= pageHeight;
+            pdf.addPage();
+            pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+            heightLeft -= pageHeight;
+        }
+
+        // Save the PDF
+        pdf.save("shahi_services_financial_statement.pdf");
+
+    }).catch(error => {
+        alert("Error generating PDF: " + error);
+    }).finally(() => {
+        // Hide Loading Indicator & Re-enable Button
+        downloadButton.disabled = false;
+        loadingIndicator.style.display = "none";
+    });
+});
+    </script>
 @endsection
