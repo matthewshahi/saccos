@@ -19,7 +19,7 @@
                 <img src="{{ asset($domainLogoPath) }}" alt="Logo" style="height: 50px;">
            
             @else
-                <span style="margin-left: 10px; font-size: 33px; color: rebeccapurple; font-weight: 900; font-family: 'Montserrat', sans-serif; background: linear-gradient(to right, rebeccapurple, indigo); -webkit-background-clip: text; color: transparent; text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);">
+                <span style="margin-left: 10px; font-size: 19px; color: rebeccapurple; font-weight: 900; font-family: 'Montserrat', sans-serif; background: linear-gradient(to right, rebeccapurple, indigo); -webkit-background-clip: text; color: transparent; text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);">
                     {{ $defaultCompanyName }}
                 </span>
             @endif
