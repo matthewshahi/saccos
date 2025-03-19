@@ -1,6 +1,20 @@
 @extends('layouts.app')
 
 @section('content')
+
+<?php
+if (!function_exists('formatAmount')) {
+    function formatAmount($amount)
+    {
+        if ($amount >= 1000000) {
+            return number_format($amount / 1000000, 1) . 'M'; // Converts to '14.6M' for 14,563,333.88545
+        } elseif ($amount >= 1000) {
+            return number_format($amount, 0, '.', ','); // Regular comma formatting (e.g., 1,234,567)
+        }
+        return number_format($amount, 2); // Default decimal places for small amounts
+    }
+}
+?>
     <div class="breadcrumb d-flex justify-content-between align-items-center">
         <h1>Dashboard</h1>
         <div class="header-part-right">
@@ -90,7 +104,9 @@
                     <h6 class="card-title">Repayments ({{ $currentPeriod->period_name }})</h6>
                     <div class="d-flex justify-content-center align-items-center">
                         <i class="i-Money-Bag text-success" style="font-size: 2rem; margin-right: 0.5rem;"></i>
-                        <p class="card-text mb-0" id="repaymentsTotal" style="font-size: 1.5rem;">KES {{ number_format($repaymentsTotal, 2) }}</p>
+                        <p class="card-text mb-0" id="repaymentsTotal" style="font-size: 1.5rem;">
+                                KES {{ formatAmount($repaymentsTotal) }}
+                            </p>
                     </div>
                 </div>
             </div>
