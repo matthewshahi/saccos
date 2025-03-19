@@ -1,21 +1,22 @@
 @extends('layouts.app')
 
 @section('content')
+<div class="statement-container">
     <div class="breadcrumb d-flex justify-content-between align-items-center">
         <h1>Member Statement for {{ $data['member']->member_name }}</h1>
         <div class="header-part-right">
-        <ul>
+            <ul>
                 @if(Auth::check())
-                    <li class="d-none d-sm-inline-block">{{ Auth::user()->member_name }}</li>
+                <li class="d-none d-sm-inline-block">{{ Auth::user()->member_name }}</li>
                 @endif
                 @if(isset($currentPeriod))
-                    <li class="d-none d-sm-inline-block"><a href="{{ route('admin.periods') }}">{{ $currentPeriod->period_name }}</a></li>
+                <li class="d-none d-sm-inline-block"><a href="{{ route('admin.periods') }}">{{ $currentPeriod->period_name }}</a></li>
                 @endif
 
-              
-              <li><i class="i-Full-Screen header-icon d-none d-sm-inline-block" data-fullscreen=""></i></li>
+
+                <li><i class="i-Full-Screen header-icon d-none d-sm-inline-block" data-fullscreen=""></i></li>
             </ul>
-            
+
         </div>
     </div>
     <div class="separator-breadcrumb border-top"></div>
@@ -76,27 +77,27 @@
             <tbody>
                 @php $total_capital = $data['openingBalanceCapital']; @endphp
                 @foreach($data['capitalContributions'] as $index => $contribution)
-                    @php
-                        $total_capital += $contribution->share_capitalamount_paying;
-                    @endphp
-                    <tr>
-                        <td>{{ $index + 1 }}.</td>
-                        <td>{{ $contribution->share_capitalperiod }}</td>
-                        <td style="white-space: nowrap;">{{ \Carbon\Carbon::parse($contribution->share_capitaldate_paid)->format('d-m-Y') }}</td>
-                        <td>{{ $contribution->share_capitaldescription }}</td>
-                        <td>{{ $contribution->share_capitaldoc_no }}</td>
-                        <td align="right">
-                            @if($contribution->share_capitalamount_paying < 0)
-                                {{ number_format(-$contribution->share_capitalamount_paying, 2) }}
+                @php
+                $total_capital += $contribution->share_capitalamount_paying;
+                @endphp
+                <tr>
+                    <td>{{ $index + 1 }}.</td>
+                    <td>{{ $contribution->share_capitalperiod }}</td>
+                    <td style="white-space: nowrap;">{{ \Carbon\Carbon::parse($contribution->share_capitaldate_paid)->format('d-m-Y') }}</td>
+                    <td>{{ $contribution->share_capitaldescription }}</td>
+                    <td>{{ $contribution->share_capitaldoc_no }}</td>
+                    <td align="right">
+                        @if($contribution->share_capitalamount_paying < 0)
+                            {{ number_format(-$contribution->share_capitalamount_paying, 2) }}
                             @endif
-                        </td>
-                        <td align="right">
-                            @if($contribution->share_capitalamount_paying > 0)
-                                {{ number_format($contribution->share_capitalamount_paying, 2) }}
-                            @endif
-                        </td>
-                        <td align="right">{{ number_format($total_capital, 2) }}</td>
-                    </tr>
+                            </td>
+                    <td align="right">
+                        @if($contribution->share_capitalamount_paying > 0)
+                        {{ number_format($contribution->share_capitalamount_paying, 2) }}
+                        @endif
+                    </td>
+                    <td align="right">{{ number_format($total_capital, 2) }}</td>
+                </tr>
                 @endforeach
             </tbody>
         </table>
@@ -131,27 +132,27 @@
             <tbody>
                 @php $total_shares = $data['openingBalanceShares']; @endphp
                 @foreach($data['shareContributions'] as $index => $contribution)
-                    @php
-                        $total_shares += $contribution->share_amount_paying;
-                    @endphp
-                    <tr>
-                        <td>{{ $index + 1 }}.</td>
-                        <td>{{ $contribution->share_period }}</td>
-                        <td style="white-space: nowrap;">{{ \Carbon\Carbon::parse($contribution->share_date_paid)->format('d-m-Y') }}</td>
-                        <td>{{ $contribution->share_description }}</td>
-                        <td>{{ $contribution->share_doc_no }}</td>
-                        <td align="right">
-                            @if($contribution->share_amount_paying < 0)
-                                {{ number_format(-$contribution->share_amount_paying, 2) }}
+                @php
+                $total_shares += $contribution->share_amount_paying;
+                @endphp
+                <tr>
+                    <td>{{ $index + 1 }}.</td>
+                    <td>{{ $contribution->share_period }}</td>
+                    <td style="white-space: nowrap;">{{ \Carbon\Carbon::parse($contribution->share_date_paid)->format('d-m-Y') }}</td>
+                    <td>{{ $contribution->share_description }}</td>
+                    <td>{{ $contribution->share_doc_no }}</td>
+                    <td align="right">
+                        @if($contribution->share_amount_paying < 0)
+                            {{ number_format(-$contribution->share_amount_paying, 2) }}
                             @endif
-                        </td>
-                        <td align="right">
-                            @if($contribution->share_amount_paying > 0)
-                                {{ number_format($contribution->share_amount_paying, 2) }}
-                            @endif
-                        </td>
-                        <td align="right">{{ number_format($total_shares, 2) }}</td>
-                    </tr>
+                            </td>
+                    <td align="right">
+                        @if($contribution->share_amount_paying > 0)
+                        {{ number_format($contribution->share_amount_paying, 2) }}
+                        @endif
+                    </td>
+                    <td align="right">{{ number_format($total_shares, 2) }}</td>
+                </tr>
                 @endforeach
             </tbody>
         </table>
@@ -179,29 +180,29 @@
             <tbody>
                 @php $total_fosas = 0; @endphp
                 @foreach($data['fosaContributions'] as $index => $contribution)
-                    @php
-                        $total_fosas += $contribution->fosa_amount_paying;
-                    @endphp
-                    <tr>
-                        <td align="right">{{ $index + 1 }}.</td>
-                        <td>{{ $contribution->fosa_period }}</td>
-                        <td style="white-space: nowrap;">{{ \Carbon\Carbon::parse($contribution->fosa_date_paid)->format('d-m-Y') }}</td>
-                        <td>{{ $contribution->fosa_description }}</td>
-                        <td>{{ $contribution->fosa_doc_no }}</td>
-                        <td align="right">
-                            @if($contribution->fosa_amount_paying < 0)
-                                {{ number_format(-$contribution->fosa_amount_paying, 2) }}
+                @php
+                $total_fosas += $contribution->fosa_amount_paying;
+                @endphp
+                <tr>
+                    <td align="right">{{ $index + 1 }}.</td>
+                    <td>{{ $contribution->fosa_period }}</td>
+                    <td style="white-space: nowrap;">{{ \Carbon\Carbon::parse($contribution->fosa_date_paid)->format('d-m-Y') }}</td>
+                    <td>{{ $contribution->fosa_description }}</td>
+                    <td>{{ $contribution->fosa_doc_no }}</td>
+                    <td align="right">
+                        @if($contribution->fosa_amount_paying < 0)
+                            {{ number_format(-$contribution->fosa_amount_paying, 2) }}
                             @endif
-                        </td>
-                        <td align="right">
-                            @if($contribution->fosa_amount_paying > 0)
-                                {{ number_format($contribution->fosa_amount_paying, 2) }}
+                            </td>
+                    <td align="right">
+                        @if($contribution->fosa_amount_paying > 0)
+                        {{ number_format($contribution->fosa_amount_paying, 2) }}
 
-                               
-                            @endif
-                        </td>
-                        <td align="right">{{ number_format($total_fosas, 2) }}</td>
-                    </tr>
+
+                        @endif
+                    </td>
+                    <td align="right">{{ number_format($total_fosas, 2) }}</td>
+                </tr>
                 @endforeach
             </tbody>
         </table>
@@ -210,54 +211,54 @@
     <!-- Loan Statement -->
     <h2>Loan Statement</h2>
     @foreach($data['loans'] as $loan)
-        <div class="table-responsive">
-            <table class="table table-sm table-hover">
-                <thead>
-                    <tr>
-                        <th colspan="8">
-                            <strong>{{ $loan->loan_type_name }} ({{ $loan->loan_id }})<br />{{ $loan->loan_category_name }}</strong>
-                        </th>
-                    </tr>
-                    <tr>
-                        <th><strong>Loan taken:</strong><br />{{ number_format($loan->loan_amount, 2) }}</th>
-                        <th><strong>Loan Paid:</strong><br />{{ number_format($loan->loan_loan_paid, 2) }}</th>
-                        <th><strong>Commission:</strong><br />{{ number_format($loan->loan_commision, 2) }}</th>
-                        <th><strong>Insurance:</strong><br />{{ number_format($loan->loan_insurance, 2) }}</th>
-                        <th><strong>Period taken:</strong><br />{{ $loan->loan_taken_period }}</th>
-                        <th><strong>Description:</strong><br />{{ $loan->loan_description }}</th>
-                        <th><strong>Doc No.:</strong><br />{{ $loan->loan_doc_no }}</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td colspan="8">
-                            <table width="100%" border="0" cellspacing="0" cellpadding="0">
-                                <thead>
-                                    <tr class="row-a">
-                                        <td>&nbsp;</td>
-                                        <td>Period</td>
-                                        <td>Date</td>
-                                        <td>Doc. No.</td>
-                                        <td>Description</td>
-                                        <td align="right">Principal</td>
-                                        <td align="right">Interest</td>
-                                        <td align="right">Total Paid</td>
-                                        <td align="right">Balance</td>
-                                    </tr>
-                                </thead>
-                                <tbody>
+    <div class="table-responsive">
+        <table class="table table-sm table-hover">
+            <thead>
+                <tr>
+                    <th colspan="8">
+                        <strong>{{ $loan->loan_type_name }} ({{ $loan->loan_id }})<br />{{ $loan->loan_category_name }}</strong>
+                    </th>
+                </tr>
+                <tr>
+                    <th><strong>Loan taken:</strong><br />{{ number_format($loan->loan_amount, 2) }}</th>
+                    <th><strong>Loan Paid:</strong><br />{{ number_format($loan->loan_loan_paid, 2) }}</th>
+                    <th><strong>Commission:</strong><br />{{ number_format($loan->loan_commision, 2) }}</th>
+                    <th><strong>Insurance:</strong><br />{{ number_format($loan->loan_insurance, 2) }}</th>
+                    <th><strong>Period taken:</strong><br />{{ $loan->loan_taken_period }}</th>
+                    <th><strong>Description:</strong><br />{{ $loan->loan_description }}</th>
+                    <th><strong>Doc No.:</strong><br />{{ $loan->loan_doc_no }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td colspan="8">
+                        <table width="100%" border="0" cellspacing="0" cellpadding="0">
+                            <thead>
+                                <tr class="row-a">
+                                    <td>&nbsp;</td>
+                                    <td>Period</td>
+                                    <td>Date</td>
+                                    <td>Doc. No.</td>
+                                    <td>Description</td>
+                                    <td align="right">Principal</td>
+                                    <td align="right">Interest</td>
+                                    <td align="right">Total Paid</td>
+                                    <td align="right">Balance</td>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @php
+                                $new_balance = $loan->loan_amount;
+                                $loanPayments = $data['paymentsByLoan'][$loan->loan_id] ?? collect();
+                                @endphp
+                                @if($loan->loan_taken_period < $data['period_from'])
                                     @php
-                                        $new_balance = $loan->loan_amount;
-                                        $loanPayments = $data['paymentsByLoan'][$loan->loan_id] ?? collect();
-                                    @endphp
-                                    @if($loan->loan_taken_period < $data['period_from'])
-                                        @php
-                                            $priorPayments = $loanPayments->filter(function ($payment) use ($data) {
-                                                return $payment->loan_payments_period < $data['period_from'];
-                                            });
-                                            $sum_loan_payments_amount = $priorPayments->sum('loan_payments_amount');
-                                            $sum_loan_payments_interest = $priorPayments->sum('loan_payments_interest');
-                                            $new_balance -= $sum_loan_payments_amount;
+                                    $priorPayments=$loanPayments->filter(function ($payment) use ($data) {
+                                    return $payment->loan_payments_period < $data['period_from'];
+                                        });
+                                        $sum_loan_payments_amount=$priorPayments->sum('loan_payments_amount');
+                                        $sum_loan_payments_interest = $priorPayments->sum('loan_payments_interest');
+                                        $new_balance -= $sum_loan_payments_amount;
                                         @endphp
                                         <tr class="row-b" style="border-bottom: 1px solid #ddd;">
                                             <td>&nbsp;</td>
@@ -268,13 +269,13 @@
                                             <td align="right">{{ number_format($sum_loan_payments_amount + $sum_loan_payments_interest, 2) }}</td>
                                             <td align="right">{{ number_format($new_balance, 2) }}</td>
                                         </tr>
-                                    @endif
+                                        @endif
 
-                                    @foreach($loanPayments->filter(function ($payment) use ($data) {
+                                        @foreach($loanPayments->filter(function ($payment) use ($data) {
                                         return $payment->loan_payments_period >= $data['period_from'];
-                                    }) as $index => $payment)
+                                        }) as $index => $payment)
                                         @php
-                                            $new_balance -= $payment->loan_payments_amount;
+                                        $new_balance -= $payment->loan_payments_amount;
                                         @endphp
                                         <tr style="border-bottom: 1px solid #ddd;">
                                             <td>{{ $index + 1 }}.&nbsp;</td>
@@ -287,14 +288,26 @@
                                             <td align="right">&nbsp;{{ number_format($payment->loan_payments_amount + $payment->loan_payments_interest, 2) }}</td>
                                             <td align="right">&nbsp;{{ number_format($new_balance, 2) }}</td>
                                         </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
+                                        @endforeach
+                            </tbody>
+                        </table>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
     @endforeach
-@endsection
+</div>
 
+ 
+    <style>
+        .statement-container {
+            margin: 20px;
+            padding: 20px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+        }
+        .table th, .table td { white-space: nowrap; }
+    </style>
+@endsection
