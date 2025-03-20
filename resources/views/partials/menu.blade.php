@@ -394,6 +394,12 @@
                                     <span class="text-muted">Accounting periods</span>
                                 </a>
                             </li>
+                            
+                            <li class="item-name">
+                                <a href="{{ url('/kintypelist') }}">
+                                    <span class="text-muted">Kin Type List</span>
+                                </a>
+                            </li>
                             <li class="item-name">
                                 <a href="{{ url('/mobile/config') }}">
                                     <span class="text-muted">MPESA configs</span>
