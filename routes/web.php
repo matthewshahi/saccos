@@ -24,7 +24,7 @@ use App\Http\Controllers\LoanApplicationSelfServiceController;
 use App\Http\Controllers\ReportLedgerController;
 use App\Http\Controllers\LoanPaymentController;
 use App\Http\Controllers\MemberReportController;
-use App\Http\Controllers\NextOfKinController;
+use App\Http\Controllers\KinTypeController;
 // use App\Http\Controllers\LoanLedgerController;
 
 
@@ -217,14 +217,16 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
     Route::post('/members/next-of-kin/update/{id}', [HomeController::class, 'updateNextOfKin'])->name('members.updateNextOfKin')->middleware('check_user_rights:add_next_of_kin');
     Route::get('/members/delete-next-of-kin/{member_id}/{kin_id}', [HomeController::class, 'deleteNextOfKin'])->name('members.deleteNextOfKin')->middleware('check_user_rights:add_next_of_kin');
 
-    Route::middleware(['auth', 'check_user_rights:edit_member'])->group(function () {
-        Route::get('/nextofkinlist', [NextOfKinController::class, 'index'])->name('nextofkin.list');
-        Route::get('/nextofkinadd', [NextOfKinController::class, 'add'])->name('nextofkin.add');
-        Route::post('/nextofkinstore', [NextOfKinController::class, 'store'])->name('nextofkin.store');
-        Route::get('/nextofkinedit/{id}', [NextOfKinController::class, 'edit'])->name('nextofkin.edit');
-        Route::post('/nextofkinupdate/{id}', [NextOfKinController::class, 'update'])->name('nextofkin.update');
-    });
     
+
+    Route::middleware(['auth', 'check_user_rights:edit_member'])->group(function () {
+        Route::get('/kintypelist', [KinTypeController::class, 'index'])->name('kintype.list');
+        Route::get('/kintypeadd', [KinTypeController::class, 'add'])->name('kintype.add');
+        Route::post('/kintypestore', [KinTypeController::class, 'store'])->name('kintype.store');
+        Route::get('/kintypeedit/{id}', [KinTypeController::class, 'edit'])->name('kintype.edit');
+        Route::post('/kintypeupdate/{id}', [KinTypeController::class, 'update'])->name('kintype.update');
+    });
+
 
 
     Route::delete('/members/{member_id}/guarantors/{guarantor_id}', [HomeController::class, 'deleteGuarantor'])->name('deleteGuarantor')->middleware('check_user_rights:loan_guarantors_change');
