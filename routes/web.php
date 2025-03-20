@@ -216,6 +216,13 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
     Route::post('/members/next-of-kin/update/{id}', [HomeController::class, 'updateNextOfKin'])->name('members.updateNextOfKin')->middleware('check_user_rights:add_next_of_kin');
     Route::get('/members/delete-next-of-kin/{member_id}/{kin_id}', [HomeController::class, 'deleteNextOfKin'])->name('members.deleteNextOfKin')->middleware('check_user_rights:add_next_of_kin');
 
+    Route::get('/nextofkinlist', [NextOfKin::class, 'index'])->name('nextofkin.list')->middleware('check_user_rights:edit_member');
+    Route::get('/nextofkinadd', [NextOfKin::class, 'add'])->name('nextofkin.add')->middleware('check_user_rights:edit_member');
+    Route::get('/nextofkinedit', [NextOfKin::class, 'edit'])->name('nextofkin.edit')->middleware('check_user_rights:edit_member');
+    Route::post('/nextofkinedit', [NextOfKin::class, 'edit'])->name('nextofkin.edit')->middleware('check_user_rights:edit_member');
+
+
+
     Route::delete('/members/{member_id}/guarantors/{guarantor_id}', [HomeController::class, 'deleteGuarantor'])->name('deleteGuarantor')->middleware('check_user_rights:loan_guarantors_change');
     Route::get('/changeGuarantors/{member_id}/{guarantor_id}', [HomeController::class, 'changeGuarantors'])->name('changeGuarantors')->middleware('check_user_rights:loan_guarantors_change');
     Route::post('/updateGuarantors/{member_id}/{guarantor_id}', [HomeController::class, 'updateGuarantors'])->name('updateGuarantors')->middleware('check_user_rights:loan_guarantors_change');
