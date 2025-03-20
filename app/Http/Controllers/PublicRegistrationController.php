@@ -32,11 +32,12 @@ class PublicRegistrationController extends Controller
             ->orderBy('id') // Ensure to pick the first value by order
             ->value('shortcode');
     
-        // Fetch kin types (not deleted)
-        $kinTypes = DB::table('sacco_kin_type')
-            ->where('kin_type_deleted', 'N')
-            ->orderBy('kin_type_name')
-            ->get(['kin_type_id', 'kin_type_name']);
+        
+         // Fetch kin types ordered alphabetically
+    $kinTypes = DB::table('sacco_kin_type')
+    ->where('kin_type_deleted', 'N')
+    ->orderBy('kin_type_name', 'asc') // Order by ascending
+    ->get(['kin_type_id', 'kin_type_name']);
     
         // Prepare data for view
         $data = [
