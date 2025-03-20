@@ -24,6 +24,7 @@ use App\Http\Controllers\LoanApplicationSelfServiceController;
 use App\Http\Controllers\ReportLedgerController;
 use App\Http\Controllers\LoanPaymentController;
 use App\Http\Controllers\MemberReportController;
+use App\Http\Controllers\NextOfKinController;
 // use App\Http\Controllers\LoanLedgerController;
 
 
@@ -216,11 +217,14 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
     Route::post('/members/next-of-kin/update/{id}', [HomeController::class, 'updateNextOfKin'])->name('members.updateNextOfKin')->middleware('check_user_rights:add_next_of_kin');
     Route::get('/members/delete-next-of-kin/{member_id}/{kin_id}', [HomeController::class, 'deleteNextOfKin'])->name('members.deleteNextOfKin')->middleware('check_user_rights:add_next_of_kin');
 
-    Route::get('/nextofkinlist', [NextOfKin::class, 'index'])->name('nextofkin.list')->middleware('check_user_rights:edit_member');
-    Route::get('/nextofkinadd', [NextOfKin::class, 'add'])->name('nextofkin.add')->middleware('check_user_rights:edit_member');
-    Route::get('/nextofkinedit', [NextOfKin::class, 'edit'])->name('nextofkin.edit')->middleware('check_user_rights:edit_member');
-    Route::post('/nextofkinedit', [NextOfKin::class, 'edit'])->name('nextofkin.edit')->middleware('check_user_rights:edit_member');
-
+    Route::middleware(['auth', 'check_user_rights:edit_member'])->group(function () {
+        Route::get('/nextofkinlist', [NextOfKinController::class, 'index'])->name('nextofkin.list');
+        Route::get('/nextofkinadd', [NextOfKinController::class, 'add'])->name('nextofkin.add');
+        Route::post('/nextofkinstore', [NextOfKinController::class, 'store'])->name('nextofkin.store');
+        Route::get('/nextofkinedit/{id}', [NextOfKinController::class, 'edit'])->name('nextofkin.edit');
+        Route::post('/nextofkinupdate/{id}', [NextOfKinController::class, 'update'])->name('nextofkin.update');
+    });
+    
 
 
     Route::delete('/members/{member_id}/guarantors/{guarantor_id}', [HomeController::class, 'deleteGuarantor'])->name('deleteGuarantor')->middleware('check_user_rights:loan_guarantors_change');
