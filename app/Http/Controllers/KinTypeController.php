@@ -10,10 +10,7 @@ class KinTypeController extends Controller
     public function index()
     {
         $kinTypes = DB::table('sacco_kin_type')
-            ->where(function ($query) {
-                $query->where('kin_type_deleted', 'N')
-                      ->orWhere('kin_type_deleted', 0); // Handle both 'N' and 0 as "not deleted"
-            })
+            ->where('kin_type_deleted', 'N') // Only fetch records where kin_type_deleted is 'N'
             ->get();
 
         return view('kintype.index', compact('kinTypes'));
@@ -37,7 +34,7 @@ class KinTypeController extends Controller
             'kin_type_user_id' => auth()->user()->id,
             'kin_type_ip' => request()->ip(),
             'kin_type_transdate' => now(),
-            'kin_type_deleted' => 'N', // Ensuring 'N' is set for active records
+            'kin_type_deleted' => 'N', // Ensure all new records are marked as 'N'
         ]);
 
         return redirect()->route('kintype.list')->with('success', 'Kin Type added successfully');
@@ -45,7 +42,10 @@ class KinTypeController extends Controller
 
     public function edit($id)
     {
-        $kinType = DB::table('sacco_kin_type')->where('kin_type_id', $id)->first();
+        $kinType = DB::table('sacco_kin_type')
+            ->where('kin_type_id', $id)
+            ->where('kin_type_deleted', 'N') // Ensure only active records can be edited
+            ->first();
 
         if (!$kinType) {
             return redirect()->route('kintype.list')->with('error', 'Record not found.');
@@ -63,6 +63,7 @@ class KinTypeController extends Controller
 
         DB::table('sacco_kin_type')
             ->where('kin_type_id', $id)
+            ->where('kin_type_deleted', 'N') // Ensure only active records are updated
             ->update([
                 'kin_type_name' => $request->kin_type_name,
                 'kin_type_details' => $request->kin_type_details,
