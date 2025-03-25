@@ -26,6 +26,8 @@ use App\Http\Controllers\LoanPaymentController;
 use App\Http\Controllers\MemberReportController;
 use App\Http\Controllers\KinTypeController;
 // use App\Http\Controllers\LoanLedgerController;
+use App\Http\Controllers\MemberAddImages;
+
 
 
 // Route::get('/import-loans-to-ledger', [LoanLedgerController::class, 'importLoansToLedger']);
@@ -212,6 +214,21 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
     Route::post('/members/store', [HomeController::class, 'storeNewMember'])->name('members.store')->middleware('check_user_rights:add_new_sacco_member');
     Route::get('/members/active/{status}', [HomeController::class, 'membersActive'])->name('members.active')->middleware('check_user_rights:list_sacco_member');
     Route::get('/members/edit/{id}', [HomeController::class, 'editMember'])->name('members.edit')->middleware('check_user_rights:edit_member');
+    Route::get('/members/download/{member_id}/{filename}', [\App\Http\Controllers\MemberAddImages::class, 'download'])
+    ->name('members.download')
+    ->middleware('check_user_rights:edit_member');
+
+    
+
+    Route::get('/members/protectedfiles/{path}', [\App\Http\Controllers\MemberAddImages::class, 'serveProtectedFile'])
+    ->where('path', '.*')
+    ->middleware('check_user_rights:edit_member')
+    ->name('members.protectedfile');
+
+
+    Route::get('/members/edit/images/{id}', [MemberAddImages::class, 'index'])->name('members.edit.image')->middleware('check_user_rights:edit_member');
+    Route::post('/members/edit/images/{id}', [MemberAddImages::class, 'update'])->name('members.edit.update.image')->middleware('check_user_rights:edit_member');
+
     Route::post('/members/update/{id}', [HomeController::class, 'updateMember'])->name('members.update')->middleware('check_user_rights:edit_member');
     Route::get('/members/next-of-kin/{id}', [HomeController::class, 'editNextOfKin'])->name('members.nextOfKin')->middleware('check_user_rights:add_next_of_kin');
     Route::post('/members/next-of-kin/update/{id}', [HomeController::class, 'updateNextOfKin'])->name('members.updateNextOfKin')->middleware('check_user_rights:add_next_of_kin');

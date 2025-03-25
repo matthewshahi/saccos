@@ -39,7 +39,10 @@
                         @method('POST')
 
                         <!-- Personal Information -->
-                        <h5 class="mb-4">Personal Information</h5>
+                        <h5 class="mb-4">Personal Information | 
+                        <a href="{{ route('members.edit.image', $data['member']->member_id) }}" class="btn btn-sm btn-outline-primary">
+                    Upload Member Docs
+                </a></h5>
                         <div class="form-group row">
                             <label for="member_name" class="col-sm-2 col-form-label">Member Name*</label>
                             <div class="col-sm-10">
