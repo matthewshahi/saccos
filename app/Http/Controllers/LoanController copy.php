@@ -249,55 +249,7 @@ class LoanController extends Controller
 
 
     // Add a new transaction to a batch
-    public function loans_batch_transactions_add(Request $request, $batch_id)
-    {
-        $batch = DB::table('sacco_loan_batch')
-            ->where('batch_id', $batch_id)
-            ->where('batch_deleted', 'N')
-            ->first();
-
-        if (!$batch) {
-            return redirect()->route('loans.batches')->with('error', 'Batch not found or has been deleted.');
-        }
-
-        $data = $request->validate([
-            'batch_trans_loan_type' => 'required|integer',
-            'batch_trans_loan_category' => 'required|integer',
-            'batch_trans_loan_amount' => 'required|numeric|min:1.01',
-            'batch_trans_member_id' => 'required|integer',
-            'batch_trans_loan_duration' => 'required|integer|min:1',
-            'batch_trans_doc_no' => 'required|string|max:100',
-            'batch_trans_description' => 'nullable|string|max:100',
-        ]);
-
-        // Check if the transaction count and total amount exceed batch limits
-        $currentTransactions = DB::table('sacco_loan_batch_trans')
-            ->where('batch_trans_batch_id', $batch_id)
-            ->where('batch_trans_deleted', 'N')
-            ->count();
-
-        $currentAmount = DB::table('sacco_loan_batch_trans')
-            ->where('batch_trans_batch_id', $batch_id)
-            ->where('batch_trans_deleted', 'N')
-            ->sum('batch_trans_loan_amount');
-
-        if ($currentTransactions >= $batch->batch_total_trans) {
-            return redirect()->route('loans.batch.transactions', $batch_id)->with('error', 'Transaction limit exceeded for this batch.');
-        }
-
-        if (($currentAmount + $data['batch_trans_loan_amount']) > $batch->batch_amount) {
-            return redirect()->route('loans.batch.transactions', $batch_id)->with('error', 'Total transaction amount exceeded for this batch.');
-        }
-
-        $data['batch_trans_batch_id'] = $batch_id;
-        $data['batch_trans_by'] = auth()->id();
-        $data['batch_trans_ip'] = $request->ip();
-
-        DB::table('sacco_loan_batch_trans')->insert($data);
-
-        return redirect()->route('loans.batch.transactions', $batch_id)->with('success', 'Transaction added successfully.');
-    }
-
+   
     // Delete a transaction
     public function loans_batch_transactions_delete($transaction_id)
     {
@@ -361,6 +313,134 @@ class LoanController extends Controller
             return response()->json($outstandingLoans);
         }
 
-         
+        public function loans_batch_transactions_add(Request $request, $batch_id)
+        {
+            $batch = DB::table('sacco_loan_batch')
+                ->where('batch_id', $batch_id)
+                ->where('batch_deleted', 'N')
+                ->first();
+        
+            if (!$batch) {
+                return redirect()->route('loans.batches')->with('error', ['Batch not found or has been deleted.']);
+            }
+        
+            // Initial validation of fields based on form
+            $validated = $request->validate([
+                'batch_trans_loan_type' => 'required|integer',
+                'batch_trans_loan_category' => 'required|integer',
+                'batch_trans_loan_amount' => 'required|numeric|min:1.01',
+                'batch_trans_member_id' => 'required|integer',
+                'batch_trans_loan_duration' => 'required|integer|min:1',
+                'batch_trans_doc_no' => 'required|string|max:100',
+                'batch_trans_description' => 'nullable|string|max:100',
+                'batch_trans_commission_amount' => 'nullable|numeric',
+                'batch_trans_loan_to_top_up' => 'nullable|integer',
+                'guarantors' => 'nullable|array',
+                'guarantors.*.member' => 'nullable|string',
+                'guarantors.*.amount' => 'nullable|numeric|min:0',
+                'guarantors.*.free_shares' => 'nullable|numeric|min:0'
+            ]);
+        
+            $errors = $this->validateLoanTransactionInput($batch_id, $batch, $validated);
+        
+            if (!empty($errors)) {
+                return redirect()->back()->withInput()->with('error', $errors);
+            }
+        
+            return redirect()->back()->withInput()->with('success', 'Initial validation passed. Proceed to calculations and saving.');
+        }
+        
+        private function validateLoanTransactionInput($batch_id, $batch, $validated)
+        {
+            $errors = [];
+        
+            $member = DB::table('sacco_members')
+                ->where('member_id', $validated['batch_trans_member_id'])
+                ->where('member_active', 'Y')
+                ->where('member_deleted', '<>', 'Y')
+                ->first();
+        
+            if (!$member) {
+                $errors[] = 'Invalid member selected.';
+            }
+        
+            $loanType = DB::table('sacco_loan_types')
+                ->where('loan_type_id', $validated['batch_trans_loan_type'])
+                ->first();
+        
+            if (!$loanType) {
+                $errors[] = 'Invalid loan type selected.';
+            }
+        
+            $loanCategory = DB::table('sacco_loan_category')
+                ->where('loan_category_id', $validated['batch_trans_loan_category'])
+                ->first();
+        
+            if (!$loanCategory) {
+                $errors[] = 'Invalid loan category selected.';
+            }
+        
+            // Skip further validations if core entities are missing
+            if (!$member || !$loanType || !$loanCategory) {
+                return $errors;
+            }
+        
+            // 1. Check for duplicate loan in batch
+            $existingLoan = DB::table('sacco_loan_batch_trans')
+                ->where('batch_trans_batch_id', $batch_id)
+                ->where('batch_trans_loan_type', $validated['batch_trans_loan_type'])
+                ->where('batch_trans_member_id', $validated['batch_trans_member_id'])
+                ->where('batch_trans_deleted', '<>', 'Y')
+                ->exists();
+        
+            if ($existingLoan) {
+                $errors[] = 'This member already has a similar loan in this batch.';
+            }
+        
+            // 2. Check batch limits
+            $currentTransactions = DB::table('sacco_loan_batch_trans')
+                ->where('batch_trans_batch_id', $batch_id)
+                ->where('batch_trans_deleted', 'N')
+                ->count();
+        
+            $currentAmount = DB::table('sacco_loan_batch_trans')
+                ->where('batch_trans_batch_id', $batch_id)
+                ->where('batch_trans_deleted', 'N')
+                ->sum('batch_trans_loan_amount');
+        
+            if ($currentTransactions >= $batch->batch_total_trans) {
+                $errors[] = 'Transaction limit exceeded for this batch.';
+            }
+        
+            if (($currentAmount + $validated['batch_trans_loan_amount']) > $batch->batch_amount) {
+                $errors[] = 'Total transaction amount exceeded for this batch.';
+            }
+        
+            // 3. Loan duration
+            if ($validated['batch_trans_loan_duration'] > $loanType->loan_type_duration) {
+                $errors[] = 'Loan duration exceeds the allowed maximum of ' . $loanType->loan_type_duration . ' months.';
+            }
+        
+            // 4. Max loan amount
+            if ($validated['batch_trans_loan_amount'] > $loanType->loan_type_max_amount) {
+                $errors[] = 'Loan amount exceeds the maximum allowed for this loan type (' . number_format($loanType->loan_type_max_amount, 2) . ').';
+            }
+        
+            // 5. Qualification period
+            $minJoinDate = now()->subMonths($loanType->loan_type_qualification_period);
+            if (strtotime($member->member_date_joined) > strtotime($minJoinDate)) {
+                $errors[] = 'Member must have been in the SACCO for at least ' . $loanType->loan_type_qualification_period . ' months to qualify for this loan.';
+            }
+        
+            // 6. Share factor check
+            $totalShares = $member->member_total_share + $member->member_total_share_capital;
+            $maxLoanByShares = $totalShares * $loanType->loan_type_share_factor;
+            if ($validated['batch_trans_loan_amount'] > $maxLoanByShares) {
+                $errors[] = 'Loan amount exceeds allowable limit based on share factor. Max allowed is ' . number_format($maxLoanByShares, 2);
+            }
+        
+            return $errors;
+        }
+             
 
 }
