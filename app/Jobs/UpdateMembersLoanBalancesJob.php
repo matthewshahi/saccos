@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use Illuminate\Bus\Queueable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -17,19 +18,26 @@ class UpdateMembersLoanBalancesJob implements ShouldQueue
 
     public function handle()
     {
-        // Process members in chunks to avoid memory issues
+        // Step 1: Reset all totals to zero
+        DB::table('sacco_members')->update(['member_total_loan' => 0]);
+
+        // Step 2: Recalculate and update
         DB::table('sacco_members')
-            ->select('id')
-            ->orderBy('id')
+            ->select('member_id')
+            ->orderBy('member_id')
             ->chunk(100, function ($members) {
                 foreach ($members as $member) {
+                    // Use COALESCE to handle NULLs in DB-side computation
                     $totalBalance = DB::table('sacco_loans')
-                        ->where('loan_member_id', $member->id)
-                        ->sum(DB::raw('loan_loan_amount - loan_loan_paid'));
+                        ->where('loan_member', $member->member_id)
+                        ->selectRaw('COALESCE(SUM(COALESCE(loan_amount, 0) - COALESCE(loan_loan_paid, 0)), 0) as balance')
+                        ->value('balance');
 
                     DB::table('sacco_members')
-                        ->where('id', $member->id)
-                        ->update(['member_total_loans' => $totalBalance]);
+                        ->where('member_id', $member->member_id)
+                        ->update(['member_total_loan' => $totalBalance]);
+
+                    Log::info("mugera_Updated member_total_loan for member {$member->member_id}: {$totalBalance}");
                 }
             });
     }
