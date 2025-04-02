@@ -16,19 +16,19 @@ class Kernel extends ConsoleKernel
         ->everyMinute()
         ->withoutOverlapping();
 
-    $schedule->job(new \App\Jobs\SendWelcomeEmailJob())
-        ->everyMinute()
-        ->withoutOverlapping();
+    // $schedule->job(new \App\Jobs\SendWelcomeEmailJob())
+    //     ->everyMinute()
+    //     ->withoutOverlapping();
 
-    $schedule->job(new \App\Jobs\SendGuarantorEmailJob())
-        ->everyMinute()
-        ->withoutOverlapping();
+    // $schedule->job(new \App\Jobs\SendGuarantorEmailJob())
+    //     ->everyMinute()
+    //     ->withoutOverlapping();
 
-    $schedule->job(new \App\Jobs\ProcessLoanEmailsJob())
-        ->everyTenMinutes()
-        ->withoutOverlapping();
+    // $schedule->job(new \App\Jobs\ProcessLoanEmailsJob())
+    //     ->everyTenMinutes()
+    //     ->withoutOverlapping();
 
-        $schedule->job(new \App\Jobs\ResetGuarantorsJob())->dailyAt('00:00')->withoutOverlapping();
+    $schedule->job(new \App\Jobs\ResetGuarantorsJob())->dailyAt('00:00')->withoutOverlapping();
 
 }
 
