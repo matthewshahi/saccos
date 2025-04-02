@@ -28,7 +28,7 @@ class Kernel extends ConsoleKernel
         ->everyTenMinutes()
         ->withoutOverlapping();
 
-    \Log::info('Scheduled jobs have been set.');
+    $schedule->command('sacco:reset-guarantors')->dailyAt('00:00');
 }
 
     /**
