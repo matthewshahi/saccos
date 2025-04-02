@@ -28,7 +28,8 @@ class Kernel extends ConsoleKernel
         ->everyTenMinutes()
         ->withoutOverlapping();
 
-    $schedule->command('sacco:reset-guarantors')->dailyAt('00:00');
+        $schedule->job(new \App\Jobs\ResetGuarantorsJob())->dailyAt('00:00')->withoutOverlapping();
+
 }
 
     /**
