@@ -11,28 +11,29 @@ class Kernel extends ConsoleKernel
      * Define the application's command schedule.
      */
     protected function schedule(Schedule $schedule): void
-{
-   $schedule->job(new \App\Jobs\ProcessTransactionsJob())
-        ->everyMinute()
-        ->withoutOverlapping();
+    {
+        $schedule->job(new \App\Jobs\ProcessTransactionsJob())
+            ->everyMinute()
+            ->withoutOverlapping();
 
-    $schedule->job(new \App\Jobs\SendWelcomeEmailJob())
-        ->everyMinute()
-        ->withoutOverlapping();
+        $schedule->job(new \App\Jobs\SendWelcomeEmailJob())
+            ->everyMinute()
+            ->withoutOverlapping();
 
-    $schedule->job(new \App\Jobs\SendGuarantorEmailJob())
-        ->everyMinute()
-        ->withoutOverlapping();
+        $schedule->job(new \App\Jobs\SendGuarantorEmailJob())
+            ->everyMinute()
+            ->withoutOverlapping();
 
-    $schedule->job(new \App\Jobs\ProcessLoanEmailsJob())
-        ->everyTenMinutes()
-        ->withoutOverlapping();
-        $schedule->job(new \App\Jobs\ResetGuarantorsJob())->dailyAt('00:00')->withoutOverlapping();
-    
-    $schedule->job(new \App\Jobs\UpdateMembersLoanBalancesJob)
-        ->dailyAt('00:00')
-        ->onOneServer();
-}
+        $schedule->job(new \App\Jobs\ResetGuarantorsJob())
+            ->dailyAt('00:00')
+            ->withoutOverlapping(); // prevent overlap if it runs long
+
+        $schedule->job(new \App\Jobs\UpdateMembersLoanBalancesJob())
+            ->dailyAt('00:00')
+            ->withoutOverlapping()
+            ->onOneServer(); // useful if using multiple servers
+
+    }
 
     /**
      * Register the commands for the application.
