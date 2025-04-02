@@ -8,6 +8,7 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Support\Facades\Log;
 
 class ResetGuarantorsJob implements ShouldQueue
 {
@@ -69,6 +70,7 @@ class ResetGuarantorsJob implements ShouldQueue
             }
         }
 
+        Log::info("mugera_Finished ................. all guarantors have been reset.");
         logger("mugera_Finished ................. all guarantors have been reset.");
     }
 }
