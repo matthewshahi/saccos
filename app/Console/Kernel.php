@@ -28,7 +28,10 @@ class Kernel extends ConsoleKernel
         ->everyTenMinutes()
         ->withoutOverlapping();
         $schedule->job(new \App\Jobs\ResetGuarantorsJob())->dailyAt('00:00')->withoutOverlapping();
-         
+    
+    $schedule->job(new \App\Jobs\UpdateMembersLoanBalancesJob)
+        ->dailyAt('00:00')
+        ->onOneServer();
 }
 
     /**
