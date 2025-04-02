@@ -1300,15 +1300,15 @@ class HomeController extends Controller
             return back()->with('success', 'Contributions updated successfully.');
         }
 
-       
 
-    $loans = DB::table('sacco_loans')
-    ->join('sacco_loan_types', 'sacco_loans.loan_loan_type', '=', 'sacco_loan_types.loan_type_id')
-    ->join('sacco_loan_category', 'sacco_loans.loan_loan_category', '=', 'sacco_loan_category.loan_category_id')
-    ->where('sacco_loans.loan_member', $id)
-    ->whereRaw('loan_amount > COALESCE(loan_loan_paid, 0)')
-    ->select('sacco_loans.*', 'sacco_loan_types.loan_type_name', 'sacco_loan_category.loan_category_name')
-    ->get();
+
+        $loans = DB::table('sacco_loans')
+            ->join('sacco_loan_types', 'sacco_loans.loan_loan_type', '=', 'sacco_loan_types.loan_type_id')
+            ->join('sacco_loan_category', 'sacco_loans.loan_loan_category', '=', 'sacco_loan_category.loan_category_id')
+            ->where('sacco_loans.loan_member', $id)
+            ->whereRaw('loan_amount > COALESCE(loan_loan_paid, 0)')
+            ->select('sacco_loans.*', 'sacco_loan_types.loan_type_name', 'sacco_loan_category.loan_category_name')
+            ->get();
 
         $data = [
             'member' => $member,
@@ -2935,31 +2935,60 @@ class HomeController extends Controller
         }
 
         // Search and sorting logic
-        $pms_srch = '%' . $request->input('pms_srch', '') . '%';
+         
         $orderby = $request->input('orderby', 'member_name');
         $sort_order = $request->input('sort_order', 'asc') == 'desc' ? 'desc' : 'asc';
 
-        // Fetch members and their contributions
-        $members = DB::table('sacco_department')
+        $query = DB::table('sacco_department')
             ->join('sacco_company', 'sacco_department.department_company_id', '=', 'sacco_company.company_id')
             ->join('sacco_members', 'sacco_department.department_id', '=', 'sacco_members.member_dept')
             ->leftJoin('sacco_position', 'sacco_members.member_position', '=', 'sacco_position.position_id')
             ->select('sacco_members.*', 'sacco_company.company_name', 'sacco_department.department_name', 'sacco_position.position_name')
             ->where('sacco_members.member_deleted', '<>', 'Y')
             ->where('sacco_members.member_active', 'Y')
+            ->where('sacco_members.member_date_joined', '<=', $monthlyCutOfDay);
 
-            ->where(function ($query) use ($pms_srch) {
-                $query->where('sacco_department.department_name', 'like', $pms_srch)
-                    ->orWhere('sacco_position.position_name', 'like', $pms_srch)
-                    ->orWhere('sacco_company.company_name', 'like', $pms_srch)
-                    ->orWhere('sacco_members.member_name', 'like', $pms_srch)
-                    ->orWhere('sacco_members.member_sacco_id', 'like', $pms_srch)
-                    ->orWhere('sacco_members.member_national_id', 'like', $pms_srch)
-                    ->orWhere('sacco_members.member_email', 'like', $pms_srch);
-            })
-            ->where('sacco_members.member_date_joined', '<=', $monthlyCutOfDay)
-            ->orderBy($orderby, $sort_order)
-            ->get();
+            $pms_srch = trim($request->input('pms_srch'));
+            
+
+            if ($pms_srch && mb_strlen($pms_srch) >= 2) {
+                $search = '%' . $pms_srch . '%';
+            
+                $query->where(function ($q) use ($search) {
+                    $q->where('sacco_department.department_name', 'like', $search)
+                      ->orWhere('sacco_position.position_name', 'like', $search)
+                      ->orWhere('sacco_company.company_name', 'like', $search)
+                      ->orWhere('sacco_members.member_name', 'like', $search)
+                      ->orWhere('sacco_members.member_sacco_id', 'like', $search)
+                      ->orWhere('sacco_members.member_national_id', 'like', $search)
+                      ->orWhere('sacco_members.member_email', 'like', $search);
+                });
+            }
+
+        $members = $query->orderBy($orderby, $sort_order)->get();
+
+
+        // // Fetch members and their contributions
+        // $members = DB::table('sacco_department')
+        //     ->join('sacco_company', 'sacco_department.department_company_id', '=', 'sacco_company.company_id')
+        //     ->join('sacco_members', 'sacco_department.department_id', '=', 'sacco_members.member_dept')
+        //     ->leftJoin('sacco_position', 'sacco_members.member_position', '=', 'sacco_position.position_id')
+        //     ->select('sacco_members.*', 'sacco_company.company_name', 'sacco_department.department_name', 'sacco_position.position_name')
+        //     ->where('sacco_members.member_deleted', '<>', 'Y')
+        //     ->where('sacco_members.member_active', 'Y')
+
+        //     ->where(function ($query) use ($pms_srch) {
+        //         $query->where('sacco_department.department_name', 'like', $pms_srch)
+        //             ->orWhere('sacco_position.position_name', 'like', $pms_srch)
+        //             ->orWhere('sacco_company.company_name', 'like', $pms_srch)
+        //             ->orWhere('sacco_members.member_name', 'like', $pms_srch)
+        //             ->orWhere('sacco_members.member_sacco_id', 'like', $pms_srch)
+        //             ->orWhere('sacco_members.member_national_id', 'like', $pms_srch)
+        //             ->orWhere('sacco_members.member_email', 'like', $pms_srch);
+        //     })
+        //     ->where('sacco_members.member_date_joined', '<=', $monthlyCutOfDay)
+        //     ->orderBy($orderby, $sort_order)
+        //     ->get();
 
         // Fetch loan types
         $loanTypes = DB::table('sacco_loan_types')
