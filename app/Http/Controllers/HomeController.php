@@ -1300,13 +1300,15 @@ class HomeController extends Controller
             return back()->with('success', 'Contributions updated successfully.');
         }
 
-        $loans = DB::table('sacco_loans')
-            ->join('sacco_loan_types', 'sacco_loans.loan_loan_type', '=', 'sacco_loan_types.loan_type_id')
-            ->join('sacco_loan_category', 'sacco_loans.loan_loan_category', '=', 'sacco_loan_category.loan_category_id')
-            ->where('sacco_loans.loan_member', $id)
-            ->whereRaw('loan_amount > loan_loan_paid')
-            ->select('sacco_loans.*', 'sacco_loan_types.loan_type_name', 'sacco_loan_category.loan_category_name')
-            ->get();
+       
+
+    $loans = DB::table('sacco_loans')
+    ->join('sacco_loan_types', 'sacco_loans.loan_loan_type', '=', 'sacco_loan_types.loan_type_id')
+    ->join('sacco_loan_category', 'sacco_loans.loan_loan_category', '=', 'sacco_loan_category.loan_category_id')
+    ->where('sacco_loans.loan_member', $id)
+    ->whereRaw('loan_amount > COALESCE(loan_loan_paid, 0)')
+    ->select('sacco_loans.*', 'sacco_loan_types.loan_type_name', 'sacco_loan_category.loan_category_name')
+    ->get();
 
         $data = [
             'member' => $member,
