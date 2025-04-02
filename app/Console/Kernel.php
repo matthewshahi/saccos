@@ -27,9 +27,8 @@ class Kernel extends ConsoleKernel
     $schedule->job(new \App\Jobs\ProcessLoanEmailsJob())
         ->everyTenMinutes()
         ->withoutOverlapping();*/
-
-    $schedule->job(new \App\Jobs\ResetGuarantorsJob())->everyMinute()->withoutOverlapping();
-
+        $schedule->job(new \App\Jobs\ResetGuarantorsJob())->dailyAt('00:00')->withoutOverlapping();
+         
 }
 
     /**
