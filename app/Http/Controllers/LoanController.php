@@ -690,7 +690,11 @@ class LoanController extends Controller
         $totalGuaranteed = 0;
         $errors = [];
         $maxGuarantorFactor = $this->getMaxGuarantorFactor();
-        $memberFreeSharesSelf = max($member->member_total_share - $member->member_tied_shares_self, 0);
+        // $memberFreeSharesSelf = max($member->member_total_share - $member->member_tied_shares_self, 0);
+
+        $maxGuarantorFactorSelf = $this->getMaxGuarantorFactorSelf();
+        $memberFreeSharesSelf = max(0, ($member->member_total_share - $member->member_tied_shares_self)) * $maxGuarantorFactorSelf;
+
         $memberFreeSharesOthers = max($member->member_total_share - $member->member_tied_shares, 0);
 
         foreach ($guarantors as $index => $guarantor) {
@@ -1061,6 +1065,10 @@ class LoanController extends Controller
                         'loan_by' => auth()->id(),
                         'loan_ip' => request()->ip(),
                         'loan_taken_period' => $this->currentPeriod->period_name,
+                        'loan_loan_paid' => 0,
+                        'loan_start_deduction_period' => $this->currentPeriod->period_name,
+                        'loan_taken_start_period' => $this->currentPeriod->period_name,
+
                     ]);
                     Log::info('Loan ID created successfully: ' . $loanId);  // Log or display for debugging
                 } catch (\Exception $e) {
@@ -1086,8 +1094,21 @@ class LoanController extends Controller
                         'loan_guar_ip' => request()->ip(),
                         'loan_guar_deleted' => 'N',
                     ]);
+
+                    // Update member tied shares
+                    if ($guarantor->guarantors_guarantor_id == $transaction->batch_trans_member_id) {
+                        // Self-guarantee
+                        DB::table('sacco_members')
+                            ->where('member_id', $guarantor->guarantors_guarantor_id)
+                            ->increment('member_tied_shares_self', $guarantor->guarantors_amount_guaranteed);
+                    } else {
+                        // Guaranteeing another member
+                        DB::table('sacco_members')
+                            ->where('member_id', $guarantor->guarantors_guarantor_id)
+                            ->increment('member_tied_shares', $guarantor->guarantors_amount_guaranteed);
+                    }
                 }
- 
+
 
                 if ($transaction->batch_trans_loan_to_top_up > 0) {
 
@@ -2040,5 +2061,24 @@ class LoanController extends Controller
             'expected_interest' => round($expectedInterest, 2),
             'insurance' => $insurance,
         ];
+    }
+
+    private function getMaxGuarantorFactorSelf()
+    {
+        $value = DB::table('sacco_defaults')
+            ->where('default_name', 'max_guarantor_factor_self')
+            ->value('default_value');
+
+        if ($value === null) {
+            // Insert default
+            DB::table('sacco_defaults')->insert([
+                'default_name' => 'max_guarantor_factor_self',
+                'default_value' => 1,
+            ]);
+
+            return 1.0;
+        }
+
+        return (float) $value;
     }
 }
