@@ -52,6 +52,13 @@
             <div class="card-body">
                 <div class="card-title mb-3">Loan Application Form</div>
                 
+                @if(isset($selfGuaranteeAvailable))
+    <div class="alert alert-info">
+        <strong>Self Guarantee Limit:</strong><br />
+        You can guarantee your own loan up to <strong>KES {{ number_format($selfGuaranteeAvailable, 2) }}</strong> 
+        based on your current free shares and SACCO policy.
+    </div>
+@endif
 
                 <form action="{{ route('loans.application.submit') }}" method="post" enctype="multipart/form-data">
                     @csrf

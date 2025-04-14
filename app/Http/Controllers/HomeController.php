@@ -2935,7 +2935,7 @@ class HomeController extends Controller
         }
 
         // Search and sorting logic
-         
+
         $orderby = $request->input('orderby', 'member_name');
         $sort_order = $request->input('sort_order', 'asc') == 'desc' ? 'desc' : 'asc';
 
@@ -2948,22 +2948,22 @@ class HomeController extends Controller
             ->where('sacco_members.member_active', 'Y')
             ->where('sacco_members.member_date_joined', '<=', $monthlyCutOfDay);
 
-            $pms_srch = trim($request->input('pms_srch'));
-            
+        $pms_srch = trim($request->input('pms_srch'));
 
-            if ($pms_srch && mb_strlen($pms_srch) >= 2) {
-                $search = '%' . $pms_srch . '%';
-            
-                $query->where(function ($q) use ($search) {
-                    $q->where('sacco_department.department_name', 'like', $search)
-                      ->orWhere('sacco_position.position_name', 'like', $search)
-                      ->orWhere('sacco_company.company_name', 'like', $search)
-                      ->orWhere('sacco_members.member_name', 'like', $search)
-                      ->orWhere('sacco_members.member_sacco_id', 'like', $search)
-                      ->orWhere('sacco_members.member_national_id', 'like', $search)
-                      ->orWhere('sacco_members.member_email', 'like', $search);
-                });
-            }
+
+        if ($pms_srch && mb_strlen($pms_srch) >= 2) {
+            $search = '%' . $pms_srch . '%';
+
+            $query->where(function ($q) use ($search) {
+                $q->where('sacco_department.department_name', 'like', $search)
+                    ->orWhere('sacco_position.position_name', 'like', $search)
+                    ->orWhere('sacco_company.company_name', 'like', $search)
+                    ->orWhere('sacco_members.member_name', 'like', $search)
+                    ->orWhere('sacco_members.member_sacco_id', 'like', $search)
+                    ->orWhere('sacco_members.member_national_id', 'like', $search)
+                    ->orWhere('sacco_members.member_email', 'like', $search);
+            });
+        }
 
         $members = $query->orderBy($orderby, $sort_order)->get();
 
@@ -3391,8 +3391,28 @@ class HomeController extends Controller
             ->where('sacco_loans.loan_amount', '>', DB::raw('sacco_loans.loan_loan_paid'))
             ->where('sacco_loans.loan_stoped', 'N')
             ->get();
+        
+        $max_guarantor_factor_self = (float) DB::table('sacco_defaults')
+            ->where('default_name', 'max_guarantor_factor_self')
+            ->value('default_value') ?? 1;
+        
+        $member = DB::table('sacco_members')
+            ->where('member_id', auth()->user()->id)
+            ->where('member_active', 'Y')
+            ->where('member_deleted', '<>', 'Y')
+            ->first();
+        
+            $selfGuaranteeAvailable = max(0, ($member->member_total_share - $member->member_tied_shares_self)) * $max_guarantor_factor_self;
 
-        return view('loans.apply', compact('loanTypes', 'loanCategories', 'maximumNoOfGuarantors', 'memberLoans'));
+ 
+        return view('loans.apply', compact(
+            'loanTypes',
+            'loanCategories',
+            'maximumNoOfGuarantors',
+            'memberLoans',
+            'selfGuaranteeAvailable'
+        ));
+
     }
 
 
@@ -3540,9 +3560,34 @@ class HomeController extends Controller
             ->value('default_value');
 
         $totalGuaranteed = 0;
+        // Define the two default names to ensure
+        $requiredDefaults = ['max_guarantor_factor', 'max_guarantor_factor_self'];
+
+        foreach ($requiredDefaults as $defaultName) {
+            $exists = DB::table('sacco_defaults')
+                ->where('default_name', $defaultName)
+                ->exists();
+
+            if (!$exists) {
+                DB::table('sacco_defaults')->insert([
+                    'default_name' => $defaultName,
+                    'default_value' => 1, // Default is always 1
+                    'default_transdate' => now(),
+                    'default_userid' => auth()->id(),
+                    'default_ip' => request()->ip(),
+                ]);
+            }
+        }
+
+        // Safe to retrieve afterward
         $max_guarantor_factor = DB::table('sacco_defaults')
             ->where('default_name', 'max_guarantor_factor')
             ->value('default_value') ?? 1;
+
+        $max_guarantor_factor_self = DB::table('sacco_defaults')
+            ->where('default_name', 'max_guarantor_factor_self')
+            ->value('default_value') ?? 1;
+
 
         $guarantors = [];
         for ($i = 0; $i < $maximumNoOfGuarantors; $i++) {
@@ -3572,8 +3617,9 @@ class HomeController extends Controller
                         $nmsg .= "Error, guarantor {$guarantorName}, in row " . ($i + 1) . " has over guaranteed. ";
                     }
                 } else {
-                    // if (($guarantor->member_total_share * $max_guarantor_factor - $guarantor->member_tied_shares_self) < $guarantorAmount) {
-                    if (($guarantor->member_total_share - $guarantor->member_tied_shares_self) < $guarantorAmount) {
+                    $availableSelfGuaranteeLimit = ($guarantor->member_total_share - $guarantor->member_tied_shares_self) * $max_guarantor_factor_self;
+
+                    if ($availableSelfGuaranteeLimit < $guarantorAmount) {
                         $nmsg .= "Error, {$guarantorName} has over guaranteed themselves. ";
                     }
                 }
