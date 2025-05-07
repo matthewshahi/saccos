@@ -2908,117 +2908,222 @@ class HomeController extends Controller
         return view('shares.proc_end_month_shares', compact('companies', 'currentPeriod'));
     }
 
-
     public function listContribution(Request $request)
-    {
+{
+    // Get the active period
+    $currentPeriod = DB::table('sacco_period')
+        ->where('period_active', 'Y')
+        ->where('period_deleted', '<>', 'Y')
+        ->first();
 
-
-        // Get the active period
-        $currentPeriod = DB::table('sacco_period')
-            ->where('period_active', 'Y')
-            ->where('period_deleted', '<>', 'Y')
-            ->first();
-
-        $monthlyCutOfDay = DB::table('sacco_defaults')
-            ->where('default_name', 'monthly_cut_of_day')
-            ->value('default_value');
-
-        if (!$monthlyCutOfDay) {
-            $monthlyCutOfDay = 28; // Default to 28th of the month if not found
-        }
-
-        $periodDate = Carbon::createFromFormat('Ym', $currentPeriod->period_name);
-        $monthlyCutOfDay = $periodDate->format('Y-m') . '-' . str_pad($monthlyCutOfDay, 2, '0', STR_PAD_LEFT);
-
-        if (!Carbon::hasFormat($monthlyCutOfDay, 'Y-m-d')) {
-            $monthlyCutOfDay = $periodDate->format('Y-m') . '-28';
-        }
-
-        // Search and sorting logic
-
-        $orderby = $request->input('orderby', 'member_name');
-        $sort_order = $request->input('sort_order', 'asc') == 'desc' ? 'desc' : 'asc';
-
-        $query = DB::table('sacco_department')
-            ->join('sacco_company', 'sacco_department.department_company_id', '=', 'sacco_company.company_id')
-            ->join('sacco_members', 'sacco_department.department_id', '=', 'sacco_members.member_dept')
-            ->leftJoin('sacco_position', 'sacco_members.member_position', '=', 'sacco_position.position_id')
-            ->select('sacco_members.*', 'sacco_company.company_name', 'sacco_department.department_name', 'sacco_position.position_name')
-            ->where('sacco_members.member_deleted', '<>', 'Y')
-            ->where('sacco_members.member_active', 'Y')
-            ->where('sacco_members.member_date_joined', '<=', $monthlyCutOfDay);
-
-        $pms_srch = trim($request->input('pms_srch'));
-
-
-        if ($pms_srch && mb_strlen($pms_srch) >= 2) {
-            $search = '%' . $pms_srch . '%';
-
-            $query->where(function ($q) use ($search) {
-                $q->where('sacco_department.department_name', 'like', $search)
-                    ->orWhere('sacco_position.position_name', 'like', $search)
-                    ->orWhere('sacco_company.company_name', 'like', $search)
-                    ->orWhere('sacco_members.member_name', 'like', $search)
-                    ->orWhere('sacco_members.member_sacco_id', 'like', $search)
-                    ->orWhere('sacco_members.member_national_id', 'like', $search)
-                    ->orWhere('sacco_members.member_email', 'like', $search);
-            });
-        }
-
-        $members = $query->orderBy($orderby, $sort_order)->get();
-
-
-        // // Fetch members and their contributions
-        // $members = DB::table('sacco_department')
-        //     ->join('sacco_company', 'sacco_department.department_company_id', '=', 'sacco_company.company_id')
-        //     ->join('sacco_members', 'sacco_department.department_id', '=', 'sacco_members.member_dept')
-        //     ->leftJoin('sacco_position', 'sacco_members.member_position', '=', 'sacco_position.position_id')
-        //     ->select('sacco_members.*', 'sacco_company.company_name', 'sacco_department.department_name', 'sacco_position.position_name')
-        //     ->where('sacco_members.member_deleted', '<>', 'Y')
-        //     ->where('sacco_members.member_active', 'Y')
-
-        //     ->where(function ($query) use ($pms_srch) {
-        //         $query->where('sacco_department.department_name', 'like', $pms_srch)
-        //             ->orWhere('sacco_position.position_name', 'like', $pms_srch)
-        //             ->orWhere('sacco_company.company_name', 'like', $pms_srch)
-        //             ->orWhere('sacco_members.member_name', 'like', $pms_srch)
-        //             ->orWhere('sacco_members.member_sacco_id', 'like', $pms_srch)
-        //             ->orWhere('sacco_members.member_national_id', 'like', $pms_srch)
-        //             ->orWhere('sacco_members.member_email', 'like', $pms_srch);
-        //     })
-        //     ->where('sacco_members.member_date_joined', '<=', $monthlyCutOfDay)
-        //     ->orderBy($orderby, $sort_order)
-        //     ->get();
-
-        // Fetch loan types
-        $loanTypes = DB::table('sacco_loan_types')
-            ->where('loan_type_deleted', '<>', 'Y')
-            ->orderBy('loan_type_name')
-            ->get();
-
-        // Fetch member loan payments
-        foreach ($members as $member) {
-            $member->loan_contributions = [];
-            $member->total_deduction = $member->member_share_contr_monthly + $member->member_fosa_contr_monthly;
-
-            foreach ($loanTypes as $loanType) {
-                $loanPayments = $this->getMemberLoanPayments($loanType->loan_type_id, $member->member_id, $currentPeriod->period_name);
-                $member->loan_contributions[$loanType->loan_type_id] = $loanPayments;
-                $member->total_deduction += $loanPayments;
-            }
-        }
-
-        $data = [
-            'members' => $members,
-            'loanTypes' => $loanTypes,
-            'currentPeriod' => $currentPeriod,
-            'pms_srch' => $pms_srch,
-            'orderby' => $orderby,
-            'sort_order' => $sort_order,
-        ];
-
-        return view('contributions.list', $data);
+    if (!$currentPeriod) {
+        abort(500, 'No active period found.');
     }
+
+    // Format the monthly cut-off date
+    $cutOffDay = DB::table('sacco_defaults')
+        ->where('default_name', 'monthly_cut_of_day')
+        ->value('default_value') ?? 28;
+
+    $periodDate = Carbon::createFromFormat('Ym', $currentPeriod->period_name);
+    $monthlyCutOfDay = Carbon::parse($periodDate->format('Y-m') . '-' . str_pad($cutOffDay, 2, '0', STR_PAD_LEFT))->format('Y-m-d');
+
+    // Search and sorting logic
+    $orderby = $request->input('orderby', 'member_name');
+    $sort_order = $request->input('sort_order') === 'desc' ? 'desc' : 'asc';
+    $pms_srch = trim($request->input('pms_srch'));
+
+    $query = DB::table('sacco_department')
+        ->join('sacco_company', 'sacco_department.department_company_id', '=', 'sacco_company.company_id')
+        ->join('sacco_members', 'sacco_department.department_id', '=', 'sacco_members.member_dept')
+        ->leftJoin('sacco_position', 'sacco_members.member_position', '=', 'sacco_position.position_id')
+        ->select('sacco_members.*', 'sacco_company.company_name', 'sacco_department.department_name', 'sacco_position.position_name')
+        ->where('sacco_members.member_deleted', '<>', 'Y')
+        ->where('sacco_members.member_active', 'Y')
+        ->where('sacco_members.member_date_joined', '<=', $monthlyCutOfDay);
+
+    if ($pms_srch && mb_strlen($pms_srch) >= 2) {
+        $search = '%' . $pms_srch . '%';
+        $query->where(function ($q) use ($search) {
+            $q->where('sacco_department.department_name', 'like', $search)
+                ->orWhere('sacco_position.position_name', 'like', $search)
+                ->orWhere('sacco_company.company_name', 'like', $search)
+                ->orWhere('sacco_members.member_name', 'like', $search)
+                ->orWhere('sacco_members.member_sacco_id', 'like', $search)
+                ->orWhere('sacco_members.member_national_id', 'like', $search)
+                ->orWhere('sacco_members.member_email', 'like', $search);
+        });
+    }
+
+    $members = $query->orderBy($orderby, $sort_order)->get();
+    $memberIds = $members->pluck('member_id')->toArray();
+
+    // Get loan types
+    $loanTypes = DB::table('sacco_loan_types')
+        ->where('loan_type_deleted', '<>', 'Y')
+        ->orderBy('loan_type_name')
+        ->get();
+
+    // Get minimum billable amount
+    $minAmount = DB::table('sacco_defaults')
+        ->where('default_name', 'min_loan_amount_bill_able')
+        ->value('default_value');
+
+    if (!is_numeric($minAmount)) {
+        $minAmount = 1;
+    }
+
+    // Batch fetch loan EMIs
+    $emiMap = DB::table('sacco_loans')
+        ->selectRaw('loan_member, loan_loan_type, SUM(loan_monthly_repayment_amount) as total')
+        ->whereIn('loan_member', $memberIds)
+        ->where('loan_amount', '>', 0)
+        ->whereColumn('loan_loan_paid', '<', 'loan_amount')
+        ->where('loan_stoped', '<>', 'Y')
+        ->where('loan_start_deduction_period', '<=', $currentPeriod->period_name)
+        ->where('loan_taken_period', '<=', $currentPeriod->period_name)
+        ->whereRaw('loan_amount - loan_loan_paid > ?', [$minAmount])
+        ->groupBy('loan_member', 'loan_loan_type')
+        ->get()
+        ->groupBy('loan_member')
+        ->map(function ($group) {
+            return $group->pluck('total', 'loan_loan_type');
+        });
+
+    // Attach contributions to each member
+    foreach ($members as $member) {
+        $member->loan_contributions = [];
+        $member->total_deduction = $member->member_share_contr_monthly + $member->member_fosa_contr_monthly;
+
+        foreach ($loanTypes as $loanType) {
+            $emi = $emiMap[$member->member_id][$loanType->loan_type_id] ?? 0;
+            $member->loan_contributions[$loanType->loan_type_id] = $emi;
+            $member->total_deduction += $emi;
+        }
+    }
+
+    return view('contributions.list', [
+        'members' => $members,
+        'loanTypes' => $loanTypes,
+        'currentPeriod' => $currentPeriod,
+        'pms_srch' => $pms_srch,
+        'orderby' => $orderby,
+        'sort_order' => $sort_order,
+    ]);
+}
+
+
+
+    // public function listContribution(Request $request)
+    // {
+
+
+    //     // Get the active period
+    //     $currentPeriod = DB::table('sacco_period')
+    //         ->where('period_active', 'Y')
+    //         ->where('period_deleted', '<>', 'Y')
+    //         ->first();
+
+    //     $monthlyCutOfDay = DB::table('sacco_defaults')
+    //         ->where('default_name', 'monthly_cut_of_day')
+    //         ->value('default_value');
+
+    //     if (!$monthlyCutOfDay) {
+    //         $monthlyCutOfDay = 28; // Default to 28th of the month if not found
+    //     }
+
+    //     $periodDate = Carbon::createFromFormat('Ym', $currentPeriod->period_name);
+    //     $monthlyCutOfDay = $periodDate->format('Y-m') . '-' . str_pad($monthlyCutOfDay, 2, '0', STR_PAD_LEFT);
+
+    //     if (!Carbon::hasFormat($monthlyCutOfDay, 'Y-m-d')) {
+    //         $monthlyCutOfDay = $periodDate->format('Y-m') . '-28';
+    //     }
+
+    //     // Search and sorting logic
+
+    //     $orderby = $request->input('orderby', 'member_name');
+    //     $sort_order = $request->input('sort_order', 'asc') == 'desc' ? 'desc' : 'asc';
+
+    //     $query = DB::table('sacco_department')
+    //         ->join('sacco_company', 'sacco_department.department_company_id', '=', 'sacco_company.company_id')
+    //         ->join('sacco_members', 'sacco_department.department_id', '=', 'sacco_members.member_dept')
+    //         ->leftJoin('sacco_position', 'sacco_members.member_position', '=', 'sacco_position.position_id')
+    //         ->select('sacco_members.*', 'sacco_company.company_name', 'sacco_department.department_name', 'sacco_position.position_name')
+    //         ->where('sacco_members.member_deleted', '<>', 'Y')
+    //         ->where('sacco_members.member_active', 'Y')
+    //         ->where('sacco_members.member_date_joined', '<=', $monthlyCutOfDay);
+
+    //     $pms_srch = trim($request->input('pms_srch'));
+
+
+    //     if ($pms_srch && mb_strlen($pms_srch) >= 2) {
+    //         $search = '%' . $pms_srch . '%';
+
+    //         $query->where(function ($q) use ($search) {
+    //             $q->where('sacco_department.department_name', 'like', $search)
+    //                 ->orWhere('sacco_position.position_name', 'like', $search)
+    //                 ->orWhere('sacco_company.company_name', 'like', $search)
+    //                 ->orWhere('sacco_members.member_name', 'like', $search)
+    //                 ->orWhere('sacco_members.member_sacco_id', 'like', $search)
+    //                 ->orWhere('sacco_members.member_national_id', 'like', $search)
+    //                 ->orWhere('sacco_members.member_email', 'like', $search);
+    //         });
+    //     }
+
+    //     $members = $query->orderBy($orderby, $sort_order)->get();
+
+
+    //     // // Fetch members and their contributions
+    //     // $members = DB::table('sacco_department')
+    //     //     ->join('sacco_company', 'sacco_department.department_company_id', '=', 'sacco_company.company_id')
+    //     //     ->join('sacco_members', 'sacco_department.department_id', '=', 'sacco_members.member_dept')
+    //     //     ->leftJoin('sacco_position', 'sacco_members.member_position', '=', 'sacco_position.position_id')
+    //     //     ->select('sacco_members.*', 'sacco_company.company_name', 'sacco_department.department_name', 'sacco_position.position_name')
+    //     //     ->where('sacco_members.member_deleted', '<>', 'Y')
+    //     //     ->where('sacco_members.member_active', 'Y')
+
+    //     //     ->where(function ($query) use ($pms_srch) {
+    //     //         $query->where('sacco_department.department_name', 'like', $pms_srch)
+    //     //             ->orWhere('sacco_position.position_name', 'like', $pms_srch)
+    //     //             ->orWhere('sacco_company.company_name', 'like', $pms_srch)
+    //     //             ->orWhere('sacco_members.member_name', 'like', $pms_srch)
+    //     //             ->orWhere('sacco_members.member_sacco_id', 'like', $pms_srch)
+    //     //             ->orWhere('sacco_members.member_national_id', 'like', $pms_srch)
+    //     //             ->orWhere('sacco_members.member_email', 'like', $pms_srch);
+    //     //     })
+    //     //     ->where('sacco_members.member_date_joined', '<=', $monthlyCutOfDay)
+    //     //     ->orderBy($orderby, $sort_order)
+    //     //     ->get();
+
+    //     // Fetch loan types
+    //     $loanTypes = DB::table('sacco_loan_types')
+    //         ->where('loan_type_deleted', '<>', 'Y')
+    //         ->orderBy('loan_type_name')
+    //         ->get();
+
+    //     // Fetch member loan payments
+    //     foreach ($members as $member) {
+    //         $member->loan_contributions = [];
+    //         $member->total_deduction = $member->member_share_contr_monthly + $member->member_fosa_contr_monthly;
+
+    //         foreach ($loanTypes as $loanType) {
+    //             $loanPayments = $this->getMemberLoanPayments($loanType->loan_type_id, $member->member_id, $currentPeriod->period_name);
+    //             $member->loan_contributions[$loanType->loan_type_id] = $loanPayments;
+    //             $member->total_deduction += $loanPayments;
+    //         }
+    //     }
+
+    //     $data = [
+    //         'members' => $members,
+    //         'loanTypes' => $loanTypes,
+    //         'currentPeriod' => $currentPeriod,
+    //         'pms_srch' => $pms_srch,
+    //         'orderby' => $orderby,
+    //         'sort_order' => $sort_order,
+    //     ];
+
+    //     return view('contributions.list', $data);
+    // }
 
     private function getMemberLoanPayments($ln_type, $mem_no, $currentPeriod)
     {
