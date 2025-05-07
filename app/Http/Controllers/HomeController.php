@@ -82,6 +82,11 @@ class HomeController extends Controller
 
     public function index()
     {
+
+        DB::table('sacco_loans')
+            ->whereNull('loan_loan_paid')
+            ->update(['loan_loan_paid' => 0]);
+
         $activeMembersCount = $this->dashboard_getActiveMembersCount();
         $newMembersCount = $this->dashboard_getNewMembersCount();
         // $pendingAppsCount = $this->dashboard_getPendingAppsCount();
@@ -2909,108 +2914,108 @@ class HomeController extends Controller
     }
 
     public function listContribution(Request $request)
-{
-    // Get the active period
-    $currentPeriod = DB::table('sacco_period')
-        ->where('period_active', 'Y')
-        ->where('period_deleted', '<>', 'Y')
-        ->first();
+    {
+        // Get the active period
+        $currentPeriod = DB::table('sacco_period')
+            ->where('period_active', 'Y')
+            ->where('period_deleted', '<>', 'Y')
+            ->first();
 
-    if (!$currentPeriod) {
-        abort(500, 'No active period found.');
-    }
-
-    // Format the monthly cut-off date
-    $cutOffDay = DB::table('sacco_defaults')
-        ->where('default_name', 'monthly_cut_of_day')
-        ->value('default_value') ?? 28;
-
-    $periodDate = Carbon::createFromFormat('Ym', $currentPeriod->period_name);
-    $monthlyCutOfDay = Carbon::parse($periodDate->format('Y-m') . '-' . str_pad($cutOffDay, 2, '0', STR_PAD_LEFT))->format('Y-m-d');
-
-    // Search and sorting logic
-    $orderby = $request->input('orderby', 'member_name');
-    $sort_order = $request->input('sort_order') === 'desc' ? 'desc' : 'asc';
-    $pms_srch = trim($request->input('pms_srch'));
-
-    $query = DB::table('sacco_department')
-        ->join('sacco_company', 'sacco_department.department_company_id', '=', 'sacco_company.company_id')
-        ->join('sacco_members', 'sacco_department.department_id', '=', 'sacco_members.member_dept')
-        ->leftJoin('sacco_position', 'sacco_members.member_position', '=', 'sacco_position.position_id')
-        ->select('sacco_members.*', 'sacco_company.company_name', 'sacco_department.department_name', 'sacco_position.position_name')
-        ->where('sacco_members.member_deleted', '<>', 'Y')
-        ->where('sacco_members.member_active', 'Y')
-        ->where('sacco_members.member_date_joined', '<=', $monthlyCutOfDay);
-
-    if ($pms_srch && mb_strlen($pms_srch) >= 2) {
-        $search = '%' . $pms_srch . '%';
-        $query->where(function ($q) use ($search) {
-            $q->where('sacco_department.department_name', 'like', $search)
-                ->orWhere('sacco_position.position_name', 'like', $search)
-                ->orWhere('sacco_company.company_name', 'like', $search)
-                ->orWhere('sacco_members.member_name', 'like', $search)
-                ->orWhere('sacco_members.member_sacco_id', 'like', $search)
-                ->orWhere('sacco_members.member_national_id', 'like', $search)
-                ->orWhere('sacco_members.member_email', 'like', $search);
-        });
-    }
-
-    $members = $query->orderBy($orderby, $sort_order)->get();
-    $memberIds = $members->pluck('member_id')->toArray();
-
-    // Get loan types
-    $loanTypes = DB::table('sacco_loan_types')
-        ->where('loan_type_deleted', '<>', 'Y')
-        ->orderBy('loan_type_name')
-        ->get();
-
-    // Get minimum billable amount
-    $minAmount = DB::table('sacco_defaults')
-        ->where('default_name', 'min_loan_amount_bill_able')
-        ->value('default_value');
-
-    if (!is_numeric($minAmount)) {
-        $minAmount = 1;
-    }
-
-    // Batch fetch loan EMIs
-    $emiMap = DB::table('sacco_loans')
-    ->selectRaw('loan_member, loan_loan_type, SUM(loan_monthly_repayment_amount) as total')
-    ->whereIn('loan_member', $memberIds)
-    ->where('loan_amount', '>', 0)
-    ->whereRaw('COALESCE(loan_loan_paid, 0) < loan_amount')
-    ->where('loan_stoped', '<>', 'Y')
-    ->where('loan_start_deduction_period', '<=', $currentPeriod->period_name)
-    ->where('loan_taken_period', '<=', $currentPeriod->period_name)
-    ->whereRaw('loan_amount - COALESCE(loan_loan_paid, 0) > ?', [$minAmount])
-    ->groupBy('loan_member', 'loan_loan_type')
-    ->get()
-    ->groupBy('loan_member')
-    ->map(function ($group) {
-        return $group->pluck('total', 'loan_loan_type');
-    });
-
-    // Attach contributions to each member
-    foreach ($members as $member) {
-        $member->loan_contributions = [];
-        $member->total_deduction = $member->member_share_contr_monthly + $member->member_fosa_contr_monthly;
-
-        foreach ($loanTypes as $loanType) {
-            $emi = $emiMap[$member->member_id][$loanType->loan_type_id] ?? 0;
-            $member->loan_contributions[$loanType->loan_type_id] = $emi;
-            $member->total_deduction += $emi;
+        if (!$currentPeriod) {
+            abort(500, 'No active period found.');
         }
-    }
 
-    return view('contributions.list', [
-        'members' => $members,
-        'loanTypes' => $loanTypes,
-        'currentPeriod' => $currentPeriod,
-        'pms_srch' => $pms_srch,
-        'orderby' => $orderby,
-        'sort_order' => $sort_order,
-    ]);
-}
+        // Format the monthly cut-off date
+        $cutOffDay = DB::table('sacco_defaults')
+            ->where('default_name', 'monthly_cut_of_day')
+            ->value('default_value') ?? 28;
+
+        $periodDate = Carbon::createFromFormat('Ym', $currentPeriod->period_name);
+        $monthlyCutOfDay = Carbon::parse($periodDate->format('Y-m') . '-' . str_pad($cutOffDay, 2, '0', STR_PAD_LEFT))->format('Y-m-d');
+
+        // Search and sorting logic
+        $orderby = $request->input('orderby', 'member_name');
+        $sort_order = $request->input('sort_order') === 'desc' ? 'desc' : 'asc';
+        $pms_srch = trim($request->input('pms_srch'));
+
+        $query = DB::table('sacco_department')
+            ->join('sacco_company', 'sacco_department.department_company_id', '=', 'sacco_company.company_id')
+            ->join('sacco_members', 'sacco_department.department_id', '=', 'sacco_members.member_dept')
+            ->leftJoin('sacco_position', 'sacco_members.member_position', '=', 'sacco_position.position_id')
+            ->select('sacco_members.*', 'sacco_company.company_name', 'sacco_department.department_name', 'sacco_position.position_name')
+            ->where('sacco_members.member_deleted', '<>', 'Y')
+            ->where('sacco_members.member_active', 'Y')
+            ->where('sacco_members.member_date_joined', '<=', $monthlyCutOfDay);
+
+        if ($pms_srch && mb_strlen($pms_srch) >= 2) {
+            $search = '%' . $pms_srch . '%';
+            $query->where(function ($q) use ($search) {
+                $q->where('sacco_department.department_name', 'like', $search)
+                    ->orWhere('sacco_position.position_name', 'like', $search)
+                    ->orWhere('sacco_company.company_name', 'like', $search)
+                    ->orWhere('sacco_members.member_name', 'like', $search)
+                    ->orWhere('sacco_members.member_sacco_id', 'like', $search)
+                    ->orWhere('sacco_members.member_national_id', 'like', $search)
+                    ->orWhere('sacco_members.member_email', 'like', $search);
+            });
+        }
+
+        $members = $query->orderBy($orderby, $sort_order)->get();
+        $memberIds = $members->pluck('member_id')->toArray();
+
+        // Get loan types
+        $loanTypes = DB::table('sacco_loan_types')
+            ->where('loan_type_deleted', '<>', 'Y')
+            ->orderBy('loan_type_name')
+            ->get();
+
+        // Get minimum billable amount
+        $minAmount = DB::table('sacco_defaults')
+            ->where('default_name', 'min_loan_amount_bill_able')
+            ->value('default_value');
+
+        if (!is_numeric($minAmount)) {
+            $minAmount = 1;
+        }
+
+        // Batch fetch loan EMIs
+        $emiMap = DB::table('sacco_loans')
+            ->selectRaw('loan_member, loan_loan_type, SUM(loan_monthly_repayment_amount) as total')
+            ->whereIn('loan_member', $memberIds)
+            ->where('loan_amount', '>', 0)
+            ->whereRaw('COALESCE(loan_loan_paid, 0) < loan_amount')
+            ->where('loan_stoped', '<>', 'Y')
+            ->where('loan_start_deduction_period', '<=', $currentPeriod->period_name)
+            ->where('loan_taken_period', '<=', $currentPeriod->period_name)
+            ->whereRaw('loan_amount - COALESCE(loan_loan_paid, 0) > ?', [$minAmount])
+            ->groupBy('loan_member', 'loan_loan_type')
+            ->get()
+            ->groupBy('loan_member')
+            ->map(function ($group) {
+                return $group->pluck('total', 'loan_loan_type');
+            });
+
+        // Attach contributions to each member
+        foreach ($members as $member) {
+            $member->loan_contributions = [];
+            $member->total_deduction = $member->member_share_contr_monthly + $member->member_fosa_contr_monthly;
+
+            foreach ($loanTypes as $loanType) {
+                $emi = $emiMap[$member->member_id][$loanType->loan_type_id] ?? 0;
+                $member->loan_contributions[$loanType->loan_type_id] = $emi;
+                $member->total_deduction += $emi;
+            }
+        }
+
+        return view('contributions.list', [
+            'members' => $members,
+            'loanTypes' => $loanTypes,
+            'currentPeriod' => $currentPeriod,
+            'pms_srch' => $pms_srch,
+            'orderby' => $orderby,
+            'sort_order' => $sort_order,
+        ]);
+    }
 
 
 
@@ -3496,20 +3501,20 @@ class HomeController extends Controller
             ->where('sacco_loans.loan_amount', '>', DB::raw('sacco_loans.loan_loan_paid'))
             ->where('sacco_loans.loan_stoped', 'N')
             ->get();
-        
+
         $max_guarantor_factor_self = (float) DB::table('sacco_defaults')
             ->where('default_name', 'max_guarantor_factor_self')
             ->value('default_value') ?? 1;
-        
+
         $member = DB::table('sacco_members')
             ->where('member_id', auth()->user()->id)
             ->where('member_active', 'Y')
             ->where('member_deleted', '<>', 'Y')
             ->first();
-        
-            $selfGuaranteeAvailable = max(0, ($member->member_total_share - $member->member_tied_shares_self)) * $max_guarantor_factor_self;
 
- 
+        $selfGuaranteeAvailable = max(0, ($member->member_total_share - $member->member_tied_shares_self)) * $max_guarantor_factor_self;
+
+
         return view('loans.apply', compact(
             'loanTypes',
             'loanCategories',
@@ -3517,7 +3522,6 @@ class HomeController extends Controller
             'memberLoans',
             'selfGuaranteeAvailable'
         ));
-
     }
 
 
