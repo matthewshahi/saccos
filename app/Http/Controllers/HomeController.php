@@ -85,13 +85,13 @@ class HomeController extends Controller
 
        // Set loan_loan_paid to 0 where it is NULL
 DB::table('sacco_loans')
-->whereNull('loan_loan_paid')
-->update(['loan_loan_paid' => 0]);
+    ->whereNull('loan_loan_paid')
+    ->update(['loan_loan_paid' => 0]);
 
 // Set loan_start_deduction_period to '00000' where it is NULL
 DB::table('sacco_loans')
-->whereNull('loan_start_deduction_period')
-->update(['loan_start_deduction_period' => '00000']);
+    ->whereNull('loan_start_deduction_period')
+    ->update(['loan_start_deduction_period' => '00000']);
 
         $activeMembersCount = $this->dashboard_getActiveMembersCount();
         $newMembersCount = $this->dashboard_getNewMembersCount();
@@ -383,15 +383,13 @@ DB::table('sacco_loans')
 
     public function membersList(Request $request)
     {
-        // Set loan_loan_paid to 0 where it is NULL
-DB::table('sacco_loans')
-->whereNull('loan_loan_paid')
-->update(['loan_loan_paid' => 0]);
+        DB::table('sacco_loans')
+            ->whereNull('loan_loan_paid')
+            ->update(['loan_loan_paid' => 0]);
 
-// Set loan_start_deduction_period to '00000' where it is NULL
-DB::table('sacco_loans')
-->whereNull('loan_start_deduction_period')
-->update(['loan_start_deduction_period' => '00000']);
+            DB::table('sacco_loans')
+    ->whereNull('loan_start_deduction_period')
+    ->update(['loan_start_deduction_period' => '00000']);
 
         $orderby = $request->input('orderby', 'member_name');
         $sort_order = 'asc';
