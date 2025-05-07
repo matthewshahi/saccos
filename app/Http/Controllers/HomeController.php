@@ -2975,20 +2975,20 @@ class HomeController extends Controller
 
     // Batch fetch loan EMIs
     $emiMap = DB::table('sacco_loans')
-        ->selectRaw('loan_member, loan_loan_type, SUM(loan_monthly_repayment_amount) as total')
-        ->whereIn('loan_member', $memberIds)
-        ->where('loan_amount', '>', 0)
-        ->whereColumn('loan_loan_paid', '<', 'loan_amount')
-        ->where('loan_stoped', '<>', 'Y')
-        ->where('loan_start_deduction_period', '<=', $currentPeriod->period_name)
-        ->where('loan_taken_period', '<=', $currentPeriod->period_name)
-        ->whereRaw('loan_amount - loan_loan_paid > ?', [$minAmount])
-        ->groupBy('loan_member', 'loan_loan_type')
-        ->get()
-        ->groupBy('loan_member')
-        ->map(function ($group) {
-            return $group->pluck('total', 'loan_loan_type');
-        });
+    ->selectRaw('loan_member, loan_loan_type, SUM(loan_monthly_repayment_amount) as total')
+    ->whereIn('loan_member', $memberIds)
+    ->where('loan_amount', '>', 0)
+    ->whereRaw('COALESCE(loan_loan_paid, 0) < loan_amount')
+    ->where('loan_stoped', '<>', 'Y')
+    ->where('loan_start_deduction_period', '<=', $currentPeriod->period_name)
+    ->where('loan_taken_period', '<=', $currentPeriod->period_name)
+    ->whereRaw('loan_amount - COALESCE(loan_loan_paid, 0) > ?', [$minAmount])
+    ->groupBy('loan_member', 'loan_loan_type')
+    ->get()
+    ->groupBy('loan_member')
+    ->map(function ($group) {
+        return $group->pluck('total', 'loan_loan_type');
+    });
 
     // Attach contributions to each member
     foreach ($members as $member) {
