@@ -377,6 +377,10 @@ class HomeController extends Controller
 
     public function membersList(Request $request)
     {
+        DB::table('sacco_loans')
+            ->whereNull('loan_loan_paid')
+            ->update(['loan_loan_paid' => 0]);
+
         $orderby = $request->input('orderby', 'member_name');
         $sort_order = 'asc';
         $search = $request->input('pms_srch', '');
