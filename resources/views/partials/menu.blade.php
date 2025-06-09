@@ -2,25 +2,25 @@
     <div class="gull-brand pe-3 text-center mt-4 mb-2 d-flex justify-content-center align-items-center">
         <a href="{{ url('/') }}" style="text-decoration: none;">
             @php
-                // Extract the domain name
-                $currentDomain = parse_url(url('/'), PHP_URL_HOST);
+            // Extract the domain name
+            $currentDomain = parse_url(url('/'), PHP_URL_HOST);
 
-                // Check if it's localhost or 127.0.0.1
-                if ($currentDomain === '127.0.0.1' || $currentDomain === 'localhost') {
-                    $currentDomain = 'default'; // Use 'default' as a placeholder
-                }
+            // Check if it's localhost or 127.0.0.1
+            if ($currentDomain === '127.0.0.1' || $currentDomain === 'localhost') {
+            $currentDomain = 'default'; // Use 'default' as a placeholder
+            }
 
-                // Construct logo paths
-                $domainLogoPath = '/image/' . $currentDomain . '.jpg'; // Domain-specific logo
-                $defaultLogoPath = '/image/logo.jpg'; // Default logo
+            // Construct logo paths
+            $domainLogoPath = '/image/' . $currentDomain . '.jpg'; // Domain-specific logo
+            $defaultLogoPath = '/image/logo.jpg'; // Default logo
             @endphp
 
             @if (file_exists(public_path($domainLogoPath))) <!-- Check if the domain-specific logo exists -->
-                <img src="{{ asset($domainLogoPath) }}" alt="Logo" style="height: 50px;">
-           
+            <img src="{{ asset($domainLogoPath) }}" alt="Logo" style="height: 50px;">
+
             @else
-                <span style="margin-left: 10px; font-size: 19px; color: rebeccapurple; font-weight: 900; font-family: 'Montserrat', sans-serif; background: linear-gradient(to right, rebeccapurple, indigo); -webkit-background-clip: text; color: transparent; text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);">
-                     @php
+            <span style="margin-left: 10px; font-size: 19px; color: rebeccapurple; font-weight: 900; font-family: 'Montserrat', sans-serif; background: linear-gradient(to right, rebeccapurple, indigo); -webkit-background-clip: text; color: transparent; text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);">
+                @php
                 $nameParts = explode(' ', $defaultCompanyName);
                 $first = $nameParts[0] ?? '';
                 $second = $nameParts[1] ?? '';
@@ -30,7 +30,7 @@
                     <span class="adom">{{ $first }}</span>
                     <span class="sacco">{{ $second }}</span>
                 </div>
-                </span>
+            </span>
             @endif
         </a>
         <div class="sidebar-compact-switch ms-auto"><span></span></div>
@@ -80,7 +80,7 @@
                                     <span class="text-muted">New Membership Requests</span>
                                 </a>
                             </li>
- 
+
                         </ul>
                     </li>
                     <li class="Ul_li--hover">
@@ -171,7 +171,7 @@
                             <span class="item-name text-15 text-muted">Loans</span>
                         </a>
                         <ul class="mm-collapse">
-                        <li class="item-name">
+                            <li class="item-name">
                                 <a href="{{ url('/loans/batch') }}">
                                     <span class="text-muted">Batches</span>
                                 </a>
@@ -186,7 +186,7 @@
                                     <span class="text-muted">Increase/Reduce Loans</span>
                                 </a>
                             </li>
-                            
+
                             <li class="item-name">
                                 <a href="{{ url('/admin/loans/pending/approval') }}">
                                     <span class="text-muted">Approve Self Serve Loans</span>
@@ -208,7 +208,7 @@
                                     <span class="text-muted">Loan categories</span>
                                 </a>
                             </li>
-                            
+
                         </ul>
                     </li>
                     <li class="Ul_li--hover">
@@ -222,7 +222,7 @@
                                     <span class="text-muted">Main Accounts</span>
                                 </a>
                             </li>
-                        
+
                             <li class="item-name">
                                 <a href="{{ url('/accounts/sub') }}">
                                     <span class="text-muted">Sub Accounts</span>
@@ -233,7 +233,7 @@
                                     <span class="text-muted">Set Budget</span>
                                 </a>
                             </li>
-                            
+
                             <li class="item-name">
                                 <a href="{{ url('/accounts/transfer') }}">
                                     <span class="text-muted">Transfer Ledgers</span>
@@ -255,13 +255,13 @@
                             <span class="item-name text-15 text-muted">Reports</span>
                         </a>
                         <ul class="mm-collapse">
-                        <li class="Ul_li--hover">
+                            <li class="Ul_li--hover">
                                 <a class="has-arrow" href="#">
                                     <i class="i-Bar-Chart text-20 me-2" style="color: #663399;"></i>
                                     <span class="item-name text-15 text-muted">General</span>
                                 </a>
                                 <ul class="mm-collapse">
-                                <li class="item-name">
+                                    <li class="item-name">
                                         <a href="{{ url('/reports/mpesa') }}">
                                             <span class="text-muted">mPesa</span>
                                         </a>
@@ -272,15 +272,15 @@
                                         </a>
                                     </li>
                                 </ul>
-                        </li>
+                            </li>
 
-                        <li class="Ul_li--hover">
+                            <li class="Ul_li--hover">
                                 <a class="has-arrow" href="#">
                                     <i class="i-Bar-Chart text-20 me-2" style="color: #663399;"></i>
                                     <span class="item-name text-15 text-muted">Share Deposits</span>
                                 </a>
                                 <ul class="mm-collapse">
-                                <li class="item-name">
+                                    <li class="item-name">
                                         <a href="{{ url('reports/sasra/member_contributions/data') }}">
                                             <span class="text-muted">Monthly Share Deposits</span>
                                         </a>
@@ -290,16 +290,16 @@
                                             <span class="text-muted">Monthly Share Compliance</span>
                                         </a>
                                     </li>
-<li class="item-name">
+                                    <li class="item-name">
                                         <a href="{{ url('/reports/shares/top-members') }}">
                                             <span class="text-muted">Top Shareholding</span>
                                         </a>
                                     </li>
-                                    
-                                    
-                                    
+
+
+
                                 </ul>
-                        </li>
+                            </li>
 
                             <li class="Ul_li--hover">
                                 <a class="has-arrow" href="#">
@@ -322,8 +322,8 @@
                                     <li class="item-name">
                                         <a href="{{url('/reports/loans/repayments/download')}}">Loans Given</a>
                                     </li> -->
-                                    
-                                </ul> 
+
+                                </ul>
 
                             </li>
 
@@ -353,14 +353,14 @@
                                             <span class="text-muted">Balance sheet</span>
                                         </a>
                                     </li>
-                                   
+
                                     <li class="item-name">
                                         <a href="{{ url('/reports/accounts/balance-sheet-horizontal') }}">
                                             <span class="text-muted">Balance sheet - V2</span>
                                         </a>
                                     </li>
 
-                        
+
 
 
                                 </ul>
@@ -381,7 +381,7 @@
                                         <a href="{{url('/reports/sasra/outstandingloans/n')}}">Fully Paid Loans</a>
                                     </li>
                                     <li class="item-name">
-                                        <a href="{{url('/reports/sasra/share')}}">Balances - Shares  </a>
+                                        <a href="{{url('/reports/sasra/share')}}">Balances - Shares </a>
                                     </li>
                                     <li class="item-name">
                                         <a href="{{url('/reports/profit_and_loss')}}">ROI</a>
@@ -396,7 +396,7 @@
                             </li>
                         </ul>
                     </li>
-                    
+
                     <li class="Ul_li--hover">
                         <a class="has-arrow" href="{{url('/file-upload')}}">
                             <i class="i-Download text-20 me-2" style="color: #663399;"></i>
@@ -431,7 +431,7 @@
                                     <span class="text-muted">Accounting periods</span>
                                 </a>
                             </li>
-                            
+
                             <li class="item-name">
                                 <a href="{{ url('/kintypelist') }}">
                                     <span class="text-muted">Kin Type List</span>
@@ -469,14 +469,14 @@
             </div>
         </div>
     </div>
-    <div class="support-contact p-2 d-flex justify-content-between align-items-center" 
-     style="position: absolute; bottom: 0; left: 0; width: 100%; background: linear-gradient(to right, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.9)); 
+    <div class="support-contact p-2 d-flex justify-content-between align-items-center"
+        style="position: absolute; bottom: 0; left: 0; width: 100%; background: linear-gradient(to right, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.9)); 
             font-size: 14px; border-top: 1px solid rgba(102, 51, 153, 0.2);">
-    <div style="font-size: 13px; color: rgba(102, 51, 153, 1); font-weight: 600;">
-        <strong>ERP provided by:</strong> <br> Shahi Services, 
-        <a href="tel:+254722400737" style="text-decoration: none; color: rgba(102, 51, 153, 1); font-weight: bold;">
-            +254722400737
-        </a>
+        <div style="font-size: 13px; color: rgba(102, 51, 153, 1); font-weight: 600;">
+            <strong>ERP provided by:</strong> <br> Shahi Services,
+            <a href="tel:+254722400737" style="text-decoration: none; color: rgba(102, 51, 153, 1); font-weight: bold;">
+                +254722400737
+            </a>
+        </div>
     </div>
-</div>
 </div>
