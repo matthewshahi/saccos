@@ -1,7 +1,7 @@
 .logo-container {
   display: inline-flex;
   align-items: baseline;
-  gap: 0.1em;
+  /* gap: 0.1em; */
   /* padding: 0.3em 0.6em; */
   background-color: #fff;
 }
