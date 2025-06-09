@@ -258,4 +258,44 @@ class ReportsShareController extends Controller
     ]);
 }
 
-}
+public function topShareholdingMembers(Request $request)
+{
+    $startPeriod = $this->sanitizePeriod($request->input('start_period'), now()->subMonths(11)->format('Ym'));
+    $endPeriod = $this->sanitizePeriod($request->input('end_period'), now()->format('Ym'));
+
+    // Fetch top members with total shares
+    $members = DB::table('sacco_shares as s')
+        ->join('sacco_members as m', 's.share_member_id', '=', 'm.member_id')
+        ->leftJoin('sacco_department as d', 'm.member_dept', '=', 'd.department_id')
+        ->leftJoin('sacco_company as c', 'd.department_company_id', '=', 'c.company_id')
+        ->select(
+            'm.member_id',
+            'm.member_name',
+            'm.member_national_id',
+            'm.member_phone_no',
+            'c.company_name',
+            DB::raw('SUM(s.share_amount_paying) as total_amount')
+        )
+        ->where('m.member_deleted', 'N')
+        ->whereBetween('s.share_period', [$startPeriod, $endPeriod])
+        ->groupBy(
+            'm.member_id',
+            'm.member_name',
+            'm.member_national_id',
+            'm.member_phone_no',
+            'c.company_name'
+        )
+        ->orderByDesc('total_amount')
+        ->limit(50)
+        ->get();
+
+    return view('reports.sasra.top_shareholding_members', [
+        'members' => $members,
+        'start_period' => $startPeriod,
+        'end_period' => $endPeriod,
+        'filter_company' => $request->input('search_company'),
+    ]);
+
+     
+
+}}

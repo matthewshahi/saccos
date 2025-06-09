@@ -290,6 +290,12 @@
                                             <span class="text-muted">Monthly Share Compliance</span>
                                         </a>
                                     </li>
+<li class="item-name">
+                                        <a href="{{ url('/reports/shares/top-members') }}">
+                                            <span class="text-muted">Top Shareholding</span>
+                                        </a>
+                                    </li>
+                                    
                                     
                                     
                                 </ul>
