@@ -1,4 +1,5 @@
 <?php
+
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\Auth\CustomAuthController;
@@ -27,6 +28,7 @@ use App\Http\Controllers\MemberReportController;
 use App\Http\Controllers\KinTypeController;
 // use App\Http\Controllers\LoanLedgerController;
 use App\Http\Controllers\MemberAddImages;
+use App\Http\Controllers\ReportsShareController;
 
 
 
@@ -35,7 +37,7 @@ use App\Http\Controllers\MemberAddImages;
 Route::get('/test-email', function () {
     Mail::raw('This is a test email from Laravel!', function ($message) {
         $message->to('matthewshahi@gmail.com')
-                ->subject('Test Email from iSacco 3');
+            ->subject('Test Email from iSacco 3');
     });
 
     return 'Test email sent!';
@@ -50,30 +52,30 @@ Route::get('/preview-loan-email', function () {
         'loan_monthly_repayment_amount' => 8333.33,
     ];
     $saccoMail = 'matthewshahi@gmail.com';
-    
+
     return new App\Mail\LoanApprovalEmail($loan, $saccoMail);
 });
 
 Route::get('/home', [HomeController::class, 'redirectBasedOnAuth'])->name('home');
 Route::get('/', [HomeController::class, 'redirectBasedOnAuth'])->name('home1');
- 
+
 Route::get('login', [CustomAuthController::class, 'showLoginForm'])->name('login');
 Route::post('login', [CustomAuthController::class, 'login']);
 Route::post('logout', [CustomAuthController::class, 'logout'])->name('logout');
 Route::get('/loans/calculator', [HomeController::class, 'loansCalculator'])->name('loans.calculator');
- 
+
 Route::get('/register', [PublicRegistrationController::class, 'showForm'])->name('register.form');
 Route::post('/register', [PublicRegistrationController::class, 'submit'])->name('register.submit');
 Route::get('/register/{code}', [PublicRegistrationController::class, 'completeRegistrationForm'])->name('register.unique');
 Route::post('/register/complete', [PublicRegistrationController::class, 'completeSubmit'])->name('register.complete.submit');
 
 
-    Route::get('/loans/types/list', [PublicLoansController::class, 'loansTypesList'])->name('loans.types.list');
-    // Route::get('/loans/types/list', [PublicLoansController::class, 'loansTypesList'])->name('loans.types.list');
-    Route::get('/public/loans/types/list', [PublicLoansController::class, 'loansTypesList'])->name('loans.types.list1');
-    Route::get('/public/loans/details/{id}', [PublicLoansController::class, 'loanDetails'])->name('loan.details');
-    Route::get('/public/loan-calculator/{id}', [PublicLoansController::class, 'showLoanCalculator'])->name('loan.calculator');
-    Route::post('/public/loan-calculator/{id}/calculate', [PublicLoansController::class, 'calculateLoan'])->name('loan.calculate');
+Route::get('/loans/types/list', [PublicLoansController::class, 'loansTypesList'])->name('loans.types.list');
+// Route::get('/loans/types/list', [PublicLoansController::class, 'loansTypesList'])->name('loans.types.list');
+Route::get('/public/loans/types/list', [PublicLoansController::class, 'loansTypesList'])->name('loans.types.list1');
+Route::get('/public/loans/details/{id}', [PublicLoansController::class, 'loanDetails'])->name('loan.details');
+Route::get('/public/loan-calculator/{id}', [PublicLoansController::class, 'showLoanCalculator'])->name('loan.calculator');
+Route::post('/public/loan-calculator/{id}/calculate', [PublicLoansController::class, 'calculateLoan'])->name('loan.calculate');
 
 
 Route::middleware(['auth'])->group(function () {
@@ -93,13 +95,13 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/loans/apply', [HomeController::class, 'loansApply'])->name('loans.apply');
     Route::post('/loans/apply', [HomeController::class, 'submitLoanApplication'])->name('loans.application.submit');
     Route::get('loans/pending/approval/self', [LoanApplicationSelfServiceController::class, 'listLoansPendingApprovalSelf'])
-    ->name('loans.pending.approval.self');
+        ->name('loans.pending.approval.self');
     Route::get('loans/pending/approval/selfedit/{id}', [LoanApplicationSelfServiceController::class, 'listLoansPendingApprovalSelfedit'])
-    ->name('loans.pending.approval.selfedit'); 
+        ->name('loans.pending.approval.selfedit');
     Route::post('/loans/process-application', [LoanApplicationSelfServiceController::class, 'processLoanApplication'])
-    ->name('loans.process.application');
+        ->name('loans.process.application');
     Route::put('loans/application/update/{id}', [LoanApplicationSelfServiceController::class, 'updateLoanApplication'])
-    ->name('loans.application.update');
+        ->name('loans.application.update');
     Route::delete('/loans/delete-guarantor/{id}', [LoanApplicationSelfServiceController::class, 'deleteGuarantor'])->name('loans.delete.guarantor');
     Route::post('/loans/add-guarantor/{id}', [LoanApplicationSelfServiceController::class, 'addGuarantor'])->name('loans.add.guarantor');
     Route::get('/search/guarantors', [LoanApplicationSelfServiceController::class, 'search'])->name('search.guarantors');
@@ -111,7 +113,7 @@ Route::middleware(['auth'])->group(function () {
     // Route::get('/loans/pending/approval', [HomeController::class, 'listLoansPendingApproval'])->name('loans.pending.approval')->middleware('check_user_rights:rpt_loans_issued');
     // Route::get('/loans/types/list', [HomeController::class, 'loansTypesList'])->name('loans.types.list');
 
-    
+
 
 
     Route::get('/profile/password', [HomeController::class, 'showChangeSelfPasswordForm'])->name('profile.password');
@@ -119,21 +121,17 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/downloads', [PublicFileController::class, 'publicDownloads'])->name('public.downloads');
     Route::get('/downloads/{file}/download', [PublicFileController::class, 'downloadFile'])->name('public.download.file');
-
-    
-   
-
 });
 
 
 Route::prefix('mobile')->group(function () {
-   
+
     // Route::post('/pay/validation', [MpesaTheController::class, 'validationRequest'])->name('mpesa.pay.validation');
     // Route::post('/pay/stk_confirmation', [MpesaTheController::class, 'handleC2BPayment'])->name('mpesa.pay.confirmation');
     // Route::post('/stkpush/callback', [MpesaTheController::class, 'handleSTKPushCallback'])->name('stkpush.callback');
     // Route::post('/stkpush/callback/{unique_number?}', [MpesaTheController::class, 'handleSTKPushCallback'])->name('stkpush.callback');
     // Route::match(['get', 'post'], '/stkpush/callback/{unique_number?}', [MpesaTheController::class, 'handleSTKPushCallback'])->name('stkpush.callback');
-    
+
     Route::middleware(['auth'])->group(function () {
         Route::get('/stkpush/{unique_number?}', [MpesaTheController::class, 'showSTKPushForm'])->name('stkpush.form'); // Show STK Push form
         Route::post('/stkpush{unique_number?}', [MpesaTheController::class, 'storeStkPush'])->name('stkpush.store');
@@ -144,14 +142,13 @@ Route::prefix('mobile')->group(function () {
         //Route::get('/payment/failed', [MpesaTheController::class, 'paymentFailed'])->name('payment.failed'); // Payment failure (optional)
         Route::post('/payment-status', [MpesaTheController::class, 'checkStatus'])->name('payment.status');
         Route::get('/stk/wait/{checkoutRequestId}', [MpesaTheController::class, 'waitForPayment'])->name('stkpush.wait');
-        
     });
 
-   
+
     Route::middleware(['auth', 'check_member_position'])->group(function () {
         Route::get('/register-urls', [MpesaTheController::class, 'registerUrls'])->name('mpesa.register.urls')->middleware('check_user_rights:mpesa_admin'); // Register URLs for validation/confirmation
 
-         
+
         Route::prefix('config')->group(function () {
             Route::get('/', [MpesaConfigController::class, 'index'])->name('mpesa_config.index')->middleware('check_user_rights:mpesa_admin');; // List all configurations
             Route::get('/create', [MpesaConfigController::class, 'create'])->name('mpesa_config.create')->middleware('check_user_rights:mpesa_admin');; // Show create form
@@ -175,7 +172,7 @@ Route::prefix('mobile')->group(function () {
 //     Route::get('/mpesa/payment/failed', [MpesaController::class, 'paymentFailed'])->name('payment.failed');
 // });
 
- 
+
 
 // Route::prefix('mpesa/config')->middleware(['auth', 'check_member_position'])->group(function () {
 //     Route::get('/', [MpesaConfigController::class, 'index'])->name('mpesa_config.index');
@@ -185,20 +182,20 @@ Route::prefix('mobile')->group(function () {
 //     Route::post('/update/{id}', [MpesaConfigController::class, 'update'])->name('mpesa_config.update');
 // });
 
-Route::get('/import/members', [MemberImportController::class, 'showForm'])->name('import.members.form');//->middleware('check_user_rights:new_member_applications_updateXXX');
-Route::post('/import/members', [MemberImportController::class, 'import'])->name('import.members.process');//->middleware('check_user_rights:new_member_applications_updateXXX');
+Route::get('/import/members', [MemberImportController::class, 'showForm'])->name('import.members.form'); //->middleware('check_user_rights:new_member_applications_updateXXX');
+Route::post('/import/members', [MemberImportController::class, 'import'])->name('import.members.process'); //->middleware('check_user_rights:new_member_applications_updateXXX');
 Route::get('/update/ledgers', [MemberImportController::class, 'updatefLedgers'])->name('update.ledgers');
 
 
 Route::middleware(['auth', 'check_member_position'])->group(function () {
-  
+
 
     Route::get('/new_members/list', [PublicRegistrationActionsController::class, 'listMembers'])->name('members.list')->middleware('check_user_rights:new_member_applications_list');
     Route::post('/new_members/update/{id}', [PublicRegistrationActionsController::class, 'updateField'])->middleware('check_user_rights:new_member_applications_update');
     Route::get('/new_members/details/{id}', [PublicRegistrationActionsController::class, 'getMemberDetails'])->name('members.details')->middleware('check_user_rights:new_member_applications_update');
     Route::post('/new_members/export/live', [PublicRegistrationActionsImportController::class, 'exportLiveData'])->name('members.exportLive')->middleware('check_user_rights:new_member_applications_update');
 
-    
+
 
     // Route::get('/import/members', [MemberImportController::class, 'showForm'])->name('import.members.form');//->middleware('check_user_rights:new_member_applications_updateXXX');
     // Route::post('/import/members', [MemberImportController::class, 'import'])->name('import.members.process');//->middleware('check_user_rights:new_member_applications_updateXXX');
@@ -215,15 +212,15 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
     Route::get('/members/active/{status}', [HomeController::class, 'membersActive'])->name('members.active')->middleware('check_user_rights:list_sacco_member');
     Route::get('/members/edit/{id}', [HomeController::class, 'editMember'])->name('members.edit')->middleware('check_user_rights:edit_member');
     Route::get('/members/download/{member_id}/{filename}', [\App\Http\Controllers\MemberAddImages::class, 'download'])
-    ->name('members.download')
-    ->middleware('check_user_rights:edit_member');
+        ->name('members.download')
+        ->middleware('check_user_rights:edit_member');
 
-    
+
 
     Route::get('/members/protectedfiles/{path}', [\App\Http\Controllers\MemberAddImages::class, 'serveProtectedFile'])
-    ->where('path', '.*')
-    ->middleware('check_user_rights:edit_member')
-    ->name('members.protectedfile');
+        ->where('path', '.*')
+        ->middleware('check_user_rights:edit_member')
+        ->name('members.protectedfile');
 
 
     Route::get('/members/edit/images/{id}', [MemberAddImages::class, 'index'])->name('members.edit.image')->middleware('check_user_rights:edit_member');
@@ -234,7 +231,7 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
     Route::post('/members/next-of-kin/update/{id}', [HomeController::class, 'updateNextOfKin'])->name('members.updateNextOfKin')->middleware('check_user_rights:add_next_of_kin');
     Route::get('/members/delete-next-of-kin/{member_id}/{kin_id}', [HomeController::class, 'deleteNextOfKin'])->name('members.deleteNextOfKin')->middleware('check_user_rights:add_next_of_kin');
 
-    
+
 
     Route::middleware(['auth', 'check_user_rights:edit_member'])->group(function () {
         Route::get('/kintypelist', [KinTypeController::class, 'index'])->name('kintype.list');
@@ -278,7 +275,7 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
         Route::get('/', [MpesaReportController::class, 'paymentsReceived'])->name('reports.mpesa.paymentsreceived');
         Route::get('/c2b', [MpesaReportController::class, 'c2bPayments'])->name('reports.mpesa.paymentsreceived.c2b');
     });
-    
+
     Route::get('/reports/sasra/outstandingloans/{status}/{active?}', [HomeController::class, 'reportSasraLoans'])->name('reports.sasra.loans')->middleware('check_user_rights:rpt_loans_issued');
     Route::post('/reports/sasra/outstandingloans/{status}/{active?}', [HomeController::class, 'reportSasraLoans'])->name('reports.sasra.loans.post')->middleware('check_user_rights:rpt_loans_issued');
     Route::get('/reports/sasra/loans/data', [HomeController::class, 'fetchSasraLoansData'])->name('reports.sasra.loans.data')->middleware('check_user_rights:rpt_loans_issued');
@@ -300,6 +297,10 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
     Route::get('/reports/sasra/deposits', [HomeController::class, 'reportSasraCapitalBalances'])->name('reports.sasra.capitalbalances')->middleware('check_user_rights:rpt_profit_loss');
     Route::get('/reports/sasra/return_on_investment_report', [HomeController::class, 'reportSasraReturnOnInvestmentReport'])->name('reports.sasra.returnoninvestment')->middleware('check_user_rights:rpt_profit_loss');
 
+    Route::get('/reports/sasra/member_contributions/data', [ReportsShareController::class, 'fetchMemberContributionsData'])
+    ->name('reports.sasra.membercontributions.data')
+    ->middleware('check_user_rights:rpt_profit_loss');
+
     Route::get('/list/contribution', [HomeController::class, 'listContribution'])->name('list.contribution')->middleware('check_user_rights:list_sacco_member_contributions');
     Route::get('/proc/end/month/loans', [LoanEndMonthController::class, 'endMonthLoans'])->name('proc.end.month.loans')->middleware('check_user_rights:end_month_processing_loans');
     Route::post('/proc/end/month/loans', [LoanEndMonthController::class, 'processEndMonthLoans'])->name('proc.end.month.loans.process')->middleware('check_user_rights:end_month_processing_loans');
@@ -309,8 +310,8 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
 
     // Route::get('/admin/loans/pending/approval', [HomeController::class, 'adminListLoansPendingApproval'])->name('admin.loans.pending.approval')->middleware('check_user_rights:end_month_processing_loans');
     Route::get('admin/loans/pending/approval', [LoanApplicationSelfServiceController::class, 'listLoansPendingApproval'])
-    ->name('loans.pending.approval')
-    ->middleware('check_user_rights:end_month_processing_loans');
+        ->name('loans.pending.approval')
+        ->middleware('check_user_rights:end_month_processing_loans');
 
     Route::post('admin/loans/approve/{id}', [LoanApplicationSelfServiceController::class, 'approveLoan'])
         ->name('loans.approve')->middleware('check_user_rights:end_month_processing_loans');
@@ -364,11 +365,11 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
     Route::post('/loans/categories/update/{id}', [HomeController::class, 'updateLoanCategory'])->name('loans.categories.update')->middleware('check_user_rights:add_loan_type');
     Route::delete('/loans/categories/delete/{id}', [HomeController::class, 'deleteLoanCategory'])->name('loans.categories.delete')->middleware('check_user_rights:add_loan_type');
 
-   
+
 
     Route::get('/modify/member/loans', [LoanPaymentController::class, 'index'])
-    ->name('modify.member.loans')
-    ->middleware('check_user_rights:modify_member_loan_journal');
+        ->name('modify.member.loans')
+        ->middleware('check_user_rights:modify_member_loan_journal');
 
     Route::post('/modify/member/loans/update', [LoanPaymentController::class, 'updateLoanPayment'])
         ->name('modify.member.loans.update')
@@ -382,13 +383,13 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
     Route::post('/modify/member/loans/reduce', [LoanPaymentController::class, 'reduceLoan'])
         ->name('modify.member.loans.reduce')
         ->middleware('check_user_rights:modify_member_loan_journal');
-    
 
-    
+
+
     Route::get('/modify/member/loans/asset-accounts', [LoanPaymentController::class, 'getAssetAccounts'])
         ->name('modify.member.loans.asset.accounts')
         ->middleware('check_user_rights:modify_member_loan_journal');
-        
+
 
 
     Route::get('/guarantors/deduction', [HomeController::class, 'guarantorsDeduction'])->name('guarantors.deduction')->name('loans.categories.delete')->middleware('check_user_rights:loan_guarantors_change');
@@ -416,7 +417,7 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
     Route::get('/reports/contributions', [HomeController::class, 'reportsContributions'])->name('reports.contributions')->middleware('check_user_rights:rpt_reports');
     Route::get('/reports/contributions/principal', [HomeController::class, 'reportsContributionsPrincipal'])->name('reports.contributions.principal')->middleware('check_user_rights:rpt_reports');
 
-    
+
 
     Route::get('/members/report', [MemberReportController::class, 'index'])->name('members.report')->middleware('check_user_rights:rpt_reports');
     Route::post('/members/report/data', [MemberReportController::class, 'fetchReportData'])->name('members.report.data')->middleware('check_user_rights:rpt_reports');
@@ -486,7 +487,7 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
     Route::get('/files/download/{file}', [FileUploadController::class, 'download'])->name('file.download')->middleware('check_user_rights:file_upload');
     Route::delete('/files/delete/{file}', [FileUploadController::class, 'delete'])->name('file.delete');
 
-   
+
     //Route::get('/randomize-members', [RandController::class, 'randomizeMembers'])->name('randomize.members')->middleware('check_user_rights:testing_randomize_members');
     // Route::get('/randomize-loan-payments', [RandController::class, 'randomizeLoanPayments'])->name('randomize.loan.payments')->middleware('check_user_rights:testing_randomize_members');
     // Route::get('/randomize-shares', [RandController::class, 'randomizeShares'])->name('randomize.shares')->middleware('check_user_rights:testing_randomize_members');

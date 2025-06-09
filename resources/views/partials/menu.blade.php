@@ -273,6 +273,22 @@
                                     </li>
                                 </ul>
                         </li>
+
+                        <li class="Ul_li--hover">
+                                <a class="has-arrow" href="#">
+                                    <i class="i-Bar-Chart text-20 me-2" style="color: #663399;"></i>
+                                    <span class="item-name text-15 text-muted">Share Deposits</span>
+                                </a>
+                                <ul class="mm-collapse">
+                                <li class="item-name">
+                                        <a href="{{ url('reports/sasra/member_contributions/data') }}">
+                                            <span class="text-muted">Mom Share Deposits / Contributions</span>
+                                        </a>
+                                    </li>
+                                    
+                                </ul>
+                        </li>
+
                             <li class="Ul_li--hover">
                                 <a class="has-arrow" href="#">
                                     <i class="i-Bar-Chart text-20 me-2" style="color: #663399;"></i>
