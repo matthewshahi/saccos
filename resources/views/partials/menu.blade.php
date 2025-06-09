@@ -282,9 +282,15 @@
                                 <ul class="mm-collapse">
                                 <li class="item-name">
                                         <a href="{{ url('reports/sasra/member_contributions/data') }}">
-                                            <span class="text-muted">MoM Share Deposits / Contributions</span>
+                                            <span class="text-muted">Monthly Share Deposits</span>
                                         </a>
                                     </li>
+                                    <li class="item-name">
+                                        <a href="{{ url('/reports/sasra/share_compliance') }}">
+                                            <span class="text-muted">Monthly Share Compliance</span>
+                                        </a>
+                                    </li>
+                                    
                                     
                                 </ul>
                         </li>

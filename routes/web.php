@@ -301,6 +301,11 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
     ->name('reports.sasra.membercontributions.data')
     ->middleware('check_user_rights:rpt_profit_loss');
 
+    Route::get('/reports/sasra/share_compliance', [ReportsShareController::class, 'index'])
+    ->name('reports.sasra.sharecompliance')
+    ->middleware('check_user_rights:rpt_profit_loss');
+
+
     Route::get('/list/contribution', [HomeController::class, 'listContribution'])->name('list.contribution')->middleware('check_user_rights:list_sacco_member_contributions');
     Route::get('/proc/end/month/loans', [LoanEndMonthController::class, 'endMonthLoans'])->name('proc.end.month.loans')->middleware('check_user_rights:end_month_processing_loans');
     Route::post('/proc/end/month/loans', [LoanEndMonthController::class, 'processEndMonthLoans'])->name('proc.end.month.loans.process')->middleware('check_user_rights:end_month_processing_loans');
