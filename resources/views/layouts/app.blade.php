@@ -15,7 +15,7 @@
     <link rel="stylesheet" href="{{ asset('dist-assets/css/plugins/datatables.min.css') }}" />
     <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
     <link href="https://fonts.googleapis.com/css?family=Nunito:300,400,400i,600,700,800,900" rel="stylesheet" />
-    <link rel="stylesheet" href="{{ asset('dist-assets/css/logo.css?x=1') }}" />
+    <link rel="stylesheet" href="{{ asset('dist-assets/css/logo.css?x=3') }}" />
 
     <!-- Google tag (gtag.js) -->
     @if(env('GA_ANALYTICS'))
