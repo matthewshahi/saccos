@@ -6,6 +6,8 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta http-equiv="X-UA-Compatible" content="ie=edge" />
     <title>{{ $defaultCompanyName }} | v<?php echo (date('Y')) ?></title>
+    <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Cormorant+Garamond:wght@700&display=swap" rel="stylesheet">
+
     <link rel="stylesheet" href="{{ asset('dist-assets/css/themes/lite-purple.css?123') }}" />
     <link rel="stylesheet" href="{{ asset('dist-assets/css/plugins/perfect-scrollbar.css') }}" />
     <link rel="stylesheet" href="{{ asset('dist-assets/css/plugins/fontawesome-5.css') }}" />
@@ -13,6 +15,7 @@
     <link rel="stylesheet" href="{{ asset('dist-assets/css/plugins/datatables.min.css') }}" />
     <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
     <link href="https://fonts.googleapis.com/css?family=Nunito:300,400,400i,600,700,800,900" rel="stylesheet" />
+    <link rel="stylesheet" href="{{ asset('dist-assets/css/logo.css') }}" />
 
     <!-- Google tag (gtag.js) -->
     @if(env('GA_ANALYTICS'))
