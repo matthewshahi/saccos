@@ -298,4 +298,100 @@ public function topShareholdingMembers(Request $request)
 
      
 
-}}
+}
+public function shareAgingReport(Request $request)
+{
+    $buckets = [
+        '0-3' => [0, 3],
+        '4-6' => [4, 6],
+        '7-12' => [7, 12],
+        '13-24' => [13, 24],
+        '25-36' => [25, 36],
+        '37+' => [37, 9999],
+    ];
+
+    $today = Carbon::now();
+
+    $query = DB::table('sacco_shares as s')
+        ->join('sacco_members as m', 's.share_member_id', '=', 'm.member_id')
+        ->leftJoin('sacco_department as d', 'm.member_dept', '=', 'd.department_id')
+        ->leftJoin('sacco_company as c', 'd.department_company_id', '=', 'c.company_id')
+        ->where('m.member_deleted', 'N')
+        ->select(
+            'm.member_id',
+            'm.member_name',
+            'm.member_national_id',
+            'm.member_phone_no',
+            'm.member_active',
+            'c.company_name',
+            DB::raw('MAX(s.share_period) as last_period'),
+            DB::raw('SUM(s.share_amount_paying) as total_shares')
+        )
+        ->groupBy(
+            'm.member_id',
+            'm.member_name',
+            'm.member_national_id',
+            'm.member_phone_no',
+            'm.member_active',
+            'c.company_name'
+        );
+
+    // 🔍 Smart search
+    if ($request->filled('search')) {
+        $search = $request->input('search');
+        $query->where(function ($q) use ($search) {
+            $q->where('m.member_name', 'like', "%{$search}%")
+              ->orWhere('m.member_national_id', 'like', "%{$search}%")
+              ->orWhere('m.member_phone_no', 'like', "%{$search}%")
+              ->orWhere('c.company_name', 'like', "%{$search}%");
+        });
+    }
+
+    // 🧾 Active/Inactive filter
+    if ($request->filled('status') && in_array($request->status, ['active', 'inactive'])) {
+        if ($request->status === 'active') {
+            $query->where('m.member_active', 'Y');
+        } else {
+            $query->where(function ($q) {
+                $q->whereNull('m.member_active')->orWhere('m.member_active', '!=', 'Y');
+            });
+        }
+    }
+
+    $shareAging = $query->get();
+
+    $rows = [];
+    foreach ($shareAging as $row) {
+        $last = $row->last_period ? Carbon::createFromFormat('Ym', $row->last_period) : null;
+        $monthsAgo = $last ? $last->diffInMonths($today) : null;
+
+        $bucket = 'Unknown';
+        foreach ($buckets as $label => [$min, $max]) {
+            if ($monthsAgo !== null && $monthsAgo >= $min && $monthsAgo <= $max) {
+                $bucket = $label;
+                break;
+            }
+        }
+
+        $rows[] = [
+            'member_name' => strtoupper($row->member_name),
+            'id_number' => $row->member_national_id,
+            'phone' => $row->member_phone_no,
+            'company_name' => strtoupper($row->company_name ?? '-'),
+            'last_period' => $row->last_period ? Carbon::createFromFormat('Ym', $row->last_period)->format('M Y') : '-',
+            'months_ago' => $monthsAgo,
+            'bucket' => $bucket,
+            'total_shares' => $row->total_shares,
+            'status' => $row->member_active === 'Y' ? 'Active' : 'Inactive',
+        ];
+    }
+
+    return view('reports.sasra.share_aging_report', [
+        'rows' => $rows,
+        'buckets' => array_keys($buckets),
+        'search' => $request->input('search'),
+        'status' => $request->input('status', 'all'),
+    ]);
+}
+
+}

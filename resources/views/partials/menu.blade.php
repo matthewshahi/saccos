@@ -296,6 +296,12 @@
                                         </a>
                                     </li>
 
+                                    <li class="item-name">
+                                        <a href="{{ url('/reports/shares/aging') }}">
+                                            <span class="text-muted">Share Deposist - Aging</span>
+                                        </a>
+                                    </li>
+
 
 
                                 </ul>
