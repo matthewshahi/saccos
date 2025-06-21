@@ -176,20 +176,37 @@ class PublicRegistrationController extends Controller
                 'bank_branch' => 'nullable|string|max:255',
                 'bank_account_number' => 'nullable|string|max:50',
                 
-                // Next of Kin
-                'next_of_kin' => 'nullable|array|max:3',
-                'next_of_kin.*.name' => 'required_with:next_of_kin|string|max:100',
-                'next_of_kin.*.relationship' => [
-                    'required_with:next_of_kin',
-                    function ($attribute, $value, $fail) use ($validKinRelationships) {
-                        if (!in_array($value, $validKinRelationships)) {
-                            $fail('Invalid relationship value.');
-                        }
-                    },
-                ],
-                'next_of_kin.*.phone' => 'nullable|string|max:30',
-                'next_of_kin.*.id_or_cert_no' => 'nullable|string|max:30',
-                'next_of_kin.*.share_percent' => 'nullable|numeric|min:0|max:100',
+                // // Next of Kin
+                // 'next_of_kin' => 'nullable|array|max:3',
+                // 'next_of_kin.*.name' => 'required_with:next_of_kin|string|max:100',
+                // 'next_of_kin.*.relationship' => [
+                //     'required_with:next_of_kin',
+                //     function ($attribute, $value, $fail) use ($validKinRelationships) {
+                //         if (!in_array($value, $validKinRelationships)) {
+                //             $fail('Invalid relationship value.');
+                //         }
+                //     },
+                // ],
+                // 'next_of_kin.*.phone' => 'nullable|string|max:30',
+                // 'next_of_kin.*.id_or_cert_no' => 'nullable|string|max:30',
+                // 'next_of_kin.*.share_percent' => 'nullable|numeric|min:0|max:100',
+
+                // Next of Kin (All Optional)
+'next_of_kin' => 'nullable|array|max:3',
+'next_of_kin.*.name' => 'nullable|string|max:100',
+'next_of_kin.*.relationship' => [
+    'nullable',
+    'string',
+    function ($attribute, $value, $fail) use ($validKinRelationships) {
+        if (!is_null($value) && !in_array($value, $validKinRelationships)) {
+            $fail('Invalid relationship value.');
+        }
+    },
+],
+'next_of_kin.*.phone' => 'nullable|string|max:30',
+'next_of_kin.*.id_or_cert_no' => 'nullable|string|max:30',
+'next_of_kin.*.share_percent' => 'nullable|numeric|min:0|max:100',
+
         
                 // Terms and Conditions
                 'certification_statement' => 'accepted',
