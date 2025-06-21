@@ -172,9 +172,9 @@ class PublicRegistrationController extends Controller
 'payslips_bank_statements' => 'nullable|mimes:jpeg,jpg,pdf|max:300',
                 
                 // Bank Details
-                'bank_name' => 'string|max:255',
-                'bank_branch' => 'string|max:255',
-                'bank_account_number' => 'string|max:50',
+                'bank_name' => 'nullable|string|max:255',
+                'bank_branch' => 'nullable|string|max:255',
+                'bank_account_number' => 'nullable|string|max:50',
                 
                 // Next of Kin
                 'next_of_kin' => 'nullable|array|max:3',
