@@ -122,7 +122,7 @@
                 </div>
                 <div class="col-md-6 form-group mb-3">
                     <label for="physical_location">Location <span class="text-danger">*</span></label>
-                    <input type="text" class="form-control" id="physical_location" name="physical_location" value="{{ old('physical_location') }}" required>
+                    <input type="text" class="form-control" id="physical_location" name="physical_location" value="{{ old('physical_location') }}">
                 </div>
             </div>
 
@@ -176,31 +176,31 @@
 
                             <div class="col-md-6 form-group mb-3">
                                 <label for="passport_photo">Passport Photo <span class="text-danger">*</span></label>
-                                <input class="form-control" id="passport_photo" type="file" name="passport_photo" accept=".jpeg,.jpg,.pdf" required>
+                                <input class="form-control" id="passport_photo" type="file" name="passport_photo" accept=".jpeg,.jpg,.pdf" >
                                 <small class="text-muted">JPEG/JPG or PDF only, max size: 300KB</small>
                             </div>
 
                             <div class="col-md-6 form-group mb-3">
                                 <label for="signature">Signature <span class="text-danger">*</span></label>
-                                <input class="form-control" id="signature" type="file" name="signature" accept=".jpeg,.jpg,.pdf" required>
+                                <input class="form-control" id="signature" type="file" name="signature" accept=".jpeg,.jpg,.pdf">
                                 <small class="text-muted">JPEG/JPG or PDF only, max size: 300KB</small>
                             </div>
 
                             <div class="col-md-6 form-group mb-3">
                                 <label for="id_copy_front">ID Copy (Front) <span class="text-danger">*</span></label>
-                                <input class="form-control" id="id_copy_front" type="file" name="id_copy_front" accept=".jpeg,.jpg,.pdf" required>
+                                <input class="form-control" id="id_copy_front" type="file" name="id_copy_front" accept=".jpeg,.jpg,.pdf">
                                 <small class="text-muted">JPEG/JPG or PDF only, max size: 300KB</small>
                             </div>
 
                             <div class="col-md-6 form-group mb-3">
                                 <label for="id_copy_back">ID Copy (Back) <span class="text-danger">*</span></label>
-                                <input class="form-control" id="id_copy_back" type="file" name="id_copy_back" accept=".jpeg,.jpg,.pdf" required>
+                                <input class="form-control" id="id_copy_back" type="file" name="id_copy_back" accept=".jpeg,.jpg,.pdf">
                                 <small class="text-muted">JPEG/JPG or PDF only, max size: 300KB</small>
                             </div>
 
                             <div class="col-md-6 form-group mb-3">
                                 <label for="payslips_bank_statements">Payslips or Bank Statements <span class="text-danger"></span></label>
-                                <input class="form-control" id="payslips_bank_statements" type="file" name="payslips_bank_statements" accept=".jpeg,.jpg,.pdf" required>
+                                <input class="form-control" id="payslips_bank_statements" type="file" name="payslips_bank_statements" accept=".jpeg,.jpg,.pdf">
                                 <small class="text-muted">JPEG/JPG or PDF only, max size: 300KB</small>
                             </div>
 
@@ -212,17 +212,17 @@
 
                             <div class="col-md-6 form-group mb-3">
                                 <label for="bank_name">Bank Name <span class="text-danger"></span></label>
-                                <input class="form-control" id="bank_name" type="text" name="bank_name" placeholder="Enter your bank name" value="{{ old('bank_name') }}" required>
+                                <input class="form-control" id="bank_name" type="text" name="bank_name" placeholder="Enter your bank name" value="{{ old('bank_name') }}">
                             </div>
 
                             <div class="col-md-6 form-group mb-3">
                                 <label for="bank_branch">Bank Branch <span class="text-danger"></span></label>
-                                <input class="form-control" id="bank_branch" type="text" name="bank_branch" placeholder="Enter your bank branch" value="{{ old('bank_branch') }}" required>
+                                <input class="form-control" id="bank_branch" type="text" name="bank_branch" placeholder="Enter your bank branch" value="{{ old('bank_branch') }}">
                             </div>
 
                             <div class="col-md-6 form-group mb-3">
                                 <label for="bank_account_number">Bank Account Number <span class="text-danger"></span></label>
-                                <input class="form-control" id="bank_account_number" type="text" name="bank_account_number" placeholder="Enter your bank account number" value="{{ old('bank_account_number') }}" required>
+                                <input class="form-control" id="bank_account_number" type="text" name="bank_account_number" placeholder="Enter your bank account number" value="{{ old('bank_account_number') }}">
                             </div>
 
                      
