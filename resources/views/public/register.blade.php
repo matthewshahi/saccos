@@ -99,8 +99,8 @@
                     <input type="number" class="form-control" id="dependents" name="dependents" value="{{ old('dependents') }}">
                 </div>
                 <div class="col-md-6 form-group mb-3">
-                    <label for="preferred_monthly_contribution">Preferred Monthly Contribution (in Ksh) <span class="text-danger">*</span></label>
-                    <input type="number" class="form-control" id="preferred_monthly_contribution" name="preferred_monthly_contribution" value="{{ old('preferred_monthly_contribution') }}" required>
+                    <label for="preferred_monthly_contribution">Preferred Monthly Contribution (in Ksh) <span class="text-danger"></span></label>
+                    <input type="number" class="form-control" id="preferred_monthly_contribution" name="preferred_monthly_contribution" value="{{ old('preferred_monthly_contribution') }}">
                 </div>
             </div>
 
