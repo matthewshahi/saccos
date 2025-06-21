@@ -1606,12 +1606,15 @@ DB::table('sacco_loans')
 
         $period_name = strtoupper($request->input('period_name'));
 
+      
+
         $currentYear = date('Y');
+        $currentMonth = date('n');
         $cYear = (int)substr($period_name, 0, 4);
         $cMonth = (int)substr($period_name, 4, 2);
 
-        if ($cYear > ($currentYear + 1) || $cYear < $currentYear || $cMonth > 12 || $cMonth < 1) {
-            return back()->withErrors(['period_name' => 'Invalid period. Record not saved.'])->withInput();
+        if ($cMonth < 1 || $cMonth > 12 || (($cYear * 12 + $cMonth) - ($currentYear * 12 + $currentMonth)) < -12 || (($cYear * 12 + $cMonth) - ($currentYear * 12 + $currentMonth)) > 3) {
+            return back()->withErrors(['period_name' => 'Period must be within the last 12 months or next 3 months.'])->withInput();
         }
 
         $duplicate = DB::table('sacco_period')
