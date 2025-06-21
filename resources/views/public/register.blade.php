@@ -175,25 +175,25 @@
                             </div>
 
                             <div class="col-md-6 form-group mb-3">
-                                <label for="passport_photo">Passport Photo <span class="text-danger">*</span></label>
+                                <label for="passport_photo">Passport Photo <span class="text-danger"></span></label>
                                 <input class="form-control" id="passport_photo" type="file" name="passport_photo" accept=".jpeg,.jpg,.pdf" >
                                 <small class="text-muted">JPEG/JPG or PDF only, max size: 300KB</small>
                             </div>
 
                             <div class="col-md-6 form-group mb-3">
-                                <label for="signature">Signature <span class="text-danger">*</span></label>
+                                <label for="signature">Signature <span class="text-danger"></span></label>
                                 <input class="form-control" id="signature" type="file" name="signature" accept=".jpeg,.jpg,.pdf">
                                 <small class="text-muted">JPEG/JPG or PDF only, max size: 300KB</small>
                             </div>
 
                             <div class="col-md-6 form-group mb-3">
-                                <label for="id_copy_front">ID Copy (Front) <span class="text-danger">*</span></label>
+                                <label for="id_copy_front">ID Copy (Front) <span class="text-danger"></span></label>
                                 <input class="form-control" id="id_copy_front" type="file" name="id_copy_front" accept=".jpeg,.jpg,.pdf">
                                 <small class="text-muted">JPEG/JPG or PDF only, max size: 300KB</small>
                             </div>
 
                             <div class="col-md-6 form-group mb-3">
-                                <label for="id_copy_back">ID Copy (Back) <span class="text-danger">*</span></label>
+                                <label for="id_copy_back">ID Copy (Back) <span class="text-danger"></span></label>
                                 <input class="form-control" id="id_copy_back" type="file" name="id_copy_back" accept=".jpeg,.jpg,.pdf">
                                 <small class="text-muted">JPEG/JPG or PDF only, max size: 300KB</small>
                             </div>
