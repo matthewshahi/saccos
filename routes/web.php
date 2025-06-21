@@ -282,7 +282,7 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
     Route::get('/reports/sasra/share', [HomeController::class, 'reportSasraShareBalances'])->name('reports.sasra.share.balances')->middleware('check_user_rights:rpt_loans_issued');
     Route::get('/reports/sasra/share/data', [HomeController::class, 'fetchSasraShareData'])->name('reports.sasra.share.data')->middleware('check_user_rights:rpt_loans_issued');
 
-    Route::get('/admin/access-rights', [HomeController::class, 'adminAccessRights'])->name('admin.access-rights');
+    Route::get('/admin/access-rights', [HomeController::class, 'adminAccessRights'])->name('admin.access-rights')->middleware('check_user_rights:ad');
     Route::post('/admin/access-rights/save', [HomeController::class, 'user_rights_save'])->name('admin.access-rights.save');
     Route::match(['get', 'post'], '/admin/access-rights/add_modules', [HomeController::class, 'user_rights_add_module'])->name('admin.access-rights.add.module');
 
