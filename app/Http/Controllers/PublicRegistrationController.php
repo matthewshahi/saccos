@@ -162,7 +162,7 @@ class PublicRegistrationController extends Controller
                         }
                     },
                 ],
-                'physical_location' => 'required|string|max:100',
+                'physical_location' => 'nullable|string|max:100',
         
                 // File Uploads (All Optional)
 'passport_photo' => 'nullable|mimes:jpeg,jpg,pdf|max:300',

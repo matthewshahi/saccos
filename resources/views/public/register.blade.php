@@ -121,7 +121,7 @@
                     <input type="text" class="form-control" id="phone" name="phone" value="{{ old('phone') }}" required>
                 </div>
                 <div class="col-md-6 form-group mb-3">
-                    <label for="physical_location">Location <span class="text-danger">*</span></label>
+                    <label for="physical_location">Location <span class="text-danger"></span></label>
                     <input type="text" class="form-control" id="physical_location" name="physical_location" value="{{ old('physical_location') }}">
                 </div>
             </div>
