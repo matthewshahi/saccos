@@ -481,12 +481,12 @@ class PublicRegistrationController extends Controller
 
 
 
+        // Normalize to null if empty or not a string
         $request->merge([
-            'bank_name' => $request->input('bank_name') ?: null,
-            'bank_branch' => $request->input('bank_branch') ?: null,
-            'bank_account_number' => $request->input('bank_account_number') ?: null,
+            'bank_name' => is_string($request->input('bank_name')) ? $request->input('bank_name') : null,
+            'bank_branch' => is_string($request->input('bank_branch')) ? $request->input('bank_branch') : null,
+            'bank_account_number' => is_string($request->input('bank_account_number')) ? $request->input('bank_account_number') : null,
         ]);
-
         $request->validate([
             'member_id' => 'required|exists:sacco_members_new_applications,id',
 
