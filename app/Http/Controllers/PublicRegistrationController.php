@@ -164,12 +164,12 @@ class PublicRegistrationController extends Controller
                 ],
                 'physical_location' => 'required|string|max:100',
         
-                // File Uploads
-                'passport_photo' => 'required|mimes:jpeg,jpg,pdf|max:300',
-                'signature' => 'required|mimes:jpeg,jpg,pdf|max:300',
-                'id_copy_front' => 'required|mimes:jpeg,jpg,pdf|max:300',
-                'id_copy_back' => 'required|mimes:jpeg,jpg,pdf|max:300',
-                'payslips_bank_statements' => 'mimes:jpeg,jpg,pdf|max:300',
+                // File Uploads (All Optional)
+'passport_photo' => 'nullable|mimes:jpeg,jpg,pdf|max:300',
+'signature' => 'nullable|mimes:jpeg,jpg,pdf|max:300',
+'id_copy_front' => 'nullable|mimes:jpeg,jpg,pdf|max:300',
+'id_copy_back' => 'nullable|mimes:jpeg,jpg,pdf|max:300',
+'payslips_bank_statements' => 'nullable|mimes:jpeg,jpg,pdf|max:300',
                 
                 // Bank Details
                 'bank_name' => 'string|max:255',
