@@ -477,17 +477,24 @@ class PublicRegistrationController extends Controller
     public function completeSubmit(Request $request)
     {
         // Validate the input
+      
+        
+
+
         $request->validate([
-            'member_id' => 'required|exists:sacco_members_new_applications,id',
-            'passport_photo' => 'mimes:jpeg,jpg,pdf|max:300',
-            'signature' => 'mimes:jpeg,jpg,pdf|max:300',
-            'id_copy_front' => 'mimes:jpeg,jpg,pdf|max:300',
-            'id_copy_back' => 'mimes:jpeg,jpg,pdf|max:300',
-            'payslips_bank_statements' => 'mimes:jpeg,jpg,pdf|max:300',
-            'bank_name' => 'string|max:255',
-            'bank_branch' => 'string|max:255',
-            'bank_account_number' => 'string|max:50',
-        ]);
+    'member_id' => 'required|exists:sacco_members_new_applications,id',
+
+    'passport_photo' => 'nullable|mimes:jpeg,jpg,pdf|max:300',
+    'signature' => 'nullable|mimes:jpeg,jpg,pdf|max:300',
+    'id_copy_front' => 'nullable|mimes:jpeg,jpg,pdf|max:300',
+    'id_copy_back' => 'nullable|mimes:jpeg,jpg,pdf|max:300',
+    'payslips_bank_statements' => 'nullable|mimes:jpeg,jpg,pdf|max:300',
+
+    'bank_name' => 'nullable|string|max:255',
+    'bank_branch' => 'nullable|string|max:255',
+    'bank_account_number' => 'nullable|string|max:50',
+]);
+
 
         // Handle file uploads
         $uploadedFiles = [];
