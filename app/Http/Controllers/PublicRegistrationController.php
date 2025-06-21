@@ -165,10 +165,10 @@ class PublicRegistrationController extends Controller
                 'physical_location' => 'required|string|max:100',
         
                 // File Uploads
-                'passport_photo' => 'required|mimes:jpeg,jpg,pdf|max:300',
-                'signature' => 'required|mimes:jpeg,jpg,pdf|max:300',
-                'id_copy_front' => 'required|mimes:jpeg,jpg,pdf|max:300',
-                'id_copy_back' => 'required|mimes:jpeg,jpg,pdf|max:300',
+                'passport_photo' => 'mimes:jpeg,jpg,pdf|max:300',
+                'signature' => 'mimes:jpeg,jpg,pdf|max:300',
+                'id_copy_front' => 'mimes:jpeg,jpg,pdf|max:300',
+                'id_copy_back' => 'mimes:jpeg,jpg,pdf|max:300',
                 'payslips_bank_statements' => 'mimes:jpeg,jpg,pdf|max:300',
                 
                 // Bank Details
