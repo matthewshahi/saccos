@@ -383,26 +383,26 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
 
     Route::get('/modify/member/loans', [LoanPaymentController::class, 'index'])
         ->name('modify.member.loans')
-        ->middleware('check_user_rights:modify_member_loan_journal');
+        ->middleware('check_user_rights:add_loan_batch_transactions');
 
     Route::post('/modify/member/loans/update', [LoanPaymentController::class, 'updateLoanPayment'])
         ->name('modify.member.loans.update')
-        ->middleware('check_user_rights:modify_member_loan_journal');
+        ->middleware('check_user_rights:add_loan_batch_transactions');
 
     // Additional Routes
     Route::post('/modify/member/loans/pay', [LoanPaymentController::class, 'payLoan'])
         ->name('modify.member.loans.pay')
-        ->middleware('check_user_rights:modify_member_loan_journal');
+        ->middleware('check_user_rights:add_loan_batch_transactions');
 
     Route::post('/modify/member/loans/reduce', [LoanPaymentController::class, 'reduceLoan'])
         ->name('modify.member.loans.reduce')
-        ->middleware('check_user_rights:modify_member_loan_journal');
+        ->middleware('check_user_rights:add_loan_batch_transactions');
 
 
 
     Route::get('/modify/member/loans/asset-accounts', [LoanPaymentController::class, 'getAssetAccounts'])
         ->name('modify.member.loans.asset.accounts')
-        ->middleware('check_user_rights:modify_member_loan_journal');
+        ->middleware('check_user_rights:add_loan_batch_transactions');
 
 
 
@@ -499,7 +499,7 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
     Route::get('/file-upload', [FileUploadController::class, 'showUploadForm'])->name('file.upload.form')->middleware('check_user_rights:file_upload');
     Route::get('/files', [FileUploadController::class, 'listFiles'])->name('files.list')->middleware('check_user_rights:file_upload');
     Route::get('/files/download/{file}', [FileUploadController::class, 'download'])->name('file.download')->middleware('check_user_rights:file_upload');
-    Route::delete('/files/delete/{file}', [FileUploadController::class, 'delete'])->name('file.delete');
+    Route::delete('/files/delete/{file}', [FileUploadController::class, 'delete'])->name('file.delete')->middleware('check_user_rights:file_delete');
 
 
     //Route::get('/randomize-members', [RandController::class, 'randomizeMembers'])->name('randomize.members')->middleware('check_user_rights:testing_randomize_members');
