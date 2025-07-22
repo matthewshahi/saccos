@@ -186,7 +186,7 @@ class MemberDashboardController extends Controller
                     DB::raw('loan_amount - loan_loan_paid AS loan_balance') // Calculate loan balance
                 )
                 ->where('loan_member', Auth::user()->id)
-                ->whereRaw('loan_amount - loan_loan_paid > 1') // Only outstanding loans
+                // ->whereRaw('loan_amount - loan_loan_paid > 1') // Only outstanding loans
                 ->orderBy('loan_taken_period', 'desc')
                 ->get();
         
