@@ -441,8 +441,17 @@ DB::table('sacco_loans')
             ->orderBy('position_name')
             ->select('position_id', 'position_name')
             ->get();
+        $guardians = DB::table('sacco_members')
+    ->where('member_is_junior', 0)
+    ->where('member_deleted', '<>', 'Y')
+    ->select('member_id', 'member_name', 'member_email')
+    ->orderBy('member_name')
+    ->get();
 
-        return view('members.add', compact('departments', 'positions'));
+return view('members.add', compact('departments', 'positions', 'guardians'));
+ 
+
+         
     }
 
     public function storeNewMember(Request $request)
@@ -459,10 +468,14 @@ DB::table('sacco_loans')
             'member_postal_address' => 'nullable|string',
             'member_gender' => 'required|string|in:M,F',
             'member_kra_pin' => 'nullable|string|max:255',
-            'member_dob' => 'nullable|date|before_or_equal:' . now()->subYears($this->minAge)->format('Y-m-d'),
+            'member_dob' => 'nullable|date',
+            // 'member_dob' => 'nullable|date|before_or_equal:' . now()->subYears($this->minAge)->format('Y-m-d'),
             'bank_name' => 'nullable|string|max:255',
             'bank_branch' => 'nullable|string|max:255',
             'bank_account_number' => 'nullable|string|max:255',
+            'member_is_junior' => 'required|in:0,1',
+            'member_guardian_id' => 'nullable|exists:sacco_members,member_id',
+
         ]);
 
         if ($validator->fails()) {
@@ -484,16 +497,20 @@ DB::table('sacco_loans')
             'member_dob',
             'bank_name',
             'bank_branch',
-            'bank_account_number'
+            'bank_account_number',
+            
         ]);
 
         $data['member_active'] = 'Y';
         $data['member_ip'] = $request->ip();
         $data['member_user_id'] = auth()->id();
+        $data['member_is_junior'] = $request->input('member_is_junior', 0);
+        $data['member_guardian_id'] = $request->input('member_guardian_id');
+
 
         DB::table('sacco_members')->insert($data);
 
-        return redirect()->route('members.list')->with('success', 'Member added successfully.');
+        return redirect()->route('members.listing')->with('success', 'Member added successfully.');
     }
 
     private function getMembers($orderby = 'member_name', $sort_order = 'asc', $search = '', $limit = null, $status = null)
@@ -529,7 +546,7 @@ DB::table('sacco_loans')
             ->select('*')
             ->limit($limit)
             ->get();
-    }
+    } 
 
     public function editMember($id)
     {
@@ -550,7 +567,24 @@ DB::table('sacco_loans')
             'positions' => $positions
         ];
 
-        return view('members.edit', compact('data'));
+        $allMembers = DB::table('sacco_members')
+    ->select('member_id', 'member_name', 'member_sacco_id')
+    ->where('member_active', 'Y')
+    ->orderBy('member_name')
+    ->get();
+
+$data = [
+    'member' => $member,
+    'departments' => $departments,
+    'positions' => $positions,
+    'allMembers' => $allMembers
+];
+
+        
+        return view('members.edit', [
+    'data' => $data,
+    'allMembers' => $allMembers
+]);
     }
 
     public function updateMember(Request $request, $id)
@@ -570,7 +604,13 @@ DB::table('sacco_loans')
             'member_position' => 'required|integer|exists:sacco_position,position_id',
             'bank_name' => 'nullable|string|max:255',
             'bank_branch' => 'nullable|string|max:255',
-            'bank_account_number' => 'nullable|string|max:255'
+            'bank_account_number' => 'nullable|string|max:255',
+            'member_active' => 'required|in:Y,N',
+            'member_deleted' => 'required|in:Y,N',
+            'member_is_junior' => 'nullable|boolean',
+'member_guardian_id' => 'nullable|integer|exists:sacco_members,member_id',
+
+
         ]);
 
         if ($validator->fails()) {
@@ -596,10 +636,15 @@ DB::table('sacco_loans')
                 'member_position' => $request->input('member_position'),
                 'bank_name' => strtoupper($request->input('bank_name')),
                 'bank_branch' => strtoupper($request->input('bank_branch')),
-                'bank_account_number' => strtoupper($request->input('bank_account_number'))
+                'bank_account_number' => strtoupper($request->input('bank_account_number')),
+                'member_active' => $request->input('member_active'),
+                'member_deleted' => $request->input('member_deleted'),
+                'member_is_junior' => $request->input('member_is_junior', 0),
+'member_guardian_id' => $request->input('member_guardian_id'),
+
             ]);
 
-        return redirect()->route('members.list')->with('success', 'Member updated successfully.');
+        return redirect()->route('members.listing')->with('success', 'Member updated successfully.');
     }
 
     // Status

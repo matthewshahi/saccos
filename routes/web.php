@@ -34,6 +34,8 @@ use App\Http\Controllers\ReportsShareController;
 
 // Route::get('/import-loans-to-ledger', [LoanLedgerController::class, 'importLoansToLedger']);
 
+// Route::get('/anonymize-members', [\App\Http\Controllers\DemoDataController::class, 'anonymizeMembers']);
+
 Route::get('/test-email', function () {
     Mail::raw('This is a test email from Laravel!', function ($message) {
         $message->to('matthewshahi@gmail.com')

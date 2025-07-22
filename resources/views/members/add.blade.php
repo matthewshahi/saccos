@@ -60,6 +60,30 @@
                             </div>
                         </div>
                         <div class="form-group row">
+    <label for="member_is_junior" class="col-sm-2 col-form-label">Junior Account?</label>
+    <div class="col-sm-10">
+        <select class="form-control" id="member_is_junior" name="member_is_junior">
+            <option value="0" {{ old('member_is_junior') == 0 ? 'selected' : '' }}>No</option>
+            <option value="1" {{ old('member_is_junior') == 1 ? 'selected' : '' }}>Yes</option>
+        </select>
+    </div>
+</div>
+
+<div class="form-group row">
+    <label for="member_guardian_id" class="col-sm-2 col-form-label">Guardian Member</label>
+    <div class="col-sm-10">
+        <select class="form-control" id="member_guardian_id" name="member_guardian_id">
+            <option value="">-- Select Guardian --</option>
+            @foreach ($guardians ?? [] as $guardian)
+                <option value="{{ $guardian->member_id }}" {{ old('member_guardian_id') == $guardian->member_id ? 'selected' : '' }}>
+                    {{ $guardian->member_name }} ({{ $guardian->member_email }})
+                </option>
+            @endforeach
+        </select>
+    </div>
+</div>
+
+                        <div class="form-group row">
                             <label for="member_date_joined" class="col-sm-2 col-form-label">Date Joined*</label>
                             <div class="col-sm-10">
                                 <input type="date" class="form-control" id="member_date_joined" name="member_date_joined" value="{{ old('member_date_joined', date('Y-m-d')) }}" required>
