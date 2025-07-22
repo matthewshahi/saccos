@@ -76,6 +76,9 @@
             <td style="white-space: nowrap;">{{ $member->company_name }}</td>
             <td style="white-space: nowrap;">{{ $member->department_name }}</td>
             <td style="white-space: nowrap;">{{ $member->position_name }}</td>
+            
+
+            <td style="white-space: nowrap;">{{ $member->member_active == 'Y' ? 'Active' : 'Inactive' }}</td>
             <td style="white-space: nowrap;">
     @if ($member->member_is_junior)
         <span class="badge bg-warning text-dark">Junior</span>
@@ -83,8 +86,6 @@
         <span class="badge bg-primary">Standard</span>
     @endif
 </td>
-
-            <td style="white-space: nowrap;">{{ $member->member_active == 'Y' ? 'Active' : 'Inactive' }}</td>
             <td style="white-space: nowrap;">
                 <div class="btn-group">
                     <button class="btn bg-white _r_btn" type="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
