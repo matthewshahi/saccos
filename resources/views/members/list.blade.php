@@ -119,6 +119,7 @@
         <th style="white-space: nowrap;">Department</th>
         <th style="white-space: nowrap;">Position</th>
         <th style="white-space: nowrap;">Status</th>
+        <th style="white-space: nowrap;">Account Type</th>
         <th style="white-space: nowrap;">Actions</th>
     </tr>
 </tfoot>
