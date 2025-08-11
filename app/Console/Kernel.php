@@ -7,40 +7,60 @@ use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
 
 class Kernel extends ConsoleKernel
 {
-    /**
-     * Define the application's command schedule.
-     */
     protected function schedule(Schedule $schedule): void
     {
+        // Process incoming transactions every minute
         $schedule->job(new \App\Jobs\ProcessTransactionsJob())
             ->everyMinute()
-            ->withoutOverlapping();
+            ->withoutOverlapping()
+            ->onOneServer()
+            ->timezone('Africa/Nairobi')
+            ->runInBackground();
 
+        // Welcome emails (lightweight; still staggered safely)
         $schedule->job(new \App\Jobs\SendWelcomeEmailJob())
             ->everyMinute()
-            ->withoutOverlapping();
+            ->withoutOverlapping()
+            ->onOneServer()
+            ->timezone('Africa/Nairobi')
+            ->runInBackground();
 
+        // Guarantor emails
         $schedule->job(new \App\Jobs\SendGuarantorEmailJob())
             ->everyMinute()
-            ->withoutOverlapping();
+            ->withoutOverlapping()
+            ->onOneServer()
+            ->timezone('Africa/Nairobi')
+            ->runInBackground();
 
+        // Nightly resets
         $schedule->job(new \App\Jobs\ResetGuarantorsJob())
             ->dailyAt('00:00')
-            ->withoutOverlapping(); // prevent overlap if it runs long
+            ->withoutOverlapping()
+            ->onOneServer()
+            ->timezone('Africa/Nairobi')
+            ->runInBackground();
 
+        // Nightly loan recompute (if you still use it)
         $schedule->job(new \App\Jobs\UpdateMembersLoanBalancesJob())
             ->dailyAt('00:00')
             ->withoutOverlapping()
-            ->onOneServer(); // useful if using multiple servers
+            ->onOneServer()
+            ->timezone('Africa/Nairobi')
+            ->runInBackground();
 
+        // Nightly aggregates (shares/fosa/capital) at 01:00
+        $schedule->job(new \App\Jobs\UpdateMemberAggregatesJob())
+            ->dailyAt('01:00')
+            ->withoutOverlapping()
+            ->onOneServer()
+            ->timezone('Africa/Nairobi')
+            ->runInBackground();
     }
 
-    /**
-     * Register the commands for the application.
-     */
     protected function commands(): void
     {
-        $this->load(__DIR__ . '/Commands');
+        $this->load(__DIR__.'/Commands');
         require base_path('routes/console.php');
     }
 }

@@ -36,27 +36,27 @@ use App\Http\Controllers\ReportsShareController;
 
 // Route::get('/anonymize-members', [\App\Http\Controllers\DemoDataController::class, 'anonymizeMembers']);
 
-Route::get('/test-email', function () {
-    Mail::raw('This is a test email from Laravel!', function ($message) {
-        $message->to('matthewshahi@gmail.com')
-            ->subject('Test Email from iSacco 3');
-    });
+// Route::get('/test-email', function () {
+//     Mail::raw('This is a test email from Laravel!', function ($message) {
+//         $message->to('matthewshahi@gmail.com')
+//             ->subject('Test Email from iSacco 3');
+//     });
 
-    return 'Test email sent!';
-});
+//     return 'Test email sent!';
+// });
 
-Route::get('/preview-loan-email', function () {
-    $loan = (object) [
-        'member_name' => 'John Doe',
-        'loan_type' => 'Personal Loan',
-        'loan_amount' => 100000,
-        'loan_taken_period' => 12,
-        'loan_monthly_repayment_amount' => 8333.33,
-    ];
-    $saccoMail = 'matthewshahi@gmail.com';
+// Route::get('/preview-loan-email', function () {
+//     $loan = (object) [
+//         'member_name' => 'John Doe',
+//         'loan_type' => 'Personal Loan',
+//         'loan_amount' => 100000,
+//         'loan_taken_period' => 12,
+//         'loan_monthly_repayment_amount' => 8333.33,
+//     ];
+//     $saccoMail = 'matthewshahi@gmail.com';
 
-    return new App\Mail\LoanApprovalEmail($loan, $saccoMail);
-});
+//     return new App\Mail\LoanApprovalEmail($loan, $saccoMail);
+// });
 
 Route::get('/home', [HomeController::class, 'redirectBasedOnAuth'])->name('home');
 Route::get('/', [HomeController::class, 'redirectBasedOnAuth'])->name('home1');
@@ -184,9 +184,9 @@ Route::prefix('mobile')->group(function () {
 //     Route::post('/update/{id}', [MpesaConfigController::class, 'update'])->name('mpesa_config.update');
 // });
 
-Route::get('/import/members', [MemberImportController::class, 'showForm'])->name('import.members.form'); //->middleware('check_user_rights:new_member_applications_updateXXX');
-Route::post('/import/members', [MemberImportController::class, 'import'])->name('import.members.process'); //->middleware('check_user_rights:new_member_applications_updateXXX');
-Route::get('/update/ledgers', [MemberImportController::class, 'updatefLedgers'])->name('update.ledgers');
+// Route::get('/import/members', [MemberImportController::class, 'showForm'])->name('import.members.form'); //->middleware('check_user_rights:new_member_applications_updateXXX');
+// Route::post('/import/members', [MemberImportController::class, 'import'])->name('import.members.process'); //->middleware('check_user_rights:new_member_applications_updateXXX');
+// Route::get('/update/ledgers', [MemberImportController::class, 'updatefLedgers'])->name('update.ledgers');
 
 
 Route::middleware(['auth', 'check_member_position'])->group(function () {
