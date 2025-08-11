@@ -35,7 +35,7 @@ class Kernel extends ConsoleKernel
 
         // Nightly resets
         $schedule->job(new \App\Jobs\ResetGuarantorsJob())
-            ->dailyAt('00:00')
+            ->dailyAt('00:30')
             ->withoutOverlapping()
             ->onOneServer()
             ->timezone('Africa/Nairobi')
@@ -49,13 +49,15 @@ class Kernel extends ConsoleKernel
             ->timezone('Africa/Nairobi')
             ->runInBackground();
 
-        // Nightly aggregates (shares/fosa/capital) at 01:00
-        $schedule->job(new \App\Jobs\UpdateMemberAggregatesJob())
+     
+        $schedule->job(new \App\Jobs\UpdateMemberTotalsJob())
             ->dailyAt('01:00')
+            ->onOneServer()        // if using multiple servers with shared cache/redis
             ->withoutOverlapping()
-            ->onOneServer()
             ->timezone('Africa/Nairobi')
             ->runInBackground();
+   
+
     }
 
     protected function commands(): void
