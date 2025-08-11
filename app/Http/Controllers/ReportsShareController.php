@@ -260,7 +260,7 @@ class ReportsShareController extends Controller
 
 public function topShareholdingMembers(Request $request)
 {
-    $startPeriod = $this->sanitizePeriod($request->input('start_period'), now()->subMonths(11)->format('Ym'));
+    $startPeriod ='000000';
     $endPeriod = $this->sanitizePeriod($request->input('end_period'), now()->format('Ym'));
 
     // Fetch top members with total shares
