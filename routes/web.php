@@ -32,6 +32,7 @@ use App\Http\Controllers\ReportsShareController;
 
 
 
+
 // Route::get('/import-loans-to-ledger', [LoanLedgerController::class, 'importLoansToLedger']);
 
 // Route::get('/anonymize-members', [\App\Http\Controllers\DemoDataController::class, 'anonymizeMembers']);
@@ -300,22 +301,22 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
     Route::get('/reports/sasra/return_on_investment_report', [HomeController::class, 'reportSasraReturnOnInvestmentReport'])->name('reports.sasra.returnoninvestment')->middleware('check_user_rights:rpt_profit_loss');
 
     Route::get('/reports/sasra/member_contributions/data', [ReportsShareController::class, 'fetchMemberContributionsData'])
-    ->name('reports.sasra.membercontributions.data')
-    ->middleware('check_user_rights:rpt_profit_loss');
+        ->name('reports.sasra.membercontributions.data')
+        ->middleware('check_user_rights:rpt_profit_loss');
 
     Route::get('/reports/sasra/share_compliance', [ReportsShareController::class, 'index'])
-    ->name('reports.sasra.sharecompliance')
-    ->middleware('check_user_rights:rpt_profit_loss');
+        ->name('reports.sasra.sharecompliance')
+        ->middleware('check_user_rights:rpt_profit_loss');
 
     Route::get('/reports/shares/top-members', [ReportsShareController::class, 'topShareholdingMembers'])
-    ->name('reports.shares.top_members')
-    ->middleware('check_user_rights:rpt_profit_loss');
+        ->name('reports.shares.top_members')
+        ->middleware('check_user_rights:rpt_profit_loss');
 
     Route::get('/reports/shares/aging', [ReportsShareController::class, 'shareAgingReport'])
-    ->name('reports.shares.aging')
-    ->middleware('check_user_rights:rpt_profit_loss');
+        ->name('reports.shares.aging')
+        ->middleware('check_user_rights:rpt_profit_loss');
 
-    
+
 
     Route::get('/list/contribution', [HomeController::class, 'listContribution'])->name('list.contribution')->middleware('check_user_rights:list_sacco_member_contributions');
     Route::get('/proc/end/month/loans', [LoanEndMonthController::class, 'endMonthLoans'])->name('proc.end.month.loans')->middleware('check_user_rights:end_month_processing_loans');
@@ -502,6 +503,12 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
     Route::get('/files', [FileUploadController::class, 'listFiles'])->name('files.list')->middleware('check_user_rights:file_upload');
     Route::get('/files/download/{file}', [FileUploadController::class, 'download'])->name('file.download')->middleware('check_user_rights:file_upload');
     Route::delete('/files/delete/{file}', [FileUploadController::class, 'delete'])->name('file.delete')->middleware('check_user_rights:file_delete');
+
+    if (config('sacco.transport_sacco') === 'Y') {
+    Route::prefix('transport')->group(function () {
+    require __DIR__.'/transport/routes.php';
+});
+}
 
 
     //Route::get('/randomize-members', [RandController::class, 'randomizeMembers'])->name('randomize.members')->middleware('check_user_rights:testing_randomize_members');

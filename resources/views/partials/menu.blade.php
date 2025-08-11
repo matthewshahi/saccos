@@ -211,6 +211,7 @@
 
                         </ul>
                     </li>
+                    @include('partials.menu_matatu')
                     <li class="Ul_li--hover">
                         <a class="has-arrow" href="#">
                             <i class="i-Financial text-20 me-2" style="color: #663399;"></i>
