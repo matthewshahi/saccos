@@ -2,62 +2,52 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
     public function up(): void
     {
-        // sacco_shares
+        // sacco_shares (idx_share_member_id)
         if (! $this->indexExists('sacco_shares', 'idx_share_member_id')) {
-            Schema::table('sacco_shares', function ($table) {
-                $table->index('share_member_id', 'idx_share_member_id');
-            });
+            DB::statement("ALTER TABLE sacco_shares ADD INDEX idx_share_member_id (share_member_id)");
         }
 
-        // sacco_fosas
+        // sacco_fosas (idx_fosa_member_id)
         if (! $this->indexExists('sacco_fosas', 'idx_fosa_member_id')) {
-            Schema::table('sacco_fosas', function ($table) {
-                $table->index('fosa_member_id', 'idx_fosa_member_id');
-            });
+            DB::statement("ALTER TABLE sacco_fosas ADD INDEX idx_fosa_member_id (fosa_member_id)");
         }
 
-        // sacco_capital_shares
+        // sacco_capital_shares (idx_capital_member_id)
         if (! $this->indexExists('sacco_capital_shares', 'idx_capital_member_id')) {
-            Schema::table('sacco_capital_shares', function ($table) {
-                $table->index('share_capitalmember_id', 'idx_capital_member_id');
-            });
+            DB::statement("ALTER TABLE sacco_capital_shares ADD INDEX idx_capital_member_id (share_capitalmember_id)");
         }
     }
 
     public function down(): void
     {
         if ($this->indexExists('sacco_shares', 'idx_share_member_id')) {
-            Schema::table('sacco_shares', function ($table) {
-                $table->dropIndex('idx_share_member_id');
-            });
+            DB::statement("DROP INDEX idx_share_member_id ON sacco_shares");
         }
 
         if ($this->indexExists('sacco_fosas', 'idx_fosa_member_id')) {
-            Schema::table('sacco_fosas', function ($table) {
-                $table->dropIndex('idx_fosa_member_id');
-            });
+            DB::statement("DROP INDEX idx_fosa_member_id ON sacco_fosas");
         }
 
         if ($this->indexExists('sacco_capital_shares', 'idx_capital_member_id')) {
-            Schema::table('sacco_capital_shares', function ($table) {
-                $table->dropIndex('idx_capital_member_id');
-            });
+            DB::statement("DROP INDEX idx_capital_member_id ON sacco_capital_shares");
         }
     }
 
-    /**
-     * Check if a specific index exists on a table.
-     */
-    private function indexExists(string $table, string $indexName): bool
+    private function indexExists(string $table, string $index): bool
     {
-        $connection = Schema::getConnection()->getDoctrineSchemaManager();
-        $indexes = $connection->listTableIndexes($table);
-        return array_key_exists($indexName, $indexes);
+        $row = DB::selectOne("
+            SELECT COUNT(1) AS c
+            FROM information_schema.statistics
+            WHERE table_schema = DATABASE()
+              AND table_name = ?
+              AND index_name = ?
+        ", [$table, $index]);
+
+        return isset($row->c) && (int)$row->c > 0;
     }
 };
