@@ -16,7 +16,7 @@ class UpdateMemberTotalsJob implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     // match trait typing on PHP 8.2+ to avoid conflicts
-    public ?string $queue = 'maintenance';
+    // public ?string $queue = 'maintenance';
     public int $tries = 1;
     public int $timeout = 1800; // 30 minutes
 
