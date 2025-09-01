@@ -28,36 +28,49 @@ use App\Http\Controllers\MemberReportController;
 use App\Http\Controllers\KinTypeController;
 // use App\Http\Controllers\LoanLedgerController;
 use App\Http\Controllers\MemberAddImages;
-use App\Http\Controllers\ReportsShareController;
+// use App\Http\Controllers\ReportsShareController;
+
+Route::get('/members/update-totals', [\App\Http\Controllers\MemberTotalsController::class, 'recalculateAll'])->name('members.recalculate.totals');
+
+// // Route::get('/members/import-transactions', [MemberImportController::class, 'showImportTransactionsForm'])->name('members.import.transactions.form');
+// // Route::post('/members/import-transactions', [MemberImportController::class, 'importSavingsAndShares'])->name('members.import.transactions');
 
 
+// // use App\Http\Controllers\MemberImportController;
+
+// Route::get('/import/members', [MemberImportController::class, 'showImportForm'])->name('import.members.form');
+// Route::post('/import/members', [MemberImportController::class, 'import'])->name('import.members.run');
+
+// Route::get('/import/shares', [MemberImportController::class, 'showSharesImportForm'])
+//     ->name('import.shares.form');
+// Route::post('/import/shares', [MemberImportController::class, 'importShares'])
+//     ->name('import.shares.run');
+
+//     // Loans (Taken) import
+// Route::get('/import/loans/taken', [MemberImportController::class, 'showLoansTakenImportForm'])
+//     ->name('import.loans.taken.form');
+
+// Route::post('/import/loans/taken', [MemberImportController::class, 'importLoansTaken'])
+//     ->name('import.loans.taken.run');
+    
+// // Loans (Taken) import
+// Route::get('/import/loans/taken', [MemberImportController::class, 'showLoansTakenImportForm'])
+//     ->name('import.loans.taken.form');
+
+// Route::post('/import/loans/taken', [MemberImportController::class, 'importLoansTaken'])
+//     ->name('import.loans.taken.run');
 
 
-// Route::get('/import-loans-to-ledger', [LoanLedgerController::class, 'importLoansToLedger']);
+// use App\Http\Controllers\RoamWelfareImportController;
 
-// Route::get('/anonymize-members', [\App\Http\Controllers\DemoDataController::class, 'anonymizeMembers']);
+// Route::get('/welfare/import', [RoamWelfareImportController::class, 'showImportForm'])->name('roamwelfare.form');
+// Route::post('/welfare/import', [RoamWelfareImportController::class, 'import'])->name('roamwelfare.import');
 
-// Route::get('/test-email', function () {
-//     Mail::raw('This is a test email from Laravel!', function ($message) {
-//         $message->to('matthewshahi@gmail.com')
-//             ->subject('Test Email from iSacco 3');
-//     });
+// Route::get('/members/import', [MemberImportController::class, 'showImportForm'])->name('members.import.form');
+// Route::post('/members/import', [MemberImportController::class, 'import'])->name('members.import');
+// Route::view('/members/import-kin-form', 'import.next_of_kin')->name('members.import.kin.form');
+// Route::post('/members/import-next-of-kin', [MemberImportController::class, 'importNextOfKin'])->name('members.import.kin');
 
-//     return 'Test email sent!';
-// });
-
-// Route::get('/preview-loan-email', function () {
-//     $loan = (object) [
-//         'member_name' => 'John Doe',
-//         'loan_type' => 'Personal Loan',
-//         'loan_amount' => 100000,
-//         'loan_taken_period' => 12,
-//         'loan_monthly_repayment_amount' => 8333.33,
-//     ];
-//     $saccoMail = 'matthewshahi@gmail.com';
-
-//     return new App\Mail\LoanApprovalEmail($loan, $saccoMail);
-// });
 
 Route::get('/home', [HomeController::class, 'redirectBasedOnAuth'])->name('home');
 Route::get('/', [HomeController::class, 'redirectBasedOnAuth'])->name('home1');
@@ -510,13 +523,4 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
 });
 }
 
-
-    //Route::get('/randomize-members', [RandController::class, 'randomizeMembers'])->name('randomize.members')->middleware('check_user_rights:testing_randomize_members');
-    // Route::get('/randomize-loan-payments', [RandController::class, 'randomizeLoanPayments'])->name('randomize.loan.payments')->middleware('check_user_rights:testing_randomize_members');
-    // Route::get('/randomize-shares', [RandController::class, 'randomizeShares'])->name('randomize.shares')->middleware('check_user_rights:testing_randomize_members');
-    // Route::get('/randomize-accounts-transactions', [RandController::class, 'randomizeAccountsTransactions'])->name('randomize.accounts.transactions')->middleware('check_user_rights:testing_randomize_members');
-    // Route::post('/temp/import_capital', [TempCapitalImportController::class, 'importCapital'])->name('temp.import_capital')->middleware('check_user_rights:add_period');
-    // Route::get('/test/test', function () {
-    //     return view('test.test');
-    // })->name('test.view')->middleware('check_user_rights:add_period');
 });
