@@ -28,6 +28,7 @@ use App\Http\Controllers\MemberReportController;
 use App\Http\Controllers\KinTypeController;
 // use App\Http\Controllers\LoanLedgerController;
 use App\Http\Controllers\MemberAddImages;
+use App\Http\Controllers\MemberController;
 // use App\Http\Controllers\ReportsShareController;
 
 // Route::get('/members/update-totals', [\App\Http\Controllers\MemberTotalsController::class, 'recalculateAll'])->name('members.recalculate.totals');
@@ -137,6 +138,9 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/downloads', [PublicFileController::class, 'publicDownloads'])->name('public.downloads');
     Route::get('/downloads/{file}/download', [PublicFileController::class, 'downloadFile'])->name('public.download.file');
+     
+Route::get('/members/juniors/create', [MemberController::class, 'createJunior'])->name('members.juniors.create');
+Route::post('/members/juniors/store', [MemberController::class, 'storeJunior'])->name('members.juniors.store');
 });
 
 

@@ -47,6 +47,15 @@
                         </a>
                     </li>
 
+                    <li class="menu-section-title text-muted mt-3 mb-1">Junior Accounts</li>
+                     
+                    <li class="Ul_li--hover">
+                        <a href="{{ url('/members/juniors/create') }}">
+                            <i class="i-Files text-20 me-2 text-muted"></i>
+                            <span class="item-name text-15 text-muted">Add Junior Account</span>
+                        </a>
+                    </li>
+
                     <!-- Reports Section -->
                     <li class="menu-section-title text-muted mt-3 mb-1">Reports</li>
                      
