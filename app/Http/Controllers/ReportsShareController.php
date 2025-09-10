@@ -257,7 +257,7 @@ class ReportsShareController extends Controller
         'status' => $status,
     ]);
 }
-
+ 
 public function topShareholdingMembers(Request $request)
 {
     $startPeriod ='000000';
