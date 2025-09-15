@@ -245,7 +245,7 @@ class ProcessTransactionsJob implements ShouldQueue
         return DB::table('sacco_period')->where('period_active', 'Y')->where('period_deleted', '<>', 'Y')->first();
     }
 
-    <?php
+ 
 private function processFallbackTransaction($reference, $transaction)
 {
     $parts = preg_split('/\s+/', trim($reference), 2);
