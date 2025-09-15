@@ -249,7 +249,7 @@ class ProcessTransactionsJob implements ShouldQueue
  
 private function processFallbackTransaction($reference, $transaction)
 {
-     $id = $transaction->id;
+    $id = $transaction->id;
     $parts = preg_split('/\s+/', trim($reference), 2);
     $idPart = $parts[0] ?? '';
     $descPart = strtolower($parts[1] ?? '');
@@ -268,7 +268,7 @@ private function processFallbackTransaction($reference, $transaction)
 
     $member = $members->first();
     $memberId = $member->member_id;
-    $period = $this->getCurrentPeriod();
+    $period = (object)['period_name' => now()->format('Ym')];
     $amount = $transaction->transaction_amount;
     $docNo = "Paybill {$transaction->business_shortcode} - {$transaction->transaction_id}";
     $description = $descPart ?: "Mpesa Deposit {$transaction->first_name}";
