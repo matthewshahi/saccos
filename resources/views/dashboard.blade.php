@@ -141,7 +141,7 @@ if (!function_exists('formatAmount')) {
             </div>
         </a>
     </div>
-  @include("dashboard.member_dashboard_mpesa") 
+
   
 </div>
 
@@ -591,4 +591,6 @@ if (!function_exists('formatAmount')) {
         });
     });
     </script>
+
+      @include("dashboard.member_dashboard_mpesa") 
 @endsection
