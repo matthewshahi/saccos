@@ -64,10 +64,11 @@ class ProcessTransactionsJob implements ShouldQueue
         } elseif (str_starts_with($reference, 'LN')) {
             Log::info("Identified as a Loan transaction for reference: $reference");
             $this->processLoans($reference, $transaction);
-        } else {
-            Log::warning("Unknown transaction type for reference: $reference");
-            return;
-        }
+        } 
+         else {
+    Log::info("Trying FOSA fallback for reference: $reference");
+    $this->processFosaFallback($transaction->bill_ref_number, $transaction);
+}
 
         // Mark transaction as processed
         DB::table('c2b_payments')
