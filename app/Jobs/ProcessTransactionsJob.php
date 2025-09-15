@@ -67,7 +67,7 @@ class ProcessTransactionsJob implements ShouldQueue
         } 
          else {
     Log::info("Trying FOSA fallback for reference: $reference");
-    $this->processFosaFallback($transaction->bill_ref_number, $transaction);
+    $this->processFallbackTransaction($transaction->bill_ref_number, $transaction);
 }
 
         // Mark transaction as processed
