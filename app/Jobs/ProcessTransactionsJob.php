@@ -271,8 +271,12 @@ private function processFallbackTransaction($reference, $transaction)
     $period = (object)['period_name' => now()->format('Ym')];
     $amount = $transaction->transaction_amount;
     $docNo = "Paybill {$transaction->business_shortcode} - {$transaction->transaction_id}";
-    $description = $descPart ?: "Mpesa Deposit {$transaction->first_name}";
-    $now = Carbon::now();
+    
+    $senderName = $transaction->first_name ?: $transaction->msisdn;
+$description = ($descPart ?: 'Mpesa Deposit') 
+             . " - $senderName - Paybill {$transaction->business_shortcode} - {$transaction->transaction_id}";
+             
+             $now = Carbon::now();
     $ip = request()->ip() ?? '127.0.0.1';
     $userId = auth()->id() ?? 999;
 
@@ -285,8 +289,8 @@ private function processFallbackTransaction($reference, $transaction)
         Log::error("Fallback: Missing required defaults (mpesa_in/period)");
         return;
     }
-
-    if (Str::contains($descPart, ['share', 'deposit'])) {
+if (Str::contains($descPart, ['share', 'shares', 'deposit', 'deposits'])) {
+     
         DB::table('sacco_shares')->insert([
             'share_member_id' => $memberId,
             'share_amount_paying' => $amount,
