@@ -142,7 +142,7 @@ if (!function_exists('formatAmount')) {
         </a>
     </div>
 
-    @include("dashboard.member_dashboard");
+    @include("dashboard.member_dashboard") 
 </div>
 
 <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
