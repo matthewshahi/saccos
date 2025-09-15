@@ -217,13 +217,13 @@ Route::prefix('mobile')->group(function () {
 
 
 
-// Route::prefix('mpesa/config')->middleware(['auth', 'check_member_position'])->group(function () {
-//     Route::get('/', [MpesaConfigController::class, 'index'])->name('mpesa_config.index');
-//     Route::get('/create', [MpesaConfigController::class, 'create'])->name('mpesa_config.create');
-//     Route::post('/store', [MpesaConfigController::class, 'store'])->name('mpesa_config.store');
-//     Route::get('/edit/{id}', [MpesaConfigController::class, 'edit'])->name('mpesa_config.edit');
-//     Route::post('/update/{id}', [MpesaConfigController::class, 'update'])->name('mpesa_config.update');
-// });
+Route::prefix('mpesa/config')->middleware(['auth', 'check_member_position'])->group(function () {
+    Route::get('/', [MpesaConfigController::class, 'index'])->name('mpesa_config.index');
+    Route::get('/create', [MpesaConfigController::class, 'create'])->name('mpesa_config.create');
+    Route::post('/store', [MpesaConfigController::class, 'store'])->name('mpesa_config.store');
+    Route::get('/edit/{id}', [MpesaConfigController::class, 'edit'])->name('mpesa_config.edit');
+    Route::post('/update/{id}', [MpesaConfigController::class, 'update'])->name('mpesa_config.update');
+});
 
 // Route::get('/import/members', [MemberImportController::class, 'showForm'])->name('import.members.form'); //->middleware('check_user_rights:new_member_applications_updateXXX');
 // Route::post('/import/members', [MemberImportController::class, 'import'])->name('import.members.process'); //->middleware('check_user_rights:new_member_applications_updateXXX');
