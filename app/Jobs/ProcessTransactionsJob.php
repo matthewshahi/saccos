@@ -10,6 +10,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
+use Illuminate\Support\Str;
 
 class ProcessTransactionsJob implements ShouldQueue
 {
