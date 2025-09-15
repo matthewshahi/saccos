@@ -76,7 +76,7 @@
       <li><strong>FOSA Savings</strong></li>
     </ul>
     <p class="mt-3">
-      If your payment does not reflect within 15 minutes, please reach out to support below.
+      If your payment does not reflect within 15 minutes, please reach out to support.
     </p>
   </div>
 </div>
