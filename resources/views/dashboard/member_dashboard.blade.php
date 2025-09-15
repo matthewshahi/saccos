@@ -193,6 +193,8 @@
         </div>
     </div>
 </div>
+
+@include("dashboard.member_dashboard");
      
 </div>
 
