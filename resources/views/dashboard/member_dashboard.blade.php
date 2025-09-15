@@ -194,7 +194,9 @@
     </div>
 </div>
 
-@include("dashboard.member_dashboard");
+ 
+
+ @include("dashboard.member_dashboard_mpesa")
      
 </div>
 
