@@ -300,7 +300,7 @@ class ProcessTransactionsJob implements ShouldQueue
         'fosa_ip' => request()->ip() ?? '127.0.0.1',
         'fosa_transdate' => now(),
     ]);
-
+ 
     // Step 7: Update member_total_fosa
     DB::table('sacco_members')
         ->where('member_id', $memberId)
