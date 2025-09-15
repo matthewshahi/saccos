@@ -249,6 +249,7 @@ class ProcessTransactionsJob implements ShouldQueue
  
 private function processFallbackTransaction($reference, $transaction)
 {
+     $id = $transaction->id;
     $parts = preg_split('/\s+/', trim($reference), 2);
     $idPart = $parts[0] ?? '';
     $descPart = strtolower($parts[1] ?? '');
@@ -351,6 +352,9 @@ private function processFallbackTransaction($reference, $transaction)
     }
 
     Log::info("Transaction fallback processing complete for reference: $reference");
-    DB::table('mpesa_c2b_transactions')->where('id', $transaction->id)->update(['processed' => 'Yes', 'processed_date' => now()]);
+    DB::table('c2b_payments')->where('id', $id)->update([
+    'processed' => 'Yes',
+    'processed_date' => now(),
+]);
 }
 }
