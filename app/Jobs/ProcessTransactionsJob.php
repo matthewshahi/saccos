@@ -245,74 +245,111 @@ class ProcessTransactionsJob implements ShouldQueue
         return DB::table('sacco_period')->where('period_active', 'Y')->where('period_deleted', '<>', 'Y')->first();
     }
 
-    private function processFosaFallback($reference, $transaction)
+    <?php
+private function processFallbackTransaction($reference, $transaction)
 {
-    // Step 1: Clean & Split input
     $parts = preg_split('/\s+/', trim($reference), 2);
     $idPart = $parts[0] ?? '';
-    $descPart = $parts[1] ?? '';
-
+    $descPart = strtolower($parts[1] ?? '');
     $cleanedId = preg_replace('/\D/', '', $idPart);
 
-    // Step 2: Validate the ID
     if (!is_numeric($cleanedId) || strlen($cleanedId) < 6) {
-        Log::warning("FOSA fallback: Invalid ID format '$reference'");
+        Log::warning("Fallback: Invalid ID format '$reference'");
         return;
     }
 
-    // Step 3: Find matching member
-    $members = DB::table('sacco_members')
-        ->where('member_national_id', $cleanedId)
-        ->get();
-
+    $members = DB::table('sacco_members')->where('member_national_id', $cleanedId)->get();
     if ($members->count() !== 1) {
-        Log::warning("FOSA fallback: Found {$members->count()} matches for ID '$cleanedId'. Skipping.");
+        Log::warning("Fallback: Found {$members->count()} matches for ID '$cleanedId'. Skipping.");
         return;
     }
 
     $member = $members->first();
     $memberId = $member->member_id;
-
-    // Step 4: Fetch period and default accounts
     $period = $this->getCurrentPeriod();
-    $defaultMpesaIn = DB::table('sacco_defaults')->where('default_name', 'default_mpesa_in_account')->value('default_value');
-    $defaultFosaAccount = DB::table('sacco_defaults')->where('default_name', 'default_fosa_account')->value('default_value');
+    $amount = $transaction->transaction_amount;
+    $docNo = "Paybill {$transaction->business_shortcode} - {$transaction->transaction_id}";
+    $description = $descPart ?: "Mpesa Deposit {$transaction->first_name}";
+    $now = Carbon::now();
+    $ip = request()->ip() ?? '127.0.0.1';
+    $userId = auth()->id() ?? 999;
 
-    if (!$defaultMpesaIn || !$defaultFosaAccount || !$period) {
-        Log::error("FOSA fallback: Missing required defaults (mpesa_in/fosa_account/period).");
+    $mpesaAccount = DB::table('sacco_defaults')->where('default_name', 'default_mpesa_in_account')->value('default_value');
+    $fosaAccount = DB::table('sacco_defaults')->where('default_name', 'default_fosa_account')->value('default_value');
+    $shareAccount = DB::table('sacco_defaults')->where('default_name', 'default_share_account')->value('default_value');
+    $capitalAccount = DB::table('sacco_defaults')->where('default_name', 'default_share_capital_account')->value('default_value');
+
+    if (!$mpesaAccount || !$period) {
+        Log::error("Fallback: Missing required defaults (mpesa_in/period)");
         return;
     }
 
-    // Step 5: Construct description and doc no
-    $description = $descPart ?: "Mpesa FOSA {$transaction->first_name}";
-    $docNo = "Paybill {$transaction->business_shortcode} - {$transaction->transaction_id}";
+    if (Str::contains($descPart, ['share', 'deposit'])) {
+        DB::table('sacco_shares')->insert([
+            'share_member_id' => $memberId,
+            'share_amount_paying' => $amount,
+            'share_paid_by' => 'MPesa',
+            'share_period' => $period->period_name,
+            'share_description' => $description,
+            'share_doc_no' => $docNo,
+            'share_date_paid' => $now,
+            'share_end_month_proc' => 'N',
+            'share_by' => $userId,
+            'share_ip' => $ip,
+            'share_transdate' => $now,
+        ]);
 
-    // Step 6: Insert into sacco_fosas
-    DB::table('sacco_fosas')->insert([
-        'fosa_member_id' => $memberId,
-        'fosa_amount_paying' => $transaction->transaction_amount,
-        'fosa_paid_by' => 'MPesa',
-        'fosa_period' => $period->period_name,
-        'fosa_description' => $description,
-        'fosa_doc_no' => $docNo,
-        'fosa_date_paid' => Carbon::now(),
-        'fosa_end_month_proc' => 'N',
-        'fosa_by' => auth()->id() ?? 999,
-        'fosa_ip' => request()->ip() ?? '127.0.0.1',
-        'fosa_transdate' => now(),
-    ]);
- 
-    // Step 7: Update member_total_fosa
-    DB::table('sacco_members')
-        ->where('member_id', $memberId)
-        ->increment('member_total_fosa', $transaction->transaction_amount);
+        DB::table('sacco_members')->where('member_id', $memberId)->increment('member_total_share', $amount);
 
-    Log::info("FOSA fallback: member_total_fosa incremented for Member ID: $memberId");
+        $this->updateSaccoAccountsTrans($mpesaAccount, $amount, 0, $docNo, "Share Deposit - $description", $transaction->transaction_time);
+        $this->updateSaccoAccountsTrans($shareAccount, 0, $amount, $docNo, "Share Deposit - $description", $transaction->transaction_time);
 
-    // Step 8: Ledger Entries
-    $this->updateSaccoAccountsTrans($defaultMpesaIn, $transaction->transaction_amount, 0, $docNo, "FOSA Deposit - $description", $transaction->transaction_time);
-    $this->updateSaccoAccountsTrans($defaultFosaAccount, 0, $transaction->transaction_amount, $docNo, "FOSA Deposit - $description", $transaction->transaction_time);
+        Log::info("SHARE fallback: Completed for Member ID: $memberId");
+    } elseif (Str::contains($descPart, 'capital')) {
+        DB::table('sacco_capital_shares')->insert([
+            'share_capitalmember_id' => $memberId,
+            'share_capitalamount_paying' => $amount,
+            'share_capitalpaid_by' => 'MPesa',
+            'share_capitalperiod' => $period->period_name,
+            'share_capitaldescription' => $description,
+            'share_capitaldoc_no' => $docNo,
+            'share_capitaldate_paid' => $now,
+            'share_capitalend_month_proc' => 'N',
+            'share_capitalby' => $userId,
+            'share_capitalip' => $ip,
+            'share_capitaltransdate' => $now,
+        ]);
 
-    Log::info("FOSA fallback: Ledger entries completed for Member ID: $memberId");
+        DB::table('sacco_members')->where('member_id', $memberId)->increment('member_total_share_capital', $amount);
+
+        $this->updateSaccoAccountsTrans($mpesaAccount, $amount, 0, $docNo, "Capital Deposit - $description", $transaction->transaction_time);
+        $this->updateSaccoAccountsTrans($capitalAccount, 0, $amount, $docNo, "Capital Deposit - $description", $transaction->transaction_time);
+
+        Log::info("CAPITAL fallback: Completed for Member ID: $memberId");
+    } else {
+        DB::table('sacco_fosas')->insert([
+            'fosa_member_id' => $memberId,
+            'fosa_amount_paying' => $amount,
+            'fosa_paid_by' => 'MPesa',
+            'fosa_period' => $period->period_name,
+            'fosa_description' => $description,
+            'fosa_doc_no' => $docNo,
+            'fosa_date_paid' => $now,
+            'fosa_end_month_proc' => 'N',
+            'fosa_by' => $userId,
+            'fosa_ip' => $ip,
+            'fosa_transdate' => $now,
+        ]);
+
+        DB::table('sacco_members')->where('member_id', $memberId)->increment('member_total_fosa', $amount);
+
+        $this->updateSaccoAccountsTrans($mpesaAccount, $amount, 0, $docNo, "FOSA Deposit - $description", $transaction->transaction_time);
+        $this->updateSaccoAccountsTrans($fosaAccount, 0, $amount, $docNo, "FOSA Deposit - $description", $transaction->transaction_time);
+
+        Log::info("FOSA fallback: Completed for Member ID: $memberId");
+    }
+
+    Log::info("Transaction fallback processing complete for reference: $reference");
+    DB::table('mpesa_c2b_transactions')->where('id', $transaction->id)->update(['processed' => 'Yes', 'processed_date' => now()]);
 }
 }
