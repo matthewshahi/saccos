@@ -1011,6 +1011,67 @@ private function getRegisteredUrls($accessToken)
     
  }
 
+ public function handleC2BPayment(Request $request)
+{
+    Log::info('C2B Payment received.', ['raw' => $request->all()]);
+
+    try {
+        $paymentData = json_decode($request->getContent(), true);
+
+        // Format transaction time safely
+        $transactionTime = null;
+        if (!empty($paymentData['TransTime'])) {
+            try {
+                $transactionTime = Carbon::createFromFormat('YmdHis', $paymentData['TransTime'])->format('Y-m-d H:i:s');
+            } catch (\Exception $e) {
+                Log::warning('Invalid TransTime format', ['TransTime' => $paymentData['TransTime']]);
+            }
+        }
+
+        // Prevent duplicates
+        $exists = DB::table('c2b_payments')
+            ->where('transaction_id', $paymentData['TransID'] ?? '')
+            ->exists();
+
+        if ($exists) {
+            Log::info('Duplicate C2B transaction ignored.', ['TransID' => $paymentData['TransID']]);
+            return response()->json(['ResultCode' => 0, 'ResultDesc' => 'Duplicate transaction']);
+        }
+
+        // Save transaction
+        DB::table('c2b_payments')->insert([
+            'transaction_type' => $paymentData['TransactionType'] ?? null,
+            'transaction_id' => $paymentData['TransID'] ?? null,
+            'transaction_time' => $transactionTime,
+            'transaction_amount' => $paymentData['TransAmount'] ?? 0.00,
+            'business_shortcode' => $paymentData['BusinessShortCode'] ?? null,
+            'bill_ref_number' => $paymentData['BillRefNumber'] ?? null,
+            'invoice_number' => $paymentData['InvoiceNumber'] ?? null,
+            'org_account_balance' => $paymentData['OrgAccountBalance'] ?? null,
+            'third_party_transaction_id' => $paymentData['ThirdPartyTransID'] ?? null,
+            'msisdn' => $paymentData['MSISDN'] ?? null,
+            'first_name' => $paymentData['FirstName'] ?? null,
+            'middle_name' => $paymentData['MiddleName'] ?? null,
+            'last_name' => $paymentData['LastName'] ?? null,
+            'ip_address' => $request->ip(),
+            'processed' => 'No',
+            'processed_date' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        Log::info('C2B Payment saved successfully.', ['TransID' => $paymentData['TransID']]);
+
+        // ✅ Only after saving do we confirm to Safaricom
+        return response()->json(['ResultCode' => 0, 'ResultDesc' => 'Success']);
+
+    } catch (\Exception $e) {
+        Log::error('Failed to save C2B payment.', ['error' => $e->getMessage()]);
+        // ❌ Tell Safaricom we failed so it retries
+        return response()->json(['ResultCode' => 1, 'ResultDesc' => 'Failed to process payment']);
+    }
+}
+
 //  public function handleC2BPayment(Request $request)
 // {
 //     // Log the receipt of the C2B payment
