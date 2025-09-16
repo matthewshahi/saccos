@@ -32,6 +32,8 @@ class CheckSafaricomIP
         if (!in_array($clientIP, $this->allowedIPs)) {
             
             Log::warning('Unauthorized Safaricom IP attempt', ['ip' => $clientIP]);
+Log::channel('safaricom')->warning('Unauthorized Safaricom IP attempt', ['ip' => $clientIP]);
+
             return response()->json(['error' => 'Unauthorized IP'], 403);
         }
 
