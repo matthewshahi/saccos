@@ -4,12 +4,10 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class CheckSafaricomIP
 {
-    /**
-     * List of Safaricom IPs to whitelist.
-     */
     private $allowedIPs = [
         '196.201.214.200',
         '196.201.214.206',
@@ -27,17 +25,16 @@ class CheckSafaricomIP
         '196.201.212.74',
     ];
 
-    /**
-     * Handle an incoming request.
-     */
     public function handle(Request $request, Closure $next)
     {
-        $clientIP = $request->ip(); // Get the IP address of the client
+        $clientIP = $request->getClientIp(); // safer with proxies
 
         if (!in_array($clientIP, $this->allowedIPs)) {
-            return response()->json(['error' => 'Unauthorized IP'], 403); // Reject unauthorized IPs
+            
+            Log::warning('Unauthorized Safaricom IP attempt', ['ip' => $clientIP]);
+            return response()->json(['error' => 'Unauthorized IP'], 403);
         }
 
-        return $next($request); // Allow the request if IP is valid
+        return $next($request);
     }
 }
