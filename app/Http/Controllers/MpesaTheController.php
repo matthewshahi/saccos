@@ -1011,7 +1011,8 @@ private function getRegisteredUrls($accessToken)
     
  }
 
- public function handleC2BPayment(Request $request)
+ 
+public function handleC2BPayment(Request $request)
 {
     Log::info('C2B Payment received.', [
         'all' => $request->all(),          // Parsed form-data
@@ -1086,7 +1087,6 @@ private function getRegisteredUrls($accessToken)
         ]);
         return response()->json(['ResultCode' => 1, 'ResultDesc' => 'Failed to process payment']);
     }
-}
 }
 
 //  public function handleC2BPayment(Request $request)
