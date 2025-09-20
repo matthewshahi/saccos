@@ -1013,17 +1013,25 @@ private function getRegisteredUrls($accessToken)
 
  public function handleC2BPayment(Request $request)
 {
-   
     Log::info('C2B Payment received.', [
-    'all' => $request->all(),          // Parsed form-data (if any)
-    'raw' => $request->getContent(),   // Raw JSON/string body
-    'headers' => $request->headers->all(), // Bonus: request headers
-    'ip' => $request->ip(),            // Caller IP
-]);
-
+        'all' => $request->all(),          // Parsed form-data
+        'raw' => $request->getContent(),   // Raw JSON or form string
+        'headers' => $request->headers->all(),
+        'ip' => $request->ip(),
+    ]);
 
     try {
+        // Decode JSON, fallback to form-data if needed
         $paymentData = json_decode($request->getContent(), true);
+        if (empty($paymentData)) {
+            $paymentData = $request->all();
+        }
+
+        // Validate required fields (at minimum we need TransID + Amount)
+        if (empty($paymentData['TransID']) || empty($paymentData['TransAmount'])) {
+            Log::warning('Invalid C2B payload, missing TransID or TransAmount', ['payload' => $paymentData]);
+            return response()->json(['ResultCode' => 1, 'ResultDesc' => 'Invalid payload']);
+        }
 
         // Format transaction time safely
         $transactionTime = null;
@@ -1037,7 +1045,7 @@ private function getRegisteredUrls($accessToken)
 
         // Prevent duplicates
         $exists = DB::table('c2b_payments')
-            ->where('transaction_id', $paymentData['TransID'] ?? '')
+            ->where('transaction_id', $paymentData['TransID'])
             ->exists();
 
         if ($exists) {
@@ -1048,7 +1056,7 @@ private function getRegisteredUrls($accessToken)
         // Save transaction
         DB::table('c2b_payments')->insert([
             'transaction_type' => $paymentData['TransactionType'] ?? null,
-            'transaction_id' => $paymentData['TransID'] ?? null,
+            'transaction_id' => $paymentData['TransID'],
             'transaction_time' => $transactionTime,
             'transaction_amount' => $paymentData['TransAmount'] ?? 0.00,
             'business_shortcode' => $paymentData['BusinessShortCode'] ?? null,
@@ -1069,14 +1077,16 @@ private function getRegisteredUrls($accessToken)
 
         Log::info('C2B Payment saved successfully.', ['TransID' => $paymentData['TransID']]);
 
-        // ✅ Only after saving do we confirm to Safaricom
         return response()->json(['ResultCode' => 0, 'ResultDesc' => 'Success']);
 
     } catch (\Exception $e) {
-        Log::error('Failed to save C2B payment.', ['error' => $e->getMessage()]);
-        // ❌ Tell Safaricom we failed so it retries
+        Log::error('Failed to save C2B payment.', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+        ]);
         return response()->json(['ResultCode' => 1, 'ResultDesc' => 'Failed to process payment']);
     }
+}
 }
 
 //  public function handleC2BPayment(Request $request)
