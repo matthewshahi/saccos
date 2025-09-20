@@ -1013,7 +1013,14 @@ private function getRegisteredUrls($accessToken)
 
  public function handleC2BPayment(Request $request)
 {
-    Log::info('C2B Payment received.', ['raw' => $request->all()]);
+   
+    Log::info('C2B Payment received.', [
+    'all' => $request->all(),          // Parsed form-data (if any)
+    'raw' => $request->getContent(),   // Raw JSON/string body
+    'headers' => $request->headers->all(), // Bonus: request headers
+    'ip' => $request->ip(),            // Caller IP
+]);
+
 
     try {
         $paymentData = json_decode($request->getContent(), true);
