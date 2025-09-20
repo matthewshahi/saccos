@@ -1069,6 +1069,7 @@ public function handleC2BPayment(Request $request)
             'first_name' => $paymentData['FirstName'] ?? null,
             'middle_name' => $paymentData['MiddleName'] ?? null,
             'last_name' => $paymentData['LastName'] ?? null,
+            'raw_payload' => $request->getContent(),
             'ip_address' => $request->ip(),
             'processed' => 'No',
             'processed_date' => null,
