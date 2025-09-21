@@ -21,13 +21,12 @@ Route::prefix('mobile')->group(function () {
         ->name('mpesa.pay.confirmation')
         ->middleware('safaricom.ip'); // Apply IP filtering middleware
 
-        // Transaction Status Result Callback
-    Route::post('/status/result', [MpesaTheController::class, 'handleTransactionStatusResult'])
+      // ✅ Fix: Point to PaymentInquiryController
+    Route::post('/status/result', [PaymentInquiryController::class, 'handleTransactionStatusResult'])
         ->name('mpesa.status.result')
         ->middleware('safaricom.ip');
 
-    // Transaction Status Timeout Callback
-    Route::post('/status/timeout', [MpesaTheController::class, 'handleTransactionStatusTimeout'])
+    Route::post('/status/timeout', [PaymentInquiryController::class, 'handleTransactionStatusTimeout'])
         ->name('mpesa.status.timeout')
         ->middleware('safaricom.ip');
 });
