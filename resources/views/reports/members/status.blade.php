@@ -29,7 +29,7 @@
                             <th>National ID</th>
                             <th>Sacco ID</th>
                             <th>Status</th>
-                            <th class="text-right">Total Shares</th>
+                            <th class="text-right">Total Deposits</th>
                             <th class="text-right">Total Capital</th>
                             <!-- The loanTypes headers will be added dynamically -->
                         </tr>
