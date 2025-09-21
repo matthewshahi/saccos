@@ -17,7 +17,6 @@ class PaymentInquiryController extends Controller
 
     public function check(Request $request)
     {
-        Log::info("Base path is: " . base_path());
         $request->validate([
             'reference_number' => 'required|string|max:50',
         ]);
@@ -27,30 +26,35 @@ class PaymentInquiryController extends Controller
         $response = null;
 
         try {
-            // ✅ 1. First check locally in c2b_payments
-            $payment = DB::table('c2b_payments')->where('transaction_id', $ref)->first();
+            // ✅ Always log inquiry attempt
+            DB::table('payment_inquiries')->insert([
+                'reference_number' => $ref,
+                'status'           => 'Queried',
+                'response'         => null,
+                'checked_ip'       => $request->ip(),
+                'created_at'       => now(),
+                'updated_at'       => now(),
+            ]);
 
+            // 1. Check locally first
+            $payment = DB::table('c2b_payments')->where('transaction_id', $ref)->first();
             if ($payment) {
                 $status   = 'Success';
                 $response = json_encode($payment, JSON_PRETTY_PRINT);
             } else {
-                // ✅ 2. Pull config from DB (main source)
-                $config = DB::table('mpesa_configs')
-                    ->where('api_type', 'c2b')
-                    ->first();
-
-                // ✅ 3. Merge DB values with fallback to .env
-                $initiatorName     = $config->initiator_name     ?? config('mpesa.initiator_name');
-                $initiatorPassword = $config->initiator_password ?? config('mpesa.initiator_password');
-                $shortCode         = $config->shortcode          ?? config('mpesa.shortcode');
-                $resultUrl         = $config->result_url         ?? config('mpesa.result_url');
-                $timeoutUrl        = $config->timeout_url        ?? config('mpesa.timeout_url');
-
-                if (empty($initiatorName) || empty($initiatorPassword) || empty($shortCode) || empty($resultUrl) || empty($timeoutUrl)) {
-                    throw new Exception("M-Pesa configuration incomplete. Please set initiator, password, shortcode, and callback URLs in DB or .env.");
+                // 2. Pull config from DB
+                $config = DB::table('mpesa_configs')->where('api_type', 'c2b')->first();
+                if (!$config) {
+                    throw new Exception("No C2B configuration found in DB.");
                 }
 
-                // ✅ 4. Get access token via MpesaTheController
+                // 3. Credentials
+                $initiatorName     = $config->initiator_name     ?? config('mpesa.initiator_name');
+                $initiatorPassword = $config->initiator_password ?? config('mpesa.initiator_password');
+                $shortCode         = $config->shortcode;
+                $resultUrl         = $config->result_url ?? config('mpesa.result_url');
+                $timeoutUrl        = $config->timeout_url ?? config('mpesa.timeout_url');
+
                 $mpesa = new MpesaTheController();
                 $token = $mpesa->getAccessToken();
 
@@ -58,7 +62,7 @@ class PaymentInquiryController extends Controller
                     ? 'https://api.safaricom.co.ke/mpesa/transactionstatus/v1/query'
                     : 'https://sandbox.safaricom.co.ke/mpesa/transactionstatus/v1/query';
 
-                // ✅ 5. Generate SecurityCredential
+                // 4. Security Credential
                 $securityCredential = $this->generateSecurityCredential($initiatorPassword);
 
                 $payload = [
@@ -67,14 +71,14 @@ class PaymentInquiryController extends Controller
                     "CommandID"          => "TransactionStatusQuery",
                     "TransactionID"      => $ref,
                     "PartyA"             => $shortCode,
-                    "IdentifierType"     => "4", // TransactionID
+                    "IdentifierType"     => "4",
                     "ResultURL"          => url($resultUrl),
                     "QueueTimeOutURL"    => url($timeoutUrl),
                     "Remarks"            => "Payment inquiry",
                     "Occasion"           => "StatusQuery"
                 ];
 
-                // ✅ 6. Call Safaricom API
+                // 5. Safaricom call
                 $safaricomResponse = Http::withHeaders([
                     'Authorization' => 'Bearer ' . $token,
                     'Content-Type'  => 'application/json',
@@ -84,22 +88,6 @@ class PaymentInquiryController extends Controller
                     $result   = $safaricomResponse->json();
                     $status   = $result['ResultDesc'] ?? 'Pending';
                     $response = json_encode($result, JSON_PRETTY_PRINT);
-
-                    // ✅ Cache in local DB if confirmed success
-                    if (isset($result['ResultCode']) && $result['ResultCode'] == 0) {
-                        DB::table('c2b_payments')->updateOrInsert(
-                            ['transaction_id' => $ref],
-                            [
-                                'transaction_type'   => 'Queried',
-                                'transaction_amount' => $result['ResultParameters']['TransAmount'] ?? 0,
-                                'msisdn'             => $result['ResultParameters']['MSISDN'] ?? null,
-                                'transaction_time'   => now(),
-                                'raw_payload'        => json_encode($result),
-                                'created_at'         => now(),
-                                'updated_at'         => now(),
-                            ]
-                        );
-                    }
                 } else {
                     $status   = 'Error';
                     $response = $safaricomResponse->body();
@@ -114,13 +102,9 @@ class PaymentInquiryController extends Controller
         return view('payments.result', compact('ref', 'status', 'response'));
     }
 
-    /**
-     * Encrypt initiator password into SecurityCredential
-     */
     private function generateSecurityCredential($initiatorPassword)
     {
         $certPath = config('mpesa.certificates.' . config('mpesa.env'));
-
         if (!file_exists($certPath)) {
             throw new Exception("M-Pesa certificate not found at: {$certPath}");
         }
@@ -131,73 +115,59 @@ class PaymentInquiryController extends Controller
         return base64_encode($encrypted);
     }
 
-    /**
-     * Handle Safaricom Transaction Status Result Callback
-     */
     public function handleTransactionStatusResult(Request $request)
     {
         Log::info('Transaction Status Result received', [
             'payload' => $request->all(),
-            'raw' => $request->getContent(),
         ]);
 
         try {
             $data = $request->json()->all();
+            $ref  = $data['Result']['TransactionID'] ?? 'N/A';
 
-            DB::table('payment_inquiries')->insert([
-                'reference_number' => $data['Result']['TransactionID'] ?? 'N/A',
-                'status'           => 'Result',
-                'response'         => json_encode($data),
-                'checked_ip'       => $request->ip(),
-                'created_at'       => now(),
-                'updated_at'       => now(),
-            ]);
+            // ✅ Update existing inquiry
+            DB::table('payment_inquiries')->updateOrInsert(
+                ['reference_number' => $ref],
+                [
+                    'status'     => 'Result',
+                    'response'   => json_encode($data),
+                    'checked_ip' => $request->ip(),
+                    'updated_at' => now(),
+                ]
+            );
 
-            return response()->json([
-                'ResultCode' => 0,
-                'ResultDesc' => 'Result received successfully'
-            ]);
+            return response()->json(['ResultCode' => 0, 'ResultDesc' => 'Result saved']);
         } catch (Exception $e) {
             Log::error('Error saving Transaction Status Result', ['error' => $e->getMessage()]);
-            return response()->json([
-                'ResultCode' => 1,
-                'ResultDesc' => 'Failed to process result'
-            ]);
+            return response()->json(['ResultCode' => 1, 'ResultDesc' => 'Failed to save result']);
         }
     }
 
-    /**
-     * Handle Safaricom Transaction Status Timeout Callback
-     */
     public function handleTransactionStatusTimeout(Request $request)
     {
         Log::warning('Transaction Status Timeout received', [
             'payload' => $request->all(),
-            'raw' => $request->getContent(),
         ]);
 
         try {
             $data = $request->json()->all();
+            $ref  = $data['TransactionID'] ?? 'N/A';
 
-            DB::table('payment_inquiries')->insert([
-                'reference_number' => $data['TransactionID'] ?? 'N/A',
-                'status'           => 'Timeout',
-                'response'         => json_encode($data),
-                'checked_ip'       => $request->ip(),
-                'created_at'       => now(),
-                'updated_at'       => now(),
-            ]);
+            // ✅ Update existing inquiry
+            DB::table('payment_inquiries')->updateOrInsert(
+                ['reference_number' => $ref],
+                [
+                    'status'     => 'Timeout',
+                    'response'   => json_encode($data),
+                    'checked_ip' => $request->ip(),
+                    'updated_at' => now(),
+                ]
+            );
 
-            return response()->json([
-                'ResultCode' => 0,
-                'ResultDesc' => 'Timeout received successfully'
-            ]);
+            return response()->json(['ResultCode' => 0, 'ResultDesc' => 'Timeout saved']);
         } catch (Exception $e) {
             Log::error('Error saving Transaction Status Timeout', ['error' => $e->getMessage()]);
-            return response()->json([
-                'ResultCode' => 1,
-                'ResultDesc' => 'Failed to process timeout'
-            ]);
+            return response()->json(['ResultCode' => 1, 'ResultDesc' => 'Failed to save timeout']);
         }
     }
 }
