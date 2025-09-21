@@ -8,10 +8,10 @@ return [
 
     'certificates' => [
         'sandbox'    => base_path('config/SandboxCertificate.cer'),
+        'live'       => base_path('config/ProductionCertificate.cer'),
         'production' => base_path('config/ProductionCertificate.cer'),
     ],
 
-    // store only paths here, not full URLs
-    'result_url'  => env('MPESA_RESULT_URL', '/api/mobile/mpesa/result'),
-    'timeout_url' => env('MPESA_TIMEOUT_URL', '/api/mobile/mpesa/timeout'),
+    'result_url'  => env('MPESA_RESULT_URL', url('/api/mobile/status/result')),
+    'timeout_url' => env('MPESA_TIMEOUT_URL', url('/api/mobile/status/timeout')),
 ];
