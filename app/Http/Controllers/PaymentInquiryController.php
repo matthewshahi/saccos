@@ -17,6 +17,9 @@ class PaymentInquiryController extends Controller
 
     public function check(Request $request)
     {
+        
+
+        
         $request->validate([
             'reference_number' => 'required|string|max:50',
         ]);
@@ -78,6 +81,8 @@ class PaymentInquiryController extends Controller
                     "Occasion"           => "StatusQuery"
                 ];
 
+                Log::info('TransactionStatusQuery payload', $payload);
+                
                 // 5. Safaricom call
                 $safaricomResponse = Http::withHeaders([
                     'Authorization' => 'Bearer ' . $token,
