@@ -17,6 +17,7 @@ class PaymentInquiryController extends Controller
 
     public function check(Request $request)
     {
+        Log::info("Base path is: " . base_path());
         $request->validate([
             'reference_number' => 'required|string|max:50',
         ]);
