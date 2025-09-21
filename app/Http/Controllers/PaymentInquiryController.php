@@ -21,40 +21,35 @@ class PaymentInquiryController extends Controller
             'reference_number' => 'required|string|max:50',
         ]);
 
-        $ref     = trim($request->reference_number);
-        $status  = 'Pending';
+        $ref      = trim($request->reference_number);
+        $status   = 'Pending';
         $response = null;
 
         try {
-            if (
-                empty(config('mpesa.initiator_name')) ||
-                empty(config('mpesa.initiator_password')) ||
-                empty(config('mpesa.result_url')) ||
-                empty(config('mpesa.timeout_url'))
-            ) {
-                throw new Exception(
-                    "M-Pesa ENV variables missing. Please set MPESA_INITIATOR_NAME, " .
-                    "MPESA_INITIATOR_PASSWORD, MPESA_RESULT_URL and MPESA_TIMEOUT_URL in your .env file."
-                );
-            }
-
-            // ✅ 1. Check locally first
+            // ✅ 1. First check locally in c2b_payments
             $payment = DB::table('c2b_payments')->where('transaction_id', $ref)->first();
 
             if ($payment) {
                 $status   = 'Success';
                 $response = json_encode($payment, JSON_PRETTY_PRINT);
             } else {
-                // ✅ 2. Pull config from DB (shortcode, keys, urls)
+                // ✅ 2. Pull config from DB (main source)
                 $config = DB::table('mpesa_configs')
                     ->where('api_type', 'c2b')
                     ->first();
 
-                if (!$config) {
-                    throw new Exception("No C2B configuration found in DB.");
+                // ✅ 3. Merge DB values with fallback to .env
+                $initiatorName     = $config->initiator_name     ?? config('mpesa.initiator_name');
+                $initiatorPassword = $config->initiator_password ?? config('mpesa.initiator_password');
+                $shortCode         = $config->shortcode          ?? config('mpesa.shortcode');
+                $resultUrl         = $config->result_url         ?? config('mpesa.result_url');
+                $timeoutUrl        = $config->timeout_url        ?? config('mpesa.timeout_url');
+
+                if (empty($initiatorName) || empty($initiatorPassword) || empty($shortCode) || empty($resultUrl) || empty($timeoutUrl)) {
+                    throw new Exception("M-Pesa configuration incomplete. Please set initiator, password, shortcode, and callback URLs in DB or .env.");
                 }
 
-                // ✅ 3. Get access token via your MpesaTheController
+                // ✅ 4. Get access token via MpesaTheController
                 $mpesa = new MpesaTheController();
                 $token = $mpesa->getAccessToken();
 
@@ -62,25 +57,23 @@ class PaymentInquiryController extends Controller
                     ? 'https://api.safaricom.co.ke/mpesa/transactionstatus/v1/query'
                     : 'https://sandbox.safaricom.co.ke/mpesa/transactionstatus/v1/query';
 
-                // ✅ 4. Build SecurityCredential from .env password + cert
-                $securityCredential = $this->generateSecurityCredential(
-                    config('mpesa.initiator_password')
-                );
+                // ✅ 5. Generate SecurityCredential
+                $securityCredential = $this->generateSecurityCredential($initiatorPassword);
 
                 $payload = [
-                    "Initiator"          => config('mpesa.initiator_name'),
+                    "Initiator"          => $initiatorName,
                     "SecurityCredential" => $securityCredential,
                     "CommandID"          => "TransactionStatusQuery",
                     "TransactionID"      => $ref,
-                    "PartyA"             => $config->shortcode,  // from DB
+                    "PartyA"             => $shortCode,
                     "IdentifierType"     => "4", // TransactionID
-                    "ResultURL"          => config('mpesa.result_url'),
-                    "QueueTimeOutURL"    => config('mpesa.timeout_url'),
+                    "ResultURL"          => url($resultUrl),
+                    "QueueTimeOutURL"    => url($timeoutUrl),
                     "Remarks"            => "Payment inquiry",
                     "Occasion"           => "StatusQuery"
                 ];
 
-                // ✅ 5. Make Safaricom request
+                // ✅ 6. Call Safaricom API
                 $safaricomResponse = Http::withHeaders([
                     'Authorization' => 'Bearer ' . $token,
                     'Content-Type'  => 'application/json',
@@ -91,7 +84,7 @@ class PaymentInquiryController extends Controller
                     $status   = $result['ResultDesc'] ?? 'Pending';
                     $response = json_encode($result, JSON_PRETTY_PRINT);
 
-                    // ✅ Save if confirmed success
+                    // ✅ Cache in local DB if confirmed success
                     if (isset($result['ResultCode']) && $result['ResultCode'] == 0) {
                         DB::table('c2b_payments')->updateOrInsert(
                             ['transaction_id' => $ref],
@@ -137,7 +130,7 @@ class PaymentInquiryController extends Controller
         return base64_encode($encrypted);
     }
 
-        /**
+    /**
      * Handle Safaricom Transaction Status Result Callback
      */
     public function handleTransactionStatusResult(Request $request)
