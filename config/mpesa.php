@@ -1,6 +1,5 @@
 <?php
 
-
 return [
     'env' => env('MPESA_ENV', 'sandbox'),
 
@@ -12,6 +11,7 @@ return [
         'production' => base_path('config/ProductionCertificate.cer'),
     ],
 
-    'result_url'  => env('MPESA_RESULT_URL', url('/api/mobile/mpesa/result')),
-    'timeout_url' => env('MPESA_TIMEOUT_URL', url('/api/mobile/mpesa/timeout')),
+    // store only paths here, not full URLs
+    'result_url'  => env('MPESA_RESULT_URL', '/api/mobile/mpesa/result'),
+    'timeout_url' => env('MPESA_TIMEOUT_URL', '/api/mobile/mpesa/timeout'),
 ];
