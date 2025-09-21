@@ -30,7 +30,7 @@ use App\Http\Controllers\KinTypeController;
 use App\Http\Controllers\MemberAddImages;
 use App\Http\Controllers\MemberController;
 use App\Http\Controllers\ReportsShareController;
-
+use App\Http\Controllers\PaymentInquiryController;
 // use App\Http\Controllers\TxnImportController;
 
 // // Upload form
@@ -164,6 +164,10 @@ Route::middleware(['auth'])->group(function () {
      
 Route::get('/members/juniors/create', [MemberController::class, 'createJunior'])->name('members.juniors.create');
 Route::post('/members/juniors/store', [MemberController::class, 'storeJunior'])->name('members.juniors.store');
+
+Route::get('/check-payment', [PaymentInquiryController::class, 'index'])->name('payment.check');
+Route::post('/check-payment', [PaymentInquiryController::class, 'check'])->name('payment.check.submit');
+
 });
 
 

@@ -523,16 +523,20 @@ function checkPayment(Request $request){
      * Get or generate a new access token.
      */
     
-     private function getAccessToken()
+    public function getAccessToken()
 {
-    // Check if token is already stored and valid
-    // if (Carbon::now()->lt(Carbon::parse($this->tokenExpiresAt))) {
-    //     return $this->accessToken; // Return valid token
-    // }
+    // Refresh 10 minutes before expiry
+    if (
+        $this->accessToken &&
+        $this->tokenExpiresAt &&
+        Carbon::now()->lt(Carbon::parse($this->tokenExpiresAt)->subMinutes(10))
+    ) {
+        return $this->accessToken;
+    }
 
-    // Fetch a new token
-    $url = env('MPESA_ENV') === 'live' 
-        ? 'https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials' 
+    // Otherwise fetch a new token
+    $url = env('MPESA_ENV') === 'live'
+        ? 'https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials'
         : 'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials';
 
     $response = Http::withBasicAuth($this->consumerKey, $this->consumerSecret)->get($url);
@@ -542,19 +546,58 @@ function checkPayment(Request $request){
         throw new Exception('Failed to generate access token.');
     }
 
-    $accessToken = $response->json()['access_token'];
-    $expiresIn = $response->json()['expires_in'];
+    $accessToken = $response['access_token'];
+    $expiresIn   = $response['expires_in'];
 
-    // Save new token to the database
-    DB::table('mpesa_configs')->where('shortcode', $this->shortCode)->where('api_type', 'c2b')->update([
-        'access_token' => $accessToken,
-        'token_expires_at' => Carbon::now()->addSeconds($expiresIn),
-    ]);
+    // Save to DB for reuse by other controllers
+    DB::table('mpesa_configs')
+        ->where('shortcode', $this->shortCode)
+        ->whereIn('api_type', ['c2b', 'mpesa_express'])
+        ->update([
+            'access_token'     => $accessToken,
+            'token_expires_at' => Carbon::now()->addSeconds($expiresIn),
+        ]);
 
-    Log::info('New access token generated and saved.');
+    $this->accessToken    = $accessToken;
+    $this->tokenExpiresAt = Carbon::now()->addSeconds($expiresIn);
+
+    Log::info('New access token generated and cached in DB.');
 
     return $accessToken;
 }
+
+//      public function getAccessToken()
+// {
+//     // Check if token is already stored and valid
+//     // if (Carbon::now()->lt(Carbon::parse($this->tokenExpiresAt))) {
+//     //     return $this->accessToken; // Return valid token
+//     // }
+
+//     // Fetch a new token
+//     $url = env('MPESA_ENV') === 'live' 
+//         ? 'https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials' 
+//         : 'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials';
+
+//     $response = Http::withBasicAuth($this->consumerKey, $this->consumerSecret)->get($url);
+
+//     if ($response->failed()) {
+//         Log::error('Failed to generate access token: ' . $response->body());
+//         throw new Exception('Failed to generate access token.');
+//     }
+
+//     $accessToken = $response->json()['access_token'];
+//     $expiresIn = $response->json()['expires_in'];
+
+//     // Save new token to the database
+//     DB::table('mpesa_configs')->where('shortcode', $this->shortCode)->where('api_type', 'c2b')->update([
+//         'access_token' => $accessToken,
+//         'token_expires_at' => Carbon::now()->addSeconds($expiresIn),
+//     ]);
+
+//     Log::info('New access token generated and saved.');
+
+//     return $accessToken;
+// }
 public function handleSTKPushCallback(Request $request, $unique_number = null)
 {
     Log::info('STK Push callback received.', [
