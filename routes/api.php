@@ -20,6 +20,16 @@ Route::prefix('mobile')->group(function () {
     Route::post('/pay/stk_confirmation', [MpesaTheController::class, 'handleC2BPayment'])
         ->name('mpesa.pay.confirmation')
         ->middleware('safaricom.ip'); // Apply IP filtering middleware
+
+        // Transaction Status Result Callback
+    Route::post('/status/result', [MpesaTheController::class, 'handleTransactionStatusResult'])
+        ->name('mpesa.status.result')
+        ->middleware('safaricom.ip');
+
+    // Transaction Status Timeout Callback
+    Route::post('/status/timeout', [MpesaTheController::class, 'handleTransactionStatusTimeout'])
+        ->name('mpesa.status.timeout')
+        ->middleware('safaricom.ip');
 });
 
  
