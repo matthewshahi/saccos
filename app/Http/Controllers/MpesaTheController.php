@@ -1323,4 +1323,8 @@ public function paymentFailed($unique_number = null)
         {
             return view('mpesa.waiting', ['checkoutRequestId' => $checkoutRequestId]);
         }
+        public function getShortCode()
+{
+    return $this->shortCode;
+}
 }

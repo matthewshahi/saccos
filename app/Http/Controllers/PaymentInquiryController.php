@@ -21,8 +21,8 @@ class PaymentInquiryController extends Controller
             'reference_number' => 'required|string|max:50',
         ]);
 
-        $ref     = trim($request->reference_number);
-        $status  = 'Pending';
+        $ref      = trim($request->reference_number);
+        $status   = 'Pending';
         $response = null;
 
         try {
@@ -34,23 +34,22 @@ class PaymentInquiryController extends Controller
                 $response = json_encode($payment, JSON_PRETTY_PRINT);
             } else {
                 // ✅ 2. Not found locally → check Safaricom Transaction Status API
-                $mpesa = new MpesaTheController();
-
-                // This call handles token validity (50-min rule) and refresh if needed
-                $token = $mpesa->getAccessToken();
+                $mpesa   = new MpesaTheController();
+                $token   = $mpesa->getAccessToken();     // handles validity refresh
+                $shortcode = $mpesa->getShortCode();     // ✅ use getter, not protected property
 
                 $url = env('MPESA_ENV') === 'live'
                     ? 'https://api.safaricom.co.ke/mpesa/transactionstatus/v1/query'
                     : 'https://sandbox.safaricom.co.ke/mpesa/transactionstatus/v1/query';
 
                 $payload = [
-                    "CommandID"     => "TransactionStatusQuery",
-                    "PartyA"        => $mpesa->shortCode,
-                    "IdentifierType"=> "4", // 4 = Transaction ID
-                    "Remarks"       => "Payment inquiry",
-                    "Initiator"     => $mpesa->shortCode,
-                    "TransactionID" => $ref,
-                    "Occasion"      => "StatusQuery"
+                    "CommandID"      => "TransactionStatusQuery",
+                    "PartyA"         => $shortcode,
+                    "IdentifierType" => "4",  // 4 = Transaction ID
+                    "Remarks"        => "Payment inquiry",
+                    "Initiator"      => $shortcode,
+                    "TransactionID"  => $ref,
+                    "Occasion"       => "StatusQuery"
                 ];
 
                 $safaricomResponse = Http::withHeaders([
@@ -63,7 +62,7 @@ class PaymentInquiryController extends Controller
                     $status   = $result['ResultDesc'] ?? 'Pending';
                     $response = json_encode($result, JSON_PRETTY_PRINT);
 
-                    // ✅ If confirmed successful, cache it in local DB
+                    // ✅ Cache confirmed successful payments locally
                     if (isset($result['ResultCode']) && $result['ResultCode'] == 0) {
                         DB::table('c2b_payments')->updateOrInsert(
                             ['transaction_id' => $ref],
