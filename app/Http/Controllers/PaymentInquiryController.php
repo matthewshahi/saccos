@@ -80,10 +80,13 @@ class PaymentInquiryController extends Controller
                     "Occasion"           => "StatusQuery"
                 ];
 
-                Log::info('Sending Transaction Status payload to Safaricom', [
+               $payloadToLog = $payload;
+$payloadToLog['SecurityCredential'] = substr($payloadToLog['SecurityCredential'], 0, 8) . '***hidden***';
+
+Log::info('Sending Transaction Status payload to Safaricom', [
     'url'     => $url,
     'headers' => ['Authorization' => 'Bearer ' . substr($token, 0, 10) . '...'],
-    'payload' => $payload,
+    'payload' => $payloadToLog,
 ]);
 
 
