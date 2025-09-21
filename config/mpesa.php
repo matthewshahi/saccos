@@ -1,6 +1,5 @@
 <?php
 
-// config/mpesa.php
 return [
     'env' => env('MPESA_ENV', 'sandbox'),
 
@@ -8,11 +7,11 @@ return [
     'initiator_password' => env('MPESA_INITIATOR_PASSWORD'),
 
     'certificates' => [
-        'sandbox'    => base_path('config/SandboxCertificate.cer'),
-        'production' => base_path('config/ProductionCertificate.cer'),
+        'live'    => base_path('config/ProductionCertificate.cer'),
+        'default' => base_path('config/SandboxCertificate.cer'),
     ],
 
-    // Just keep relative paths if user doesn’t set full URL
+    // Always store only relative paths in .env, expanded with url()
     'result_url'  => env('MPESA_RESULT_URL', '/api/mobile/status/result'),
     'timeout_url' => env('MPESA_TIMEOUT_URL', '/api/mobile/status/timeout'),
 ];
