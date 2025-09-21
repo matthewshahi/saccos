@@ -80,11 +80,23 @@ class PaymentInquiryController extends Controller
                     "Occasion"           => "StatusQuery"
                 ];
 
+                Log::info('Sending Transaction Status payload to Safaricom', [
+    'url'     => $url,
+    'headers' => ['Authorization' => 'Bearer ' . substr($token, 0, 10) . '...'],
+    'payload' => $payload,
+]);
+
+
                 // 7. Safaricom API call
                 $safaricomResponse = Http::withHeaders([
                     'Authorization' => 'Bearer ' . $token,
                     'Content-Type'  => 'application/json',
                 ])->post($url, $payload);
+
+                Log::info('Safaricom Transaction Status response', [
+    'status' => $safaricomResponse->status(),
+    'body'   => $safaricomResponse->body(),
+]);
 
                 if ($safaricomResponse->successful()) {
                     $result   = $safaricomResponse->json();
