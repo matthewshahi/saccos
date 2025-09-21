@@ -374,17 +374,13 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
         ->name('loans.pending.approval')
         ->middleware('check_user_rights:end_month_processing_loans');
 
-    Route::post('admin/loans/approve/{id}', [LoanApplicationSelfServiceController::class, 'approveLoan'])
-        ->name('loans.approve')->middleware('check_user_rights:end_month_processing_loans');
+    // Route::post('admin/loans/approve/{id}', [LoanApplicationSelfServiceController::class, 'approveLoan'])
+    //     ->name('loans.approve')->middleware('check_user_rights:end_month_processing_loans');
 
     Route::post('admin/loans/reject/{id}', [LoanApplicationSelfServiceController::class, 'rejectLoan'])
         ->name('loans.reject')->middleware('check_user_rights:end_month_processing_loans');
 
-    // // Update loan status (Mark as Updated)
-    // Route::get('admin/loans/approve/{id}', [LoanApplicationSelfServiceController::class, 'updateLoan'])
-    //     ->name('loans.approve')
-    //     ->middleware('check_user_rights:end_month_processing_loans');
-
+  
     Route::get('/admin/end-of-year-processing', [HomeController::class, 'showEndOfYearProcessingForm'])->name('admin.show-end-of-year-processing-form')->middleware('check_user_rights:end_of_year_processing');
     Route::post('/admin/end-of-year-processing', [HomeController::class, 'endOfYearProcessing'])->name('admin.end-of-year-processing')->middleware('check_user_rights:end_of_year_processing');
 
