@@ -17,9 +17,6 @@ class PaymentInquiryController extends Controller
 
     public function check(Request $request)
     {
-        
-
-        
         $request->validate([
             'reference_number' => 'required|string|max:50',
         ]);
@@ -45,27 +42,29 @@ class PaymentInquiryController extends Controller
                 $status   = 'Success';
                 $response = json_encode($payment, JSON_PRETTY_PRINT);
             } else {
-                // 2. Pull config from DB
+                // 2. Pull dynamic config from DB
                 $config = DB::table('mpesa_configs')->where('api_type', 'c2b')->first();
                 if (!$config) {
                     throw new Exception("No C2B configuration found in DB.");
                 }
 
-                // 3. Credentials
-                $initiatorName     = $config->initiator_name     ?? config('mpesa.initiator_name');
-                $initiatorPassword = $config->initiator_password ?? config('mpesa.initiator_password');
+                // 3. Credentials (static from config, dynamic from DB)
+                $initiatorName     = config('mpesa.initiator_name');
+                $initiatorPassword = config('mpesa.initiator_password');
                 $shortCode         = $config->shortcode;
-                $resultUrl         = $config->result_url ?? config('mpesa.result_url');
-                $timeoutUrl        = $config->timeout_url ?? config('mpesa.timeout_url');
+                $resultUrl         = config('mpesa.result_url');
+                $timeoutUrl        = config('mpesa.timeout_url');
 
+                // 4. Get Access Token (via MpesaTheController logic)
                 $mpesa = new MpesaTheController();
                 $token = $mpesa->getAccessToken();
 
-                $url = env('MPESA_ENV') === 'live'
+                // 5. Transaction Status endpoint
+                $url = config('mpesa.env') === 'live'
                     ? 'https://api.safaricom.co.ke/mpesa/transactionstatus/v1/query'
                     : 'https://sandbox.safaricom.co.ke/mpesa/transactionstatus/v1/query';
 
-                // 4. Security Credential
+                // 6. Security Credential
                 $securityCredential = $this->generateSecurityCredential($initiatorPassword);
 
                 $payload = [
@@ -75,15 +74,13 @@ class PaymentInquiryController extends Controller
                     "TransactionID"      => $ref,
                     "PartyA"             => $shortCode,
                     "IdentifierType"     => "4",
-                    "ResultURL"          => url($resultUrl),
-                    "QueueTimeOutURL"    => url($timeoutUrl),
+                    "ResultURL"          => $resultUrl,
+                    "QueueTimeOutURL"    => $timeoutUrl,
                     "Remarks"            => "Payment inquiry",
                     "Occasion"           => "StatusQuery"
                 ];
 
-                Log::info('TransactionStatusQuery payload', $payload);
-                
-                // 5. Safaricom call
+                // 7. Safaricom API call
                 $safaricomResponse = Http::withHeaders([
                     'Authorization' => 'Bearer ' . $token,
                     'Content-Type'  => 'application/json',
@@ -109,7 +106,11 @@ class PaymentInquiryController extends Controller
 
     private function generateSecurityCredential($initiatorPassword)
     {
-        $certPath = config('mpesa.certificates.' . config('mpesa.env'));
+        $certificates = config('mpesa.certificates');
+        $env          = config('mpesa.env');
+
+        $certPath = $certificates[$env] ?? $certificates['default'];
+
         if (!file_exists($certPath)) {
             throw new Exception("M-Pesa certificate not found at: {$certPath}");
         }
@@ -130,7 +131,6 @@ class PaymentInquiryController extends Controller
             $data = $request->json()->all();
             $ref  = $data['Result']['TransactionID'] ?? 'N/A';
 
-            // ✅ Update existing inquiry
             DB::table('payment_inquiries')->updateOrInsert(
                 ['reference_number' => $ref],
                 [
@@ -158,7 +158,6 @@ class PaymentInquiryController extends Controller
             $data = $request->json()->all();
             $ref  = $data['TransactionID'] ?? 'N/A';
 
-            // ✅ Update existing inquiry
             DB::table('payment_inquiries')->updateOrInsert(
                 ['reference_number' => $ref],
                 [

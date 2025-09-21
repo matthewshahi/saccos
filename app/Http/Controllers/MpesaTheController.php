@@ -522,21 +522,17 @@ function checkPayment(Request $request){
     /**
      * Get or generate a new access token.
      */
-    
-    public function getAccessToken()
+public function getAccessToken()
 {
-    // Refresh 10 minutes before expiry
-    if (
-        $this->accessToken &&
-        $this->tokenExpiresAt &&
-        Carbon::now()->lt(Carbon::parse($this->tokenExpiresAt)->subMinutes(10))
-    ) {
+    // ✅ Reuse token if still valid (refresh 5 mins before expiry)
+    if ($this->accessToken && $this->tokenExpiresAt &&
+        Carbon::now()->lt(Carbon::parse($this->tokenExpiresAt)->subMinutes(5))) {
         return $this->accessToken;
     }
 
     // Otherwise fetch a new token
-    $url = env('MPESA_ENV') === 'live'
-        ? 'https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials'
+    $url = env('MPESA_ENV') === 'live' 
+        ? 'https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials' 
         : 'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials';
 
     $response = Http::withBasicAuth($this->consumerKey, $this->consumerSecret)->get($url);
@@ -549,19 +545,19 @@ function checkPayment(Request $request){
     $accessToken = $response['access_token'];
     $expiresIn   = $response['expires_in'];
 
-    // Save to DB for reuse by other controllers
+    // ✅ Update DB for all related rows (C2B + STK etc.)
     DB::table('mpesa_configs')
         ->where('shortcode', $this->shortCode)
-        ->whereIn('api_type', ['c2b', 'mpesa_express'])
         ->update([
             'access_token'     => $accessToken,
             'token_expires_at' => Carbon::now()->addSeconds($expiresIn),
         ]);
 
+    // ✅ Update current instance
     $this->accessToken    = $accessToken;
     $this->tokenExpiresAt = Carbon::now()->addSeconds($expiresIn);
 
-    Log::info('New access token generated and cached in DB.');
+    Log::info('New access token generated and saved.');
 
     return $accessToken;
 }
@@ -589,10 +585,14 @@ function checkPayment(Request $request){
 //     $expiresIn = $response->json()['expires_in'];
 
 //     // Save new token to the database
-//     DB::table('mpesa_configs')->where('shortcode', $this->shortCode)->where('api_type', 'c2b')->update([
-//         'access_token' => $accessToken,
-//         'token_expires_at' => Carbon::now()->addSeconds($expiresIn),
-//     ]);
+
+//     // 🔑 Update ALL rows for this shortcode (C2B + STK etc.) to stay in sync
+//     DB::table('mpesa_configs')
+//         ->where('shortcode', $this->shortCode)
+//         ->update([
+//             'access_token'     => $accessToken,
+//             'token_expires_at' => Carbon::now()->addSeconds($expiresIn),
+//         ]);
 
 //     Log::info('New access token generated and saved.');
 
@@ -1323,8 +1323,4 @@ public function paymentFailed($unique_number = null)
         {
             return view('mpesa.waiting', ['checkoutRequestId' => $checkoutRequestId]);
         }
-        public function getShortCode()
-{
-    return $this->shortCode;
-}
 }
