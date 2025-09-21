@@ -29,7 +29,7 @@
                             <th>National ID</th>
                             <th>Sacco ID</th>
                             <th>Status</th>
-                            <th class="text-right">Total Deposits</th>
+                            <th class="text-right">Total Savings/Deposits</th>
                             <th class="text-right">Total Capital</th>
                             <!-- The loanTypes headers will be added dynamically -->
                         </tr>
@@ -104,7 +104,7 @@
                                 <th>National ID</th>
                                 <th>Sacco ID</th>
                                 <th>Status</th>
-                                <th class="text-right">Total Deposits</th>
+                                <th class="text-right">Total Savings/Deposits</th>
                                 <th class="text-right">Total Capital</th>`;
                         loanTypes.forEach(type => {
                             headers += `<th class="text-right">${type.loan_type_name} Loan Balance</th>`;
