@@ -104,7 +104,7 @@
                                 <th>National ID</th>
                                 <th>Sacco ID</th>
                                 <th>Status</th>
-                                <th class="text-right">Total Shares</th>
+                                <th class="text-right">Total Deposits</th>
                                 <th class="text-right">Total Capital</th>`;
                         loanTypes.forEach(type => {
                             headers += `<th class="text-right">${type.loan_type_name} Loan Balance</th>`;
