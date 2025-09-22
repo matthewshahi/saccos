@@ -69,7 +69,7 @@
                     <li class="Ul_li--hover">
                         <a href="{{ url('/contributions/member-shares') }}">
                             <i class="i-Money-Bag text-20 me-2 text-muted"></i>
-                            <span class="item-name text-15 text-muted">Member Shares</span>
+                            <span class="item-name text-15 text-muted">Member Deposits / Contributions</span>
                         </a>
                     </li>
                     <li class="Ul_li--hover">

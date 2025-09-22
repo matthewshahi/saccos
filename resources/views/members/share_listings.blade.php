@@ -5,7 +5,7 @@
     <div class="col-md-12">
         <div class="card o-hidden mb-4">
             <div class="card-header d-flex align-items-center border-0">
-                <h3 class="w-50 float-start card-title m-0">Share Contribution Listings</h3>
+                <h3 class="w-50 float-start card-title m-0">Member Dopisits / Contributions Listings</h3>
             </div>
             <div>
                 <div class="table-responsive">
