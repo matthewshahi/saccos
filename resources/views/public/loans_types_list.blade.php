@@ -41,8 +41,11 @@
         </table>
 
         <div class="d-flex justify-content-center mt-4">
-            {{ $loanTypes->links() }}
-        </div>
+    {{ $loanTypes->links('pagination::bootstrap-5') }}
+</div>
+
+
+      
     </div>
 </div>
 @endsection
