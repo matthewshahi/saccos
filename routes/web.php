@@ -31,6 +31,7 @@ use App\Http\Controllers\MemberAddImages;
 use App\Http\Controllers\MemberController;
 use App\Http\Controllers\ReportsShareController;
 use App\Http\Controllers\PaymentInquiryController;
+use App\Http\Controllers\LoanPDFController;
 // use App\Http\Controllers\TxnImportController;
 
 // // Upload form
@@ -146,6 +147,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/loans/add-guarantor/{id}', [LoanApplicationSelfServiceController::class, 'addGuarantor'])->name('loans.add.guarantor');
     Route::get('/search/guarantors', [LoanApplicationSelfServiceController::class, 'search'])->name('search.guarantors');
 
+
     Route::get('/search/members', [HomeController::class, 'searchMembers'])->name('search.members');
 
 
@@ -153,7 +155,9 @@ Route::middleware(['auth'])->group(function () {
     // Route::get('/loans/pending/approval', [HomeController::class, 'listLoansPendingApproval'])->name('loans.pending.approval')->middleware('check_user_rights:rpt_loans_issued');
     // Route::get('/loans/types/list', [HomeController::class, 'loansTypesList'])->name('loans.types.list');
 
-
+// routes/web.php
+Route::get('loans/pending/pdf/{loanId}', [LoanPDFController::class, 'downloadLoanForm'])
+    ->name('loans.pending.getPDF');
 
 
     Route::get('/profile/password', [HomeController::class, 'showChangeSelfPasswordForm'])->name('profile.password');

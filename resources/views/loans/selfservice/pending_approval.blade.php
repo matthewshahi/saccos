@@ -77,6 +77,7 @@
         <th>Date Applied</th>
         <th>Updated</th>
         <th>Edit</th>
+        <th>PDF</th>
         <th>Actions</th>
     </tr>
 </thead>
@@ -113,11 +114,21 @@
                     Edit
                 </a>
             </td>
+               <td>
+    <a href="{{ route('loans.pending.getPDF', ['loanId' => $loan->batch_trans_id]) }}" 
+       class="btn btn-secondary btn-sm" target="_blank">
+        PDF
+    </a>
+</td>
             <td>
                 <button class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#loanModal{{ $loan->batch_trans_id }}">
                     Details
                 </button>
             </td>
+
+
+        
+
         </tr>
     @empty
         <tr>
@@ -221,6 +232,7 @@
                     </table>
                 </div>
 
+                
                 <!-- Modal Footer -->
                 <div class="modal-footer">
                         @if ($loan->batch_trans_updated == 'N' && $loan->batch_trans_deleted != 'Y')

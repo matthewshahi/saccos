@@ -113,7 +113,7 @@ class LoanApplicationSelfServiceController extends Controller
             return view('loans.selfservice.pending_approval', compact('loans'));
         }
     
-
+ 
     public function approveLoan($id)
     {
         $logged_in_user = auth()->id();

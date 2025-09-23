@@ -62,126 +62,154 @@
 
                 <form action="{{ route('loans.application.submit') }}" method="post" enctype="multipart/form-data">
                     @csrf
-                    <div class="row">
-                        <div class="col-md-6 form-group mb-3">
-                            <label for="batch_trans_member_name">Member Name*</label>
-                            <input class="form-control" id="batch_trans_member_name" name="batch_trans_member_name" type="text" value="{{ auth()->user()->member_name }} - ({{ auth()->user()->member_sacco_id }})" readonly>
-                        </div>
-                        <div class="col-md-6 form-group mb-3">
-                            <label for="batch_trans_loan_amount">Amount*</label>
-                            <input class="form-control" id="batch_trans_loan_amount" name="batch_trans_loan_amount" type="text" value="{{ old('batch_trans_loan_amount') }}">
-                        </div>
-                        <div class="col-md-6 form-group mb-3">
-                            <label for="batch_trans_loan_type">Loan Type*</label>
-                            <select class="form-control" id="batch_trans_loan_type" name="batch_trans_loan_type">
-                                @foreach($loanTypes as $type)
-                                    <option value="{{ $type->loan_type_id }}" {{ old('batch_trans_loan_type') == $type->loan_type_id ? 'selected' : '' }}>{{ $type->loan_type_name }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div class="col-md-6 form-group mb-3">
-                            <label for="batch_trans_loan_category">Loan Category*</label>
-                            <select class="form-control" id="batch_trans_loan_category" name="batch_trans_loan_category">
-                                @foreach($loanCategories as $category)
-                                    <option value="{{ $category->loan_category_id }}" {{ old('batch_trans_loan_category') == $category->loan_category_id ? 'selected' : '' }}>{{ $category->loan_category_name }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div class="col-md-6 form-group mb-3">
-                            <label for="batch_trans_loan_duration">Repayment Period*</label>
-                            <select class="form-control" id="batch_trans_loan_duration" name="batch_trans_loan_duration">
-                                @for($i=1; $i<=100; $i++)
-                                    <option value="{{ $i }}" {{ old('batch_trans_loan_duration') == $i ? 'selected' : '' }}>{{ $i }} months</option>
-                                @endfor
-                            </select>
-                        </div>
-                        <div class="col-md-6 form-group mb-3">
-                            <label for="batch_trans_description">Reason(s)* (max 50 characters)</label>
-                            <input class="form-control" id="batch_trans_description" name="batch_trans_description" type="text" value="{{ old('batch_trans_description') }}" maxlength="50">
-                        </div>
-                        <div class="col-md-6 form-group mb-3">
-                            <label for="batch_trans_loan_to_top_up">Loan to Top Up***</label>
-                            <select class="form-control" id="batch_trans_loan_to_top_up" name="batch_trans_loan_to_top_up">
-                                <option value="">Select Loan</option>
-                                @foreach($memberLoans as $loan)
-                                    <option value="{{ $loan->loan_id }}" {{ old('batch_trans_loan_to_top_up') == $loan->loan_id ? 'selected' : '' }}>{{ $loan->loan_type_name }} - {{ number_format($loan->loan_balance, 2) }} ({{ $loan->loan_id }})</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div class="col-md-6 form-group mb-3">
-                            <label for="batch_trans_pay1">Attach your latest 2 payslips (jpg/jpeg/png/gif, max 200KB)</label>
-                            <input type="file" class="form-control" id="batch_trans_pay1" name="batch_trans_pay1">
-                        </div>
-                        <div class="col-md-6 form-group mb-3">
-                            <label for="batch_trans_pay2">Attach payslip 2 (jpg/jpeg/png/gif, max 200KB)</label>
-                            <input type="file" class="form-control" id="batch_trans_pay2" name="batch_trans_pay2">
-                        </div>
-                        <div class="col-md-6 form-group mb-3">
-    <label for="batch_trans_payroll_number">Payroll Number (optional)</label>
-    <input class="form-control" id="batch_trans_payroll_number" 
-           name="batch_trans_payroll_number" 
-           type="text" 
-           value="{{ old('batch_trans_payroll_number') }}" 
-           placeholder="Enter payroll number if applicable">
-</div>
+                   <div class="row">
+    <!-- SECTION 1: Member & Loan Details -->
+    <div class="col-md-12 mt-3">
+        <h5 class="text-primary">Loan Details</h5>
+    </div>
 
-<div class="col-md-6 form-group mb-3">
-    <label for="batch_trans_present_designation">Present Designation (optional)</label>
-    <input class="form-control" id="batch_trans_present_designation" 
-           name="batch_trans_present_designation" 
-           type="text" 
-           value="{{ old('batch_trans_present_designation') }}" 
-           placeholder="Enter your job title if applicable">
-</div>
+    <div class="col-md-6 form-group mb-3">
+        <label for="batch_trans_member_name">Member Name*</label>
+        <input class="form-control" id="batch_trans_member_name" name="batch_trans_member_name" type="text"
+               value="{{ auth()->user()->member_name }} - ({{ auth()->user()->member_sacco_id }})" readonly>
+    </div>
 
-<div class="col-md-6 form-group mb-3">
-    <label for="batch_trans_terms_of_employment">Terms of Employment (optional)</label>
-    <input class="form-control" id="batch_trans_terms_of_employment" 
-           name="batch_trans_terms_of_employment" 
-           type="text" 
-           value="{{ old('batch_trans_terms_of_employment') }}" 
-           placeholder="e.g., Permanent, Contract, Casual">
-</div>
+    <div class="col-md-6 form-group mb-3">
+        <label for="batch_trans_loan_amount">Loan Amount*</label>
+        <input class="form-control" id="batch_trans_loan_amount" name="batch_trans_loan_amount" type="text"
+               value="{{ old('batch_trans_loan_amount') }}">
+    </div>
 
-<div class="col-md-12 mb-3">
-    <small class="text-muted">
-        <em>Note: Some members are not employed. These fields are optional and can be left blank.</em>
-    </small>
-</div>
-                        <div class="col-md-12">
-                            <div class="mt-4">
-                                <h4>Guarantors</h4>
-                                <table class="display table table-striped table-bordered" style="width: 100%">
-                                    <thead>
-                                        <tr>
-                                            <th>#</th>
-                                            <th>Member</th>
-                                            <th>Amount</th>
-                                            <th>Free shares****</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @for($i = 0; $i < $maximumNoOfGuarantors; $i++)
-                                            <tr>
-                                                <td>{{ $i + 1 }}</td>
-                                                <td>
-                                                    <input type="text" id="guarantors_guarantor_name{{ $i }}" name="guarantors_guarantor_name[]" class="form-control" onkeyup="showHintMembers(this.value, 'guarantors_guarantor_name{{ $i }}', 'txtHintMembersG{{ $i }}')" autocomplete="off" value="{{ old('guarantors_guarantor_name.' . $i) }}">
-                                                    <div id="txtHintMembersG{{ $i }}" class="suggestions-box"></div>
-                                                </td>
-                                                <td><input type="text" name="guarantors_amount_guaranteed[]" class="form-control" value="{{ old('guarantors_amount_guaranteed.' . $i) }}" /></td>
-                                                <td><input type="text" name="free_shares[]" class="form-control" disabled /></td>
-                                            </tr>
-                                        @endfor
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                        <div class="col-md-12">
+    <div class="col-md-6 form-group mb-3">
+        <label for="batch_trans_loan_type">Loan Type*</label>
+        <select class="form-control" id="batch_trans_loan_type" name="batch_trans_loan_type">
+            @foreach($loanTypes as $type)
+                <option value="{{ $type->loan_type_id }}" {{ old('batch_trans_loan_type') == $type->loan_type_id ? 'selected' : '' }}>
+                    {{ $type->loan_type_name }}
+                </option>
+            @endforeach
+        </select>
+    </div>
+
+    <div class="col-md-6 form-group mb-3">
+        <label for="batch_trans_loan_category">Loan Category*</label>
+        <select class="form-control" id="batch_trans_loan_category" name="batch_trans_loan_category">
+            @foreach($loanCategories as $category)
+                <option value="{{ $category->loan_category_id }}" {{ old('batch_trans_loan_category') == $category->loan_category_id ? 'selected' : '' }}>
+                    {{ $category->loan_category_name }}
+                </option>
+            @endforeach
+        </select>
+    </div>
+
+    <div class="col-md-6 form-group mb-3">
+        <label for="batch_trans_loan_duration">Repayment Period*</label>
+        <select class="form-control" id="batch_trans_loan_duration" name="batch_trans_loan_duration">
+            @for($i=1; $i<=100; $i++)
+                <option value="{{ $i }}" {{ old('batch_trans_loan_duration') == $i ? 'selected' : '' }}>{{ $i }} months</option>
+            @endfor
+        </select>
+    </div>
+
+    <div class="col-md-6 form-group mb-3">
+        <label for="batch_trans_description">Reason(s)* (max 50 characters)</label>
+        <input class="form-control" id="batch_trans_description" name="batch_trans_description" type="text"
+               value="{{ old('batch_trans_description') }}" maxlength="50">
+    </div>
+
+    <!-- SECTION 2: Top-Up -->
+    <div class="col-md-12 mt-4">
+        <h5 class="text-primary">Top-Up (Optional)</h5>
+        <small class="text-muted">Only fill if you are topping up an existing loan.</small>
+    </div>
+
+    <div class="col-md-6 form-group mb-3">
+        <label for="batch_trans_loan_to_top_up">Select Loan to Top Up</label>
+        <select class="form-control" id="batch_trans_loan_to_top_up" name="batch_trans_loan_to_top_up">
+            <option value="">None</option>
+            @foreach($memberLoans as $loan)
+                <option value="{{ $loan->loan_id }}" {{ old('batch_trans_loan_to_top_up') == $loan->loan_id ? 'selected' : '' }}>
+                    {{ $loan->loan_type_name }} - {{ number_format($loan->loan_balance, 2) }} ({{ $loan->loan_id }})
+                </option>
+            @endforeach
+        </select>
+    </div>
+
+    <!-- SECTION 3: Employment Details -->
+    <div class="col-md-12 mt-4">
+        <h5 class="text-primary">Employment Details (Optional)</h5>
+        <small class="text-muted">Not all members are employed. You may leave this section blank.</small>
+    </div>
+
+    <div class="col-md-4 form-group mb-3">
+        <label for="batch_trans_payroll_number">Payroll Number</label>
+        <input class="form-control" id="batch_trans_payroll_number" name="batch_trans_payroll_number" type="text"
+               value="{{ old('batch_trans_payroll_number') }}" placeholder="Enter payroll number if applicable">
+    </div>
+
+    <div class="col-md-4 form-group mb-3">
+        <label for="batch_trans_present_designation">Present Designation</label>
+        <input class="form-control" id="batch_trans_present_designation" name="batch_trans_present_designation" type="text"
+               value="{{ old('batch_trans_present_designation') }}" placeholder="Job title if applicable">
+    </div>
+
+    <div class="col-md-4 form-group mb-3">
+        <label for="batch_trans_terms_of_employment">Terms of Employment</label>
+        <input class="form-control" id="batch_trans_terms_of_employment" name="batch_trans_terms_of_employment" type="text"
+               value="{{ old('batch_trans_terms_of_employment') }}" placeholder="e.g., Permanent, Contract, Casual">
+    </div>
+
+    <div class="col-md-6 form-group mb-3">
+        <label for="batch_trans_pay1">Attach Payslip 1 (Optional)</label>
+        <input type="file" class="form-control" id="batch_trans_pay1" name="batch_trans_pay1">
+    </div>
+
+    <div class="col-md-6 form-group mb-3">
+        <label for="batch_trans_pay2">Attach Payslip 2 (Optional)</label>
+        <input type="file" class="form-control" id="batch_trans_pay2" name="batch_trans_pay2">
+    </div>
+
+    <!-- SECTION 4: Guarantors -->
+    <div class="col-md-12 mt-4">
+        <h4>Guarantors</h4>
+        <table class="display table table-striped table-bordered" style="width: 100%">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Member</th>
+                    <th>Amount</th>
+                    <th>Free shares****</th>
+                </tr>
+            </thead>
+            <tbody>
+                @for($i = 0; $i < $maximumNoOfGuarantors; $i++)
+                    <tr>
+                        <td>{{ $i + 1 }}</td>
+                        <td>
+                            <input type="text" id="guarantors_guarantor_name{{ $i }}" 
+                                   name="guarantors_guarantor_name[]" 
+                                   class="form-control"
+                                   onkeyup="showHintMembers(this.value, 'guarantors_guarantor_name{{ $i }}', 'txtHintMembersG{{ $i }}')" 
+                                   autocomplete="off" 
+                                   value="{{ old('guarantors_guarantor_name.' . $i) }}">
+                            <div id="txtHintMembersG{{ $i }}" class="suggestions-box"></div>
+                        </td>
+                        <td><input type="text" name="guarantors_amount_guaranteed[]" class="form-control" value="{{ old('guarantors_amount_guaranteed.' . $i) }}" /></td>
+                        <td><input type="text" name="free_shares[]" class="form-control" disabled /></td>
+                    </tr>
+                @endfor
+            </tbody>
+        </table>
+    </div>
+
+    <div class="col-md-12">
                             <button class="btn btn-primary" type="submit">Submit</button>
                         </div>
-                        <input type="hidden" name="batch_trans_member_id" value="{{ Auth::user()->id }}">
-
-                    </div>
+    <!-- Hidden member id -->
+    <input type="hidden" name="batch_trans_member_id" value="{{ Auth::user()->id }}">
+</div>
+                        
+                        
                 </form>
                 <p>
                     <strong>**Commission will not attract insurance, and is also not used when calculating interest. The final total loan taken will include insurance and commission.<br />
