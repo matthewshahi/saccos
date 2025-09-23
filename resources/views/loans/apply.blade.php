@@ -116,6 +116,38 @@
                             <label for="batch_trans_pay2">Attach payslip 2 (jpg/jpeg/png/gif, max 200KB)</label>
                             <input type="file" class="form-control" id="batch_trans_pay2" name="batch_trans_pay2">
                         </div>
+                        <div class="col-md-6 form-group mb-3">
+    <label for="batch_trans_payroll_number">Payroll Number (optional)</label>
+    <input class="form-control" id="batch_trans_payroll_number" 
+           name="batch_trans_payroll_number" 
+           type="text" 
+           value="{{ old('batch_trans_payroll_number') }}" 
+           placeholder="Enter payroll number if applicable">
+</div>
+
+<div class="col-md-6 form-group mb-3">
+    <label for="batch_trans_present_designation">Present Designation (optional)</label>
+    <input class="form-control" id="batch_trans_present_designation" 
+           name="batch_trans_present_designation" 
+           type="text" 
+           value="{{ old('batch_trans_present_designation') }}" 
+           placeholder="Enter your job title if applicable">
+</div>
+
+<div class="col-md-6 form-group mb-3">
+    <label for="batch_trans_terms_of_employment">Terms of Employment (optional)</label>
+    <input class="form-control" id="batch_trans_terms_of_employment" 
+           name="batch_trans_terms_of_employment" 
+           type="text" 
+           value="{{ old('batch_trans_terms_of_employment') }}" 
+           placeholder="e.g., Permanent, Contract, Casual">
+</div>
+
+<div class="col-md-12 mb-3">
+    <small class="text-muted">
+        <em>Note: Some members are not employed. These fields are optional and can be left blank.</em>
+    </small>
+</div>
                         <div class="col-md-12">
                             <div class="mt-4">
                                 <h4>Guarantors</h4>

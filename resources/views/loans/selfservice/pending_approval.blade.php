@@ -225,7 +225,7 @@
                 <div class="modal-footer">
                         @if ($loan->batch_trans_updated == 'N' && $loan->batch_trans_deleted != 'Y')
                             <!-- Approve Form -->
-                            <form id="approveForm{{ $loan->batch_trans_id }}" action="{{ route('loans.approve', ['id' => $loan->batch_trans_id]) }}" method="POST" style="display: inline;">
+                            <form id="approveForm{{ $loan->batch_trans_id }}" action="{{ route('loans.approve', ['loanId' => $loan->batch_trans_id]) }}" method="POST" style="display: inline;">
                                 @csrf
                                 <button type="button" class="btn btn-success" onclick="confirmAction('approve', '{{ $loan->batch_trans_id }}')">Approve</button>
                             </form>

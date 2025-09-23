@@ -3606,6 +3606,10 @@ $data = [
             'batch_trans_loan_to_top_up' => 'nullable|integer|exists:sacco_loans,loan_id',
             'batch_trans_pay1' => 'nullable|file|mimes:jpg,jpeg,png,gif|max:200',
             'batch_trans_pay2' => 'nullable|file|mimes:jpg,jpeg,png,gif|max:200',
+            'batch_trans_payroll_number' => 'nullable|string|max:50',
+    'batch_trans_present_designation' => 'nullable|string|max:100',
+    'batch_trans_terms_of_employment' => 'nullable|string|max:100',
+
         ], [
             'batch_trans_pay1.mimes' => 'File must be of type jpg, jpeg, png, gif.',
             'batch_trans_pay1.max' => 'File must be less than 200KB.',
@@ -3869,6 +3873,9 @@ $data = [
             'batch_trans_ip' => $request->ip(),
             'batch_trans_payslip1' => $payslip1Path,
             'batch_trans_payslip2' => $payslip2Path,
+            'batch_trans_payroll_number' => $data['batch_trans_payroll_number'] ?? null,
+    'batch_trans_present_designation' => $data['batch_trans_present_designation'] ?? null,
+    'batch_trans_terms_of_employment' => $data['batch_trans_terms_of_employment'] ?? null,
         ];
 
         // Generate the SQL query
