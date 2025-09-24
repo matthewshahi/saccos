@@ -299,7 +299,7 @@
 
                                     <li class="item-name">
                                         <a href="{{ url('/reports/shares/aging') }}">
-                                            <span class="text-muted">Share Deposist - Aging</span>
+                                            <span class="text-muted">Savings/Deposist - Aging</span>
                                         </a>
                                     </li>
 
