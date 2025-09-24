@@ -12,7 +12,7 @@
             <div class="card card-icon mb-4" style="min-height: 150px;">
                 <div class="card-body text-center">
                     <i class="i-Money-Bag"></i>
-                    <p class="text-muted mt-2 mb-2">Total Shares</p>
+                    <p class="text-muted mt-2 mb-2">Total Savings</p>
                     <p class="text-primary text-24 line-height-1 m-0">
                         {{ number_format($data['member']->member_total_share ?? 0, 2) }}
                     </p>
@@ -209,7 +209,7 @@
         var myChart = echarts.init(chartDom);
 
         var option = {
-            title: { text: 'Last 6 Share Payments', left: 'center' },
+            title: { text: 'Last 6 Savings / Depositis', left: 'center' },
             tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
             xAxis: {
                 type: 'category',
