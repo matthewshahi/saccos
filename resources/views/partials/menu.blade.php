@@ -293,7 +293,7 @@
                                     </li>
                                     <li class="item-name">
                                         <a href="{{ url('/reports/shares/top-members') }}">
-                                            <span class="text-muted">Top Shareholding</span>
+                                            <span class="text-muted">Top Savers</span>
                                         </a>
                                     </li>
 

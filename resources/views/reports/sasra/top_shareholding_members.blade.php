@@ -11,9 +11,9 @@
   <div class="card mb-4">
     <div class="card-header d-flex justify-content-between align-items-center">
       <div>
-        <h4 class="card-title mb-0">Top Shareholding Members</h4>
+        <h4 class="card-title mb-0">Top Saving Members</h4>
         <small class="text-muted">
-          Showing top 50 members based on total share contributions from
+          Showing top 50 members based on total  contributions from
           <strong>{{ $startText }}</strong> to <strong>{{ $endText }}</strong>
           @if (!empty($filter_company))
             for company <strong>{{ strtoupper($filter_company) }}</strong>
@@ -35,7 +35,7 @@
               <th class="text-start">ID</th>
               <th class="text-start">PHONE</th>
               <th class="text-start">COMPANY</th>
-              <th>TOTAL SHARES (KES)</th>
+              <th>TOTAL SAVINGS (KES)</th>
             </tr>
           </thead>
           <tbody>
