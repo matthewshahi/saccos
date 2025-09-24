@@ -13,6 +13,7 @@
         .small { font-size: 10px; color: #555; }
         .page-break { page-break-after: always; }
 
+        /* Page numbers */
         @page { margin: 60px 40px; }
         footer {
             position: fixed; 
@@ -29,31 +30,30 @@
     </style>
 </head>
 <body>
-    <h2>{{ $companyName ?? 'SACCO Ltd' }}</h2>
+    <h2>{{ $companyName }}</h2>
     <h3>Loan Application & Agreement Form</h3>
-    <p class="small">Generated on {{ $today ?? '' }}</p>
+    <p class="small">Generated on {{ $today }}</p>
 
     {{-- SECTION 1 --}}
     <div class="section-title">SECTION 1 – Applicant Details</div>
     <table>
-        <tr><td>Name</td><td>{{ $loan->member_name ?? '-' }}</td></tr>
-        <tr><td>Member No</td><td>{{ $loan->member_sacco_id ?? '-' }}</td></tr>
-        <tr><td>National ID</td><td>{{ $loan->member_national_id ?? '-' }}</td></tr>
-        <tr><td>Phone</td><td>{{ $loan->member_phone_no ?? '-' }}</td></tr>
+        <tr><td>Name</td><td>{{ $loan->member_name }}</td></tr>
+        <tr><td>Member No</td><td>{{ $loan->member_sacco_id }}</td></tr>
+        <tr><td>National ID</td><td>{{ $loan->member_national_id }}</td></tr>
+        <tr><td>Phone</td><td>{{ $loan->member_phone_no }}</td></tr>
         <tr><td>Payroll/Employee No</td><td>{{ $loan->batch_trans_payroll_number ?? '-' }}</td></tr>
         <tr><td>Designation</td><td>{{ $loan->batch_trans_present_designation ?? '-' }}</td></tr>
         <tr><td>Terms of Employment</td><td>{{ $loan->batch_trans_terms_of_employment ?? '-' }}</td></tr>
-        <tr><td>Date of Application</td>
-            <td>
-                {{ isset($loan->batch_trans_on) ? \Carbon\Carbon::parse($loan->batch_trans_on)->format('d/m/Y H:i') : '-' }}
-            </td>
+        <tr>
+            <td>Date of Application</td>
+            <td>{{ $loan->loan_created_at ? \Carbon\Carbon::parse($loan->loan_created_at)->format('d/m/Y H:i') : '-' }}</td>
         </tr>
         <tr>
             <td>Status</td>
             <td>
-                @if(($loan->batch_trans_deleted ?? 'N') == 'Y')
+                @if($loan->batch_trans_deleted == 'Y')
                     Rejected
-                @elseif(($loan->batch_trans_updated ?? 'N') == 'Y')
+                @elseif($loan->batch_trans_updated == 'Y')
                     Proceeded / Approved
                 @else
                     Pending
@@ -65,11 +65,11 @@
     {{-- SECTION 2 --}}
     <div class="section-title">SECTION 2 – Loan Details</div>
     <table>
-        <tr><td>Loan Type</td><td>{{ $loan->loan_type_name ?? '-' }}</td></tr>
-        <tr><td>Loan Category</td><td>{{ $loan->loan_category_name ?? '-' }}</td></tr>
-        <tr><td>Requested Amount</td><td>KES {{ number_format($loan->batch_trans_loan_amount ?? 0, 2) }}</td></tr>
-        <tr><td>Repayment Period</td><td>{{ $loan->batch_trans_loan_duration ?? '-' }} months</td></tr>
-        <tr><td>Purpose / Reason</td><td>{{ $loan->batch_trans_description ?? '-' }}</td></tr>
+        <tr><td>Loan Type</td><td>{{ $loan->loan_type_name }}</td></tr>
+        <tr><td>Loan Category</td><td>{{ $loan->loan_category_name }}</td></tr>
+        <tr><td>Requested Amount</td><td>KES {{ number_format($loan->batch_trans_loan_amount, 2) }}</td></tr>
+        <tr><td>Repayment Period</td><td>{{ $loan->batch_trans_loan_duration }} months</td></tr>
+        <tr><td>Purpose / Reason</td><td>{{ $loan->batch_trans_description }}</td></tr>
     </table>
 
     {{-- SECTION 3 --}}
@@ -84,16 +84,13 @@
             @forelse($guarantors as $i => $g)
             <tr>
                 <td>{{ $i+1 }}</td>
-                <td>{{ $g->member_name ?? '-' }}</td>
-                <td>{{ $g->member_sacco_id ?? '-' }}</td>
-                <td>{{ $g->member_phone_no ?? '-' }}</td>
-                <td>{{ number_format($g->guarantors_amount_guaranteed ?? 0, 2) }}</td>
+                <td>{{ $g->member_name }}</td>
+                <td>{{ $g->member_sacco_id }}</td>
+                <td>{{ $g->member_phone_no }}</td>
+                <td>{{ number_format($g->guarantors_amount_guaranteed, 2) }}</td>
                 <td class="small">
-                    @if(($g->guarantors_approved ?? 'N') == 'Y')
-                        Approved 
-                        @if(isset($g->guarantor_created_at))
-                            on {{ \Carbon\Carbon::parse($g->guarantor_created_at)->format('d/m/Y') }}
-                        @endif
+                    @if($g->guarantors_approved == 'Y')
+                        Approved on {{ $g->guarantor_created_at ? \Carbon\Carbon::parse($g->guarantor_created_at)->format('d/m/Y H:i') : '-' }}
                     @else
                         Pending
                     @endif
