@@ -36,7 +36,7 @@
             <div class="card card-icon mb-4" style="min-height: 150px;">
                 <div class="card-body text-center">
                     <i class="i-Bank"></i>
-                    <p class="text-muted mt-2 mb-2">Total FOSA</p>
+                    <p class="text-muted mt-2 mb-2">Total FOSA / Welfare</p>
                     <p class="text-primary text-24 line-height-1 m-0">
                         {{ number_format($data['member']->member_total_fosa ?? 0, 2) }}
                     </p>
