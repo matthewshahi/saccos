@@ -73,7 +73,7 @@ class ReportsShareController extends Controller
 
         // ✅ Build result rows
         $rows = [];
-        foreach ($members as $member) {
+        foreach ($members as $member) { 
             $row = [
                 'member_name' => strtoupper($member->member_name),
                 'member_id_number' => strtoupper($member->member_national_id),
