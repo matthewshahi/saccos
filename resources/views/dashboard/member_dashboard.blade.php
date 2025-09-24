@@ -86,7 +86,7 @@
     <div class="col-lg-6 col-md-12">
         <div class="card mb-4">
             <div class="card-body p-0">
-                <h5 class="card-title m-0 p-3">Share Payments |
+                <h5 class="card-title m-0 p-3">Savings |
                     <?php
                     
                     
