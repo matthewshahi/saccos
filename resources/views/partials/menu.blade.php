@@ -140,6 +140,11 @@
                                     <span class="text-muted">Add/reduce</span>
                                 </a>
                             </li>
+                            <li class="item-name">
+                                <a href="{{ route('fosa.index') }}">
+                                    <span class="text-muted">Types</span>
+                                </a>
+                            </li>
                         </ul>
                     </li>
                     <li class="Ul_li--hover">

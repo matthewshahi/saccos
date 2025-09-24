@@ -32,6 +32,8 @@ use App\Http\Controllers\MemberController;
 use App\Http\Controllers\ReportsShareController;
 use App\Http\Controllers\PaymentInquiryController;
 use App\Http\Controllers\LoanPDFController;
+use App\Http\Controllers\FosaTypeController;
+
 // use App\Http\Controllers\TxnImportController;
 
 // // Upload form
@@ -240,6 +242,18 @@ Route::prefix('mobile')->group(function () {
 
 Route::middleware(['auth', 'check_member_position'])->group(function () {
 
+ 
+Route::prefix('fosa-types')
+        ->middleware('check_user_rights:FosaTypesEdit')
+        ->group(function () {
+            Route::get('/', [FosaTypeController::class, 'index'])->name('fosa.index');
+            Route::get('/create', [FosaTypeController::class, 'create'])->name('fosa.create');
+            Route::post('/store', [FosaTypeController::class, 'store'])->name('fosa.store');
+            Route::post('/{id}/toggle', [FosaTypeController::class, 'toggle'])->name('fosa.toggle');
+        });
+ 
+
+
 
     Route::get('/new_members/list', [PublicRegistrationActionsController::class, 'listMembers'])->name('members.list')->middleware('check_user_rights:new_member_applications_list');
     Route::post('/new_members/update/{id}', [PublicRegistrationActionsController::class, 'updateField'])->middleware('check_user_rights:new_member_applications_update');
@@ -284,14 +298,7 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
 
 
 
-    Route::middleware(['auth', 'check_user_rights:edit_member'])->group(function () {
-        Route::get('/kintypelist', [KinTypeController::class, 'index'])->name('kintype.list');
-        Route::get('/kintypeadd', [KinTypeController::class, 'add'])->name('kintype.add');
-        Route::post('/kintypestore', [KinTypeController::class, 'store'])->name('kintype.store');
-        Route::get('/kintypeedit/{id}', [KinTypeController::class, 'edit'])->name('kintype.edit');
-        Route::post('/kintypeupdate/{id}', [KinTypeController::class, 'update'])->name('kintype.update');
-    });
-
+    
 
 
     Route::delete('/members/{member_id}/guarantors/{guarantor_id}', [HomeController::class, 'deleteGuarantor'])->name('deleteGuarantor')->middleware('check_user_rights:loan_guarantors_change');
