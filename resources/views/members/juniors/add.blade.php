@@ -1,6 +1,7 @@
 @extends('layouts.app')
 
 @section('content')
+@include("member_name")
 <div class="container">
     @if(session('success'))
         <div class="alert alert-success">{{ session('success') }}</div>

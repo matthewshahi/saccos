@@ -36,6 +36,8 @@
 </head>
 
 <body class="text-start">
+
+
 @php $isLoginRoute = Route::currentRouteName() === 'login'; @endphp
 <div class="app-admin-wrap {{ $isLoginRoute ? '' : 'layout-sidebar-vertical sidebar-full' }}">
 

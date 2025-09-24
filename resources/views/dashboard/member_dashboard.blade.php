@@ -1,7 +1,8 @@
 @extends('layouts.app')
 
 @section('content')
- 
+
+@include("member_name")
 <div class="row">
     <!-- Icon Cards Section -->
     <div class="col-lg-6 col-md-12">

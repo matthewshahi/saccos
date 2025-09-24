@@ -1,20 +1,9 @@
 @extends('layouts.app')
 
 @section('content')
-    <div class="breadcrumb d-flex justify-content-between align-items-center">
-        <h1>Member Status Report</h1>
-        <div class="header-part-right">
-            <ul>
-                @if(Auth::check())
-                    <li>{{ Auth::user()->member_name }}</li>
-                @endif
-                @if(isset($currentPeriod))
-                    <li><a href="{{ route('admin.periods') }}">{{ $currentPeriod->period_name }}</a></li>
-                @endif
-                <li><i class="i-Full-Screen header-icon d-none d-sm-inline-block" data-fullscreen=""></i></li>
-            </ul>
-        </div>
-    </div>
+
+@include("member_name")
+     
     <div class="separator-breadcrumb border-top"></div>
 
     @if(session('success'))

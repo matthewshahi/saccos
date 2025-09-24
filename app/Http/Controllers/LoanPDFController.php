@@ -15,14 +15,23 @@ class LoanPDFController extends Controller
     {
         $userId = Auth::id();
 
-        // Fetch loan details
-        $loan = DB::table('sacco_loan_batch_trans_members as trans')
-            ->join('sacco_members as m', 'trans.batch_trans_member_id', '=', 'm.member_id')
-            ->join('sacco_loan_types as t', 'trans.batch_trans_loan_type', '=', 't.loan_type_id')
-            ->join('sacco_loan_category as c', 'trans.batch_trans_loan_category', '=', 'c.loan_category_id')
-            ->select('trans.*', 'm.*', 't.loan_type_name', 'c.loan_category_name')
-            ->where('trans.batch_trans_id', $loanId)
-            ->first();
+        
+
+
+            $loan = DB::table('sacco_loan_batch_trans_members as trans')
+    ->join('sacco_members as m', 'trans.batch_trans_member_id', '=', 'm.member_id')
+    ->join('sacco_loan_types as t', 'trans.batch_trans_loan_type', '=', 't.loan_type_id')
+    ->join('sacco_loan_category as c', 'trans.batch_trans_loan_category', '=', 'c.loan_category_id')
+    ->select(
+        'trans.*',
+        'm.*',
+        't.loan_type_name',
+        'c.loan_category_name',
+        DB::raw('trans.created_at as loan_created_at')
+    )
+    ->where('trans.batch_trans_id', $loanId)
+    ->first();
+
 
         if (!$loan || $loan->member_id != $userId) {
             abort(403, "Unauthorized: This loan does not belong to you.");

@@ -1,6 +1,7 @@
 @extends('layouts.app')
 
 @section('content')
+@include("member_name")
 <div class="row">
     <div class="col-md-12">
         <h3 class="mb-4">Loans Taken</h3>

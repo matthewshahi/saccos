@@ -85,6 +85,8 @@
                 <td>{{ $g->member_sacco_id }}</td>
                 <td>{{ $g->member_phone_no }}</td>
                 <td>{{ number_format($g->guarantors_amount_guaranteed, 2) }}</td>
+
+                
                 <td class="small">
                     {{ $g->guarantors_approved == 'Y' ? 'Approved on ' . $g->created_at : 'Pending' }}
                 </td>
