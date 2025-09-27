@@ -36,6 +36,7 @@ use App\Http\Controllers\FosaTypeController;
 use App\Http\Controllers\FosaTransactionController;
 use App\Http\Controllers\FosaImportController;
 use App\Http\Controllers\FosaEndMonthController;
+use App\Http\Controllers\SharesClearanceController;
 
 
 // use App\Http\Controllers\TxnImportController;
@@ -179,6 +180,31 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/check-payment', [PaymentInquiryController::class, 'check'])->name('payment.check.submit');
 });
 
+
+
+// ========================
+// Shares Clearance Module
+// ========================
+Route::prefix('shares-clearance')
+    ->middleware(['check_user_rights:SharesClearance'])
+    ->group(function () {
+
+        // 1️⃣ Listing/Search page (searchable members, max 20 results)
+        Route::get('/', [SharesClearanceController::class, 'index'])
+            ->name('shares.clearance.index');
+
+        // 2️⃣ Search API (AJAX smart search for members)
+        Route::get('/search', [SharesClearanceController::class, 'searchMembers'])
+            ->name('shares.clearance.search');
+
+        // 3️⃣ Get loans for a member (modal load)
+        Route::get('/{member}/loans', [SharesClearanceController::class, 'getLoans'])
+            ->name('shares.clearance.loans');
+
+        // 4️⃣ Process clearance (apply selected shares to loans)
+        Route::post('/process', [SharesClearanceController::class, 'process'])
+            ->name('shares.clearance.process');
+    });
 
 Route::prefix('mobile')->group(function () {
 

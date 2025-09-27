@@ -95,10 +95,16 @@
                                 </a>
                             </li>
                             <li class="item-name">
+                                <a href="{{ route('shares.clearance.index') }}">
+                                    <span class="text-muted">Clear Loans Using Savings</span>
+                                </a>
+                            </li>
+                            <li class="item-name">
                                 <a href="{{ route('transfer.member.shares') }}">
                                     <span class="text-muted">Transfer between members</span>
                                 </a>
                             </li>
+
                             <li class="item-name">
                                 <a href="{{ route('proc.end.month.shares') }}">
                                     <span class="text-muted">End month proc.</span>
