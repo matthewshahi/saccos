@@ -136,10 +136,21 @@
                         </a>
                         <ul class="mm-collapse">
                             <li class="item-name">
-                                <a href="{{ route('modify.member.fosas') }}">
+                                <a href="{{ route('fosa.transactions.index') }}">
                                     <span class="text-muted">Add/reduce</span>
                                 </a>
                             </li>
+                            <li class="item-name">
+                                <a href="{{ route('fosa.transactions.import') }}">
+                                    <span class="text-muted">Import</span>
+                                </a>
+                            </li>
+                            <li class="item-name">
+                                <a href="{{ route('fosa.endmonth.index') }}">
+                                    <span class="text-muted">End Month Proc</span>
+                                </a>
+                            </li>
+                            
                             <li class="item-name">
                                 <a href="{{ route('fosa.index') }}">
                                     <span class="text-muted">Types</span>

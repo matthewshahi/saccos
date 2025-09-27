@@ -33,6 +33,10 @@ use App\Http\Controllers\ReportsShareController;
 use App\Http\Controllers\PaymentInquiryController;
 use App\Http\Controllers\LoanPDFController;
 use App\Http\Controllers\FosaTypeController;
+use App\Http\Controllers\FosaTransactionController;
+use App\Http\Controllers\FosaImportController;
+use App\Http\Controllers\FosaEndMonthController;
+
 
 // use App\Http\Controllers\TxnImportController;
 
@@ -69,7 +73,7 @@ use App\Http\Controllers\FosaTypeController;
 
 // Route::post('/import/loans/taken', [MemberImportController::class, 'importLoansTaken'])
 //     ->name('import.loans.taken.run');
-    
+
 // // Loans (Taken) import
 // Route::get('/import/loans/taken', [MemberImportController::class, 'showLoansTakenImportForm'])
 //     ->name('import.loans.taken.form');
@@ -157,9 +161,9 @@ Route::middleware(['auth'])->group(function () {
     // Route::get('/loans/pending/approval', [HomeController::class, 'listLoansPendingApproval'])->name('loans.pending.approval')->middleware('check_user_rights:rpt_loans_issued');
     // Route::get('/loans/types/list', [HomeController::class, 'loansTypesList'])->name('loans.types.list');
 
-// routes/web.php
-Route::get('loans/pending/pdf/{loanId}', [LoanPDFController::class, 'downloadLoanForm'])
-    ->name('loans.pending.getPDF');
+    // routes/web.php
+    Route::get('loans/pending/pdf/{loanId}', [LoanPDFController::class, 'downloadLoanForm'])
+        ->name('loans.pending.getPDF');
 
 
     Route::get('/profile/password', [HomeController::class, 'showChangeSelfPasswordForm'])->name('profile.password');
@@ -167,13 +171,12 @@ Route::get('loans/pending/pdf/{loanId}', [LoanPDFController::class, 'downloadLoa
 
     Route::get('/downloads', [PublicFileController::class, 'publicDownloads'])->name('public.downloads');
     Route::get('/downloads/{file}/download', [PublicFileController::class, 'downloadFile'])->name('public.download.file');
-     
-Route::get('/members/juniors/create', [MemberController::class, 'createJunior'])->name('members.juniors.create');
-Route::post('/members/juniors/store', [MemberController::class, 'storeJunior'])->name('members.juniors.store');
 
-Route::get('/check-payment', [PaymentInquiryController::class, 'index'])->name('payment.check');
-Route::post('/check-payment', [PaymentInquiryController::class, 'check'])->name('payment.check.submit');
+    Route::get('/members/juniors/create', [MemberController::class, 'createJunior'])->name('members.juniors.create');
+    Route::post('/members/juniors/store', [MemberController::class, 'storeJunior'])->name('members.juniors.store');
 
+    Route::get('/check-payment', [PaymentInquiryController::class, 'index'])->name('payment.check');
+    Route::post('/check-payment', [PaymentInquiryController::class, 'check'])->name('payment.check.submit');
 });
 
 
@@ -242,8 +245,8 @@ Route::prefix('mobile')->group(function () {
 
 Route::middleware(['auth', 'check_member_position'])->group(function () {
 
- 
-Route::prefix('fosa-types')
+
+    Route::prefix('fosa-types')
         ->middleware('check_user_rights:FosaTypesEdit')
         ->group(function () {
             Route::get('/', [FosaTypeController::class, 'index'])->name('fosa.index');
@@ -251,7 +254,65 @@ Route::prefix('fosa-types')
             Route::post('/store', [FosaTypeController::class, 'store'])->name('fosa.store');
             Route::post('/{id}/toggle', [FosaTypeController::class, 'toggle'])->name('fosa.toggle');
         });
- 
+
+
+    // Route::middleware(['check_user_rights:FosaTransactions'])
+    //     ->prefix('fosa')
+    //     ->group(function () {
+    //         Route::get('/transactions', [FosaTransactionController::class, 'index'])->name('fosa.transactions.index');
+    //         Route::get('/transactions/create', [FosaTransactionController::class, 'create'])->name('fosa.transactions.create');
+    //         Route::post('/transactions/store', [FosaTransactionController::class, 'store'])->name('fosa.transactions.store');
+    //         Route::get('/transactions/{id}/receipt', [FosaTransactionController::class, 'receipt'])->name('fosa.transactions.receipt');
+    //     });
+
+
+
+    Route::middleware(['check_user_rights:FosaTransactions'])->group(function () {
+        Route::get('/api/members/search', [FosaTransactionController::class, 'searchMembers'])
+            ->name('api.members.search');
+
+        Route::get('/api/accounts/search', [FosaTransactionController::class, 'searchAccounts'])
+            ->name('api.accounts.search');
+    });
+
+
+   Route::middleware(['check_user_rights:FosaTransactions'])
+    ->prefix('fosa')
+    ->group(function () {
+        Route::get('/transactions', [FosaTransactionController::class, 'index'])
+            ->name('fosa.transactions.index');
+
+        Route::get('/transactions/create', [FosaTransactionController::class, 'create'])
+            ->name('fosa.transactions.create');
+
+        Route::post('/transactions/store', [FosaTransactionController::class, 'store'])
+            ->name('fosa.transactions.store');
+
+        Route::get('/transactions/{id}/receipt', [FosaTransactionController::class, 'receipt'])
+            ->name('fosa.transactions.receipt');
+
+        // 📌 Import routes
+        Route::get('/transactions/import', [FosaImportController::class, 'showForm'])
+            ->name('fosa.transactions.import');
+        Route::get('/transactions/import/preview/{csv}', [FosaImportController::class, 'showPreview'])
+            ->name('fosa.transactions.import.preview.show');
+
+        Route::post('/transactions/import/preview', [FosaImportController::class, 'preview'])
+            ->name('fosa.transactions.import.preview');
+             
+
+    Route::get('/transactions/import/preview/{csv}', [FosaImportController::class, 'showPreview'])
+    ->name('fosa.transactions.import.preview.show');
+    });
+
+        Route::post('/transactions/import/process', [FosaImportController::class, 'process'])
+            ->name('fosa.transactions.import.process'); // ✅ Added
+
+            Route::get('/transactions/import/preview', function () {
+    return redirect()->route('fosa.transactions.import')
+        ->with('error', 'Please upload a CSV file first.');
+});
+
 
 
 
@@ -260,6 +321,16 @@ Route::prefix('fosa-types')
     Route::get('/new_members/details/{id}', [PublicRegistrationActionsController::class, 'getMemberDetails'])->name('members.details')->middleware('check_user_rights:new_member_applications_update');
     Route::post('/new_members/export/live', [PublicRegistrationActionsImportController::class, 'exportLiveData'])->name('members.exportLive')->middleware('check_user_rights:new_member_applications_update');
 
+
+    
+
+Route::middleware(['check_user_rights:FosaTransactions'])
+    ->prefix('fosa/endmonth')
+    ->group(function () {
+        Route::get('/', [FosaEndMonthController::class, 'index'])->name('fosa.endmonth.index');
+        Route::post('/update/{id}', [FosaEndMonthController::class, 'update'])->name('fosa.endmonth.update'); // AJAX update monthly contr.
+        Route::post('/process', [FosaEndMonthController::class, 'process'])->name('fosa.endmonth.process');
+    });
 
 
     // Route::get('/import/members', [MemberImportController::class, 'showForm'])->name('import.members.form');//->middleware('check_user_rights:new_member_applications_updateXXX');
@@ -298,7 +369,7 @@ Route::prefix('fosa-types')
 
 
 
-    
+
 
 
     Route::delete('/members/{member_id}/guarantors/{guarantor_id}', [HomeController::class, 'deleteGuarantor'])->name('deleteGuarantor')->middleware('check_user_rights:loan_guarantors_change');
@@ -391,7 +462,7 @@ Route::prefix('fosa-types')
     Route::post('admin/loans/reject/{id}', [LoanApplicationSelfServiceController::class, 'rejectLoan'])
         ->name('loans.reject')->middleware('check_user_rights:end_month_processing_loans');
 
-  
+
     Route::get('/admin/end-of-year-processing', [HomeController::class, 'showEndOfYearProcessingForm'])->name('admin.show-end-of-year-processing-form')->middleware('check_user_rights:end_of_year_processing');
     Route::post('/admin/end-of-year-processing', [HomeController::class, 'endOfYearProcessing'])->name('admin.end-of-year-processing')->middleware('check_user_rights:end_of_year_processing');
 
@@ -556,9 +627,8 @@ Route::prefix('fosa-types')
     Route::delete('/files/delete/{file}', [FileUploadController::class, 'delete'])->name('file.delete')->middleware('check_user_rights:file_delete');
 
     if (config('sacco.transport_sacco') === 'Y') {
-    Route::prefix('transport')->group(function () {
-    require __DIR__.'/transport/routes.php';
-});
-}
-
+        Route::prefix('transport')->group(function () {
+            require __DIR__ . '/transport/routes.php';
+        });
+    }
 });

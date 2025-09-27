@@ -1,0 +1,6 @@
+member_no,national_id,amount,type,description,doc_no,period,date_paid,fosa_paid_by,fosa_type
+M001,12345678,1500,deposit,Monthly saving,DOC1001,202509,25/09/2025 10:15,John Doe,Normal Savings
+M002,23456789,2000,deposit,Salary deposit,SLRY1002,202509,25/09/2025 11:00,Jane Smith,Salary
+M003,,500,withdrawal,ATM cash withdrawal,WD1003,202509,25/09/2025 12:30,Peter Kariuki,
+,34567890,750,deposit,Loan repayment,LRP1004,202509,25/09/2025 13:45,Mary Achieng,
+M004,45678901,300,withdrawal,Cash counter withdrawal,CWD1005,202509,25/09/2025 15:10,Ali Mohamed,
