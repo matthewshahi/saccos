@@ -24,40 +24,63 @@ class FosaTypeController extends Controller
     // Store new type
     public function store(Request $request)
     {
-        $request->validate([
-            'type_name' => 'required|string|max:50|unique:sacco_fosa_types,type_name',
-        ]);
+        try {
+            $request->validate([
+                'type_name'   => 'required|string|max:50|unique:sacco_fosa_types,type_name',
+                'type_prefix' => 'required|string|size:2|unique:sacco_fosa_types,type_prefix|not_in:SH,LN',
+            ]);
 
-        DB::table('sacco_fosa_types')->insert([
-            'type_name'   => ucfirst($request->type_name),
-            'type_active' => 'Y',
-            'type_default'=> 'N',
-            'created_by'  => Auth::id(),
-            'created_ip'  => $request->ip(),
-            'created_at'  => now(),
-            'updated_at'  => now(),
-        ]);
+            DB::table('sacco_fosa_types')->insert([
+                'type_name'   => ucfirst($request->type_name),
+                'type_prefix' => strtoupper($request->type_prefix),
+                'type_active' => 'Y',
+                'type_default'=> 'N',
+                'created_by'  => Auth::id(),
+                'created_ip'  => $request->ip(),
+                'created_at'  => now(),
+                'updated_at'  => now(),
+            ]);
 
-        return redirect()->route('fosa.index')->with('success', 'FOSA Type added successfully.');
+            return redirect()
+                ->route('fosa.index')
+                ->with('success', 'FOSA Type added successfully.');
+        } catch (\Exception $e) {
+            return back()
+                ->withInput()
+                ->with('error', 'Failed to add FOSA Type: ' . $e->getMessage());
+        }
     }
 
     // Toggle Active/Inactive
     public function toggle($id, Request $request)
     {
         $record = DB::table('sacco_fosa_types')->where('type_id', $id)->first();
+
         if (!$record) {
-            return redirect()->route('fosa.index')->with('error', 'Record not found.');
+            return redirect()
+                ->route('fosa.index')
+                ->with('error', 'Record not found.');
         }
 
-        $newStatus = $record->type_active === 'Y' ? 'N' : 'Y';
+        try {
+            $newStatus = $record->type_active === 'Y' ? 'N' : 'Y';
 
-        DB::table('sacco_fosa_types')->where('type_id', $id)->update([
-            'type_active' => $newStatus,
-            'updated_by'  => Auth::id(),
-            'updated_ip'  => $request->ip(),
-            'updated_at'  => now(),
-        ]);
+            DB::table('sacco_fosa_types')
+                ->where('type_id', $id)
+                ->update([
+                    'type_active' => $newStatus,
+                    'updated_by'  => Auth::id(),
+                    'updated_ip'  => $request->ip(),
+                    'updated_at'  => now(),
+                ]);
 
-        return redirect()->route('fosa.index')->with('success', 'Status updated.');
+            return redirect()
+                ->route('fosa.index')
+                ->with('success', 'Status updated.');
+        } catch (\Exception $e) {
+            return redirect()
+                ->route('fosa.index')
+                ->with('error', 'Failed to update status: ' . $e->getMessage());
+        }
     }
 }

@@ -12,47 +12,44 @@
         Add New
     </a>
 </div>
+
       </div>
+      @include('partials.alerts')
       <div class="card-body">
         <div class="table-responsive">
           <table class="table text-center">
             <thead>
-              <tr>
-                <th>#</th>
-                <th>Type Name</th>
-                <th>Default</th>
-                <th>Status</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              @foreach($records as $i => $rec)
-              <tr>
-                <td>{{ $i+1 }}</td>
-                <td>{{ $rec->type_name }}</td>
-                <td>
-                  @if($rec->type_default == 'Y')
-                    <span class="badge bg-info">Default</span>
-                  @endif
-                </td>
-                <td>
-                  @if($rec->type_active == 'Y')
-                    <span class="badge bg-success">Active</span>
-                  @else
-                    <span class="badge bg-danger">Inactive</span>
-                  @endif
-                </td>
-                <td>
-                  <form action="{{ route('fosa.toggle', $rec->type_id) }}" method="POST">
-                    @csrf
-                    <button type="submit" class="btn btn-sm {{ $rec->type_active == 'Y' ? 'btn-warning' : 'btn-success' }}">
-                      {{ $rec->type_active == 'Y' ? 'Disable' : 'Enable' }}
-                    </button>
-                  </form>
-                </td>
-              </tr>
-              @endforeach
-            </tbody>
+  <tr>
+    <th>#</th>
+    <th>Type Name</th>
+    <th>Prefix</th>
+    <th>Default</th>
+    <th>Status</th>
+    <th>Action</th>
+  </tr>
+</thead>
+<tbody>
+  @foreach($records as $i => $rec)
+  <tr>
+    <td>{{ $i+1 }}</td>
+    <td>{{ $rec->type_name }}</td>
+    <td><span class="badge bg-secondary">{{ $rec->type_prefix }}</span></td>
+    <td>
+      @if($rec->type_default == 'Y')
+        <span class="badge bg-info">Default</span>
+      @endif
+    </td>
+    <td>
+      @if($rec->type_active == 'Y')
+        <span class="badge bg-success">Active</span>
+      @else
+        <span class="badge bg-danger">Inactive</span>
+      @endif
+    </td>
+    <td> … </td>
+  </tr>
+  @endforeach
+</tbody>
           </table>
         </div>
       </div>
