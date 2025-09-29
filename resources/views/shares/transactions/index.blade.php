@@ -7,7 +7,7 @@
 
     <div class="card o-hidden mb-4">
       <div class="card-header d-flex justify-content-between align-items-center">
-        <h3 class="card-title m-0">Shares Transactions</h3>
+        <h3 class="card-title m-0">Savings Transactions</h3>
       </div>
 
       <div class="card-body">

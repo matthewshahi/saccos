@@ -54,35 +54,35 @@ class ProcessTransactionsJob implements ShouldQueue
     }
 
     private function processTransaction($transaction)
-{
-    // Clean and normalize the reference
-    $reference = strtoupper(trim(str_replace(' ', '', $transaction->bill_ref_number)));
-    Log::info("Normalized transaction reference: $reference");
+    {
+        // Clean and normalize the reference
+        $reference = strtoupper(trim(str_replace(' ', '', $transaction->bill_ref_number)));
+        Log::info("Normalized transaction reference: $reference");
 
-    if (str_starts_with($reference, 'SH')) {
-        Log::info("Identified as a Share transaction for reference: $reference");
-        $this->processShares($reference, $transaction);
-    } elseif (str_starts_with($reference, 'LN')) {
-        Log::info("Identified as a Loan transaction for reference: $reference");
-        $this->processLoans($reference, $transaction);
-    } elseif (str_starts_with($reference, 'CA')) {
-        Log::info("Identified as a Capital Shares transaction for reference: $reference");
-        $this->processCapital($reference, $transaction);
-    } else {
-        Log::info("Trying FOSA/fallback for reference: $reference");
-        $this->processFallbackTransaction($reference, $transaction);
+        if (str_starts_with($reference, 'SH')) {
+            Log::info("Identified as a Share transaction for reference: $reference");
+            $this->processShares($reference, $transaction);
+        } elseif (str_starts_with($reference, 'LN')) {
+            Log::info("Identified as a Loan transaction for reference: $reference");
+            $this->processLoans($reference, $transaction);
+        } elseif (str_starts_with($reference, 'CA')) {
+            Log::info("Identified as a Capital Shares transaction for reference: $reference");
+            $this->processCapital($reference, $transaction);
+        } else {
+            Log::info("Trying FOSA/fallback for reference: $reference");
+            $this->processFallbackTransaction($reference, $transaction);
+        }
+
+        // ✅ Mark transaction as processed ONCE here
+        DB::table('c2b_payments')
+            ->where('id', $transaction->id)
+            ->update([
+                'processed' => 'Yes',
+                'processed_date' => Carbon::now(),
+            ]);
+
+        Log::info("Transaction ID {$transaction->id} marked as processed.");
     }
-
-    // ✅ Mark transaction as processed ONCE here
-    DB::table('c2b_payments')
-        ->where('id', $transaction->id)
-        ->update([
-            'processed' => 'Yes',
-            'processed_date' => Carbon::now(),
-        ]);
-
-    Log::info("Transaction ID {$transaction->id} marked as processed.");
-}
 
     private function processShares($reference, $transaction)
     {
@@ -254,16 +254,29 @@ class ProcessTransactionsJob implements ShouldQueue
     {
         $id = $transaction->id;
         $parts = preg_split('/\s+/', trim($reference), 2);
-        $idPart = $parts[0] ?? '';
+        $idPart   = $parts[0] ?? '';
         $descPart = strtolower($parts[1] ?? '');
-        $cleanedId = preg_replace('/\D/', '', $idPart);
 
-        if (!is_numeric($cleanedId) || strlen($cleanedId) < 6) {
-            Log::warning("Fallback: Invalid ID format '$reference'");
+        // Remove non-numeric
+        $cleanedId = preg_replace('/\D/', '', $idPart);
+        if (empty($cleanedId)) {
+            Log::warning("Fallback: No numeric ID found in reference '$reference'. Exiting.");
             return;
         }
 
-        $members = DB::table('sacco_members')->where('member_national_id', $cleanedId)->get();
+        // Detect prefix usage
+        $prefix = strtoupper(substr($idPart, 0, 2));
+
+        if (in_array($prefix, ['SH', 'LN', 'CA', 'FO'])) {
+            // Use member_id
+            $members = DB::table('sacco_members')->where('member_id', $cleanedId)->get();
+            Log::info("Fallback: Using member_id lookup with prefix {$prefix}, value {$cleanedId}");
+        } else {
+            // Use national_id
+            $members = DB::table('sacco_members')->where('member_national_id', $cleanedId)->get();
+            Log::info("Fallback: Using national_id lookup, value {$cleanedId}");
+        }
+
         if ($members->count() !== 1) {
             Log::warning("Fallback: Found {$members->count()} matches for ID '$cleanedId'. Skipping.");
             return;
@@ -405,48 +418,46 @@ class ProcessTransactionsJob implements ShouldQueue
             ]);
     }
     private function processCapital($reference, $transaction)
-{
-    $memberId = ltrim($reference, 'CA');
-    Log::info("Processing capital shares for Member ID: $memberId");
+    {
+        $memberId = ltrim($reference, 'CA');
+        Log::info("Processing capital shares for Member ID: $memberId");
 
-    $defaultMpesaIn    = DB::table('sacco_defaults')->where('default_name', 'default_mpesa_in_account')->value('default_value');
-    $defaultCapitalAcc = DB::table('sacco_defaults')->where('default_name', 'default_share_capital_account')->value('default_value');
+        $defaultMpesaIn    = DB::table('sacco_defaults')->where('default_name', 'default_mpesa_in_account')->value('default_value');
+        $defaultCapitalAcc = DB::table('sacco_defaults')->where('default_name', 'default_share_capital_account')->value('default_value');
 
-    if (!$defaultMpesaIn || !$defaultCapitalAcc) {
-        Log::error("Missing default accounts for processing capital shares: Member ID {$memberId}");
-        return;
+        if (!$defaultMpesaIn || !$defaultCapitalAcc) {
+            Log::error("Missing default accounts for processing capital shares: Member ID {$memberId}");
+            return;
+        }
+
+        $currentPeriod = $this->getCurrentPeriod();
+        $description   = "Capital Deposit - Mpesa By {$transaction->first_name} - {$transaction->bill_ref_number}";
+        $docNo         = "Paybill {$transaction->business_shortcode} - {$transaction->transaction_id}";
+
+        // Insert into sacco_capital_shares
+        DB::table('sacco_capital_shares')->insert([
+            'share_capitalmember_id'     => $memberId,
+            'share_capitalamount_paying' => $transaction->transaction_amount,
+            'share_capitalpaid_by'       => 'MPesa',
+            'share_capitalperiod'        => $currentPeriod->period_name,
+            'share_capitaldescription'   => $description,
+            'share_capitaldoc_no'        => $docNo,
+            'share_capitaldate_paid'     => Carbon::now(),
+            'share_capitalend_month_proc' => 'N',
+            'share_capitalby'            => auth()->id() ?? null,
+            'share_capitalip'            => request()->ip() ?? '127.0.0.1',
+            'share_capitaltransdate'     => Carbon::now(),
+        ]);
+
+        // Update member totals
+        DB::table('sacco_members')
+            ->where('member_id', $memberId)
+            ->increment('member_total_share_capital', $transaction->transaction_amount);
+
+        // Ledger updates
+        $this->updateSaccoAccountsTrans($defaultMpesaIn, $transaction->transaction_amount, 0, $docNo, $description, $transaction->transaction_time);
+        $this->updateSaccoAccountsTrans($defaultCapitalAcc, 0, $transaction->transaction_amount, $docNo, $description, $transaction->transaction_time);
+
+        Log::info("Capital shares processed for Member ID: $memberId, Amount: {$transaction->transaction_amount}");
     }
-
-    $currentPeriod = $this->getCurrentPeriod();
-    $description   = "Capital Deposit - Mpesa By {$transaction->first_name} - {$transaction->bill_ref_number}";
-    $docNo         = "Paybill {$transaction->business_shortcode} - {$transaction->transaction_id}";
-
-    // Insert into sacco_capital_shares
-    DB::table('sacco_capital_shares')->insert([
-        'share_capitalmember_id'     => $memberId,
-        'share_capitalamount_paying' => $transaction->transaction_amount,
-        'share_capitalpaid_by'       => 'MPesa',
-        'share_capitalperiod'        => $currentPeriod->period_name,
-        'share_capitaldescription'   => $description,
-        'share_capitaldoc_no'        => $docNo,
-        'share_capitaldate_paid'     => Carbon::now(),
-        'share_capitalend_month_proc'=> 'N',
-        'share_capitalby'            => auth()->id() ?? null,
-        'share_capitalip'            => request()->ip() ?? '127.0.0.1',
-        'share_capitaltransdate'     => Carbon::now(),
-    ]);
-
-    // Update member totals
-    DB::table('sacco_members')
-        ->where('member_id', $memberId)
-        ->increment('member_total_share_capital', $transaction->transaction_amount);
-
-    // Ledger updates
-    $this->updateSaccoAccountsTrans($defaultMpesaIn, $transaction->transaction_amount, 0, $docNo, $description, $transaction->transaction_time);
-    $this->updateSaccoAccountsTrans($defaultCapitalAcc, 0, $transaction->transaction_amount, $docNo, $description, $transaction->transaction_time);
-
-    Log::info("Capital shares processed for Member ID: $memberId, Amount: {$transaction->transaction_amount}");
 }
-}
-
-
