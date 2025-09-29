@@ -3,6 +3,10 @@
 @section('content')
 
 @include("member_name")
+
+
+@include('dashboard.payment_options')
+
 <div class="row">
     <!-- Icon Cards Section -->
     <div class="col-lg-6 col-md-12">
@@ -195,9 +199,7 @@
     </div>
 </div>
 
- 
-
- @include("dashboard.member_dashboard_mpesa")
+  
      
 </div>
 

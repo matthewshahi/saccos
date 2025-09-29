@@ -67,14 +67,22 @@ class MemberDashboardController extends Controller
             )
             ->get();
 
-        // Prepare data for the view
-        $data = [
-            'pendingLoans' => $pendingLoans,
-            'member' => $member,
-            'labels' => $labels,
-            'amounts' => $amounts,
-            'nextOfKin' => $nextOfKin,
-        ];
+       // Dynamic FOSA types (active, alphabetical)
+    $paymentOptions = DB::table('sacco_fosa_types')
+        ->where('type_active', 'Y')
+        ->orderBy('type_prefix')
+        ->get();
+
+    // Package all data for the view
+    $data = [
+        'member'        => $member,
+        'pendingLoans'  => $pendingLoans,
+        'nextOfKin'     => $nextOfKin,
+        'labels'        => $labels,
+        'amounts'       => $amounts,
+        'paymentOptions'=> $paymentOptions,
+    ];
+      
 
         return view('dashboard.member_dashboard', compact('data'));
     }

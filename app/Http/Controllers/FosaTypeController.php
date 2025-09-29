@@ -27,7 +27,7 @@ class FosaTypeController extends Controller
         try {
             $request->validate([
                 'type_name'   => 'required|string|max:50|unique:sacco_fosa_types,type_name',
-                'type_prefix' => 'required|string|size:2|unique:sacco_fosa_types,type_prefix|not_in:SH,LN',
+                'type_prefix' => 'required|string|size:2|unique:sacco_fosa_types,type_prefix|not_in:CA,SH,LN',
             ]);
 
             DB::table('sacco_fosa_types')->insert([
