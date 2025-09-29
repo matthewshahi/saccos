@@ -303,26 +303,43 @@ private function getCurrentPeriod(): string
             return;
         }
 
-        // Detect prefix usage
-        $prefix = strtoupper(substr($idPart, 0, 2));
+    // Detect prefix usage
+$prefix = strtoupper(substr($idPart, 0, 2));
+Log::info("Fallback prefix detected: {$prefix} from idPart={$idPart}");
 
-        if (in_array($prefix, ['SH', 'LN', 'CA', 'FO'])) {
-            // Use member_id
-            $members = DB::table('sacco_members')->where('member_id', $cleanedId)->get();
-            Log::info("Fallback: Using member_id lookup with prefix {$prefix}, value {$cleanedId}");
-        } else {
-            // Use national_id
-            $members = DB::table('sacco_members')->where('member_national_id', $cleanedId)->get();
-            Log::info("Fallback: Using national_id lookup, value {$cleanedId}");
-        }
+// ✅ Check for known prefixes (hardcoded + sacco_fosa_types)
+$isKnownPrefix = in_array($prefix, ['SH', 'LN', 'CA']) ||
+    DB::table('sacco_fosa_types')
+        ->whereRaw('UPPER(type_prefix) = ?', [$prefix])
+        ->where('type_active', 'Y')
+        ->exists();
 
-        if ($members->count() !== 1) {
-            Log::warning("Fallback: Found {$members->count()} matches for ID '$cleanedId'. Skipping.");
-            return;
-        }
+Log::info("Fallback: prefix {$prefix}, isKnownPrefix=" . ($isKnownPrefix ? 'YES' : 'NO'));
 
-        $member = $members->first();
-        $memberId = $member->member_id;
+if ($isKnownPrefix) {
+    // ✅ Always use member_id lookup for known prefixes
+    $members = DB::table('sacco_members')
+        ->where('member_id', $cleanedId)
+        ->get();
+    Log::info("Fallback: Using member_id lookup with prefix {$prefix}, value {$cleanedId}");
+} else {
+    // 🔎 Fallback to national_id lookup if prefix is unknown
+    $members = DB::table('sacco_members')
+        ->where('member_national_id', $cleanedId)
+        ->get();
+    Log::info("Fallback: Using national_id lookup, value {$cleanedId}");
+}
+
+
+
+// ✅ Handle case where no match or multiple matches
+if ($members->count() !== 1) {
+    Log::warning("Fallback: Found {$members->count()} matches for ID '$cleanedId'. Skipping.");
+    return;
+}
+
+$member   = $members->first();
+$memberId = $member->member_id;
         // $period = (object)['period_name' => now()->format('Ym')];
         $period = $this->getCurrentPeriod(); // returns "202509"
         $amount = $transaction->transaction_amount;
