@@ -85,48 +85,87 @@ class ProcessTransactionsJob implements ShouldQueue
     }
 
     private function processShares($reference, $transaction)
-    {
-        $memberId = ltrim($reference, 'SH');
-        Log::info("Processing shares for Member ID: $memberId");
+{
+    $memberId = ltrim($reference, 'SH');
+    Log::info("Processing shares for Member ID: $memberId");
 
-        // Validate default accounts
-        $defaultMpesaIn = DB::table('sacco_defaults')->where('default_name', 'default_mpesa_in_account')->value('default_value');
-        $defaultShareAccount = DB::table('sacco_defaults')->where('default_name', 'default_share_account')->value('default_value');
+    // Validate default accounts
+    $defaultMpesaIn = DB::table('sacco_defaults')
+        ->where('default_name', 'default_mpesa_in_account')
+        ->value('default_value');
+    $defaultShareAccount = DB::table('sacco_defaults')
+        ->where('default_name', 'default_share_account')
+        ->value('default_value');
 
-        if (!$defaultMpesaIn || !$defaultShareAccount) {
-            Log::error("Missing default accounts for processing shares: Member ID {$memberId}");
-            return;
-        }
+    if (!$defaultMpesaIn || !$defaultShareAccount) {
+        Log::error("Missing default accounts for processing shares: Member ID {$memberId}");
+        return;
+    }
 
-        // Update member's shares
-        DB::table('sacco_members')
+    try {
+        // 1️⃣ Update member's shares
+        $affected = DB::table('sacco_members')
             ->where('member_id', $memberId)
             ->increment('member_total_share', $transaction->transaction_amount);
+
+        if ($affected === 0) {
+            throw new \Exception("No sacco_members row updated for Member ID {$memberId}");
+        }
         Log::info("Updated shares for Member ID: $memberId by Amount: {$transaction->transaction_amount}");
 
-        // Insert into sacco_shares
+        // 2️⃣ Insert into sacco_shares
         $currentPeriod = $this->getCurrentPeriod();
         $description = "Mpesa By {$transaction->first_name} - {$transaction->bill_ref_number}";
         $docNo = "Paybill {$transaction->business_shortcode} - {$transaction->transaction_id}";
 
         DB::table('sacco_shares')->insert([
-            'share_member_id' => $memberId,
-            'share_amount_paying' => $transaction->transaction_amount,
-            'share_paid_by' => 'mPesa',
-            'share_period' => $currentPeriod->period_name,
-            'share_description' => $description,
-            'share_doc_no' => $docNo,
-            'share_date_paid' => Carbon::now(),
+            'share_member_id'      => $memberId,
+            'share_amount_paying'  => $transaction->transaction_amount,
+            'share_paid_by'        => 'MPesa',
+            'share_period'         =>  $this->getCurrentPeriod(),
+            'share_description'    => $description,
+            'share_doc_no'         => $docNo,
+            'share_date_paid'      => Carbon::now(),
             'share_end_month_proc' => 'N',
-            'share_by' => auth()->id() ?? null,
-            'share_ip' => request()->ip() ?? '127.0.0.1',
+            'share_by'             => auth()->id() ?? null,
+            'share_ip'             => request()->ip() ?? '127.0.0.1',
+            'share_transdate'      => Carbon::now(), // ✅ ensure column exists
         ]);
 
-        // Update ledger entries
-        $this->updateSaccoAccountsTrans($defaultMpesaIn, $transaction->transaction_amount, 0, $docNo, "Shares Deposit - $description", $transaction->transaction_time);
-        $this->updateSaccoAccountsTrans($defaultShareAccount, 0, $transaction->transaction_amount, $docNo, "Shares Deposit - $description", $transaction->transaction_time);
-    }
+        Log::info("Inserted sacco_shares record for Member ID: $memberId, Amount: {$transaction->transaction_amount}");
 
+        // 3️⃣ Update ledger entries
+        $this->updateSaccoAccountsTrans(
+            $defaultMpesaIn,
+            $transaction->transaction_amount,
+            0,
+            $docNo,
+            "Shares Deposit - $description",
+            $transaction->transaction_time
+        );
+        $this->updateSaccoAccountsTrans(
+            $defaultShareAccount,
+            0,
+            $transaction->transaction_amount,
+            $docNo,
+            "Shares Deposit - $description",
+            $transaction->transaction_time
+        );
+
+    } catch (\Illuminate\Database\QueryException $e) {
+        // Logs SQL error message + bindings
+        Log::error("DB error in processShares()", [
+            'memberId' => $memberId,
+            'error'    => $e->getMessage(),
+            'sql'      => $e->getSql(),
+            'bindings' => $e->getBindings(),
+        ]);
+        throw $e; // rethrow so job fails visibly
+    } catch (\Exception $e) {
+        Log::error("processShares failed: " . $e->getMessage(), ['memberId' => $memberId]);
+        throw $e;
+    }
+}
     private function processLoans($reference, $transaction)
     {
         $loanId = ltrim($reference, 'LN');
@@ -153,7 +192,7 @@ class ProcessTransactionsJob implements ShouldQueue
         // Check if there are any payments for this loan in the current period with interest
         $existingPayment = DB::table('sacco_loan_payments')
             ->where('loan_payments_loan_id', $loanId)
-            ->where('loan_payments_period', $currentPeriod->period_name)
+            ->where('loan_payments_period',  $this->getCurrentPeriod())
             ->where('loan_payments_interest', '>', 0)
             ->exists();
 
@@ -185,7 +224,7 @@ class ProcessTransactionsJob implements ShouldQueue
             'loan_payments_docno' => $docNo,
             'loan_payments_paid_on' => Carbon::now(),
             'loan_payments_loan_id' => $loanId,
-            'loan_payments_period' => $currentPeriod->period_name,
+            'loan_payments_period' =>  $this->getCurrentPeriod(),
             'loan_payments_description' => "Loan Payment - $description",
             'loan_payments_paid_in_by' => "MPesa",
             'loan_payments_ip' => request()->ip() ?? '127.0.0.1',
@@ -204,7 +243,7 @@ class ProcessTransactionsJob implements ShouldQueue
     {
         DB::table('sacco_accounts_trans')->insert([
             'accounts_trans_sub_account' => $account,
-            'accounts_trans_period' => $this->getCurrentPeriod()->period_name ?? 'Unknown Period', // Current period or default
+            'accounts_trans_period' => $this->getCurrentPeriod() ?? 'Unknown Period', // Current period or default
             'accounts_trans_debit' => $debit,
             'accounts_trans_credit' => $credit,
             'accounts_trans_doc_no' => $docNo,
@@ -244,10 +283,10 @@ class ProcessTransactionsJob implements ShouldQueue
         }
     }
 
-    private function getCurrentPeriod()
-    {
-        return DB::table('sacco_period')->where('period_active', 'Y')->where('period_deleted', '<>', 'Y')->first();
-    }
+private function getCurrentPeriod(): string
+{
+    return now()->format('Ym'); // e.g. "202509"
+}
 
 
     private function processFallbackTransaction($reference, $transaction)
@@ -284,7 +323,8 @@ class ProcessTransactionsJob implements ShouldQueue
 
         $member = $members->first();
         $memberId = $member->member_id;
-        $period = (object)['period_name' => now()->format('Ym')];
+        // $period = (object)['period_name' => now()->format('Ym')];
+        $period = $this->getCurrentPeriod(); // returns "202509"
         $amount = $transaction->transaction_amount;
         $docNo = "Paybill {$transaction->business_shortcode} - {$transaction->transaction_id}";
 
@@ -311,7 +351,7 @@ class ProcessTransactionsJob implements ShouldQueue
                 'share_member_id' => $memberId,
                 'share_amount_paying' => $amount,
                 'share_paid_by' => 'MPesa',
-                'share_period' => $period->period_name,
+                'share_period' => $period,
                 'share_description' => $description,
                 'share_doc_no' => $docNo,
                 'share_date_paid' => $now,
@@ -332,7 +372,7 @@ class ProcessTransactionsJob implements ShouldQueue
                 'share_capitalmember_id'   => $memberId,
                 'share_capitalamount_paying' => $amount,
                 'share_capitalpaid_by'     => 'MPesa',
-                'share_capitalperiod'      => $period->period_name,
+                'share_capitalperiod'      => $period,
                 'share_capitaldescription' => $description,
                 'share_capitaldoc_no'      => $docNo,
                 'share_capitaldate_paid'   => $now,
@@ -372,7 +412,7 @@ class ProcessTransactionsJob implements ShouldQueue
                 'fosa_member_id'     => $memberId,
                 'fosa_amount_paying' => $amount,
                 'fosa_paid_by'       => 'MPesa',
-                'fosa_period'        => $period->period_name,
+                'fosa_period'        => $period,
                 'fosa_description'   => $fullDescription,
                 'fosa_doc_no'        => $docNo,
                 'fosa_date_paid'     => $now,
@@ -439,7 +479,7 @@ class ProcessTransactionsJob implements ShouldQueue
             'share_capitalmember_id'     => $memberId,
             'share_capitalamount_paying' => $transaction->transaction_amount,
             'share_capitalpaid_by'       => 'MPesa',
-            'share_capitalperiod'        => $currentPeriod->period_name,
+            'share_capitalperiod'        =>  $this->getCurrentPeriod(),
             'share_capitaldescription'   => $description,
             'share_capitaldoc_no'        => $docNo,
             'share_capitaldate_paid'     => Carbon::now(),
