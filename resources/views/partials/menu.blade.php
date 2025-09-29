@@ -86,9 +86,14 @@
                     <li class="Ul_li--hover">
                         <a class="has-arrow" href="#">
                             <i class="i-Money-Bag text-20 me-2" style="color: #663399;"></i>
-                            <span class="item-name text-15 text-muted">Shares/deposits</span>
+                            <span class="item-name text-15 text-muted">Savings/deposits</span>
                         </a>
                         <ul class="mm-collapse">
+                            <li class="item-name">
+                                <a href="{{ route('shares.transactions.index') }}">
+                                    <span class="text-muted">Savings</span>
+                                </a>
+                            </li>
                             <li class="item-name">
                                 <a href="{{ route('modify.member.shares') }}">
                                     <span class="text-muted">Add/reduce</span>
@@ -117,7 +122,14 @@
                             <i class="i-Business-Mens text-20 me-2" style="color: #663399;"></i>
                             <span class="item-name text-15 text-muted">Capital</span>
                         </a>
+                        
                         <ul class="mm-collapse">
+                            <li class="item-name">
+                                <a href="{{ route('capitalshares.transactions.index') }}">
+                                    <span class="text-muted">Capital Shares</span>
+                                </a>
+                            </li>
+
                             <li class="item-name">
                                 <a href="{{ route('modify.member.share.capital') }}">
                                     <span class="text-muted">Add/reduce </span>

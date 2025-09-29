@@ -37,6 +37,8 @@ use App\Http\Controllers\FosaTransactionController;
 use App\Http\Controllers\FosaImportController;
 use App\Http\Controllers\FosaEndMonthController;
 use App\Http\Controllers\SharesClearanceController;
+use App\Http\Controllers\ShareTransactionController;
+use App\Http\Controllers\CapitalShareTransactionController;
 
 
 // use App\Http\Controllers\TxnImportController;
@@ -341,7 +343,25 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
 
 
 
+Route::middleware(['check_user_rights:ShareTransactions'])
+    ->prefix('shares')
+    ->group(function () {
+        Route::get('/transactions', [ShareTransactionController::class, 'index'])
+            ->name('shares.transactions.index');
 
+        Route::get('/transactions/{id}/receipt', [ShareTransactionController::class, 'receipt'])
+            ->name('shares.transactions.receipt');
+    });
+
+    Route::middleware(['check_user_rights:CapitalShareTransactions'])
+    ->prefix('capital-shares')
+    ->group(function () {
+        Route::get('/transactions', [CapitalShareTransactionController::class, 'index'])
+            ->name('capitalshares.transactions.index');
+
+        Route::get('/transactions/{id}/receipt', [CapitalShareTransactionController::class, 'receipt'])
+            ->name('capitalshares.transactions.receipt');
+    });
     Route::get('/new_members/list', [PublicRegistrationActionsController::class, 'listMembers'])->name('members.list')->middleware('check_user_rights:new_member_applications_list');
     Route::post('/new_members/update/{id}', [PublicRegistrationActionsController::class, 'updateField'])->middleware('check_user_rights:new_member_applications_update');
     Route::get('/new_members/details/{id}', [PublicRegistrationActionsController::class, 'getMemberDetails'])->name('members.details')->middleware('check_user_rights:new_member_applications_update');

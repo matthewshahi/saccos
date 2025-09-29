@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\Middleware;
 
 use Closure;
@@ -33,18 +34,34 @@ class CheckUserRights
         return $next($request);
     }
 
+
     private function getGrantedRights($moduleName, $userId)
     {
-        $query = "SELECT * FROM sacco_userrights 
-                  INNER JOIN sacco_modules ON sacco_userrights.rights_app = sacco_modules.module_id 
-                  WHERE sacco_modules.module_name = ? AND rights_user = ?";
+        // ✅ Ensure module exists (insert if missing)
+        $module = DB::table('sacco_modules')
+            ->where('module_name', $moduleName)
+            ->first();
 
-        $results = DB::select($query, [$moduleName, $userId]);
+        if (!$module) {
+            $id = DB::table('sacco_modules')->insertGetId([
+                'module_name'        => $moduleName,
+                'module_active'      => 'Y',
+                'module_description' => $moduleName,
+                'module_deleted'     => 'N',
+                'module_userid'      => $userId,
+                'module_ip'          => request()->ip(),
+                'module_transdate'   => now(),
+            ]);
 
-        if (count($results) === 1) {
-            return $results[0]->rights_access;
+            $module = DB::table('sacco_modules')->where('module_id', $id)->first();
         }
 
-        return 'N';
+        // ✅ Now check rights for the user against this module
+        $results = DB::table('sacco_userrights')
+            ->where('rights_app', $module->module_id)
+            ->where('rights_user', $userId)
+            ->first();
+
+        return $results ? $results->rights_access : 'N';
     }
 }
