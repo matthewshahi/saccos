@@ -8,9 +8,12 @@ use Illuminate\Support\Facades\DB;
 
 class FosaTypeController extends Controller
 {
-    // List all FOSA deposit types
-    public function index()
+     public function index(Request $request)
     {
+        // ✅ Ensure "Registration Fee (RF)" always exists
+        $this->ensureRegistrationFeeExists($request);
+        
+        
         $records = DB::table('sacco_fosa_types')->orderBy('type_id')->get();
         return view('fosa.index', compact('records'));
     }
@@ -26,9 +29,9 @@ class FosaTypeController extends Controller
     {
         try {
             $request->validate([
-                'type_name'   => 'required|string|max:50|unique:sacco_fosa_types,type_name',
-                'type_prefix' => 'required|string|size:2|unique:sacco_fosa_types,type_prefix|not_in:CA,SH,LN',
-            ]);
+    'type_name'   => 'required|string|max:50|unique:sacco_fosa_types,type_name',
+    'type_prefix' => 'required|string|size:2|unique:sacco_fosa_types,type_prefix|not_in:CA,SH,LN,RF',
+]);
 
             DB::table('sacco_fosa_types')->insert([
                 'type_name'   => ucfirst($request->type_name),
@@ -83,4 +86,24 @@ class FosaTypeController extends Controller
                 ->with('error', 'Failed to update status: ' . $e->getMessage());
         }
     }
+private function ensureRegistrationFeeExists(Request $request)
+{
+    $exists = DB::table('sacco_fosa_types')
+        ->where('type_prefix', 'RF')
+        ->exists();
+
+    if (!$exists) {
+        DB::table('sacco_fosa_types')->insert([
+            'type_name'   => 'Registration Fee',
+            'type_prefix' => 'RF',
+            'type_active' => 'Y',
+            'type_default'=> 'N',
+            'created_by'  => Auth::id() ?? 1, // fallback to system/admin
+            'created_ip'  => $request->ip(),
+            'created_at'  => now(),
+            'updated_at'  => now(),
+        ]);
+    }
+}
+
 }

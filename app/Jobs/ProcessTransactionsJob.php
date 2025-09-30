@@ -68,7 +68,26 @@ class ProcessTransactionsJob implements ShouldQueue
         } elseif (str_starts_with($reference, 'CA')) {
             Log::info("Identified as a Capital Shares transaction for reference: $reference");
             $this->processCapital($reference, $transaction);
-        } else {
+        } 
+        elseif (str_starts_with($reference, 'RF')) {
+        Log::info("Identified as a Registration Fee transaction for reference: $reference");
+
+        $memberId = ltrim($reference, 'RF'); // strip "RF" prefix
+        $period   = $this->getCurrentPeriod();
+        $now      = Carbon::now();
+        $docNo    = "Paybill {$transaction->business_shortcode} - {$transaction->transaction_id}";
+        $ip       = request()->ip() ?? '127.0.0.1';
+        $userId   = auth()->id() ?? 999;
+        $desc     = "Mpesa By {$transaction->first_name} - {$transaction->bill_ref_number}";
+
+        $mpesaAccount = DB::table('sacco_defaults')
+            ->where('default_name', 'default_mpesa_in_account')
+            ->value('default_value');
+
+        $this->processRegistrationFee($memberId, $transaction, $desc, $docNo, $period, $now, $userId, $ip, $mpesaAccount);
+
+    }
+    else {
             Log::info("Trying FOSA/fallback for reference: $reference");
             $this->processFallbackTransaction($reference, $transaction);
         }
@@ -517,4 +536,56 @@ $memberId = $member->member_id;
 
         Log::info("Capital shares processed for Member ID: $memberId, Amount: {$transaction->transaction_amount}");
     }
+
+    private function processRegistrationFee($memberId, $transaction, $description, $docNo, $period, $now, $userId, $ip, $mpesaAccount)
+{
+    $amount = $transaction->transaction_amount;
+
+    // Insert into sacco_registration_fees
+    DB::table('sacco_registration_fees')->insert([
+        'regfee_member_id'      => $memberId,
+        'regfee_amount'         => $amount,
+        'regfee_doc_no'         => $docNo,
+        'regfee_description'    => "Registration Fee - $description",
+        'regfee_date_paid'      => $now->toDateString(),
+        'regfee_paid_by'        => $userId,
+        'regfee_ip'             => $ip,
+        'regfee_by'             => $userId,
+        'regfee_created_ip'     => $ip,
+        'regfee_transdate'      => $now,
+        'regfee_end_month_proc' => $period,
+        'created_at'            => $now,
+        'updated_at'            => $now,
+    ]);
+
+    
+
+    // Ledger update (using default_member_ship_fee_account)
+    $regFeeAccount = DB::table('sacco_defaults')
+        ->where('default_name', 'default_member_ship_fee_account')
+        ->value('default_value');
+
+    if ($regFeeAccount) {
+        $this->updateSaccoAccountsTrans(
+            $mpesaAccount,
+            $amount,
+            0,
+            $docNo,
+            "Registration Fee - $description",
+            $transaction->transaction_time
+        );
+
+        $this->updateSaccoAccountsTrans(
+            $regFeeAccount,
+            0,
+            $amount,
+            $docNo,
+            "Registration Fee - $description",
+            $transaction->transaction_time
+        );
+    }
+
+    Log::info("REGISTRATION FEE processed for Member ID: $memberId, Amount: $amount");
+}
+
 }
