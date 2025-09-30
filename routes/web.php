@@ -39,7 +39,8 @@ use App\Http\Controllers\FosaEndMonthController;
 use App\Http\Controllers\SharesClearanceController;
 use App\Http\Controllers\ShareTransactionController;
 use App\Http\Controllers\CapitalShareTransactionController;
-use App\Http\Controllers\TxnImportController;
+// use App\Http\Controllers\TxnImportController;
+use App\Http\Controllers\RegistrationFeeController;
 
 // use App\Http\Controllers\TxnImportController;
 
@@ -183,7 +184,17 @@ Route::middleware(['auth'])->group(function () {
 });
 
 
+Route::middleware(['check_user_rights:RegistrationFees'])
+    ->prefix('registration-fees')
+    ->group(function () {
+        // 📋 Listing page
+        Route::get('/', [RegistrationFeeController::class, 'index'])
+            ->name('registrationfees.index');
 
+        // 🧾 Receipt
+        Route::get('/{id}/receipt', [RegistrationFeeController::class, 'receipt'])
+            ->name('registrationfees.receipt');
+    });
 // ========================
 // Shares Clearance Module
 // ========================
