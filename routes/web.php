@@ -60,7 +60,7 @@ use App\Http\Controllers\CapitalShareTransactionController;
 // // Route::post('/members/import-transactions', [MemberImportController::class, 'importSavingsAndShares'])->name('members.import.transactions');
 
 
-// // use App\Http\Controllers\MemberImportController;
+//  use App\Http\Controllers\MemberImportController;
 
 // Route::get('/import/members', [MemberImportController::class, 'showImportForm'])->name('import.members.form');
 // Route::post('/import/members', [MemberImportController::class, 'import'])->name('import.members.run');
@@ -94,17 +94,17 @@ use App\Http\Controllers\CapitalShareTransactionController;
 // Route::post('/members/import', [MemberImportController::class, 'import'])->name('members.import');
 
 
-// // Show patch form
-// Route::get('/members/patch', [MemberImportController::class, 'showPatchForm'])
-//     ->name('members.patch.form');
+// Show patch form
+Route::get('/members/patch', [MemberImportController::class, 'showPatchForm'])
+    ->name('members.patch.form');
 
-// // Handle patch CSV upload and update members
-// Route::post('/members/patch', [MemberImportController::class, 'patch'])
-//     ->name('members.patch');
+// Handle patch CSV upload and update members
+Route::post('/members/patch', [MemberImportController::class, 'patch'])
+    ->name('members.patch');
 
 // Route::view('/members/import-kin-form', 'import.next_of_kin')->name('members.import.kin.form');
 // Route::post('/members/import-next-of-kin', [MemberImportController::class, 'importNextOfKin'])->name('members.import.kin');
-
+//==============
 
 Route::get('/home', [HomeController::class, 'redirectBasedOnAuth'])->name('home');
 Route::get('/', [HomeController::class, 'redirectBasedOnAuth'])->name('home1');

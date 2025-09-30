@@ -185,6 +185,7 @@ class MemberImportController extends Controller
             ]);
     }
 
+
     public function patch(Request $request)
 {
     $request->validate([
@@ -203,7 +204,7 @@ class MemberImportController extends Controller
     $delimiter = array_key_first($counts) ?? ',';
     rewind($fh);
 
-    // --- Read header (row 1) and normalize, but we can fall back to positions
+    // --- Read header
     $header = fgetcsv($fh, 0, $delimiter);
     if (!$header) { fclose($fh); return back()->withErrors(['csv' => 'CSV header missing.']); }
 
@@ -211,31 +212,24 @@ class MemberImportController extends Controller
         $h = preg_replace('/^\xEF\xBB\xBF/', '', $h);                 // BOM
         $h = preg_replace('/[\x{200B}-\x{200D}\x{FEFF}]/u', '', $h);  // zero-width
         $h = mb_strtolower(trim($h));
-        $h = preg_replace('/\s+/', ' ', $h);                          // collapse spaces
+        $h = preg_replace('/\s+/', ' ', $h);
         $h = str_replace(['_', '-'], ' ', $h);
         return $h;
     };
     $H = array_map($norm, $header);
     $map = []; foreach ($H as $i => $c) $map[$c] = $i;
 
-    // Resolve columns (prefer header names; otherwise positional A..E)
+    // Resolve columns
     $colOrNull = function(array $alts, array $map) {
         foreach ($alts as $a) if (isset($map[$a])) return $map[$a];
         return null;
     };
 
-    $idxName  = $colOrNull(['name'], $map);
-    $idxPhone = $colOrNull(['phone number','phone','mobile'], $map);
-    $idxNatId = $colOrNull(['identification number','id number','national id','national identification number'], $map);
-    $idxSacco = $colOrNull(['sacco number','sacco no','member sacco id','sacco'], $map);
-    $idxDob   = $colOrNull(['date of birth','dob','birth date'], $map);
-
-    // Positional fallback if headers are messy: A..E -> 0..4
-    if ($idxName === null)  $idxName  = 0;
-    if ($idxPhone === null) $idxPhone = 1;
-    if ($idxNatId === null) $idxNatId = 2;
-    if ($idxSacco === null) $idxSacco = 3;
-    if ($idxDob === null)   $idxDob   = 4;
+    $idxName  = $colOrNull(['name'], $map) ?? 0;
+    $idxPhone = $colOrNull(['phone number','phone','mobile'], $map) ?? 1;
+    $idxNatId = $colOrNull(['identification number','id number','national id','national identification number'], $map) ?? 2;
+    $idxSacco = $colOrNull(['sacco number','sacco no','member sacco id','sacco'], $map) ?? 3;
+    $idxDob   = $colOrNull(['date of birth','dob','birth date'], $map) ?? 4;
 
     // --- Helpers
     $normalizeName = fn(?string $n) => trim(preg_replace('/\s+/', ' ', $n ?? ''));
@@ -279,13 +273,11 @@ class MemberImportController extends Controller
         return $dt ? $dt->format('Y-m-d') : null;
     };
 
-    // --- Loop (row 2 onwards)
-    $total=0; $matched=0; $updated=0; $notFound=[]; $updatesPreview=[];
+    // --- Loop
+    $total=0; $matched=0; $updated=0; $inserted=0; $updatesPreview=[]; $newMembersPreview=[];
     while (($row = fgetcsv($fh, 0, $delimiter)) !== false) {
         $total++;
-
-        // Guard against short rows
-        $get = function($idx) use ($row) { return array_key_exists($idx, $row) ? $row[$idx] : null; };
+        $get = fn($idx) => array_key_exists($idx, $row) ? $row[$idx] : null;
 
         $nameRaw = $get($idxName);
         $name = $normalizeName($nameRaw);
@@ -294,12 +286,11 @@ class MemberImportController extends Controller
         $ts = $tokens($name);
         if (!$ts) continue;
 
-        // 1) all-token AND search
+        // Try match by tokens
         $q = \DB::table('sacco_members');
         foreach ($ts as $t) $q->where('member_name','LIKE','%'.$likeEscape($t).'%');
         $member = $q->first();
 
-        // 2) any 2-token AND (for 3+ names)
         if (!$member && count($ts) >= 3) {
             foreach ($twoCombos($ts) as $pair) {
                 [$a,$b] = explode(' ', $pair, 2);
@@ -311,29 +302,72 @@ class MemberImportController extends Controller
             }
         }
 
-        if (!$member) { $notFound[] = $name; continue; }
-        $matched++;
-
-        // Build update payload — overwrite existing when value provided
         $valSacco = trim((string)$get($idxSacco));
         $valNatId = trim((string)$get($idxNatId));
         $valPhone = $normalizePhoneKE($get($idxPhone));
         $valDob   = $parseDOB($get($idxDob));
 
-        $updates = [];
-        if ($valSacco !== '') $updates['member_sacco_id'] = $valSacco;
-        if ($valNatId !== '') $updates['member_national_id'] = $valNatId;
-        if (!empty($valPhone)) $updates['member_phone_no'] = $valPhone;
-        if (!empty($valDob))   $updates['member_dob']      = $valDob;
+        if ($member) {
+            // --- UPDATE flow
+            $matched++;
+            $updates = [];
+            if ($valSacco !== '') {
+                $exists = DB::table('sacco_members')
+                    ->where('member_sacco_id', $valSacco)
+                    ->where('member_id', '!=', $member->member_id)
+                    ->exists();
+                if (!$exists) $updates['member_sacco_id'] = $valSacco;
+            }
+            if ($valNatId !== '') $updates['member_national_id'] = $valNatId;
+            if (!empty($valPhone)) $updates['member_phone_no'] = $valPhone;
+            if (!empty($valDob))   $updates['member_dob']      = $valDob;
 
-        if (!empty($updates)) {
-            // use your PK (member_id preferred; fallback id)
-            $pkName = property_exists($member, 'member_id') ? 'member_id' : (property_exists($member, 'id') ? 'id' : null);
-            if ($pkName === null) { continue; }
-            \DB::table('sacco_members')->where($pkName, $member->{$pkName})->update($updates);
-            $updated++;
-            if (count($updatesPreview) < 200) {
-                $updatesPreview[] = array_merge(['name' => $member->member_name], $updates);
+            if (!empty($updates)) {
+                \DB::table('sacco_members')->where('member_id', $member->member_id)->update($updates);
+                $updated++;
+                if (count($updatesPreview) < 200) {
+                    $updatesPreview[] = array_merge(['name' => $member->member_name], $updates);
+                }
+            }
+        } else {
+            // --- INSERT flow
+            $saccoId = !empty($valSacco) ? $valSacco : 'ROAM'.random_int(100000, 999999);
+            while (DB::table('sacco_members')->where('member_sacco_id', $saccoId)->exists()) {
+                $saccoId = 'ROAM'.random_int(100000, 999999);
+            }
+
+            $natId = !empty($valNatId) ? $valNatId : 'ID'.random_int(10000000, 99999999);
+            while (DB::table('sacco_members')->where('member_national_id', $natId)->exists()) {
+                $natId = 'ID'.random_int(10000000, 99999999);
+            }
+
+            $email = strtolower(str_replace(' ', '.', $name)).random_int(100,999).'@roam.com';
+            while (DB::table('sacco_members')->where('member_email', $email)->exists()) {
+                $email = strtolower(str_replace(' ', '.', $name)).random_int(100,999).'@roam.com';
+            }
+
+            DB::table('sacco_members')->insert([
+                'member_name'        => $name,
+                'member_sacco_id'    => $saccoId,
+                'member_national_id' => $natId,
+                'member_phone_no'    => $valPhone ?: '0722000000',
+                'member_dob'         => $valDob,
+                'member_email'       => $email,
+                'member_date_joined' => now()->format('Y-m-d'),
+                'member_dept'        => 1,
+                'member_active'      => 'Y',
+                'member_position'    => 1,
+            ]);
+
+            $inserted++;
+            if (count($newMembersPreview) < 200) {
+                $newMembersPreview[] = [
+                    'name' => $name,
+                    'member_sacco_id' => $saccoId,
+                    'member_national_id' => $natId,
+                    'member_phone_no' => $valPhone,
+                    'member_dob' => $valDob,
+                ];
             }
         }
     }
@@ -342,13 +376,14 @@ class MemberImportController extends Controller
     return redirect()
         ->route('members.patch.form')
         ->with('summary', [
-            'total_rows'      => $total,
-            'matched'         => $matched,
-            'updated'         => $updated,
-            'not_found'       => $notFound,
-            'updates_preview' => $updatesPreview,
+            'total_rows'       => $total,
+            'matched_updated'  => $updated,
+            'new_inserted'     => $inserted,
+            'updates_preview'  => $updatesPreview,
+            'new_members_preview' => $newMembersPreview,
         ]);
 }
+
 
 public function showPatchForm()
 {
