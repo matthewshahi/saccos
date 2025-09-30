@@ -39,17 +39,17 @@ use App\Http\Controllers\FosaEndMonthController;
 use App\Http\Controllers\SharesClearanceController;
 use App\Http\Controllers\ShareTransactionController;
 use App\Http\Controllers\CapitalShareTransactionController;
-use App\Http\Controllers\TxnImportController;
+// use App\Http\Controllers\TxnImportController;
 
 // use App\Http\Controllers\TxnImportController;
 
-// Upload form
-Route::get('/transactions/import', [TxnImportController::class, 'showForm'])
-    ->name('transactions.import.form');
+// // Upload form
+// Route::get('/transactions/import', [TxnImportController::class, 'showForm'])
+//     ->name('transactions.import.form');
 
-// Process CSV and import
-Route::post('/transactions/import', [TxnImportController::class, 'import'])
-    ->name('transactions.import');
+// // Process CSV and import
+// Route::post('/transactions/import', [TxnImportController::class, 'import'])
+//     ->name('transactions.import');
 
 
 // use App\Http\Controllers\ReportsShareController;
@@ -94,13 +94,13 @@ Route::post('/transactions/import', [TxnImportController::class, 'import'])
 // Route::post('/members/import', [MemberImportController::class, 'import'])->name('members.import');
 
 
-// Show patch form
-Route::get('/members/patch', [MemberImportController::class, 'showPatchForm'])
-    ->name('members.patch.form');
+// // Show patch form
+// Route::get('/members/patch', [MemberImportController::class, 'showPatchForm'])
+//     ->name('members.patch.form');
 
-// Handle patch CSV upload and update members
-Route::post('/members/patch', [MemberImportController::class, 'patch'])
-    ->name('members.patch');
+// // Handle patch CSV upload and update members
+// Route::post('/members/patch', [MemberImportController::class, 'patch'])
+//     ->name('members.patch');
 
 // Route::view('/members/import-kin-form', 'import.next_of_kin')->name('members.import.kin.form');
 // Route::post('/members/import-next-of-kin', [MemberImportController::class, 'importNextOfKin'])->name('members.import.kin');
