@@ -171,17 +171,16 @@ class TxnImportController extends Controller
             if ($amount <= 0) continue;
 
             // map category
-            $catU = strtoupper(trim((string)$rawCat));
-            if (strpos($catU, 'DEPOSIT') !== false) {
-                $category = 'Deposits';
-            } elseif (strpos($catU, 'CAPITAL') !== false) {
-                $category = 'Capital Shares';
-            } elseif (strpos($catU, 'FOSA') !== false) {
-                $category = 'FOSA';
-            } else {
-                // Unknown category → treat as FOSA (per earlier rule "anything else FOSA")
-                $category = 'FOSA';
-            }
+           $catU = strtoupper(trim((string)$rawCat));
+if (strpos($catU, 'DEPOSIT') !== false || strpos($catU, 'SAVING') !== false || strpos($catU, 'SHARE') !== false) {
+    $category = 'Deposits';
+} elseif (strpos($catU, 'CAPITAL') !== false) {
+    $category = 'Capital Shares';
+} elseif (strpos($catU, 'FOSA') !== false || strpos($catU, 'WELFARE') !== false) {
+    $category = 'FOSA';
+} else {
+    $category = 'FOSA'; // fallback
+}
 
             // resolve member_id
             $memberId = $resolveMemberId($name);
