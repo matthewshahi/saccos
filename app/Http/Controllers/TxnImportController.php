@@ -61,9 +61,9 @@ class TxnImportController extends Controller
         $idxCategory = $col(['category','type']) ?? 4;
 
         // 3) Truncate destination tables (as requested)
-        DB::table('sacco_fosas')->truncate();
-        DB::table('sacco_shares')->truncate();
-        DB::table('sacco_capital_shares')->truncate();
+        // DB::table('sacco_fosas')->truncate();
+        // DB::table('sacco_shares')->truncate();
+        // DB::table('sacco_capital_shares')->truncate();
 
         // 4) Helpers (SMART member matching)
         $normalizeName = fn(?string $n) => trim(preg_replace('/\s+/', ' ', $n ?? ''));
