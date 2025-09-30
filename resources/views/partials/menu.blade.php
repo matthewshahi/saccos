@@ -81,6 +81,8 @@
                                 </a>
                             </li>
 
+                            
+
                         </ul>
                     </li>
                     <li class="Ul_li--hover">
@@ -306,6 +308,12 @@
                                             <span class="text-muted">Consolidated (All in One)</span>
                                         </a>
                                     </li>
+                                    <li class="item-name">
+                                        <a href="{{ url('/registration-fees') }}">
+                                            <span class="text-muted">Registration Fees</span>
+                                        </a>
+                                    </li>
+                                    
                                 </ul>
                             </li>
 
