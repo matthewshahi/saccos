@@ -53,6 +53,12 @@ class MemberTotalsController extends Controller
                 ->update(['member_total_share_capital' => $record->total]);
         }
 
-        return redirect()->back()->with('success', 'All member totals have been recalculated successfully.');
+        // 🟢 Instead of redirect, just dump summary to the screen
+    dd([
+        'shares_updated'   => $shares->count(),
+        'fosas_updated'    => $fosas->count(),
+        'capital_updated'  => $capitalShares->count(),
+        'message'          => 'All member totals have been recalculated successfully.'
+    ]);
     }
 }
