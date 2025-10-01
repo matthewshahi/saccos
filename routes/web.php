@@ -42,6 +42,7 @@ use App\Http\Controllers\CapitalShareTransactionController;
 // use App\Http\Controllers\TxnImportController;
 use App\Http\Controllers\RegistrationFeeController;
 
+
 use App\Http\Controllers\TxnImportController;
 
 // Upload form
@@ -55,7 +56,7 @@ Route::post('/transactions/import', [TxnImportController::class, 'import'])
 
 // use App\Http\Controllers\ReportsShareController;
 
-// Route::get('/members/update-totals', [\App\Http\Controllers\MemberTotalsController::class, 'recalculateAll'])->name('members.recalculate.totals');
+Route::get('/members/update-totals', [\App\Http\Controllers\MemberTotalsController::class, 'recalculateAll'])->name('members.recalculate.totals');
 
 // // Route::get('/members/import-transactions', [MemberImportController::class, 'showImportTransactionsForm'])->name('members.import.transactions.form');
 // // Route::post('/members/import-transactions', [MemberImportController::class, 'importSavingsAndShares'])->name('members.import.transactions');
