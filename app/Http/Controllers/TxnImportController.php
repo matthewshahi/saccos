@@ -171,14 +171,20 @@ class TxnImportController extends Controller
             if ($amount <= 0) continue;
 
             // map category
-           $catU = strtoupper(trim((string)$rawCat));
-if (strpos($catU, 'DEPOSIT') !== false || strpos($catU, 'SAVING') !== false || strpos($catU, 'SHARE') !== false) {
-    $category = 'Deposits';
-} elseif (strpos($catU, 'CAPITAL') !== false) {
+          $catU = strtoupper(trim((string)$rawCat));
+$catU = preg_replace('/\s+/', ' ', $catU); // normalize spaces
+
+if (strpos($catU, 'CAPITAL') !== false 
+    || in_array($catU, ['SHARES','CAPITAL SHARE','CAPITAL SHARES','SHARE CAPITAL'])) {
     $category = 'Capital Shares';
-} elseif (strpos($catU, 'FOSA') !== false || strpos($catU, 'WELFARE') !== false) {
+}
+elseif (strpos($catU, 'DEPOSIT') !== false || strpos($catU, 'SAVING') !== false) {
+    $category = 'Deposits';
+}
+elseif (strpos($catU, 'FOSA') !== false || strpos($catU, 'WELFARE') !== false) {
     $category = 'FOSA';
-} else {
+}
+else {
     $category = 'FOSA'; // fallback
 }
 
