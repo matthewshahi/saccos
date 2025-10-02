@@ -41,8 +41,7 @@
                                 <th>Name</th>
                                 <th>Code</th>
                                 <th>Main Account</th>
-                                <th>Debit</th>
-                                <th>Credit</th>
+                                
                                 <th>Action</th>
                             </tr>
                         </thead>
@@ -53,8 +52,7 @@
                                     <td>{{ $subAccount->sub_account_name }}</td>
                                     <td>{{ $subAccount->sub_account_code }}</td>
                                     <td>{{ $subAccount->main_account_code }}/{{ $subAccount->sub_account_code }}</td>
-                                    <td>{{ number_format($subAccount->sub_account_debit, 2) }}</td>
-                                    <td>{{ number_format($subAccount->sub_account_credit, 2) }}</td>
+                                    
                                     <td>
                                         <a href="{{ route('accounts.sub.edit', $subAccount->sub_account_id) }}" class="btn btn-warning btn-sm">Edit</a>
                                     </td>

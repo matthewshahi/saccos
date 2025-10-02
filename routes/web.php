@@ -41,8 +41,9 @@ use App\Http\Controllers\ShareTransactionController;
 use App\Http\Controllers\CapitalShareTransactionController;
 // use App\Http\Controllers\TxnImportController;
 use App\Http\Controllers\RegistrationFeeController;
+use App\Http\Controllers\TrialBalanceController;
 
-
+ 
 use App\Http\Controllers\TxnImportController;
 
 // Upload form
@@ -630,7 +631,9 @@ Route::middleware(['check_user_rights:FosaTransactions'])
     Route::put('/reports/accounts/ledger/update/{id}', [ReportLedgerController::class, 'updateTransaction'])->name('reports.accounts.update')->middleware('check_user_rights:modify_member_shares_journal');
     Route::get('/reports/accounts/ledger/export', [ReportLedgerController::class, 'export'])->name('reports.accounts.ledger.export');
 
-    Route::get('/reports/accounts/trial-balance', [HomeController::class, 'reportsAccountsTrialBalance'])->name('reports.accounts.trial-balance')->middleware('check_user_rights:rpt_trial_balance');
+    // Route::get('/reports/accounts/trial-balance', [HomeController::class, 'reportsAccountsTrialBalance'])->name('reports.accounts.trial-balance')->middleware('check_user_rights:rpt_trial_balance');
+    Route::get('/reports/accounts/trial-balance', [TrialBalanceController::class, 'index'])->name('reports.accounts.trial-balance')->middleware('check_user_rights:rpt_trial_balance');
+
     Route::get('/reports/accounts/profit-loss', [HomeController::class, 'reportsAccountsTrialBalance'])->name('reports.accounts.profit-loss')->middleware('check_user_rights:rpt_profit_loss');
     Route::get('/reports/accounts/profit-loss/budget', [HomeController::class, 'reportsAccountsTrialBalanceBudget'])->name('reports.accounts.profit-loss.budget')->middleware('check_user_rights:rpt_profit_loss');
     Route::get('/reports/accounts/balance-sheet', [HomeController::class, 'reportsAccountsTrialBalance'])->name('reports.accounts.balance-sheet')->middleware('check_user_rights:rpt_balance_sheet');
