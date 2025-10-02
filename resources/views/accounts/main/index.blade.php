@@ -40,8 +40,7 @@
                                 <th>Account Name</th>
                                 <th>Account Code</th>
                                 <th>Account Type</th>
-                                <th>Debit</th>
-                                <th>Credit</th>
+                                 
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -52,8 +51,7 @@
                                     <td>{{ $mainAccount->main_account_name }}</td>
                                     <td>{{ $mainAccount->main_account_code }}</td>
                                     <td>{{ $mainAccount->main_account_type }}</td>
-                                    <td>{{ number_format($mainAccount->main_account_debit, 2) }}</td>
-                                    <td>{{ number_format($mainAccount->main_account_credit, 2) }}</td>
+                                     
                                     <td>
                                         <a href="{{ route('accounts.main.edit', $mainAccount->main_account_id) }}" class="btn btn-sm btn-primary">Edit</a>
                                     </td>
