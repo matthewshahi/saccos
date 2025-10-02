@@ -47,12 +47,12 @@ use App\Http\Controllers\TrialBalanceController;
 use App\Http\Controllers\TxnImportController;
 
 // Upload form
-// Route::get('/transactions/import', [TxnImportController::class, 'showForm'])
-//     ->name('transactions.import.form');
+Route::get('/transactions/import', [TxnImportController::class, 'showForm'])
+    ->name('transactions.import.form');
 
-// // // Process CSV and import
-// Route::post('/transactions/import', [TxnImportController::class, 'import'])
-//     ->name('transactions.import');
+// // Process CSV and import
+Route::post('/transactions/import', [TxnImportController::class, 'import'])
+    ->name('transactions.import');
 
 
 // use App\Http\Controllers\ReportsShareController;
