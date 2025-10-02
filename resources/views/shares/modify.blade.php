@@ -2,7 +2,7 @@
 
 @section('content')
     <div class="breadcrumb d-flex justify-content-between align-items-center">
-        <h1>Modify Member Savings</h1>
+        <h1>Modify Member Savings / Deposits</h1>
         <div class="header-part-right">
             <ul>
                 @if(Auth::check())
