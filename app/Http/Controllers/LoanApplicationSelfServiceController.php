@@ -109,6 +109,7 @@ class LoanApplicationSelfServiceController extends Controller
             $loans = $query->orderBy('trans.batch_trans_on', 'desc') // Ensure orderBy is before paginate
                         ->paginate(20); // Fetch paginated results
 
+                        
             // Return the view with loans
             return view('loans.selfservice.pending_approval', compact('loans'));
         }

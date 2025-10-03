@@ -8,6 +8,8 @@
             <h3 class="text-center">Loans Pending Approval</h3>
         </div>
     </div>
+
+    
     
 <!-- Success and Error Messages -->
 @if (session('success'))
@@ -236,6 +238,7 @@
                 <!-- Modal Footer -->
                 <div class="modal-footer">
                         @if ($loan->batch_trans_updated == 'N' && $loan->batch_trans_deleted != 'Y')
+                        @if (Auth::user()->member_position == 2)
                             <!-- Approve Form -->
                             <form id="approveForm{{ $loan->batch_trans_id }}" action="{{ route('loans.approve', ['loanId' => $loan->batch_trans_id]) }}" method="POST" style="display: inline;">
                                 @csrf
@@ -247,6 +250,7 @@
                                 @csrf
                                 <button type="button" class="btn btn-danger" onclick="confirmAction('reject', '{{ $loan->batch_trans_id }}')">Reject</button>
                             </form>
+                         @endif
                         @else
                             <span class="text-muted">This application is closed or deleted.</span>
                         @endif
