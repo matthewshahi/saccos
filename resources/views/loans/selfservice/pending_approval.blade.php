@@ -240,10 +240,13 @@
                         @if ($loan->batch_trans_updated == 'N' && $loan->batch_trans_deleted != 'Y')
                         @if (Auth::user()->member_position == 2)
                             <!-- Approve Form -->
-                            <form id="approveForm{{ $loan->batch_trans_id }}" action="{{ route('loans.approve', ['loanId' => $loan->batch_trans_id]) }}" method="POST" style="display: inline;">
-                                @csrf
-                                <button type="button" class="btn btn-success" onclick="confirmAction('approve', '{{ $loan->batch_trans_id }}')">Approve</button>
-                            </form>
+                            <form id="approveForm{{ $loan->batch_trans_id }}" 
+      action="{{ route('loans.approve.self', ['loanId' => $loan->batch_trans_id]) }}" 
+      method="POST" style="display: inline;">
+    @csrf
+    <button type="button" class="btn btn-success" 
+            onclick="confirmAction('approve', '{{ $loan->batch_trans_id }}')">Approve</button>
+</form>
 
                             <!-- Reject Form -->
                             <form id="rejectForm{{ $loan->batch_trans_id }}" action="{{ route('loans.reject', ['id' => $loan->batch_trans_id]) }}" method="POST" style="display: inline;">
