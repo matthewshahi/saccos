@@ -1027,6 +1027,15 @@ class LoanController extends Controller
             $default_insurance_account = $this->getDefaultAccount('default_insurance_account');
             $default_commission_account = $this->getDefaultAccount('default_loan_commission_account');
             $default_loan_account = $this->getDefaultAccount('default_loan_account');
+            
+ 
+
+if (!$default_bank_account || !$default_insurance_account || !$default_commission_account || !$default_loan_account) {
+    return back()->withErrors([
+        'defaults' => 'One or more required default accounts are missing. Please configure all default accounts before proceeding.',
+    ]);
+}
+
 
             foreach ($transactions as $transaction) {
                 // Retrieve specific accounts from sacco_loan_types
@@ -2081,4 +2090,46 @@ class LoanController extends Controller
 
         return (float) $value;
     }
+
+   private function calc_loan_interest_insurance_dhl($loanAmount, $durationMonths, $loanType, $member = null, $commission = 0)
+{
+    $interestType = strtoupper(trim($loanType->loan_type_interest_type ?? 'FIXED INTEREST'));
+    $annualRate   = (float) ($loanType->loan_type_interest ?? 0);
+    $monthlyRate  = $annualRate / 12 / 100;
+
+    // ✅ Insurance — only if insurable
+    $insurance = ($loanType->loan_type_insurable == 'Y') ? round($loanAmount * 0.01, 2) : 0.0;
+
+    $emi = 0;
+    $expectedInterest = 0;
+    $monthlyPrincipal = 0;
+
+    if ($interestType === 'FIXED INTEREST') {
+        // ✅ Fixed interest calculation
+        $expectedInterest = round(($loanAmount + $insurance) * $annualRate / 100, 2);
+        $emi = ceil(($loanAmount + $expectedInterest + $insurance) / $durationMonths);
+        $monthlyPrincipal = ceil(($loanAmount + $insurance) / $durationMonths);
+    } else {
+        // ✅ Flat interest monthly (legacy SACCO model)
+        $loanAmountWithInsu = $loanAmount + $insurance;
+        $interestPercent = $annualRate / 12 / 100;
+
+        $emi = ($loanAmountWithInsu / $durationMonths) + ($loanAmountWithInsu * $interestPercent);
+        $EMI = ceil($emi);
+
+        $expectedInterest = $loanAmountWithInsu * $interestPercent;
+        $monthlyPrincipal = $EMI - ($loanAmountWithInsu * $interestPercent);
+
+        // enforce the same rounding logic
+        $emi = $EMI;
+        $monthlyPrincipal = ceil($monthlyPrincipal);
+    }
+
+    return [
+        'monthly_payment'            => round($emi, 2),
+        'monthly_payment_principal'  => round($monthlyPrincipal, 2),
+        'expected_interest'          => round($expectedInterest, 2),
+        'insurance'                  => round($insurance, 2),
+    ];
+}
 }
