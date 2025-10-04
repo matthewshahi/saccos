@@ -2097,8 +2097,13 @@ if (!$default_bank_account || !$default_insurance_account || !$default_commissio
     $annualRate   = (float) ($loanType->loan_type_interest ?? 0);
     $monthlyRate  = $annualRate / 12 / 100;
 
-    // ✅ Insurance — only if insurable
-    $insurance = ($loanType->loan_type_insurable == 'Y') ? round($loanAmount * 0.01, 2) : 0.0;
+    // ✅ Insurance — only if insurable, 1% of loan amount
+    $insurance = ($loanType->loan_type_insurable == 'Y')
+        ? round($loanAmount * 0.01, 2)
+        : 0.0;
+
+    // ✅ Include insurance and commission in total loan cost base
+    $loanAmountWithInsu = $loanAmount + $commission + $insurance;
 
     $emi = 0;
     $expectedInterest = 0;
@@ -2106,12 +2111,11 @@ if (!$default_bank_account || !$default_insurance_account || !$default_commissio
 
     if ($interestType === 'FIXED INTEREST') {
         // ✅ Fixed interest calculation
-        $expectedInterest = round(($loanAmount + $insurance) * $annualRate / 100, 2);
-        $emi = ceil(($loanAmount + $expectedInterest + $insurance) / $durationMonths);
-        $monthlyPrincipal = ceil(($loanAmount + $insurance) / $durationMonths);
+        $expectedInterest = round(($loanAmountWithInsu) * $annualRate / 100, 2);
+        $emi = ceil(($loanAmountWithInsu + $expectedInterest) / $durationMonths);
+        $monthlyPrincipal = ceil(($loanAmountWithInsu) / $durationMonths);
     } else {
-        // ✅ Flat interest monthly (legacy SACCO model)
-        $loanAmountWithInsu = $loanAmount + $insurance;
+        // ✅ Flat interest monthly (legacy SACCO method)
         $interestPercent = $annualRate / 12 / 100;
 
         $emi = ($loanAmountWithInsu / $durationMonths) + ($loanAmountWithInsu * $interestPercent);
@@ -2120,7 +2124,7 @@ if (!$default_bank_account || !$default_insurance_account || !$default_commissio
         $expectedInterest = $loanAmountWithInsu * $interestPercent;
         $monthlyPrincipal = $EMI - ($loanAmountWithInsu * $interestPercent);
 
-        // enforce the same rounding logic
+        // enforce consistent rounding
         $emi = $EMI;
         $monthlyPrincipal = ceil($monthlyPrincipal);
     }
