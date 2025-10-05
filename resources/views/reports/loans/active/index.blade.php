@@ -72,10 +72,7 @@
             <i class="bi bi-file-earmark-excel"></i> Excel
         </a>
 
-        <a href="{{ route('reports.loans.active.export', ['format' => 'pdf'] + request()->query()) }}"
-           class="btn btn-danger" title="Export to PDF">
-            <i class="bi bi-file-earmark-pdf"></i> PDF
-        </a>
+       
     </div>
 </form>
         </div>
