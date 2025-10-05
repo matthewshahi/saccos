@@ -1101,6 +1101,13 @@ if (!$default_bank_account || !$default_insurance_account || !$default_commissio
                         'loan_loan_paid' => 0,
                         'loan_start_deduction_period' => $this->currentPeriod->period_name,
                         'loan_taken_start_period' => $this->currentPeriod->period_name,
+    
+                      
+                        'loan_monthly_repayment_principal' => $transaction->batch_trans_monthly_payment_principal,
+                        'loan_monthly_repayment_amount'    => $transaction->batch_trans_monthly_payment,
+                        'loan_interest_payable'            => $transaction->batch_trans_expected_interest,
+
+
 
                     ]);
                     Log::info('Loan ID created successfully: ' . $loanId);  // Log or display for debugging
