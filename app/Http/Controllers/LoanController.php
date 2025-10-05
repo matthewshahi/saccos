@@ -892,29 +892,53 @@ class LoanController extends Controller
             return redirect()->back()->withErrors($errors)->withInput();
         }
 
-        // Prepare data for update
-        $data['batch_trans_member_id'] = $member->member_id;
-        $data['batch_trans_batch_id'] = $batch_id;
-        $data['batch_trans_by'] = auth()->id();
-        $data['batch_trans_ip'] = $request->ip();
-        $data['batch_trans_commission'] = $data['batch_trans_commission_amount'] ?? null;
-        unset($data['batch_trans_commission_amount']);
+        $commission = $data['batch_trans_commission_amount'] ?? 0;
 
-        // Update transaction
-        DB::table('sacco_loan_batch_trans')
-            ->where('batch_trans_id', $transaction_id)
-            ->update($data);
+// ✅ Reuse your central calculator (same as ADD)
+$calc = $this->calculateLoanFinancials(
+    $data['batch_trans_loan_amount'],
+    $data['batch_trans_loan_duration'],
+    $loanType,
+    $member,
+    $commission
+);
 
-        // Delete old guarantors
-        DB::table('sacco_loan_batch_guarantors')
-            ->where('guarantors_loan_batch_trans_id', $transaction_id)
-            ->delete();
+// ✅ Merge calculations into data
+$data['batch_trans_monthly_payment']            = $calc['monthly_payment'];
+$data['batch_trans_monthly_payment_principal']  = $calc['monthly_payment_principal'];
+$data['batch_trans_expected_interest']          = $calc['expected_interest'];
+$data['batch_trans_insurance']                  = $calc['insurance'];
+$data['batch_trans_commission']                 = $commission;
+$data['batch_trans_by']                         = auth()->id();
+$data['batch_trans_ip']                         = $request->ip();
+$data['batch_trans_member_id']                  = $member->member_id;
 
-        // Save new guarantors
-        $this->saveGuarantors($request->input('guarantors', []), $transaction_id, $data['batch_trans_loan_amount'], $loanType);
+// ❌ Remove the form-only field before updating
+unset($data['batch_trans_commission_amount']);
 
-        return redirect()->route('loans.batch.transactions', $batch_id)->with('success', 'Transaction updated successfully.');
-    }
+// ✅ Update transaction
+DB::table('sacco_loan_batch_trans')
+    ->where('batch_trans_id', $transaction_id)
+    ->update($data);
+
+// 🔁 Delete old guarantors
+DB::table('sacco_loan_batch_guarantors')
+    ->where('guarantors_loan_batch_trans_id', $transaction_id)
+    ->delete();
+
+// 💾 Save new guarantors
+$this->saveGuarantors(
+    $request->input('guarantors', []),
+    $transaction_id,
+    $data['batch_trans_loan_amount'],
+    $loanType
+);
+
+return redirect()
+    ->route('loans.batch.transactions', $batch_id)
+    ->with('success', 'Transaction updated successfully.');
+
+     }
 
     // private function validateLoanToTopUp($memberId, $loanToTopUpId, $newLoanAmount)
     // {
