@@ -42,6 +42,7 @@ use App\Http\Controllers\CapitalShareTransactionController;
 // use App\Http\Controllers\TxnImportController;
 use App\Http\Controllers\RegistrationFeeController;
 use App\Http\Controllers\TrialBalanceController;
+use App\Http\Controllers\LoansActiveReportController;
 
  
 // use App\Http\Controllers\TxnImportController;
@@ -186,41 +187,6 @@ Route::middleware(['auth'])->group(function () {
 });
 
 
-Route::middleware(['check_user_rights:RegistrationFees'])
-    ->prefix('registration-fees')
-    ->group(function () {
-        // 📋 Listing page
-        Route::get('/', [RegistrationFeeController::class, 'index'])
-            ->name('registrationfees.index');
-
-        // 🧾 Receipt
-        Route::get('/{id}/receipt', [RegistrationFeeController::class, 'receipt'])
-            ->name('registrationfees.receipt');
-    });
-// ========================
-// Shares Clearance Module
-// ========================
-Route::prefix('shares-clearance')
-    ->middleware(['check_user_rights:SharesClearance'])
-    ->group(function () {
-
-        // 1️⃣ Listing/Search page (searchable members, max 20 results)
-        Route::get('/', [SharesClearanceController::class, 'index'])
-            ->name('shares.clearance.index');
-
-        // 2️⃣ Search API (AJAX smart search for members)
-        Route::get('/search', [SharesClearanceController::class, 'searchMembers'])
-            ->name('shares.clearance.search');
-
-        // 3️⃣ Get loans for a member (modal load)
-        Route::get('/{member}/loans', [SharesClearanceController::class, 'getLoans'])
-            ->name('shares.clearance.loans');
-
-        // 4️⃣ Process clearance (apply selected shares to loans)
-        Route::post('/process', [SharesClearanceController::class, 'process'])
-            ->name('shares.clearance.process');
-    });
-
 Route::prefix('mobile')->group(function () {
 
     // Route::post('/pay/validation', [MpesaTheController::class, 'validationRequest'])->name('mpesa.pay.validation');
@@ -285,6 +251,63 @@ Route::prefix('mobile')->group(function () {
 
 
 Route::middleware(['auth', 'check_member_position'])->group(function () {
+
+
+    Route::prefix('reports/loans/active')
+    ->middleware(['auth','check_user_rights:LoansReport']) // 👈 adjust to your rights string
+    ->group(function () {
+        Route::get('/', [LoansActiveReportController::class, 'index'])
+            ->name('reports.loans.active.index');
+
+        // Inline updates (restrict more tightly)
+        Route::patch('/{loan}/principal', [LoansActiveReportController::class, 'updateMonthlyPrincipal'])
+            ->name('reports.loans.active.updatePrincipal')
+            ->middleware('check_user_rights:LoansReportEdit');
+
+        Route::patch('/{loan}/amount', [LoansActiveReportController::class, 'updateMonthlyAmount'])
+            ->name('reports.loans.active.updateAmount')
+            ->middleware('check_user_rights:LoansReportEdit');
+        
+            Route::get('/export/{format}', [LoansActiveReportController::class, 'export'])
+    ->name('reports.loans.active.export')
+    ->middleware(['check_user_rights:LoansReportView']);
+    });
+
+
+Route::middleware(['check_user_rights:RegistrationFees'])
+    ->prefix('registration-fees')
+    ->group(function () {
+        // 📋 Listing page
+        Route::get('/', [RegistrationFeeController::class, 'index'])
+            ->name('registrationfees.index');
+
+        // 🧾 Receipt
+        Route::get('/{id}/receipt', [RegistrationFeeController::class, 'receipt'])
+            ->name('registrationfees.receipt');
+    });
+// ========================
+// Shares Clearance Module
+// ========================
+Route::prefix('shares-clearance')
+    ->middleware(['check_user_rights:SharesClearance'])
+    ->group(function () {
+
+        // 1️⃣ Listing/Search page (searchable members, max 20 results)
+        Route::get('/', [SharesClearanceController::class, 'index'])
+            ->name('shares.clearance.index');
+
+        // 2️⃣ Search API (AJAX smart search for members)
+        Route::get('/search', [SharesClearanceController::class, 'searchMembers'])
+            ->name('shares.clearance.search');
+
+        // 3️⃣ Get loans for a member (modal load)
+        Route::get('/{member}/loans', [SharesClearanceController::class, 'getLoans'])
+            ->name('shares.clearance.loans');
+
+        // 4️⃣ Process clearance (apply selected shares to loans)
+        Route::post('/process', [SharesClearanceController::class, 'process'])
+            ->name('shares.clearance.process');
+    });
 
 
     Route::prefix('fosa-types')
@@ -517,8 +540,8 @@ Route::middleware(['check_user_rights:FosaTransactions'])
 
         Route::post('admin/loans/approve/{loanId}', 
     [LoanApplicationSelfServiceController::class, 'approveLoan']
-)->name('loans.approve.self')
- ->middleware('check_user_rights:end_month_processing_loans');
+    )->name('loans.approve.self')
+    ->middleware('check_user_rights:end_month_processing_loans');
  
     // Route::post('admin/loans/approve/{id}', [LoanApplicationSelfServiceController::class, 'approveLoanself'])
     //     ->name('loans.approve.self')->middleware('check_user_rights:end_month_processing_loans');

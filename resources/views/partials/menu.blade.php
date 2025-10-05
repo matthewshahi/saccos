@@ -222,6 +222,13 @@
                                     <span class="text-muted">Increase/Reduce Loans</span>
                                 </a>
                             </li>
+<li class="item-name">
+                                <a href="{{ url('/reports/loans/active') }}">
+                                    <span class="text-muted">Monthly Contributions</span>
+                                </a>
+                            </li>
+
+                            
 
                             <li class="item-name">
                                 <a href="{{ url('/admin/loans/pending/approval') }}">

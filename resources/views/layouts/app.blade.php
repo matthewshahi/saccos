@@ -31,7 +31,7 @@
         gtag('config', "{{ env('GA_ANALYTICS') }}");
     </script>
     @endif
-
+<meta name="csrf-token" content="{{ csrf_token() }}">
 
 </head>
 

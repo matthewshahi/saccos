@@ -64,4 +64,38 @@ class CheckUserRights
 
         return $results ? $results->rights_access : 'N';
     }
+    public static function userHasRight($moduleName)
+{
+    $user = Auth::user();
+    if (!$user) return false;
+
+    // ✅ Ensure the module exists — create if missing
+    $module = DB::table('sacco_modules')
+        ->where('module_name', $moduleName)
+        ->first();
+
+    if (!$module) {
+        $moduleId = DB::table('sacco_modules')->insertGetId([
+            'module_name'        => $moduleName,
+            'module_active'      => 'Y',
+            'module_description' => $moduleName,
+            'module_deleted'     => 'N',
+            'module_userid'      => $user->member_id,
+            'module_ip'          => request()->ip(),
+            'module_transdate'   => now(),
+        ]);
+
+        // Load the created record
+        $module = DB::table('sacco_modules')->where('module_id', $moduleId)->first();
+    }
+
+    // ✅ Check if user has access rights
+    $right = DB::table('sacco_userrights')
+        ->where('rights_app', $module->module_id)
+        ->where('rights_user', $user->member_id)
+        ->where('rights_access', 'Y')
+        ->first();
+
+    return (bool) $right;
+}
 }
