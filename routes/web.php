@@ -45,15 +45,15 @@ use App\Http\Controllers\TrialBalanceController;
 use App\Http\Controllers\LoansActiveReportController;
 
  
-// use App\Http\Controllers\TxnImportController;
+use App\Http\Controllers\TxnImportController;
 
 // Upload form
-// Route::get('/transactions/import', [TxnImportController::class, 'showForm'])
-//     ->name('transactions.import.form');
+Route::get('/transactions/import', [TxnImportController::class, 'showForm'])
+    ->name('transactions.import.form');
 
-// // // Process CSV and import
-// Route::post('/transactions/import', [TxnImportController::class, 'import'])
-//     ->name('transactions.import');
+// // Process CSV and import
+Route::post('/transactions/import', [TxnImportController::class, 'import'])
+    ->name('transactions.import');
 
 
 // use App\Http\Controllers\ReportsShareController;
@@ -99,12 +99,12 @@ use App\Http\Controllers\LoansActiveReportController;
 
 
 // // Show patch form
-// Route::get('/members/patch', [MemberImportController::class, 'showPatchForm'])
-//     ->name('members.patch.form');
+Route::get('/members/patch', [MemberImportController::class, 'showPatchForm'])
+    ->name('members.patch.form');
 
 // // Handle patch CSV upload and update members
-// Route::post('/members/patch', [MemberImportController::class, 'patch'])
-//     ->name('members.patch');
+Route::post('/members/patch', [MemberImportController::class, 'patch'])
+    ->name('members.patch');
 
 // Route::view('/members/import-kin-form', 'import.next_of_kin')->name('members.import.kin.form');
 // Route::post('/members/import-next-of-kin', [MemberImportController::class, 'importNextOfKin'])->name('members.import.kin');
