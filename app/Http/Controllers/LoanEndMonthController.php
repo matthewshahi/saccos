@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
+use App\Jobs\ProcessEndMonthLoansJob;
 
 class LoanEndMonthController extends Controller
 {
@@ -368,32 +369,20 @@ class LoanEndMonthController extends Controller
         }
 
         // If there are validation errors, redirect back without processing
+     
+
         if (!empty($errors)) {
-            return redirect()->route('proc.end.month.loans')->withErrors($errors);
-        }
+        return redirect()->route('proc.end.month.loans')->withErrors($errors);
+    }
 
-        // **Step 2: Processing Loop** (only if validation passed for all rows)
-        DB::beginTransaction();
+    Log::info('📦 Dispatching ProcessEndMonthLoansJob with rows: ' . json_encode($validRows));
 
-        try {
-            foreach ($validRows as $row) {
-                $this->defaultProcEndMonthLoanUpdate(
-                    $row['companyId'],
-                    $row['loanTypeId'],
-                    $row['loanDocNo'],
-                    $row['loanDatePaid'],
-                    $row['period']
-                );
-            }
+    dispatch(new ProcessEndMonthLoansJob($validRows, $period));
 
-            DB::commit();
-            return redirect()->route('proc.end.month.loans')->with('success', 'End-month loan processing completed successfully.');
-        } catch (\Exception $e) {
-            // Rollback if an error occurs
-            DB::rollBack();
-            Log::error('End-month loan processing failed: ' . $e->getMessage());
-            return redirect()->route('proc.end.month.loans')->with('error', 'End-month loan processing failed: ' . $e->getMessage());
-        }
+    return redirect()
+        ->route('proc.end.month.loans')
+        ->with('success', 'End-month loan processing has been queued and will run in the background.');
+       
     }
     /**
      * Helper function to validate date format.
@@ -604,7 +593,7 @@ class LoanEndMonthController extends Controller
     //     }
     // }
 
-    private function defaultProcEndMonthLoanUpdate($companyId, $loanTypeId, $loanDocNo, $loanDatePaid)
+    public function defaultProcEndMonthLoanUpdate($companyId, $loanTypeId, $loanDocNo, $loanDatePaid)
     {
         $period = $this->currentPeriod->period_name;
         $minLoanAmountBillable = $this->getDefaultAccountValue('min_loan_amount_bill_able') ?? 1;
@@ -710,9 +699,9 @@ class LoanEndMonthController extends Controller
                 } else {
                     $interest = ($loan->loan_amount - $loan->loan_loan_paid) * $loanInterestRate / 12 / 100;
                 }
-                
-            if ($loanCalcMethod === 'principle' && $loanInterestType !== "FIXED INTEREST") {
-                            $principalPayment = $interest + $loan->loan_monthly_repayment_principal ;
+
+                if ($loanCalcMethod === 'principle' && $loanInterestType !== "FIXED INTEREST") {
+                    $principalPayment = $interest + $loan->loan_monthly_repayment_principal;
                 }
 
                 $principalPaid = $principalPayment - $interest;
@@ -1340,58 +1329,119 @@ class LoanEndMonthController extends Controller
     /**
      * Recalculate interest and repayment for 'principle' (reducing balance) loans.
      */
-   private function recalculateReducingBalanceLoan($loanId, $interestRate)
+    private function recalculateReducingBalanceLoan($loanId, $interestRate)
+    {
+        try {
+            $loan = DB::table('sacco_loans')
+                ->select('loan_amount', 'loan_loan_paid', 'loan_monthly_repayment_principal')
+                ->where('loan_id', $loanId)
+                ->first();
+
+            if (!$loan) {
+                Log::warning("Loan {$loanId} not found for recalculation.");
+                return;
+            }
+
+            // ✅ Outstanding balance
+            $balance = max(0, (($loan->loan_amount ?? 0)) - (($loan->loan_loan_paid ?? 0)));
+
+            // ✅ Compute precise new interest (with decimals)
+            $newInterest = $balance * $interestRate / 12 / 100;
+
+            // ✅ Use stored principal *as-is*
+            $principal = $loan->loan_monthly_repayment_principal ?? 0;
+
+            // ✅ Extract the fractional (decimal) part of principal, e.g. 0.90 from 7168.90
+            $principalWhole   = floor($principal);
+            $principalDecimal = $principal - $principalWhole;
+
+            // ✅ Add that decimal part to interest to keep totals consistent
+            $newInterest += $principalDecimal;
+
+            // ✅ Round/ceil interest to nearest full shilling
+            $newInterest = ceil($newInterest);
+
+            // ✅ Compute new total repayment — must tally exactly
+            $newRepayment = $principalWhole + $newInterest;
+
+            // ✅ Prevent overpayment
+            if ($principalWhole > $balance) {
+                $principalWhole = floor($balance);
+                $newRepayment   = $principalWhole + $newInterest;
+            }
+
+            // ✅ Update only principal + repayment amount
+            DB::table('sacco_loans')
+                ->where('loan_id', $loanId)
+                ->update([
+                    'loan_monthly_repayment_principal' => $principalWhole,
+                    'loan_monthly_repayment_amount'    => $newRepayment,
+                ]);
+
+            Log::info("Loan {$loanId} recalculated → Principal={$principalWhole}, Interest={$newInterest}, Total={$newRepayment}, Balance={$balance}");
+        } catch (\Exception $e) {
+            Log::error("Error recalculating reducing balance loan {$loanId}: " . $e->getMessage());
+        }
+    }
+/**
+ * Notify all active members with position = 2 that end-month loan processing has completed.
+ */
+public function notifyEndMonthCompletion($companyId, $loanTypeId, $period)
 {
     try {
-        $loan = DB::table('sacco_loans')
-            ->select('loan_amount', 'loan_loan_paid', 'loan_monthly_repayment_principal')
-            ->where('loan_id', $loanId)
-            ->first();
+        // 1️⃣ Fetch company and loan type names
+        $companyName = DB::table('sacco_company')
+            ->where('company_id', $companyId)
+            ->value('company_name');
 
-        if (!$loan) {
-            Log::warning("Loan {$loanId} not found for recalculation.");
+        $loanTypeName = DB::table('sacco_loan_types')
+            ->where('loan_type_id', $loanTypeId)
+            ->value('loan_type_name');
+
+        if (!$companyName || !$loanTypeName) {
+            Log::warning("⚠️ Notification skipped: missing company or loan type name for IDs: {$companyId}, {$loanTypeId}");
             return;
         }
 
-        // ✅ Outstanding balance
-        $balance = max(0, (($loan->loan_amount ?? 0)) - (($loan->loan_loan_paid ?? 0)));
+        // 2️⃣ Compose message details
+        $subject = 'End-Month Loan Processing Complete';
+        $message = "End-month loan processing for period {$period} has been successfully completed for {$companyName} ({$loanTypeName}).";
 
-        // ✅ Compute precise new interest (with decimals)
-        $newInterest = $balance * $interestRate / 12 / 100;
+        // 3️⃣ Fetch recipients (position = 2, active)
+        $recipients = DB::table('sacco_members')
+            ->where('member_position', 2)
+            ->where('member_active', 'Y')
+            ->select('member_id', 'member_name', 'member_email', 'member_phone_no')
+            ->get();
 
-        // ✅ Use stored principal *as-is*
-        $principal = $loan->loan_monthly_repayment_principal ?? 0;
-
-        // ✅ Extract the fractional (decimal) part of principal, e.g. 0.90 from 7168.90
-        $principalWhole   = floor($principal);
-        $principalDecimal = $principal - $principalWhole;
-
-        // ✅ Add that decimal part to interest to keep totals consistent
-        $newInterest += $principalDecimal;
-
-        // ✅ Round/ceil interest to nearest full shilling
-        $newInterest = ceil($newInterest);
-
-        // ✅ Compute new total repayment — must tally exactly
-        $newRepayment = $principalWhole + $newInterest;
-
-        // ✅ Prevent overpayment
-        if ($principalWhole > $balance) {
-            $principalWhole = floor($balance);
-            $newRepayment   = $principalWhole + $newInterest;
+        if ($recipients->isEmpty()) {
+            Log::warning("⚠️ No active position-2 members found to notify.");
+            return;
         }
 
-        // ✅ Update only principal + repayment amount
-        DB::table('sacco_loans')
-            ->where('loan_id', $loanId)
-            ->update([
-                'loan_monthly_repayment_principal' => $principalWhole,
-                'loan_monthly_repayment_amount'    => $newRepayment,
+        // 4️⃣ Record notification for each recipient
+        foreach ($recipients as $recipient) {
+            DB::table('sacco_system_notifications')->insert([
+                'notif_subject'          => $subject,
+                'notif_message'          => $message,
+                'notif_recipient_name'   => $recipient->member_name,
+                'notif_recipient_email'  => $recipient->member_email,
+                'notif_recipient_phone'  => $recipient->member_phone_no,
+                'notif_member_id'        => $recipient->member_id,
+                'notif_type'             => 'system',
+                'notif_status'           => 'unread',
+                'notif_created_at'       => now(),
+                'notif_created_by'       => auth()->id() ?? 1,
+                'notif_ip'               => request()->ip(),
             ]);
 
-        Log::info("Loan {$loanId} recalculated → Principal={$principalWhole}, Interest={$newInterest}, Total={$newRepayment}, Balance={$balance}");
+            Log::info("📩 Logged notification for {$recipient->member_name} ({$recipient->member_email}) — {$subject}");
+        }
+
+        Log::info("📣 Successfully recorded " . count($recipients) . " notifications for {$companyName} ({$loanTypeName}) — period {$period}.");
     } catch (\Exception $e) {
-        Log::error("Error recalculating reducing balance loan {$loanId}: " . $e->getMessage());
+        Log::error("❌ Failed to record end-month notifications: " . $e->getMessage());
     }
 }
+
 }
