@@ -13,6 +13,8 @@ class LoanEndMonthController extends Controller
 
     public function __construct()
     {
+        ini_set('max_execution_time', 600); // 10 minutes
+        set_time_limit(600);
         $this->middleware('auth');
         // Set the current period only once
         $this->currentPeriod = DB::table('sacco_period')
@@ -183,8 +185,24 @@ class LoanEndMonthController extends Controller
             ->where('default_name', 'cut_off_date')
             ->value('default_value');
 
-        // Return valid cut-off date or today's date
-        return $cutOffDate ? Carbon::parse($cutOffDate)->toDateString() : Carbon::now()->toDateString();
+        // ✅ If missing, insert new record with date = 28th of current month
+        if (is_null($cutOffDate)) {
+            $newCutOff = Carbon::now()->startOfMonth()->addDays(27)->toDateString(); // always 28th day
+
+            DB::table('sacco_defaults')->insert([
+                'default_name'      => 'cut_off_date',
+                'default_value'     => $newCutOff,
+                'default_transdate' => now(),
+                'default_userid'    => auth()->id() ?? 1,
+                'default_ip'        => request()->ip(),
+            ]);
+
+            Log::warning("Default 'cut_off_date' missing — inserted {$newCutOff}.");
+            $cutOffDate = $newCutOff; // use it immediately
+        }
+
+        // ✅ Return valid date
+        return Carbon::parse($cutOffDate)->toDateString();
     }
 
     // Retrieve default account values based on the account name
@@ -586,15 +604,61 @@ class LoanEndMonthController extends Controller
     //     }
     // }
 
-
-
     private function defaultProcEndMonthLoanUpdate($companyId, $loanTypeId, $loanDocNo, $loanDatePaid)
     {
         $period = $this->currentPeriod->period_name;
-        $minLoanAmountBillable = $this->getDefaultAccountValue('min_loan_amount_bill_able') ?? 0;
+        $minLoanAmountBillable = $this->getDefaultAccountValue('min_loan_amount_bill_able') ?? 1;
+
+
+        if (is_null($minLoanAmountBillable)) {
+            DB::table('sacco_defaults')->insert([
+                'default_name'      => 'min_loan_amount_bill_able',
+                'default_value'     => 1,
+                'default_transdate' => now(),
+                'default_userid'    => auth()->id() ?? 1,
+                'default_ip'        => request()->ip(),
+            ]);
+
+            Log::warning("Default 'min_loan_amount_bill_able' missing — inserted with value 1.");
+            $minLoanAmountBillable = 1; // fallback immediately
+        }
+
         $cutOffDate = $this->getCutOffDate();
 
-        // Step 1: Fetch eligible loans with additional conditions
+        // Step 1: Fetch loan type once (instead of querying multiple times)
+        $loanType = DB::table('sacco_loan_types')
+            ->where('loan_type_id', $loanTypeId)
+            ->select('loan_type_interest_type', 'loan_type_interest', 'loan_type_id')
+            ->first();
+
+        if (!$loanType) {
+            Log::error("Loan type not found for ID {$loanTypeId}");
+            return;
+        }
+
+        $loanInterestType = strtoupper(trim($loanType->loan_type_interest_type ?? ''));
+        $loanInterestRate = (float) ($loanType->loan_type_interest ?? 0);
+
+        // Step 2: Fetch global loan calculation method
+        $loanCalcMethod = DB::table('sacco_defaults')
+            ->where('default_name', 'loan_calc_method')
+            ->value('default_value');
+
+        if (is_null($loanCalcMethod)) {
+            DB::table('sacco_defaults')->insert([
+                'default_name'      => 'loan_calc_method',
+                'default_value'     => null,
+                'default_transdate' => now(),
+                'default_userid'    => auth()->id() ?? 1,
+                'default_ip'        => request()->ip(),
+            ]);
+
+            Log::warning('loan_calc_method missing — inserted null record in sacco_defaults.');
+        }
+
+        $loanCalcMethod = strtolower(trim($loanCalcMethod ?? ''));
+
+        // Step 3: Get eligible loans
         $loans = DB::table('sacco_loans')
             ->join('sacco_members', 'sacco_loans.loan_member', '=', 'sacco_members.member_id')
             ->join('sacco_department', 'sacco_members.member_dept', '=', 'sacco_department.department_id')
@@ -606,7 +670,8 @@ class LoanEndMonthController extends Controller
             ->where('sacco_members.member_deleted', '!=', 'Y')
             ->where('sacco_members.member_date_joined', '<=', $cutOffDate)
             ->where('sacco_company.company_account', '>', 0)
-            ->whereRaw('(sacco_loans.loan_amount - sacco_loans.loan_loan_paid) > ?', [$minLoanAmountBillable])
+            // ->whereRaw('(sacco_loans.loan_amount - sacco_loans.loan_loan_paid) > ?', [$minLoanAmountBillable])
+            ->whereRaw('(COALESCE(sacco_loans.loan_amount, 0) - COALESCE(sacco_loans.loan_loan_paid, 0)) > ?', [$minLoanAmountBillable])
             ->where('sacco_loans.loan_amount', '>', 0)
             ->where('sacco_loans.loan_stoped', '!=', 'Y')
             ->where('sacco_loans.loan_taken_period', '<=', $period)
@@ -614,6 +679,7 @@ class LoanEndMonthController extends Controller
             ->select(
                 'sacco_loans.loan_id',
                 'sacco_loans.loan_monthly_repayment_amount',
+                'sacco_loans.loan_monthly_repayment_principal',
                 'sacco_loans.loan_loan_paid',
                 'sacco_loans.loan_amount',
                 'sacco_loans.loan_amount_guaranteed',
@@ -621,51 +687,55 @@ class LoanEndMonthController extends Controller
                 'sacco_loan_types.loan_type_int_account',
                 'sacco_loan_types.loan_type_acount',
                 'sacco_company.company_account',
-                'sacco_loan_types.loan_type_id',
-
+                'sacco_loan_types.loan_type_id'
             )
             ->get();
 
+        if ($loans->isEmpty()) {
+            Log::info("No eligible loans for Company ID {$companyId}, Loan Type ID {$loanTypeId}.");
+            return;
+        }
+
+        // Step 4: Process each loan
         foreach ($loans as $loan) {
-            $principalPayment = $loan->loan_monthly_repayment_amount;
-            $interest = 0;
-
-            // Calculate interest for fixed or variable types
-            $loanInterestType = DB::table('sacco_loan_types')->where('loan_type_id', $loanTypeId)->value('loan_type_interest_type');
-            $loanInterestRate = DB::table('sacco_loan_types')->where('loan_type_id', $loanTypeId)->value('loan_type_interest');
-
-            if ($loanInterestType == "FIXED INTEREST") {
-                $interest = $principalPayment - ($principalPayment * 100 / ($loanInterestRate + 100));
-            } else {
-                $interest = ($loan->loan_amount - $loan->loan_loan_paid) * $loanInterestRate / 12 / 100;
-            }
-
-            $principalPaid = $principalPayment - $interest;
-
-            // Dynamic description format
-            $loanDescription = "Payroll {$period} - Member ID: {$loan->member_id}";
-
-            // Step 2: Insert record in sacco_loan_payments
             try {
+                $principalPayment = (float) $loan->loan_monthly_repayment_amount;
+                $interest = 0;
+
+
+
+                // Compute interest
+                if ($loanInterestType === "FIXED INTEREST") {
+                    $interest = $principalPayment - ($principalPayment * 100 / ($loanInterestRate + 100));
+                } else {
+                    $interest = ($loan->loan_amount - $loan->loan_loan_paid) * $loanInterestRate / 12 / 100;
+                }
+                
+            if ($loanCalcMethod === 'principle' && $loanInterestType !== "FIXED INTEREST") {
+                            $principalPayment = $interest + $loan->loan_monthly_repayment_principal ;
+                }
+
+                $principalPaid = $principalPayment - $interest;
+
+
+                $loanDescription = "Payroll {$period} - Member ID: {$loan->member_id}";
+
+                // Step 2: Insert into payments
                 DB::table('sacco_loan_payments')->insert([
-                    'loan_payments_amount' => $principalPaid,
-                    'loan_payments_interest' => $interest,
-                    'loan_payments_docno' => $loanDocNo,
-                    'loan_payments_paid_on' => $loanDatePaid,
-                    'loan_payments_loan_id' => $loan->loan_id,
-                    'loan_payments_period' => $period,
-                    'loan_payments_by' => auth()->id(),
-                    'loan_payments_ip' => request()->ip(),
-                    'loan_end_month_proc' => 'Y',
-                    'loan_payments_description' => $loanDescription,
-                    'loan_payments_paid_in_by' => "End Month Proc"
+                    'loan_payments_amount'       => $principalPaid,
+                    'loan_payments_interest'     => $interest,
+                    'loan_payments_docno'        => $loanDocNo,
+                    'loan_payments_paid_on'      => $loanDatePaid,
+                    'loan_payments_loan_id'      => $loan->loan_id,
+                    'loan_payments_period'       => $period,
+                    'loan_payments_by'           => auth()->id(),
+                    'loan_payments_ip'           => request()->ip(),
+                    'loan_end_month_proc'        => 'Y',
+                    'loan_payments_description'  => $loanDescription,
+                    'loan_payments_paid_in_by'   => "End Month Proc"
                 ]);
-            } catch (\Exception $e) {
-                dd("Error inserting loan payment for loan ID {$loan->loan_id}: " . $e->getMessage());
-            }
 
-            // Step 3: Update loan and member balances
-            try {
+                // Step 3: Update balances
                 DB::table('sacco_loans')
                     ->where('loan_id', $loan->loan_id)
                     ->increment('loan_loan_paid', $principalPaid);
@@ -673,27 +743,172 @@ class LoanEndMonthController extends Controller
                 DB::table('sacco_members')
                     ->where('member_id', $loan->member_id)
                     ->decrement('member_total_loan', $principalPaid);
-            } catch (\Exception $e) {
-                dd("Error updating balances for loan ID {$loan->loan_id}: " . $e->getMessage());
-            }
 
-           // Step 4: Adjust guarantor shares
-if (is_numeric($loan->loan_amount_guaranteed) && $loan->loan_amount_guaranteed > 0.1) {
-    try {
-        $this->updateGuarantorShares($loan->loan_id, $principalPaid);
-    } catch (\Exception $e) {
-        dd("Error updating guarantor shares for loan ID {$loan->loan_id}: " . $e->getMessage());
-    }
-}
+                // Step 3b: Recalculate for principle method
+                if ($loanCalcMethod === 'principle' && $loanInterestType !== "FIXED INTEREST") {
+                    $this->recalculateReducingBalanceLoan($loan->loan_id, $loanInterestRate);
+                }
 
-            // Step 5: Record accounting transactions
-            try {
-                $this->recordAccountingTransactions($loan, $companyId, $principalPaid, $interest, $loanDocNo, $period, $loanDatePaid);
+                // Step 4: Update guarantors
+                if (is_numeric($loan->loan_amount_guaranteed) && $loan->loan_amount_guaranteed > 0.1) {
+                    $this->updateGuarantorShares($loan->loan_id, $principalPaid);
+                }
+
+                // Step 5: Record accounting
+                $this->recordAccountingTransactions(
+                    $loan,
+                    $companyId,
+                    $principalPaid,
+                    $interest,
+                    $loanDocNo,
+                    $period,
+                    $loanDatePaid
+                );
             } catch (\Exception $e) {
-                dd("Error recording accounting transactions for loan ID {$loan->loan_id}: " . $e->getMessage());
+                Log::error("Error processing loan ID {$loan->loan_id}: " . $e->getMessage());
+                continue; // continue to next loan without breaking the batch
             }
         }
+
+        Log::info("✅ End-month loan update completed for Company {$companyId}, Loan Type {$loanTypeId}");
     }
+
+    // private function defaultProcEndMonthLoanUpdate($companyId, $loanTypeId, $loanDocNo, $loanDatePaid)
+    // {
+    //     $period = $this->currentPeriod->period_name;
+    //     $minLoanAmountBillable = $this->getDefaultAccountValue('min_loan_amount_bill_able') ?? 0;
+    //     $cutOffDate = $this->getCutOffDate();
+
+    //     // Step 1: Fetch eligible loans with additional conditions
+    //     $loans = DB::table('sacco_loans')
+    //         ->join('sacco_members', 'sacco_loans.loan_member', '=', 'sacco_members.member_id')
+    //         ->join('sacco_department', 'sacco_members.member_dept', '=', 'sacco_department.department_id')
+    //         ->join('sacco_company', 'sacco_department.department_company_id', '=', 'sacco_company.company_id')
+    //         ->join('sacco_loan_types', 'sacco_loans.loan_loan_type', '=', 'sacco_loan_types.loan_type_id')
+    //         ->where('sacco_department.department_company_id', $companyId)
+    //         ->where('sacco_loans.loan_loan_type', $loanTypeId)
+    //         ->where('sacco_members.member_active', 'Y')
+    //         ->where('sacco_members.member_deleted', '!=', 'Y')
+    //         ->where('sacco_members.member_date_joined', '<=', $cutOffDate)
+    //         ->where('sacco_company.company_account', '>', 0)
+    //         ->whereRaw('(sacco_loans.loan_amount - sacco_loans.loan_loan_paid) > ?', [$minLoanAmountBillable])
+    //         ->where('sacco_loans.loan_amount', '>', 0)
+    //         ->where('sacco_loans.loan_stoped', '!=', 'Y')
+    //         ->where('sacco_loans.loan_taken_period', '<=', $period)
+    //         ->where('sacco_loans.loan_start_deduction_period', '<=', $period)
+    //         ->select(
+    //             'sacco_loans.loan_id',
+    //             'sacco_loans.loan_monthly_repayment_amount',
+    //             'sacco_loans.loan_loan_paid',
+    //             'sacco_loans.loan_amount',
+    //             'sacco_loans.loan_amount_guaranteed',
+    //             'sacco_members.member_id',
+    //             'sacco_loan_types.loan_type_int_account',
+    //             'sacco_loan_types.loan_type_acount',
+    //             'sacco_company.company_account',
+    //             'sacco_loan_types.loan_type_id',
+
+    //         )
+    //         ->get();
+    //     $loanCalcMethod = DB::table('sacco_defaults')
+    //                 ->where('default_name', 'loan_calc_method')
+    //                 ->value('default_value');
+
+    //             // ✅ Auto-insert a null record if it's missing in defaults
+    //             if (is_null($loanCalcMethod)) {
+    //                 DB::table('sacco_defaults')->insert([
+    //                     'default_name'      => 'loan_calc_method',
+    //                     'default_value'     => null,
+    //                     'default_transdate' => now(),
+    //                     'default_userid'    => auth()->id() ?? 1,
+    //                     'default_ip'        => request()->ip(),
+    //                 ]);
+
+    //                 Log::warning('loan_calc_method missing — inserted null record in sacco_defaults.');
+    //             }
+
+
+    //         $loanInterestType = DB::table('sacco_loan_types')->where('loan_type_id', $loanTypeId)->value('loan_type_interest_type');
+    //         $loanInterestRate = DB::table('sacco_loan_types')->where('loan_type_id', $loanTypeId)->value('loan_type_interest');
+
+
+    //     foreach ($loans as $loan) {
+    //         $principalPayment = $loan->loan_monthly_repayment_amount;
+    //         $interest = 0;
+
+    //         // Calculate interest for fixed or variable types
+
+    //         if ($loanInterestType == "FIXED INTEREST") {
+    //             $interest = $principalPayment - ($principalPayment * 100 / ($loanInterestRate + 100));
+    //         } else {
+    //             $interest = ($loan->loan_amount - $loan->loan_loan_paid) * $loanInterestRate / 12 / 100;
+    //         }
+
+    //         $principalPaid = $principalPayment - $interest;
+
+    //         // Dynamic description format
+    //         $loanDescription = "Payroll {$period} - Member ID: {$loan->member_id}";
+
+    //         // Step 2: Insert record in sacco_loan_payments
+    //         try {
+    //             DB::table('sacco_loan_payments')->insert([
+    //                 'loan_payments_amount' => $principalPaid,
+    //                 'loan_payments_interest' => $interest,
+    //                 'loan_payments_docno' => $loanDocNo,
+    //                 'loan_payments_paid_on' => $loanDatePaid,
+    //                 'loan_payments_loan_id' => $loan->loan_id,
+    //                 'loan_payments_period' => $period,
+    //                 'loan_payments_by' => auth()->id(),
+    //                 'loan_payments_ip' => request()->ip(),
+    //                 'loan_end_month_proc' => 'Y',
+    //                 'loan_payments_description' => $loanDescription,
+    //                 'loan_payments_paid_in_by' => "End Month Proc"
+    //             ]);
+    //         } catch (\Exception $e) {
+    //             dd("Error inserting loan payment for loan ID {$loan->loan_id}: " . $e->getMessage());
+    //         }
+
+    //         // Step 3: Update loan and member balances
+    //         try {
+    //             DB::table('sacco_loans')
+    //                 ->where('loan_id', $loan->loan_id)
+    //                 ->increment('loan_loan_paid', $principalPaid);
+
+    //             DB::table('sacco_members')
+    //                 ->where('member_id', $loan->member_id)
+    //                 ->decrement('member_total_loan', $principalPaid);
+
+    //             // ✅ Step 3b: If loan calculation method is 'principle', recalc interest + update repayment
+
+    //             // ✅ Try to get loan-specific calculation method from sacco_defaults instead
+
+    //             // ✅ Normalize and check
+    //             $loanCalcMethod = strtolower(trim($loanCalcMethod ?? ''));
+
+    //             if ($loanCalcMethod === 'principle' && $loanInterestType != "FIXED INTEREST") {
+    //                 $this->recalculateReducingBalanceLoan($loan->loan_id, $loanInterestRate);
+    //             }
+    //         } catch (\Exception $e) {
+    //             dd("Error updating balances for loan ID {$loan->loan_id}: " . $e->getMessage());
+    //         }
+
+    //         // Step 4: Adjust guarantor shares
+    //         if (is_numeric($loan->loan_amount_guaranteed) && $loan->loan_amount_guaranteed > 0.1) {
+    //             try {
+    //                 $this->updateGuarantorShares($loan->loan_id, $principalPaid);
+    //             } catch (\Exception $e) {
+    //                 dd("Error updating guarantor shares for loan ID {$loan->loan_id}: " . $e->getMessage());
+    //             }
+    //         }
+
+    //         // Step 5: Record accounting transactions
+    //         try {
+    //             $this->recordAccountingTransactions($loan, $companyId, $principalPaid, $interest, $loanDocNo, $period, $loanDatePaid);
+    //         } catch (\Exception $e) {
+    //             dd("Error recording accounting transactions for loan ID {$loan->loan_id}: " . $e->getMessage());
+    //         }
+    //     }
+    // }
     // private function defaultProcEndMonthLoanUpdate($companyId, $loanTypeId, $loanDocNo, $loanDatePaid)
     // {
     //     $period = $this->currentPeriod->period_name;
@@ -1121,4 +1336,62 @@ if (is_numeric($loan->loan_amount_guaranteed) && $loan->loan_amount_guaranteed >
             dd("Error recording accounting transactions: " . $e->getMessage());
         }
     }
+
+    /**
+     * Recalculate interest and repayment for 'principle' (reducing balance) loans.
+     */
+   private function recalculateReducingBalanceLoan($loanId, $interestRate)
+{
+    try {
+        $loan = DB::table('sacco_loans')
+            ->select('loan_amount', 'loan_loan_paid', 'loan_monthly_repayment_principal')
+            ->where('loan_id', $loanId)
+            ->first();
+
+        if (!$loan) {
+            Log::warning("Loan {$loanId} not found for recalculation.");
+            return;
+        }
+
+        // ✅ Outstanding balance
+        $balance = max(0, (($loan->loan_amount ?? 0)) - (($loan->loan_loan_paid ?? 0)));
+
+        // ✅ Compute precise new interest (with decimals)
+        $newInterest = $balance * $interestRate / 12 / 100;
+
+        // ✅ Use stored principal *as-is*
+        $principal = $loan->loan_monthly_repayment_principal ?? 0;
+
+        // ✅ Extract the fractional (decimal) part of principal, e.g. 0.90 from 7168.90
+        $principalWhole   = floor($principal);
+        $principalDecimal = $principal - $principalWhole;
+
+        // ✅ Add that decimal part to interest to keep totals consistent
+        $newInterest += $principalDecimal;
+
+        // ✅ Round/ceil interest to nearest full shilling
+        $newInterest = ceil($newInterest);
+
+        // ✅ Compute new total repayment — must tally exactly
+        $newRepayment = $principalWhole + $newInterest;
+
+        // ✅ Prevent overpayment
+        if ($principalWhole > $balance) {
+            $principalWhole = floor($balance);
+            $newRepayment   = $principalWhole + $newInterest;
+        }
+
+        // ✅ Update only principal + repayment amount
+        DB::table('sacco_loans')
+            ->where('loan_id', $loanId)
+            ->update([
+                'loan_monthly_repayment_principal' => $principalWhole,
+                'loan_monthly_repayment_amount'    => $newRepayment,
+            ]);
+
+        Log::info("Loan {$loanId} recalculated → Principal={$principalWhole}, Interest={$newInterest}, Total={$newRepayment}, Balance={$balance}");
+    } catch (\Exception $e) {
+        Log::error("Error recalculating reducing balance loan {$loanId}: " . $e->getMessage());
+    }
+}
 }
