@@ -78,17 +78,38 @@
         </div>
 
         <div class="card-footer">
-            <div class="row text-center small">
-                <div class="col-md-2"><strong>Rows:</strong> {{ number_format($totals['count_rows'] ?? 0) }}</div>
-                <div class="col-md-2"><strong>Total Monthly Principal:</strong> {{ number_format($totals['sum_monthly_principal'] ?? 0, 2) }}</div>
-                <div class="col-md-2">
-                    <strong>Total Monthly Interest:</strong>
-                    {{ number_format(($totals['sum_monthly_amount'] ?? 0) - ($totals['sum_monthly_principal'] ?? 0), 2) }}
-                </div>                <div class="col-md-2"><strong>Total Monthly Principal + Interest:</strong> {{ number_format($totals['sum_monthly_amount'] ?? 0, 2) }}</div>
-                <div class="col-md-3"><strong>Total Loan Amount:</strong> {{ number_format($totals['sum_loan_amount'] ?? 0, 2) }}</div>
-                <div class="col-md-3"><strong>Total Current Balance:</strong> {{ number_format($totals['sum_current_balance'] ?? 0, 2) }}</div>
-            </div>
+    <div class="row text-center small gy-2">
+        <div class="col-6 col-md-2 mb-2">
+            <strong>Rows:</strong><br>
+            {{ number_format($totals['count_rows'] ?? 0) }}
         </div>
+
+        <div class="col-6 col-md-2 mb-2">
+            <strong>Total Monthly Principal:</strong><br>
+            {{ number_format($totals['sum_monthly_principal'] ?? 0, 2) }}
+        </div>
+
+        <div class="col-6 col-md-2 mb-2">
+            <strong>Total Monthly Interest:</strong><br>
+            {{ number_format(($totals['sum_monthly_amount'] ?? 0) - ($totals['sum_monthly_principal'] ?? 0), 2) }}
+        </div>
+
+        <div class="col-6 col-md-2 mb-2">
+            <strong>Total Principal + Interest:</strong><br>
+            {{ number_format($totals['sum_monthly_amount'] ?? 0, 2) }}
+        </div>
+
+        <div class="col-6 col-md-2 mb-2">
+            <strong>Total Loan Amount:</strong><br>
+            {{ number_format($totals['sum_loan_amount'] ?? 0, 2) }}
+        </div>
+
+        <div class="col-6 col-md-2 mb-2">
+            <strong>Total Current Balance:</strong><br>
+            {{ number_format($totals['sum_current_balance'] ?? 0, 2) }}
+        </div>
+    </div>
+</div>
     </div>
 
     {{-- ===== Loans Table ===== --}}
