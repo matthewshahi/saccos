@@ -81,7 +81,10 @@
             <div class="row text-center small">
                 <div class="col-md-2"><strong>Rows:</strong> {{ number_format($totals['count_rows'] ?? 0) }}</div>
                 <div class="col-md-2"><strong>Total Monthly Principal:</strong> {{ number_format($totals['sum_monthly_principal'] ?? 0, 2) }}</div>
-                <div class="col-md-2"><strong>Total Monthly Amount:</strong> {{ number_format($totals['sum_monthly_amount'] ?? 0, 2) }}</div>
+                <div class="col-md-2">
+                    <strong>Total Monthly Interest:</strong>
+                    {{ number_format(($totals['sum_monthly_amount'] ?? 0) - ($totals['sum_monthly_principal'] ?? 0), 2) }}
+                </div>                <div class="col-md-2"><strong>Total Monthly Principal + Interest:</strong> {{ number_format($totals['sum_monthly_amount'] ?? 0, 2) }}</div>
                 <div class="col-md-3"><strong>Total Loan Amount:</strong> {{ number_format($totals['sum_loan_amount'] ?? 0, 2) }}</div>
                 <div class="col-md-3"><strong>Total Current Balance:</strong> {{ number_format($totals['sum_current_balance'] ?? 0, 2) }}</div>
             </div>
