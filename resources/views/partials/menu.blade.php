@@ -190,6 +190,11 @@
                                 </a>
                             </li>
                             <li class="item-name">
+                                <a href="{{ url('/reports/loans/active') }}">
+                                    <span class="text-muted">Loan Contributions - With Interest </span>
+                                </a>
+                            </li>
+                            <li class="item-name">
                                 <a href="{{ route('proc.end.month.shares') }}">
                                     <span class="text-muted">Shares</span>
                                 </a>
