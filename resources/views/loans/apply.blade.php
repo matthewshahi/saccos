@@ -2,7 +2,8 @@
 
 @section('content')
 <div class="breadcrumb d-flex justify-content-between align-items-center">
-    <h1>Member Loan Application</h1>
+    
+    <h1 class="mb-3 text-primary">Self-Service Loan Application & Guarantor Consent</h1>
     <div class="header-part-right">
         <ul>
             @if(Auth::check())
@@ -201,6 +202,18 @@
             </tbody>
         </table>
     </div>
+
+    <div class="alert alert-warning mt-4" style="font-size: 0.95rem;">
+    <strong>Important Declaration:</strong><br>
+    By submitting this loan application, I hereby confirm that all the information provided is true and accurate to the best of my knowledge. 
+    I understand that:
+    <ul class="mb-2 mt-2">
+        <li>The SACCO reserves the right to verify any details provided and may reject or adjust the loan application without notice.</li>
+        <li>If approved, I commit to repay the loan according to the agreed schedule and terms of the SACCO’s loan policy.</li>
+        <li>Any false information, default, or misrepresentation may result in disciplinary, legal, or financial recovery action as per SACCO bylaws and national regulations.</li>
+    </ul>
+    By proceeding, I acknowledge that I have read, understood, and agreed to these terms.
+</div>
 
     <div class="col-md-12">
                             <button class="btn btn-primary" type="submit">Submit</button>
