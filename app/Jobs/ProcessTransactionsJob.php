@@ -28,7 +28,7 @@ class ProcessTransactionsJob implements ShouldQueue
             ->value('default_value');
 
         if (!$defaultMpesaIn || !$defaultShareAccount) {
-            Log::error("Missing default accounts for processing transactions.");
+            Log::error("Missing default Mpesa accounts for processing transactions.");
             return;
         }
 
