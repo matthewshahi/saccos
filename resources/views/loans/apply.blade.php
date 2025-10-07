@@ -2,8 +2,7 @@
 
 @section('content')
 <div class="breadcrumb d-flex justify-content-between align-items-center">
-    
-    <h1 class="mb-3 text-primary">Self-Service Loan Application & Guarantor Consent</h1>
+    <h1>Self-Service Loan Application & Guarantor Consent</h1>
     <div class="header-part-right">
         <ul>
             @if(Auth::check())
@@ -202,7 +201,6 @@
             </tbody>
         </table>
     </div>
-
     <div class="alert alert-warning mt-4" style="font-size: 0.95rem;">
     <strong>Important Declaration:</strong><br>
     By submitting this loan application, I hereby confirm that all the information provided is true and accurate to the best of my knowledge. 
