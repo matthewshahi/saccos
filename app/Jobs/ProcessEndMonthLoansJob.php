@@ -14,11 +14,32 @@ class ProcessEndMonthLoansJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    /**
+     * Maximum execution time (in seconds).
+     * Extended to handle large end-month processing workloads.
+     */
+    public $timeout = 1900; // ~31 minutes
+
+    /**
+     * Number of times the job should be attempted.
+     */
+    public $tries = 5;
+
+    /**
+     * @var array
+     */
     protected array $validRows;
+
+    /**
+     * @var string
+     */
     protected string $period;
 
     /**
      * Create a new job instance.
+     *
+     * @param array $validRows
+     * @param string $period
      */
     public function __construct(array $validRows, string $period)
     {
@@ -28,6 +49,8 @@ class ProcessEndMonthLoansJob implements ShouldQueue
 
     /**
      * Execute the job.
+     *
+     * @return void
      */
     public function handle(): void
     {
@@ -37,13 +60,24 @@ class ProcessEndMonthLoansJob implements ShouldQueue
 
         foreach ($this->validRows as $row) {
             try {
+                // Ensure required keys exist before processing
+                if (
+                    !isset($row['companyId'], $row['loanTypeId'], $row['loanDocNo'], $row['loanDatePaid'])
+                ) {
+                    Log::warning("⚠️ Skipped incomplete row in ProcessEndMonthLoansJob: " . json_encode($row));
+                    continue;
+                }
+
+                // Core processing
                 $controller->defaultProcEndMonthLoanUpdate(
                     $row['companyId'],
                     $row['loanTypeId'],
                     $row['loanDocNo'],
                     $row['loanDatePaid']
                 );
-            } catch (\Exception $e) {
+
+                Log::info("✅ Processed Company {$row['companyId']} / LoanType {$row['loanTypeId']} for period {$this->period}");
+            } catch (\Throwable $e) {
                 Log::error("❌ Error in ProcessEndMonthLoansJob → Company {$row['companyId']}, LoanType {$row['loanTypeId']}: " . $e->getMessage());
                 continue;
             }
@@ -54,7 +88,7 @@ class ProcessEndMonthLoansJob implements ShouldQueue
             if (!empty($this->validRows)) {
                 $first = $this->validRows[0];
 
-                app(LoanEndMonthController::class)->notifyEndMonthCompletion(
+                $controller->notifyEndMonthCompletion(
                     $first['companyId'],
                     $first['loanTypeId'],
                     $this->period
@@ -62,8 +96,8 @@ class ProcessEndMonthLoansJob implements ShouldQueue
 
                 Log::info("📩 Notification successfully dispatched after end-month processing for Company {$first['companyId']} / LoanType {$first['loanTypeId']}");
             }
-        } catch (\Exception $e) {
-            Log::error("⚠️ Failed to send end-month completion notifications: " . $e->getMessage());
+        } catch (\Throwable $e) {
+            Log::error("⚠️ Failed to send end-month completion notification: " . $e->getMessage());
         }
 
         Log::info("✅ Completed background end-month loan processing for period {$this->period}");
