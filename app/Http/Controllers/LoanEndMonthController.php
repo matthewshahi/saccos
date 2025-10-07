@@ -709,6 +709,20 @@ class LoanEndMonthController extends Controller
 
                 $loanDescription = "Payroll {$period} - Member ID: {$loan->member_id}";
 
+                // ✅ Step 5: Skip duplicate sacco_loan_payments
+            $exists = DB::table('sacco_loan_payments')
+                ->where('loan_payments_docno', $loanDocNo)
+                ->where('loan_payments_loan_id', $loan->loan_id)
+                ->where('loan_payments_period', $period)
+                 ->where('loan_payments_description', $loanDescription)
+                ->exists();
+
+            if ($exists) {
+                Log::info("⏩ Skipped duplicate payment for Loan ID {$loan->loan_id}, Doc {$loanDocNo}, Period {$period}");
+                continue;
+            }
+
+
                 // Step 2: Insert into payments
                 DB::table('sacco_loan_payments')->insert([
                     'loan_payments_amount'       => $principalPaid,
