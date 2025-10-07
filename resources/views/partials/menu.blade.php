@@ -252,6 +252,11 @@
                                 </a>
                             </li>
                             <li class="item-name">
+                        <a href="{{ url('/loans/types/list') }}">
+                            <span class="text-muted">Loans & Loan Calculator</span>
+                        </a>
+                    </li>
+                            <li class="item-name">
                                 <a href="{{ url('/loans/categories') }}">
                                     <span class="text-muted">Loan categories</span>
                                 </a>
