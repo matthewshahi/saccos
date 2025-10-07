@@ -96,7 +96,7 @@
                     <li class="Ul_li--hover">
                         <a href="{{ url('/loans/apply') }}">
                             <i class="i-File-Clipboard-File--Text text-20 me-2 text-muted"></i>
-                            <span class="item-name text-15 text-muted">Apply for Loan</span>
+                            <span class="item-name text-15 text-muted">Self-Service Loan Application</span>
                         </a>
                     </li>
                     <li class="Ul_li--hover">

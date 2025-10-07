@@ -243,7 +243,7 @@
 
                             <li class="item-name">
                                 <a href="{{ url('/loans/apply') }}">
-                                    <span class="text-muted">Apply for Loan - Self</span>
+                                    <span class="text-muted">Self-Service Loan Application</span>
                                 </a>
                             </li>
                             <li class="item-name">
