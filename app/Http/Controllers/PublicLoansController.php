@@ -50,7 +50,6 @@ class PublicLoansController extends Controller
         return view('public.loan_calculator', compact('loan'));
     }
 
-    
     public function calculateLoan(Request $request, $id)
     {
         $loan = DB::table('sacco_loan_types')
@@ -62,14 +61,13 @@ class PublicLoansController extends Controller
             return redirect()->route('loans.types.list')->with('error', 'Loan type not found.');
         }
 
-        // Validate input with custom redirection on failure
+        // ✅ Validate user inputs
         $validator = \Validator::make($request->all(), [
             'amount' => 'required|numeric|min:1|max:' . $loan->loan_type_max_amount,
             'duration' => 'required|integer|min:1|max:' . $loan->loan_type_duration,
         ]);
 
         if ($validator->fails()) {
-            // Redirect back to the calculator view with errors
             return redirect()->route('loan.calculator', ['id' => $id])
                 ->withErrors($validator)
                 ->withInput();
@@ -77,9 +75,10 @@ class PublicLoansController extends Controller
 
         $loanAmount = $request->input('amount');
         $duration = $request->input('duration');
-        $interestRate = $loan->loan_type_interest;
-        $interestType = strtolower($loan->loan_type_interest_type);
-        
+        $interestRate = (float) $loan->loan_type_interest;
+        $interestType = strtolower(trim($loan->loan_type_interest_type));
+
+        // ✅ Determine calculation method
         if ($interestType === 'reducing balance') {
             $emi = $this->calculateReducingBalanceEMI($loanAmount, $interestRate, $duration);
             $repaymentSchedule = $this->generateReducingBalanceSchedule($loanAmount, $interestRate, $duration, $emi);
@@ -91,18 +90,27 @@ class PublicLoansController extends Controller
         return view('public.loan_calculator', compact('loan', 'emi', 'repaymentSchedule'));
     }
 
+    // 🔹 Reducing balance: annual rate ÷ 12
     private function calculateReducingBalanceEMI($principal, $rate, $months)
     {
+        if ($rate <= 0) {
+            return $principal / $months;
+        }
+
         $monthlyRate = $rate / 12 / 100;
-        return $principal * $monthlyRate * pow(1 + $monthlyRate, $months) / (pow(1 + $monthlyRate, $months) - 1);
+        return $principal * $monthlyRate * pow(1 + $monthlyRate, $months)
+               / (pow(1 + $monthlyRate, $months) - 1);
     }
 
+    // 🔹 Fixed rate: monthly rate (no ÷ 12)
     private function calculateFixedEMI($principal, $rate, $months)
     {
-        $totalInterest = ($principal * $rate * $months) / (100 * 12);
+        $monthlyRate = $rate / 100;
+        $totalInterest = $principal * $monthlyRate * $months;
         return ($principal + $totalInterest) / $months;
     }
 
+    // 🔹 Generate Reducing Balance Schedule
     private function generateReducingBalanceSchedule($principal, $rate, $months, $emi)
     {
         $schedule = [];
@@ -122,13 +130,19 @@ class PublicLoansController extends Controller
             ];
         }
 
+        if (count($schedule)) {
+            $schedule[count($schedule) - 1]['balance'] = 0;
+        }
+
         return $schedule;
     }
 
+    // 🔹 Generate Fixed (Flat) Schedule
     private function generateFixedSchedule($principal, $rate, $months, $emi)
     {
         $schedule = [];
-        $monthlyInterest = ($principal * $rate) / (100 * 12);
+        $monthlyRate = $rate / 100;
+        $monthlyInterest = $principal * $monthlyRate;
 
         for ($i = 1; $i <= $months; $i++) {
             $principalPayment = $emi - $monthlyInterest;
@@ -141,6 +155,10 @@ class PublicLoansController extends Controller
                 'emi' => round($emi, 2),
                 'balance' => max(round($principal, 2), 0),
             ];
+        }
+
+        if (count($schedule)) {
+            $schedule[count($schedule) - 1]['balance'] = 0;
         }
 
         return $schedule;
