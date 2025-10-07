@@ -14,8 +14,8 @@ class LoanEndMonthController extends Controller
 
     public function __construct()
     {
-        ini_set('max_execution_time', 600); // 10 minutes
-        set_time_limit(600);
+        ini_set('max_execution_time', 6000); // 10 minutes
+        set_time_limit(6000);
         $this->middleware('auth');
         // Set the current period only once
         $this->currentPeriod = DB::table('sacco_period')

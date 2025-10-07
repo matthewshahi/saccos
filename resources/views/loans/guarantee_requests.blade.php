@@ -47,6 +47,16 @@
         </div>
     @endif
 
+     {{-- ⚠️ Guarantor Responsibility Notice --}}
+    <div class="alert alert-warning border-start border-4 border-warning shadow-sm mb-4" role="alert">
+        <h5 class="fw-bold mb-2 text-dark">Important Notice to the Guarantor</h5>
+        <p class="mb-1 text-dark small">
+            By accepting to guarantee a loan, you commit to settle any outstanding balance of this loan in the event that the borrower fails to meet their repayment obligations. Your guaranteed amount may be recovered from your savings, deposits, or any other funds held within the SACCO should default occur.
+        </p>
+        <p class="mb-0 text-muted small">
+            Please review the loan details carefully before confirming. Once accepted, your guarantee forms a binding financial commitment under SACCO regulations. However, this does not restrict your ability to apply for your own loans, provided you have the required guarantors or meet the lending criteria.
+        </p>
+    </div>
     {{-- 🔗 Quick Links --}}
     <div class="text-center mb-3">
         <small class="fw-semibold">
