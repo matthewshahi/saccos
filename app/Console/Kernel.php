@@ -15,7 +15,7 @@ class Kernel extends ConsoleKernel
             ->withoutOverlapping()
             ->onOneServer()
             ->timezone('Africa/Nairobi')
-           ;// ->runInBackground();
+        ; // ->runInBackground();
 
         // Welcome emails (lightweight; still staggered safely)
         $schedule->job(new \App\Jobs\SendWelcomeEmailJob())
@@ -23,7 +23,7 @@ class Kernel extends ConsoleKernel
             ->withoutOverlapping()
             ->onOneServer()
             ->timezone('Africa/Nairobi')
-            ;//->runInBackground();
+        ; //->runInBackground();
 
         // Guarantor emails
         $schedule->job(new \App\Jobs\SendGuarantorEmailJob())
@@ -31,7 +31,7 @@ class Kernel extends ConsoleKernel
             ->withoutOverlapping()
             ->onOneServer()
             ->timezone('Africa/Nairobi')
-           ;// ->runInBackground();
+        ; // ->runInBackground();
 
         // Nightly resets
         $schedule->job(new \App\Jobs\ResetGuarantorsJob())
@@ -39,7 +39,7 @@ class Kernel extends ConsoleKernel
             ->withoutOverlapping()
             ->onOneServer()
             ->timezone('Africa/Nairobi')
-            ;//->runInBackground();
+        ; //->runInBackground();
 
         // Nightly loan recompute (if you still use it)
         $schedule->job(new \App\Jobs\UpdateMembersLoanBalancesJob())
@@ -47,22 +47,27 @@ class Kernel extends ConsoleKernel
             ->withoutOverlapping()
             ->onOneServer()
             ->timezone('Africa/Nairobi')
-            ;//->runInBackground();
+        ; //->runInBackground();
+        $schedule->job(new \App\Jobs\SendPendingNotificationsJob())
+            ->everyMinute()           // run once per minute
+            ->withoutOverlapping()    // don't start a new run until the last finishes
+            ->onOneServer()
+            ->timezone('Africa/Nairobi');
 
-     
+
         $schedule->job(new \App\Jobs\UpdateMemberTotalsJob())
             ->dailyAt('01:00')
             ->onOneServer()        // if using multiple servers with shared cache/redis
             ->withoutOverlapping()
             ->timezone('Africa/Nairobi')
-            ;//->runInBackground();
-   
+        ; //->runInBackground();
+
 
     }
 
     protected function commands(): void
     {
-        $this->load(__DIR__.'/Commands');
+        $this->load(__DIR__ . '/Commands');
         require base_path('routes/console.php');
     }
 }

@@ -489,7 +489,7 @@ class LoanEndMonthController extends Controller
             'sacco_loan_types.loan_type_id'
         )
         ->orderBy('sacco_loans.loan_id')
-        ->chunk(100, function ($loans) use ($companyId, $loanTypeId, $loanDocNo, $loanDatePaid, $period, $loanInterestType, $loanInterestRate, $loanCalcMethod) {
+        ->chunk(200, function ($loans) use ($companyId, $loanTypeId, $loanDocNo, $loanDatePaid, $period, $loanInterestType, $loanInterestRate, $loanCalcMethod) {
 
             $start = microtime(true);
 
