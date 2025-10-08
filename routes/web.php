@@ -44,6 +44,7 @@ use App\Http\Controllers\RegistrationFeeController;
 use App\Http\Controllers\TrialBalanceController;
 use App\Http\Controllers\LoansActiveReportController;
 use App\Http\Controllers\TempLoanCalController;
+use App\Http\Controllers\EmailController;
 
  
 // use App\Http\Controllers\TxnImportController;
@@ -253,7 +254,15 @@ Route::prefix('mobile')->group(function () {
 
 Route::middleware(['auth', 'check_member_position'])->group(function () {
 
-Route::get('/proc/recalc/loans', [TempLoanCalController::class, 'recalcAllLoansAndMembers'])
+Route::get('/emails/bulk', [EmailController::class, 'index'])
+    ->name('emails.bulk')
+    ->middleware('check_user_rights:bulk_emails');
+
+Route::post('/emails/bulk/send', [EmailController::class, 'sendBulk'])
+    ->name('emails.bulk.send')
+    ->middleware('check_user_rights:bulk_emails_send');
+    
+    Route::get('/proc/recalc/loans', [TempLoanCalController::class, 'recalcAllLoansAndMembers'])
     ->name('proc.recalc.loans.process')
     ->middleware('check_user_rights:recalc_loans');
 
