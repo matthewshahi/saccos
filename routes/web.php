@@ -43,6 +43,7 @@ use App\Http\Controllers\CapitalShareTransactionController;
 use App\Http\Controllers\RegistrationFeeController;
 use App\Http\Controllers\TrialBalanceController;
 use App\Http\Controllers\LoansActiveReportController;
+use App\Http\Controllers\TempLoanCalController;
 
  
 // use App\Http\Controllers\TxnImportController;
@@ -252,7 +253,10 @@ Route::prefix('mobile')->group(function () {
 
 Route::middleware(['auth', 'check_member_position'])->group(function () {
 
-
+Route::post('/proc/recalc/loans', [TempLoanCalController::class, 'recalcAllLoansAndMembers'])
+    ->name('proc.recalc.loans.process')
+    ->middleware('check_user_rights:recalc_loans');
+    
     Route::prefix('reports/loans/active')
     ->middleware(['auth','check_user_rights:LoansReport']) // 👈 adjust to your rights string
     ->group(function () {
