@@ -20,7 +20,9 @@ class ProcessEndMonthLoansJob implements ShouldQueue
      */
 
     public $timeout = 0;   // 0 = no timeout
-public $tries = 1;     // (optional) avoid retries if it’s long-running
+public $tries = 10;     // (optional) avoid retries if it’s long-running
+public $failOnTimeout = false;
+public $backoff = [60, 120, 300]; // Optional: wait 1, 2, 5 min between retries
 
 
    
