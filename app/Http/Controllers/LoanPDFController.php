@@ -9,33 +9,12 @@ use Carbon\Carbon;
 use Barryvdh\DomPDF\Facade\Pdf;
 use App\Http\Middleware\CheckUserRights;
 
-
-
-
 class LoanPDFController extends Controller
 {
     public function downloadLoanForm($loanId)
     {
         $userId = Auth::id();
-
-        $userId = Auth::id();
-
-    // 1️⃣ Check access rights first
-    $hasRight = CheckUserRights::userHasRight('downloadloanpdf');
-
-    // 2️⃣ Fetch minimal loan info just to verify ownership (lightweight and safe)
-    $loan = DB::table('sacco_loan_batch_trans_members')
-        ->select('batch_trans_id', 'batch_trans_member_id')
-        ->where('batch_trans_id', $loanId)
-        ->first();
-
-    $isOwner = $loan && ($loan->batch_trans_member_id == $userId);
-
-    // 3️⃣ Deny if neither ownership nor rights are granted
-    if (!$hasRight && !$isOwner) {
-        abort(403, 'Access denied — you do not have permission to download this loan PDF.');
-    }
-
+         $hasRight = CheckUserRights::userHasRight('downloadloanpdf');
 
         // Fetch loan details
         $loan = DB::table('sacco_loan_batch_trans_members as trans')
@@ -51,8 +30,14 @@ class LoanPDFController extends Controller
             )
             ->where('trans.batch_trans_id', $loanId)
             ->first();
+        
+             if (!$loan) {
+            abort(403, "Unauthorized: Invalid or missing loan record.");
+        }
 
-        if (!$loan) {
+
+
+        if ($loan->member_id != $userId && !$hasRight) {
             abort(403, "Unauthorized: This loan does not belong to you.");
         }
 
