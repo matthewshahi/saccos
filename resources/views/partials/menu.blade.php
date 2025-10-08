@@ -470,6 +470,32 @@
                             <span class="item-name text-15 text-muted">Downloads</span>
                         </a>
                     </li>
+                    
+                    
+                    <li class="Ul_li--hover">
+    <a class="has-arrow" href="#">
+        <i class="i-Mail text-20 me-2" style="color: #663399;"></i>
+        <span class="item-name text-15 text-muted">Communications</span>
+    </a>
+    <ul class="mm-collapse">
+        <li class="item-name">
+            <a href="{{ route('emails.bulk') }}">
+    <i class="i-Mail text-15 me-2" style="color: #663399;"></i>
+    <span class="text-muted">Bulk Email</span>
+</a>
+
+        </li>
+        <li class="item-name">
+            <a href="?}">
+                <i class="i-Speach-Bubble-3 text-15 me-2" style="color: #663399;"></i>
+                <span class="text-muted">Bulk SMS</span>
+            </a>
+        </li>
+         
+    </ul>
+</li>
+
+
                     <li class="Ul_li--hover">
                         <a class="has-arrow" href="#">
                             <i class="i-Administrator text-20 me-2" style="color: #663399;"></i>
