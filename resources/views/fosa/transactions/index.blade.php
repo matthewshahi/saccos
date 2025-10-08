@@ -15,12 +15,7 @@
 
       <div class="card-body">
         <!-- Search bar -->
-        <form method="GET" action="{{ route('fosa.transactions.index') }}" class="d-flex mb-3">
-          <input type="text" name="search" value="{{ $search ?? '' }}" 
-                 class="form-control me-2"
-                 placeholder="Search by Member, ID, Phone, Doc No, Description, Period">
-          <button type="submit" class="btn btn-primary">Search</button>
-        </form>
+         
 
         <form method="GET" action="{{ route('fosa.transactions.index') }}" class="d-flex mb-3 me-2">
     <input type="text" name="search" value="{{ $search ?? '' }}" 
