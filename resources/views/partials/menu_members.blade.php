@@ -102,9 +102,10 @@
                     <li class="Ul_li--hover">
                         <a href="{{ url('/loans/types/list') }}">
                             <i class="i-File-Horizontal-Text text-20 me-2 text-muted"></i>
-                            <span class="item-name text-15 text-muted">Loan Types</span>
+                            <span class="item-name text-15 text-muted">Loans & Loan Calculator</span>
                         </a>
                     </li>
+                    
                     
 
                     <!-- Resources Section -->
