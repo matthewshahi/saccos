@@ -253,10 +253,10 @@ Route::prefix('mobile')->group(function () {
 
 Route::middleware(['auth', 'check_member_position'])->group(function () {
 
-Route::post('/proc/recalc/loans', [TempLoanCalController::class, 'recalcAllLoansAndMembers'])
+Route::get('/proc/recalc/loans', [TempLoanCalController::class, 'recalcAllLoansAndMembers'])
     ->name('proc.recalc.loans.process')
     ->middleware('check_user_rights:recalc_loans');
-    
+
     Route::prefix('reports/loans/active')
     ->middleware(['auth','check_user_rights:LoansReport']) // 👈 adjust to your rights string
     ->group(function () {
