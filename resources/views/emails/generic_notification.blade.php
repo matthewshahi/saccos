@@ -57,16 +57,16 @@
 
           <!-- Footer -->
           <tr>
-            <td align="center" style="background-color:#003366; padding:20px; color:#ffffff; font-size:12px;">
-              <p style="margin:0; line-height:1.5;">
-                {{ $companyName ?? 'iSACCO Technologies' }} is part of the iSACCO Technologies network<br>
-                Powered by <a href="https://shahi.co.ke" style="color:#66b2ff; text-decoration:none;">Shahi Services Ltd</a><br>
-                <a href="{{ config('app.url') }}" style="color:#cfd8e3; text-decoration:none;">
-                  {{ parse_url(config('app.url'), PHP_URL_HOST) }}
-                </a>
-              </p>
-            </td>
-          </tr>
+  <td align="center" style="background-color:#003366; padding:20px; color:#ffffff; font-size:12px;">
+    <p style="margin:0; line-height:1.6;">
+      <strong>iSACCO</strong> is a Sacco Banking Platform developed and powered by 
+      <a href="https://shahi.co.ke" style="color:#66b2ff; text-decoration:none; font-weight:600;">Shahi Services Limited</a>.<br>
+      iSACCO is a brand of Shahi Services Ltd — creators of digital ERP systems for cooperative societies and community finance institutions across Africa.<br>
+      Contact: <a href="tel:+254722400737" style="color:#cfd8e3; text-decoration:none;">+254&nbsp;722&nbsp;400&nbsp;737</a><br>
+      <a href="https://shahi.co.ke" style="color:#cfd8e3; text-decoration:none;">shahi.co.ke</a>
+    </p>
+  </td>
+</tr>
 
         </table>
       </td>
