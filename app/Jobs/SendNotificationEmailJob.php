@@ -15,55 +15,48 @@ class SendNotificationEmailJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    protected $notification;
+    protected int $notifId;
 
-    /**
-     * Create a new job instance.
-     */
-    public function __construct($notification)
+    public function __construct(int $notifId)
     {
-        $this->notification = $notification;
+        $this->notifId = $notifId;
     }
 
-    /**
-     * Execute the job.
-     */
     public function handle(): void
     {
-        $notif = $this->notification;
+        $notif = DB::table('sacco_system_notifications')
+            ->where('notif_id', $this->notifId)
+            ->first();
+
+        if (!$notif) {
+            Log::warning("⚠️ Notification {$this->notifId} missing in database.");
+            return;
+        }
 
         try {
-            // Skip if no recipient email
             if (empty($notif->notif_recipient_email)) {
-                Log::warning("Skipping notification ID {$notif->notif_id}: No recipient email provided.");
-                return;
+                throw new \Exception('Recipient email missing');
             }
 
-            // Fetch company name dynamically from sacco_defaults
             $companyName = DB::table('sacco_defaults')
                 ->where('default_name', 'company_name')
                 ->value('default_value') ?? 'iSACCO Technologies';
 
-            // Prepare email content
             $data = [
-                'name'         => $notif->notif_recipient_name,
-                'messageBody'  => $notif->notif_message,
-                'companyName'  => $companyName,
+                'name'        => $notif->notif_recipient_name,
+                'messageBody' => $notif->notif_message,
+                'companyName' => $companyName,
             ];
 
-            // Send email
             Mail::send('emails.generic_notification', $data, function ($message) use ($notif) {
-                $subject = $notif->notif_subject ?: 'iSACCO Notification';
                 $message->to($notif->notif_recipient_email, $notif->notif_recipient_name)
-                        ->subject($subject);
+                        ->subject($notif->notif_subject ?: 'iSACCO Notification');
             });
 
-            // Detect send failure
             if (!empty(Mail::failures())) {
-                throw new \Exception('Mail sending failed for ' . $notif->notif_recipient_email);
+                throw new \Exception('Mail::failures() returned error');
             }
 
-            // Update notification status
             DB::table('sacco_system_notifications')
                 ->where('notif_id', $notif->notif_id)
                 ->update([
@@ -71,16 +64,16 @@ class SendNotificationEmailJob implements ShouldQueue
                     'notif_sent_at' => now(),
                 ]);
 
-            Log::info("✅ Notification email sent successfully to {$notif->notif_recipient_email} ({$companyName}) [ID: {$notif->notif_id}]");
+            Log::info("✅ Email sent to {$notif->notif_recipient_email} ({$companyName}) [ID {$notif->notif_id}]");
         } catch (\Throwable $e) {
-            // Update record to failed
             DB::table('sacco_system_notifications')
-                ->where('notif_id', $notif->notif_id)
+                ->where('notif_id', $this->notifId)
                 ->update([
                     'notif_status' => 'failed',
+                    'notif_sent_at' => null,
                 ]);
 
-            Log::error("❌ Failed to send notification ID {$notif->notif_id}: " . $e->getMessage());
+            Log::error("❌ Failed to send notif {$this->notifId}: ".$e->getMessage());
         }
     }
 }

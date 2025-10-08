@@ -19,22 +19,34 @@ class SendPendingNotificationsJob implements ShouldQueue
     {
         $limit = (int) env('NOTIF_EMAILS_PER_MIN', 10);
 
-        // Select unread or failed notifications that have not been sent
+        // 🔹 Only unread or failed (not queued/sent/read)
         $notifications = DB::table('sacco_system_notifications')
             ->whereIn('notif_status', ['unread', 'failed'])
-            ->whereNull('notif_sent_at')
             ->whereNotNull('notif_recipient_email')
-            ->orderBy('notif_created_at')
+            ->whereNull('notif_sent_at')
+            ->orderBy('notif_created_at', 'asc')
             ->limit($limit)
             ->get();
 
         $queued = 0;
 
         foreach ($notifications as $notif) {
-            dispatch((new SendNotificationEmailJob($notif))->onQueue('emails'));
+            // 🔹 Mark as queued immediately
+            DB::table('sacco_system_notifications')
+                ->where('notif_id', $notif->notif_id)
+                ->update([
+                    'notif_status' => 'queued',
+                    'notif_sent_at' => now(),
+                ]);
+
+            // 🔹 Dispatch actual sender job (by ID for uniqueness)
+            dispatch((new SendNotificationEmailJob((int) $notif->notif_id))->onQueue('emails'));
             $queued++;
         }
 
-        Log::info("📧 SendPendingNotificationsJob queued {$queued} email(s) this minute.");
+        Log::info($queued > 0
+            ? "📧 SendPendingNotificationsJob queued {$queued} email(s) for sending."
+            : "📧 No new notifications to queue."
+        );
     }
 }
