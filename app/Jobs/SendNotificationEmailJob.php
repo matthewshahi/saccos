@@ -48,15 +48,13 @@ class SendNotificationEmailJob implements ShouldQueue
                 'companyName' => $companyName,
             ];
 
+            // ✅ Send the email — Laravel will throw an exception automatically if it fails
             Mail::send('emails.generic_notification', $data, function ($message) use ($notif) {
                 $message->to($notif->notif_recipient_email, $notif->notif_recipient_name)
                         ->subject($notif->notif_subject ?: 'iSACCO Notification');
             });
 
-            if (!empty(Mail::failures())) {
-                throw new \Exception('Mail::failures() returned error');
-            }
-
+            // ✅ Update as sent
             DB::table('sacco_system_notifications')
                 ->where('notif_id', $notif->notif_id)
                 ->update([
@@ -65,6 +63,7 @@ class SendNotificationEmailJob implements ShouldQueue
                 ]);
 
             Log::info("✅ Email sent to {$notif->notif_recipient_email} ({$companyName}) [ID {$notif->notif_id}]");
+
         } catch (\Throwable $e) {
             DB::table('sacco_system_notifications')
                 ->where('notif_id', $this->notifId)
