@@ -39,8 +39,8 @@ class SendPendingNotificationsJob implements ShouldQueue
                     'notif_sent_at' => now(),
                 ]);
 
-            // 🔹 Dispatch actual sender job (by ID for uniqueness)
-            dispatch((new SendNotificationEmailJob((int) $notif->notif_id))->onQueue('emails'));
+            // 🔹 Dispatch actual sender job (by ID for uniqueness) 
+            dispatch(new SendNotificationEmailJob((int) $notif->notif_id));
             $queued++;
         }
 
