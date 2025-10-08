@@ -22,6 +22,17 @@
           <button type="submit" class="btn btn-primary">Search</button>
         </form>
 
+        <form method="GET" action="{{ route('fosa.transactions.index') }}" class="d-flex mb-3 me-2">
+    <input type="text" name="search" value="{{ $search ?? '' }}" 
+           class="form-control me-2"
+           placeholder="Search by Member, ID, Phone, Doc No, Description, Period">
+    <button type="submit" class="btn btn-primary me-2">Search</button>
+    <a href="{{ route('fosa.transactions.export', ['search' => $search ?? '']) }}" 
+       class="btn btn-success">
+        <i class="bi bi-file-earmark-excel"></i> Export XLS
+    </a>
+</form>
+
         <div class="table-responsive">
           <table class="table table-striped table-hover align-middle">
             <thead class="table-light text-center">

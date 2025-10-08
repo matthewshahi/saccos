@@ -5,6 +5,10 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use App\Exports\FosaTransactionsExport;
+use Maatwebsite\Excel\Facades\Excel;
+
+
 
 class FosaTransactionController extends Controller
 {
@@ -336,4 +340,13 @@ public function receipt($id)
         'docNo'       => $docNo,
     ]);
 }
+
+public function export(Request $request)
+{
+    $search = $request->input('search', null);
+    $fileName = 'FOSA_Transactions_' . now()->format('Ymd_His') . '.xlsx';
+
+    return Excel::download(new FosaTransactionsExport($search), $fileName);
+}
+
 }

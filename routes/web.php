@@ -258,6 +258,11 @@ Route::get('/emails/bulk', [EmailController::class, 'index'])
     ->name('emails.bulk')
     ->middleware('check_user_rights:bulk_emails');
 
+
+    Route::get('/fosa/transactions/export', [FosaTransactionController::class, 'export'])
+    ->name('fosa.transactions.export')
+    ->middleware('check_user_rights:fosa_transactions_export');
+
 Route::post('/emails/bulk/send', [EmailController::class, 'sendBulk'])
     ->name('emails.bulk.send')
     ->middleware('check_user_rights:bulk_emails_send');
