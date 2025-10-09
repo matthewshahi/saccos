@@ -45,45 +45,56 @@
                             <span class="item-name text-15 text-muted">Members</span>
                         </a>
                         <ul class="mm-collapse">
-                            <li class="item-name">
-                                <a href="{{ url('/members/list') }}">
-                                    <span class="text-muted">All members</span>
-                                </a>
-                            </li>
-                            <li class="item-name">
-                                <a href="{{ url('/members/active/y') }}">
-                                    <span class="text-muted">Active members</span>
-                                </a>
-                            </li>
-                            <li class="item-name">
-                                <a href="{{ url('/members/active/n') }}">
-                                    <span class="text-muted">Inactive Members</span>
-                                </a>
-                            </li>
-                            <li class="item-name">
-                                <a href="{{ url('/institutions/list') }}">
-                                    <span class="text-muted">Institutions</span>
-                                </a>
-                            </li>
-                            <li class="item-name">
-                                <a href="{{ url('/institutions/add') }}">
-                                    <span class="text-muted">Add Institutions</span>
-                                </a>
-                            </li>
-                            <li class="item-name">
-                                <a href="{{ url('/members/add') }}">
-                                    <span class="text-muted">Add New Member</span>
-                                </a>
-                            </li>
-                            <li class="item-name">
-                                <a href="{{ url('new_members/list') }}">
-                                    <span class="text-muted">New Membership Requests</span>
-                                </a>
-                            </li>
 
-                            
+    {{-- 🧍 Member Management --}}
+    <li class="item-name">
+        <a href="{{ url('/members/list') }}">
+            <span class="text-muted">All Members</span>
+        </a>
+    </li>
+    <li class="item-name">
+        <a href="{{ url('/members/active/y') }}">
+            <span class="text-muted">Active Members</span>
+        </a>
+    </li>
+    <li class="item-name">
+        <a href="{{ url('/members/active/n') }}">
+            <span class="text-muted">Inactive Members</span>
+        </a>
+    </li>
+    <li class="item-name">
+        <a href="{{ url('/members/add') }}">
+            <span class="text-muted">Register New Member</span>
+        </a>
+    </li>
 
-                        </ul>
+    {{-- 🏛️ Institution Management --}}
+    <li class="item-name">
+        <a href="{{ url('/institutions/list') }}">
+            <span class="text-muted">All Institutions</span>
+        </a>
+    </li>
+    <li class="item-name">
+        <a href="{{ url('/institutions/add') }}">
+            <span class="text-muted">Add Institution</span>
+        </a>
+    </li>
+
+    {{-- 💰 Financial Actions --}}
+    <li class="item-name">
+        <a href="{{ url('/registration-fees/create') }}">
+            <span class="text-muted">Record Registration Fee</span>
+        </a>
+    </li>
+
+    {{-- 📨 Membership Requests --}}
+    <li class="item-name">
+        <a href="{{ url('new_members/list') }}">
+            <span class="text-muted">Pending Membership Requests</span>
+        </a>
+    </li>
+
+</ul>
                     </li>
                     <li class="Ul_li--hover">
                         <a class="has-arrow" href="#">

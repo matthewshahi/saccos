@@ -46,7 +46,7 @@ use App\Http\Controllers\LoansActiveReportController;
 use App\Http\Controllers\TempLoanCalController;
 use App\Http\Controllers\EmailController;
 
- 
+
 // use App\Http\Controllers\TxnImportController;
 
 // // Upload form
@@ -254,78 +254,86 @@ Route::prefix('mobile')->group(function () {
 
 Route::middleware(['auth', 'check_member_position'])->group(function () {
 
-Route::get('/emails/bulk', [EmailController::class, 'index'])
-    ->name('emails.bulk')
-    ->middleware('check_user_rights:bulk_emails');
+    Route::get('/emails/bulk', [EmailController::class, 'index'])
+        ->name('emails.bulk')
+        ->middleware('check_user_rights:bulk_emails');
 
 
     Route::get('/fosa/transactions/export', [FosaTransactionController::class, 'export'])
-    ->name('fosa.transactions.export')
-    ->middleware('check_user_rights:fosa_transactions_export');
+        ->name('fosa.transactions.export')
+        ->middleware('check_user_rights:fosa_transactions_export');
 
-Route::post('/emails/bulk/send', [EmailController::class, 'sendBulk'])
-    ->name('emails.bulk.send')
-    ->middleware('check_user_rights:bulk_emails_send');
-    
+    Route::post('/emails/bulk/send', [EmailController::class, 'sendBulk'])
+        ->name('emails.bulk.send')
+        ->middleware('check_user_rights:bulk_emails_send');
+
     Route::get('/proc/recalc/loans', [TempLoanCalController::class, 'recalcAllLoansAndMembers'])
-    ->name('proc.recalc.loans.process')
-    ->middleware('check_user_rights:recalc_loans');
+        ->name('proc.recalc.loans.process')
+        ->middleware('check_user_rights:recalc_loans');
 
     Route::prefix('reports/loans/active')
-    ->middleware(['auth','check_user_rights:LoansReport']) // 👈 adjust to your rights string
-    ->group(function () {
-        Route::get('/', [LoansActiveReportController::class, 'index'])
-            ->name('reports.loans.active.index');
+        ->middleware(['auth', 'check_user_rights:LoansReport']) // 👈 adjust to your rights string
+        ->group(function () {
+            Route::get('/', [LoansActiveReportController::class, 'index'])
+                ->name('reports.loans.active.index');
 
-        // Inline updates (restrict more tightly)
-        Route::patch('/{loan}/principal', [LoansActiveReportController::class, 'updateMonthlyPrincipal'])
-            ->name('reports.loans.active.updatePrincipal')
-            ->middleware('check_user_rights:LoansReportEdit');
+            // Inline updates (restrict more tightly)
+            Route::patch('/{loan}/principal', [LoansActiveReportController::class, 'updateMonthlyPrincipal'])
+                ->name('reports.loans.active.updatePrincipal')
+                ->middleware('check_user_rights:LoansReportEdit');
 
-        Route::patch('/{loan}/amount', [LoansActiveReportController::class, 'updateMonthlyAmount'])
-            ->name('reports.loans.active.updateAmount')
-            ->middleware('check_user_rights:LoansReportEdit');
-        
+            Route::patch('/{loan}/amount', [LoansActiveReportController::class, 'updateMonthlyAmount'])
+                ->name('reports.loans.active.updateAmount')
+                ->middleware('check_user_rights:LoansReportEdit');
+
             Route::get('/export/{format}', [LoansActiveReportController::class, 'export'])
-    ->name('reports.loans.active.export')
-    ->middleware(['check_user_rights:LoansReportView']);
-    });
+                ->name('reports.loans.active.export')
+                ->middleware(['check_user_rights:LoansReportView']);
+        });
 
 
-Route::middleware(['check_user_rights:RegistrationFees'])
-    ->prefix('registration-fees')
-    ->group(function () {
-        // 📋 Listing page
-        Route::get('/', [RegistrationFeeController::class, 'index'])
-            ->name('registrationfees.index');
+    Route::middleware(['check_user_rights:RegistrationFees'])
+        ->prefix('registration-fees')
+        ->group(function () {
+            // 📋 Listing page
+            Route::get('/', [RegistrationFeeController::class, 'index'])
+                ->name('registrationfees.index');
 
-        // 🧾 Receipt
-        Route::get('/{id}/receipt', [RegistrationFeeController::class, 'receipt'])
-            ->name('registrationfees.receipt');
-    });
-// ========================
-// Shares Clearance Module
-// ========================
-Route::prefix('shares-clearance')
-    ->middleware(['check_user_rights:SharesClearance'])
-    ->group(function () {
+            // ➕ Create
+            Route::get('/create', [RegistrationFeeController::class, 'create'])
+                ->name('registrationfees.create');
 
-        // 1️⃣ Listing/Search page (searchable members, max 20 results)
-        Route::get('/', [SharesClearanceController::class, 'index'])
-            ->name('shares.clearance.index');
+            // 💾 Store
+            Route::post('/store', [RegistrationFeeController::class, 'store'])
+                ->name('registrationfees.store');
 
-        // 2️⃣ Search API (AJAX smart search for members)
-        Route::get('/search', [SharesClearanceController::class, 'searchMembers'])
-            ->name('shares.clearance.search');
+            // 🧾 Receipt
+            Route::get('/{id}/receipt', [RegistrationFeeController::class, 'receipt'])
+                ->name('registrationfees.receipt');
+        });
+    // ========================
+    // Shares Clearance Module
+    // ========================
+    Route::prefix('shares-clearance')
+        ->middleware(['check_user_rights:SharesClearance'])
+        ->group(function () {
 
-        // 3️⃣ Get loans for a member (modal load)
-        Route::get('/{member}/loans', [SharesClearanceController::class, 'getLoans'])
-            ->name('shares.clearance.loans');
+            // 1️⃣ Listing/Search page (searchable members, max 20 results)
+            Route::get('/', [SharesClearanceController::class, 'index'])
+                ->name('shares.clearance.index');
 
-        // 4️⃣ Process clearance (apply selected shares to loans)
-        Route::post('/process', [SharesClearanceController::class, 'process'])
-            ->name('shares.clearance.process');
-    });
+            // 2️⃣ Search API (AJAX smart search for members)
+            Route::get('/search', [SharesClearanceController::class, 'searchMembers'])
+                ->name('shares.clearance.search');
+
+            // 3️⃣ Get loans for a member (modal load)
+            Route::get('/{member}/loans', [SharesClearanceController::class, 'getLoans'])
+                ->name('shares.clearance.loans');
+
+            // 4️⃣ Process clearance (apply selected shares to loans)
+            Route::post('/process', [SharesClearanceController::class, 'process'])
+                ->name('shares.clearance.process');
+        });
 
 
     Route::prefix('fosa-types')
@@ -358,79 +366,79 @@ Route::prefix('shares-clearance')
     });
 
 
-   Route::middleware(['check_user_rights:FosaTransactions'])
-    ->prefix('fosa')
-    ->group(function () {
-        Route::get('/transactions', [FosaTransactionController::class, 'index'])
-            ->name('fosa.transactions.index');
+    Route::middleware(['check_user_rights:FosaTransactions'])
+        ->prefix('fosa')
+        ->group(function () {
+            Route::get('/transactions', [FosaTransactionController::class, 'index'])
+                ->name('fosa.transactions.index');
 
-        Route::get('/transactions/create', [FosaTransactionController::class, 'create'])
-            ->name('fosa.transactions.create');
+            Route::get('/transactions/create', [FosaTransactionController::class, 'create'])
+                ->name('fosa.transactions.create');
 
-        Route::post('/transactions/store', [FosaTransactionController::class, 'store'])
-            ->name('fosa.transactions.store');
+            Route::post('/transactions/store', [FosaTransactionController::class, 'store'])
+                ->name('fosa.transactions.store');
 
-        Route::get('/transactions/{id}/receipt', [FosaTransactionController::class, 'receipt'])
-            ->name('fosa.transactions.receipt');
+            Route::get('/transactions/{id}/receipt', [FosaTransactionController::class, 'receipt'])
+                ->name('fosa.transactions.receipt');
 
-        // 📌 Import routes
-        Route::get('/transactions/import', [FosaImportController::class, 'showForm'])
-            ->name('fosa.transactions.import');
-        Route::get('/transactions/import/preview/{csv}', [FosaImportController::class, 'showPreview'])
-            ->name('fosa.transactions.import.preview.show');
+            // 📌 Import routes
+            Route::get('/transactions/import', [FosaImportController::class, 'showForm'])
+                ->name('fosa.transactions.import');
+            Route::get('/transactions/import/preview/{csv}', [FosaImportController::class, 'showPreview'])
+                ->name('fosa.transactions.import.preview.show');
 
-        Route::post('/transactions/import/preview', [FosaImportController::class, 'preview'])
-            ->name('fosa.transactions.import.preview');
-             
+            Route::post('/transactions/import/preview', [FosaImportController::class, 'preview'])
+                ->name('fosa.transactions.import.preview');
 
-    Route::get('/transactions/import/preview/{csv}', [FosaImportController::class, 'showPreview'])
-    ->name('fosa.transactions.import.preview.show');
+
+            Route::get('/transactions/import/preview/{csv}', [FosaImportController::class, 'showPreview'])
+                ->name('fosa.transactions.import.preview.show');
+        });
+
+    Route::post('/transactions/import/process', [FosaImportController::class, 'process'])
+        ->name('fosa.transactions.import.process'); // ✅ Added
+
+    Route::get('/transactions/import/preview', function () {
+        return redirect()->route('fosa.transactions.import')
+            ->with('error', 'Please upload a CSV file first.');
     });
 
-        Route::post('/transactions/import/process', [FosaImportController::class, 'process'])
-            ->name('fosa.transactions.import.process'); // ✅ Added
-
-            Route::get('/transactions/import/preview', function () {
-    return redirect()->route('fosa.transactions.import')
-        ->with('error', 'Please upload a CSV file first.');
-});
 
 
+    Route::middleware(['check_user_rights:ShareTransactions'])
+        ->prefix('shares')
+        ->group(function () {
+            Route::get('/transactions', [ShareTransactionController::class, 'index'])
+                ->name('shares.transactions.index');
 
-Route::middleware(['check_user_rights:ShareTransactions'])
-    ->prefix('shares')
-    ->group(function () {
-        Route::get('/transactions', [ShareTransactionController::class, 'index'])
-            ->name('shares.transactions.index');
-
-        Route::get('/transactions/{id}/receipt', [ShareTransactionController::class, 'receipt'])
-            ->name('shares.transactions.receipt');
-    });
+            Route::get('/transactions/{id}/receipt', [ShareTransactionController::class, 'receipt'])
+                ->name('shares.transactions.receipt');
+        });
 
     Route::middleware(['check_user_rights:CapitalShareTransactions'])
-    ->prefix('capital-shares')
-    ->group(function () {
-        Route::get('/transactions', [CapitalShareTransactionController::class, 'index'])
-            ->name('capitalshares.transactions.index');
+        ->prefix('capital-shares')
+        ->group(function () {
+            Route::get('/transactions', [CapitalShareTransactionController::class, 'index'])
+                ->name('capitalshares.transactions.index');
 
-        Route::get('/transactions/{id}/receipt', [CapitalShareTransactionController::class, 'receipt'])
-            ->name('capitalshares.transactions.receipt');
-    });
+            Route::get('/transactions/{id}/receipt', [CapitalShareTransactionController::class, 'receipt'])
+                ->name('capitalshares.transactions.receipt');
+        });
     Route::get('/new_members/list', [PublicRegistrationActionsController::class, 'listMembers'])->name('members.list')->middleware('check_user_rights:new_member_applications_list');
     Route::post('/new_members/update/{id}', [PublicRegistrationActionsController::class, 'updateField'])->middleware('check_user_rights:new_member_applications_update');
     Route::get('/new_members/details/{id}', [PublicRegistrationActionsController::class, 'getMemberDetails'])->name('members.details')->middleware('check_user_rights:new_member_applications_update');
     Route::post('/new_members/export/live', [PublicRegistrationActionsImportController::class, 'exportLiveData'])->name('members.exportLive')->middleware('check_user_rights:new_member_applications_update');
 
 
-    
 
-Route::middleware(['check_user_rights:FosaTransactions'])
-    ->prefix('fosa/endmonth')
-    ->group(function () {
-        Route::get('/', [FosaEndMonthController::class, 'index'])->name('fosa.endmonth.index');
-        Route::post('/update/{id}', [FosaEndMonthController::class, 'update'])->name('fosa.endmonth.update'); // AJAX update monthly contr.
-        Route::post('/process', [FosaEndMonthController::class, 'process'])->name('fosa.endmonth.process');
-    });
+
+    Route::middleware(['check_user_rights:FosaTransactions'])
+        ->prefix('fosa/endmonth')
+        ->group(function () {
+            Route::get('/', [FosaEndMonthController::class, 'index'])->name('fosa.endmonth.index');
+            Route::post('/update/{id}', [FosaEndMonthController::class, 'update'])->name('fosa.endmonth.update'); // AJAX update monthly contr.
+            Route::post('/process', [FosaEndMonthController::class, 'process'])->name('fosa.endmonth.process');
+        });
 
 
     // Route::get('/import/members', [MemberImportController::class, 'showForm'])->name('import.members.form');//->middleware('check_user_rights:new_member_applications_updateXXX');
@@ -556,11 +564,12 @@ Route::middleware(['check_user_rights:FosaTransactions'])
         ->name('loans.pending.approval')
         ->middleware('check_user_rights:end_month_processing_loans');
 
-        Route::post('admin/loans/approve/{loanId}', 
-    [LoanApplicationSelfServiceController::class, 'approveLoan']
+    Route::post(
+        'admin/loans/approve/{loanId}',
+        [LoanApplicationSelfServiceController::class, 'approveLoan']
     )->name('loans.approve.self')
-    ->middleware('check_user_rights:end_month_processing_loans');
- 
+        ->middleware('check_user_rights:end_month_processing_loans');
+
     // Route::post('admin/loans/approve/{id}', [LoanApplicationSelfServiceController::class, 'approveLoanself'])
     //     ->name('loans.approve.self')->middleware('check_user_rights:end_month_processing_loans');
 
