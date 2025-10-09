@@ -143,7 +143,7 @@ class EmailController extends Controller
                 'notif_recipient_phone'  => $m->member_phone_no,
                 'notif_subject'          => $request->subject,
                 'notif_message'          => $request->message,
-                'notif_status'           => 'queued',
+                'notif_status'           => 'unread',
                 'notif_member_id'        => $m->member_id,
                 'notif_type'             => 'bulk_email',
                 'notif_created_by'       => $userId,
