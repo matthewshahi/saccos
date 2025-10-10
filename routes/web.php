@@ -47,7 +47,13 @@ use App\Http\Controllers\TempLoanCalController;
 use App\Http\Controllers\EmailController;
 
 
-use App\Http\Controllers\TxnImportController;
+use App\Http\Controllers\LedgerRebuildController;
+
+Route::get('/rebuild/ledgers', [LedgerRebuildController::class, 'rebuild'])
+    ->name('rebuild.ledgers')
+    ->middleware('check_user_rights:rpt_acc_trans');
+    
+// use App\Http\Controllers\TxnImportController;
 
 // // Upload form
 // Route::get('/transactions/import', [TxnImportController::class, 'showForm'])
@@ -60,7 +66,7 @@ use App\Http\Controllers\TxnImportController;
 
 // use App\Http\Controllers\ReportsShareController;
 
-Route::get('/members/update-totals', [\App\Http\Controllers\MemberTotalsController::class, 'recalculateAll'])->name('members.recalculate.totals');
+// Route::get('/members/update-totals', [\App\Http\Controllers\MemberTotalsController::class, 'recalculateAll'])->name('members.recalculate.totals');
 
 // // Route::get('/members/import-transactions', [MemberImportController::class, 'showImportTransactionsForm'])->name('members.import.transactions.form');
 // // Route::post('/members/import-transactions', [MemberImportController::class, 'importSavingsAndShares'])->name('members.import.transactions');
