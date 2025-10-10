@@ -1,209 +1,122 @@
 @extends('layouts.app')
 
 @section('content')
-    <div class="breadcrumb d-flex justify-content-between align-items-center">
-        <h1>Balance Sheet</h1>
-        <div class="header-part-right">
-            <ul>
-                @if(Auth::check())
-                    <li>{{ Auth::user()->member_name }}</li>
-                @endif
-                @if(isset($currentPeriod))
-                    <li><a href="{{ route('admin.periods') }}">{{ $currentPeriod->period_name }}</a></li>
-                @endif
-                <li><i class="i-Full-Screen header-icon d-none d-sm-inline-block" data-fullscreen=""></i></li>
-            </ul>
+<div class="row">
+  <div class="col-md-12">
+    <div class="card o-hidden mb-4 shadow-sm">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <h3 class="m-0">Balance Sheet</h3>
+      </div>
+
+      <div class="card-body">
+        @include('includes.accounts_nav')
+        <!-- 🔍 Filters -->
+        <form method="GET" action="{{ route('reports.accounts.balance-sheet') }}" class="row g-3 mb-4">
+          <div class="col-md-3">
+            <label for="period" class="form-label">Period (YYYYmm)</label>
+            <input type="text" name="period" id="period" class="form-control"
+              value="{{ old('period', $period ?? '') }}" maxlength="6" pattern="\d{6}" placeholder="e.g. 202510">
+          </div>
+          <div class="col-md-3">
+            <label for="date_from" class="form-label">From Date</label>
+            <input type="date" name="date_from" id="date_from" class="form-control"
+              value="{{ old('date_from', $dateFrom ?? now()->startOfMonth()->format('Y-m-d')) }}">
+          </div>
+          <div class="col-md-3">
+            <label for="date_to" class="form-label">To Date</label>
+            <input type="date" name="date_to" id="date_to" class="form-control"
+              value="{{ old('date_to', $dateTo ?? now()->endOfMonth()->format('Y-m-d')) }}">
+          </div>
+          <div class="col-md-3 d-flex align-items-end">
+            <button class="btn btn-primary w-100">Generate</button>
+          </div>
+        </form>
+
+        <!-- 🧾 Period summary -->
+        <p class="text-muted small">
+          <strong>Period:</strong> {{ \Carbon\Carbon::parse($dateFrom)->format('d M Y') }} – {{ \Carbon\Carbon::parse($dateTo)->format('d M Y') }}
+        </p>
+
+        <!-- 📊 Balance Sheet Table -->
+        <div class="table-responsive">
+          <table class="table table-bordered align-middle">
+            <thead class="table-light text-center">
+              <tr>
+                <th style="width:45%">ASSETS</th>
+                <th style="width:15%">KES</th>
+                <th style="width:30%">LIABILITIES & CAPITAL</th>
+                <th style="width:10%">KES</th>
+              </tr>
+            </thead>
+            <tbody>
+              @php
+                $maxRows = max($assets->count(), $liabilities->count() + $capital->count());
+                $rightSide = $liabilities->concat($capital)->values();
+              @endphp
+
+              {{-- Assets vs Liabilities + Capital --}}
+              @for($i=0; $i < $maxRows; $i++)
+              <tr>
+                <td>
+                  {{ $assets[$i]->sub_account_name ?? '' }}
+                  @if(!empty($assets[$i]->sub_account_code))
+                    <small class="text-muted">
+                      ({{ $assets[$i]->main_account_code }}/{{ $assets[$i]->sub_account_code }})
+                    </small>
+                  @endif
+                </td>
+                <td class="text-end">
+                  {{ isset($assets[$i]) ? number_format($assets[$i]->debit - $assets[$i]->credit, 2) : '0.00' }}
+                </td>
+
+                <td>
+                  @if(isset($rightSide[$i]))
+                    {{ $rightSide[$i]->main_account_type ?? '' }} — {{ $rightSide[$i]->sub_account_name }}
+                    @if(!empty($rightSide[$i]->sub_account_code))
+                      <small class="text-muted">
+                        ({{ $rightSide[$i]->main_account_code }}/{{ $rightSide[$i]->sub_account_code }})
+                      </small>
+                    @endif
+                  @else
+                    <em class="text-muted">—</em>
+                  @endif
+                </td>
+                <td class="text-end">
+                  {{ isset($rightSide[$i]) ? number_format($rightSide[$i]->credit - $rightSide[$i]->debit, 2) : '0.00' }}
+                </td>
+              </tr>
+              @endfor
+            </tbody>
+
+            <tfoot class="table-dark fw-bold">
+              <tr>
+                <td class="text-end">Total Assets</td>
+                <td class="text-end">{{ number_format($totalAssets, 2) }}</td>
+                <td class="text-end">Total Liabilities + Capital</td>
+                <td class="text-end">{{ number_format($totalRight, 2) }}</td>
+              </tr>
+              <tr>
+                <td colspan="4" class="text-center">
+                  @if(round($totalAssets,2) === round($totalRight,2))
+                    ✅ Balance Sheet Balances
+                  @else
+                    ⚠ Out of Balance by {{ number_format(abs($totalAssets - $totalRight),2) }}
+                  @endif
+                </td>
+              </tr>
+            </tfoot>
+          </table>
         </div>
-    </div>
-    <div class="separator-breadcrumb border-top"></div>
 
-    <div class="row mb-4">
-        <div class="col-md-12 mb-4">
-            <div class="card text-start">
-                <div class="card-body">
-                    @if(session('success'))
-                        <div class="alert alert-success">
-                            {{ session('success') }}
-                        </div>
-                    @endif
-                    @if(session('error'))
-                        <div class="alert alert-danger">
-                            {{ session('error') }}
-                        </div>
-                    @endif
-                    @if ($errors->any())
-                        <div class="alert alert-danger">
-                            <ul>
-                                @foreach ($errors->all() as $error)
-                                    <li>{{ $error }}</li>
-                                @endforeach
-                            </ul>
-                        </div>
-                    @endif
-                    <form action="{{ route('reports.accounts.balance-sheet') }}" method="GET">
-                        <div class="row row-xs">
-                            <div class="col-md-5">
-                                <input type="date" id="start_date" name="start_date" class="form-control" placeholder="Start Date" value="{{ $startDate }}">
-                            </div>
-                            <div class="col-md-5 mt-3 mt-md-0">
-                                <input type="date" id="end_date" name="end_date" class="form-control" placeholder="End Date" value="{{ $endDate }}">
-                            </div>
-                            <div class="col-md-2 mt-3 mt-md-0">
-                                <button type="submit" class="btn btn-primary w-100">Filter</button>
-                            </div>
-                        </div>
-                    </form>
-                    <button id="downloadExcel" class="btn btn-success mb-3">Download Excel</button>
-                    <div class="table-responsive mt-4">
-                        <table id="balanceSheetTable" class="display table table-striped table-bordered" style="width: 100%">
-                            <thead>
-                                <tr>
-                                    <th>Account</th>
-                                    <th>Account Name</th>
-                                    <th style="text-align: right;">Debit</th>
-                                    <th style="text-align: right;">Credit</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {{-- Opening Balance --}}
-                                @if(isset($openingBalance))
-                                    <tr>
-                                        <td colspan="2"><strong>Opening Balance</strong></td>
-                                        <td style="text-align: right;">
-                                            <strong>{{ $openingBalance->type == 'Debit' ? number_format($openingBalance->balance, 2) : '' }}</strong>
-                                        </td>
-                                        <td style="text-align: right;">
-                                            <strong>{{ $openingBalance->type == 'Credit' ? number_format($openingBalance->balance, 2) : '' }}</strong>
-                                        </td>
-                                    </tr>
-                                @endif
-
-                                {{-- Initialize totals --}}
-                                @php
-                                    $assetTotalDebit = 0;
-                                    $assetTotalCredit = 0;
-                                    $liabilityTotalDebit = 0;
-                                    $liabilityTotalCredit = 0;
-                                    $capitalTotalDebit = 0;
-                                    $capitalTotalCredit = 0;
-                                @endphp
-
-                                {{-- Fixed Assets --}}
-                                @foreach($accounts['ASSET - FIXED'] ?? [] as $account)
-                                    @php
-                                        $debit = max($account->total_debit - $account->total_credit, 0);
-                                        $credit = max($account->total_credit - $account->total_debit, 0);
-                                        $assetTotalDebit += $debit;
-                                        $assetTotalCredit += $credit;
-                                    @endphp
-                                    <tr>
-                                        <td>{{ $account->main_account_code . '/' . $account->sub_account_code }}</td>
-                                        <td>{{ $account->sub_account_name }}</td>
-                                        <td style="text-align: right;">{{ $debit > 0 ? number_format($debit, 2) : '' }}</td>
-                                        <td style="text-align: right;">{{ $credit > 0 ? number_format($credit, 2) : '' }}</td>
-                                    </tr>
-                                @endforeach
-                                <tr>
-                                    <td colspan="2"><strong>Fixed Asset Total</strong></td>
-                                    <td style="text-align: right;"><strong>{{ number_format($assetTotalDebit, 2) }}</strong></td>
-                                    <td style="text-align: right;"><strong>{{ number_format($assetTotalCredit, 2) }}</strong></td>
-                                </tr>
-
-                                {{-- Current Assets --}}
-                                @foreach($accounts['ASSETS - CURRENT'] ?? [] as $account)
-                                    @php
-                                        $debit = max($account->total_debit - $account->total_credit, 0);
-                                        $credit = max($account->total_credit - $account->total_debit, 0);
-                                        $assetTotalDebit += $debit;
-                                        $assetTotalCredit += $credit;
-                                    @endphp
-                                    <tr>
-                                        <td>{{ $account->main_account_code . '/' . $account->sub_account_code }}</td>
-                                        <td>{{ $account->sub_account_name }}</td>
-                                        <td style="text-align: right;">{{ $debit > 0 ? number_format($debit, 2) : '' }}</td>
-                                        <td style="text-align: right;">{{ $credit > 0 ? number_format($credit, 2) : '' }}</td>
-                                    </tr>
-                                @endforeach
-                                <tr>
-                                    <td colspan="2"><strong>Current Asset Total</strong></td>
-                                    <td style="text-align: right;"><strong>{{ number_format($assetTotalDebit, 2) }}</strong></td>
-                                    <td style="text-align: right;"><strong>{{ number_format($assetTotalCredit, 2) }}</strong></td>
-                                </tr>
-
-                                {{-- Liabilities --}}
-                                @foreach($accounts['LIABILITIES - SHORT'] ?? [] as $account)
-                                    @php
-                                        $debit = max($account->total_debit - $account->total_credit, 0);
-                                        $credit = max($account->total_credit - $account->total_debit, 0);
-                                        $liabilityTotalDebit += $debit;
-                                        $liabilityTotalCredit += $credit;
-                                    @endphp
-                                    <tr>
-                                        <td>{{ $account->main_account_code . '/' . $account->sub_account_code }}</td>
-                                        <td>{{ $account->sub_account_name }}</td>
-                                        <td style="text-align: right;">{{ $debit > 0 ? number_format($debit, 2) : '' }}</td>
-                                        <td style="text-align: right;">{{ $credit > 0 ? number_format($credit, 2) : '' }}</td>
-                                    </tr>
-                                @endforeach
-                                <tr>
-                                    <td colspan="2"><strong>Liability Total</strong></td>
-                                    <td style="text-align: right;"><strong>{{ number_format($liabilityTotalDebit, 2) }}</strong></td>
-                                    <td style="text-align: right;"><strong>{{ number_format($liabilityTotalCredit, 2) }}</strong></td>
-                                </tr>
-
-                                {{-- Capital --}}
-                                @foreach($accounts['CAPITAL'] ?? [] as $account)
-                                    @php
-                                        $debit = max($account->total_debit - $account->total_credit, 0);
-                                        $credit = max($account->total_credit - $account->total_debit, 0);
-                                        $capitalTotalDebit += $debit;
-                                        $capitalTotalCredit += $credit;
-                                    @endphp
-                                    <tr>
-                                        <td>{{ $account->main_account_code . '/' . $account->sub_account_code }}</td>
-                                        <td>{{ $account->sub_account_name }}</td>
-                                        <td style="text-align: right;">{{ $debit > 0 ? number_format($debit, 2) : '' }}</td>
-                                        <td style="text-align: right;">{{ $credit > 0 ? number_format($credit, 2) : '' }}</td>
-                                    </tr>
-                                @endforeach
-                                <tr>
-                                    <td colspan="2"><strong>Capital Total</strong></td>
-                                    <td style="text-align: right;"><strong>{{ number_format($capitalTotalDebit, 2) }}</strong></td>
-                                    <td style="text-align: right;"><strong>{{ number_format($capitalTotalCredit, 2) }}</strong></td>
-                                </tr>
-                            </tbody>
-                            <tfoot>
-                                {{-- Net Assets --}}
-                                @php
-                                    $netAssets = ($assetTotalDebit - $assetTotalCredit) - ($liabilityTotalCredit - $liabilityTotalDebit) - ($capitalTotalCredit - $capitalTotalDebit);
-                                @endphp
-                                <tr>
-                                    <th colspan="2">Net Assets</th>
-                                    <th style="text-align: right;">{{ number_format($netAssets > 0 ? $netAssets : 0, 2) }}</th>
-                                    <th style="text-align: right;">{{ number_format($netAssets < 0 ? abs($netAssets) : 0, 2) }}</th>
-                                </tr>
-                                {{-- Closing Balance --}}
-                                @php
-                                    $closingBalance = $netAssets + ($openingBalance->type == 'Debit' ? $openingBalance->balance : -$openingBalance->balance);
-                                @endphp
-                                <tr>
-                                    <th colspan="2">Closing Balance</th>
-                                    <th style="text-align: right;">{{ $closingBalance > 0 ? number_format($closingBalance, 2) : '' }}</th>
-                                    <th style="text-align: right;">{{ $closingBalance < 0 ? number_format(abs($closingBalance), 2) : '' }}</th>
-                                </tr>
-                            </tfoot>
-                        </table>
-                    </div>
-                </div>
-            </div>
+        @if($netProfit != 0)
+        <div class="alert alert-info mt-3 text-center">
+          <strong>Note:</strong>
+          Net {{ $netProfit >= 0 ? 'Profit' : 'Loss' }} for this period is
+          <strong>{{ number_format(abs($netProfit), 2) }} KES</strong>
         </div>
+        @endif
+      </div>
     </div>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.16.9/xlsx.full.min.js"></script>
-
-    <script>
-        document.getElementById('downloadExcel').addEventListener('click', function() {
-            var wb = XLSX.utils.table_to_book(document.getElementById('balanceSheetTable'), { sheet: "Balance Sheet" });
-            XLSX.writeFile(wb, 'balance_sheet.xlsx');
-        });
-    </script>
+  </div>
+</div>
 @endsection

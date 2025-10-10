@@ -689,9 +689,16 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
     // Route::get('/reports/accounts/trial-balance', [HomeController::class, 'reportsAccountsTrialBalance'])->name('reports.accounts.trial-balance')->middleware('check_user_rights:rpt_trial_balance');
     Route::get('/reports/accounts/trial-balance', [TrialBalanceController::class, 'index'])->name('reports.accounts.trial-balance')->middleware('check_user_rights:rpt_trial_balance');
 
-    Route::get('/reports/accounts/profit-loss', [HomeController::class, 'reportsAccountsTrialBalance'])->name('reports.accounts.profit-loss')->middleware('check_user_rights:rpt_profit_loss');
+
+    Route::get('/reports/accounts/profit-loss', [TrialBalanceController::class, 'profitLoss'])
+    ->name('reports.accounts.profit-loss')
+    ->middleware('check_user_rights:rpt_profit_loss');
+
     Route::get('/reports/accounts/profit-loss/budget', [HomeController::class, 'reportsAccountsTrialBalanceBudget'])->name('reports.accounts.profit-loss.budget')->middleware('check_user_rights:rpt_profit_loss');
-    Route::get('/reports/accounts/balance-sheet', [HomeController::class, 'reportsAccountsTrialBalance'])->name('reports.accounts.balance-sheet')->middleware('check_user_rights:rpt_balance_sheet');
+    // Route::get('/reports/accounts/balance-sheet', [HomeController::class, 'reportsAccountsTrialBalance'])->name('reports.accounts.balance-sheet')->middleware('check_user_rights:rpt_balance_sheet');
+    Route::get('/reports/accounts/balance-sheet', [TrialBalanceController::class, 'balanceSheet'])
+    ->name('reports.accounts.balance-sheet')
+    ->middleware('check_user_rights:rpt_balance_sheet');
     Route::get('/reports/accounts/budget-vs-actuals', [HomeController::class, 'reportsAccountsBudgetVsActuals'])->name('reports.accounts.budget-vs-actuals')->middleware('check_user_rights:rpt_balance_sheet');
     Route::get('/reports/accounts/trial-balance-horizontal', [HomeController::class, 'reportsAccountsTrialBalance'])->name('reports.accounts.trial-balance-horizontal')->middleware('check_user_rights:rpt_balance_sheet');
     Route::get('/reports/accounts/profit-loss-horizontal', [HomeController::class, 'reportsAccountsTrialBalance'])->name('reports.accounts.profit-loss-horizontal')->middleware('check_user_rights:rpt_balance_sheet');

@@ -10,25 +10,42 @@
       <div class="card-body">
         
         <!-- 🔍 Filter Form -->
+         @include('includes.accounts_nav')
         <form method="GET" action="{{ route('reports.accounts.trial-balance') }}" class="row g-3 mb-4">
-          <div class="col-md-3">
-            <label for="period" class="form-label">Period (YYYYmm)</label>
-            <input type="text" name="period" id="period" value="{{ $period ?? '' }}" 
-                   class="form-control" maxlength="6" pattern="\d{6}" 
-                   placeholder="e.g. 202509">
-          </div>
-          <div class="col-md-3">
-            <label for="date_from" class="form-label">From Date</label>
-            <input type="date" name="date_from" id="date_from" class="form-control" value="{{ $dateFrom ?? '' }}">
-          </div>
-          <div class="col-md-3">
-            <label for="date_to" class="form-label">To Date</label>
-            <input type="date" name="date_to" id="date_to" class="form-control" value="{{ $dateTo ?? '' }}">
-          </div>
-          <div class="col-md-3 d-flex align-items-end">
-            <button type="submit" class="btn btn-primary w-100">Filter</button>
-          </div>
-        </form>
+  <div class="col-md-3">
+    <label for="period" class="form-label">Period (YYYYmm)</label>
+    <input type="text"
+           name="period"
+           id="period"
+           value="{{ old('period', $period ?? '') }}"
+           class="form-control"
+           maxlength="6"
+           pattern="\d{6}"
+           placeholder="e.g. 202510">
+  </div>
+
+  <div class="col-md-3">
+    <label for="date_from" class="form-label">From Date</label>
+    <input type="date"
+           name="date_from"
+           id="date_from"
+           class="form-control"
+           value="{{ old('date_from', isset($dateFrom) ? \Carbon\Carbon::parse($dateFrom)->format('Y-m-d') : \Carbon\Carbon::now()->startOfMonth()->format('Y-m-d')) }}">
+  </div>
+
+  <div class="col-md-3">
+    <label for="date_to" class="form-label">To Date</label>
+    <input type="date"
+           name="date_to"
+           id="date_to"
+           class="form-control"
+           value="{{ old('date_to', isset($dateTo) ? \Carbon\Carbon::parse($dateTo)->format('Y-m-d') : \Carbon\Carbon::now()->endOfMonth()->format('Y-m-d')) }}">
+  </div>
+
+  <div class="col-md-3 d-flex align-items-end">
+    <button type="submit" class="btn btn-primary w-100">Filter</button>
+  </div>
+</form>
 
         <div class="table-responsive">
           <table class="table table-bordered">
@@ -102,22 +119,7 @@
     </td>
   </tr>
 </tfoot>
-            <tfoot class="table-dark fw-bold">
-              <tr>
-                <td colspan="3" class="text-end">Grand Totals</td>
-                <td class="text-end">{{ number_format($grandDebit,2) }}</td>
-                <td class="text-end">{{ number_format($grandCredit,2) }}</td>
-              </tr>
-              <tr>
-                <td colspan="5" class="text-center">
-                  @if($grandDebit == $grandCredit)
-                    ✅ Trial Balance Balances
-                  @else
-                    ⚠ Out of Balance by {{ number_format(abs($grandDebit - $grandCredit),2) }}
-                  @endif
-                </td>
-              </tr>
-            </tfoot>
+             
           </table>
         </div>
 

@@ -22,7 +22,7 @@
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
     @endif
-
+ @include('includes.accounts_nav')
     <!-- Search and Filter Form -->
     <form method="GET" action="{{ route('reports.accounts.ledger') }}" class="mb-3">
         <div class="row align-items-end">

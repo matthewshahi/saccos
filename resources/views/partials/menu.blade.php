@@ -432,11 +432,7 @@
                                         </a>
                                     </li>
 
-                                    <li class="item-name">
-                                        <a href="{{ url('/reports/accounts/balance-sheet-horizontal') }}">
-                                            <span class="text-muted">Balance sheet - V2</span>
-                                        </a>
-                                    </li>
+                                 
 
 
 
