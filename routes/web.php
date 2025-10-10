@@ -47,15 +47,15 @@ use App\Http\Controllers\TempLoanCalController;
 use App\Http\Controllers\EmailController;
 
 
-// use App\Http\Controllers\TxnImportController;
+use App\Http\Controllers\TxnImportController;
 
-// // Upload form
-// Route::get('/transactions/import', [TxnImportController::class, 'showForm'])
-//     ->name('transactions.import.form');
+// Upload form
+Route::get('/transactions/import', [TxnImportController::class, 'showForm'])
+    ->name('transactions.import.form');
 
-// // // Process CSV and import
-// Route::post('/transactions/import', [TxnImportController::class, 'import'])
-//     ->name('transactions.import');
+// // Process CSV and import
+Route::post('/transactions/import', [TxnImportController::class, 'import'])
+    ->name('transactions.import');
 
 
 // use App\Http\Controllers\ReportsShareController;
