@@ -29,7 +29,14 @@
             <td style="padding:30px 25px; color:#333333; font-size:15px; line-height:1.7;">
               <p style="margin-top:0;">Dear {{ $name }},</p>
 
-              <p style="white-space:pre-line; margin-bottom:25px;">{!! nl2br(e($messageBody)) !!}</p>
+
+              @if (strip_tags($messageBody) === $messageBody)
+    {{-- Plain text: escape then add line breaks --}}
+    <p style="white-space:pre-line; margin-bottom:25px;">{!! nl2br(e($messageBody)) !!}</p>
+@else
+    {{-- HTML: render directly --}}
+    <div style="margin-bottom:25px;">{!! $messageBody !!}</div>
+@endif
 
               <div style="margin-top:20px; padding:14px 18px; background-color:#e8f1fd; border-left:4px solid #1a73e8; font-size:13px; color:#333; border-radius:4px;">
                 <strong style="display:block; margin-bottom:4px;">🔐 Security Notice:</strong>

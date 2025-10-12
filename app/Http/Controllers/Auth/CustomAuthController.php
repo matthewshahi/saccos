@@ -56,24 +56,36 @@ $time      = Carbon::now()->format('Y-m-d H:i:s');
 
 // ✅ Build strong client-focused security message
 $auditMessage = "
-Dear {$member->member_name},<br><br>
-This is to notify you that a login to your SACCO account was recorded with the following details:<br><br>
+<p style='font-family: Arial, sans-serif; font-size: 15px; color: #333;'>
+  Dear <strong>{$member->member_name}</strong>,
+</p>
 
-<strong>📍 Login Details</strong><br>
-IP Address: <code>{$ip}</code><br>
-Hostname: <code>{$hostname}</code><br>
-Device / Browser: <code>{$agent}</code><br>
-Accessed URL: <code>{$uri}</code><br>
-Request Method: <code>{$method}</code><br>
-Referrer: <code>{$referer}</code><br>
-Login Time: <code>{$time}</code><br><br>
+<p style='font-family: Arial, sans-serif; font-size: 15px; color: #333;'>
+  This is to notify you that a login to your SACCO account was recorded with the following details:
+</p>
 
-⚠️ <strong>Security Notice:</strong><br>
-If this activity was not initiated by you, it may indicate unauthorized access. 
-Please change your password immediately and contact your SACCO administrator.<br><br>
+<table style='font-family: Arial, sans-serif; font-size: 14px; color: #333; border-collapse: collapse; margin-top: 10px;'>
+  <tr><td colspan='2' style='padding: 8px 0;'><strong>📍 Login Details</strong></td></tr>
+  <tr><td style='padding: 4px 8px;'>IP Address:</td><td><code>{$ip}</code></td></tr>
+  <tr><td style='padding: 4px 8px;'>Hostname:</td><td><code>{$hostname}</code></td></tr>
+  <tr><td style='padding: 4px 8px;'>Device / Browser:</td><td><code>{$agent}</code></td></tr>
+  <tr><td style='padding: 4px 8px;'>Accessed URL:</td><td><code>{$uri}</code></td></tr>
+  <tr><td style='padding: 4px 8px;'>Request Method:</td><td><code>{$method}</code></td></tr>
+  <tr><td style='padding: 4px 8px;'>Referrer:</td><td><code>{$referer}</code></td></tr>
+  <tr><td style='padding: 4px 8px;'>Login Time:</td><td><code>{$time}</code></td></tr>
+</table>
 
-<i>This login event has been logged for your security and compliance purposes.</i>
+<p style='font-family: Arial, sans-serif; font-size: 15px; color: #b30000; margin-top: 20px;'>
+  ⚠️ <strong>Security Notice:</strong><br>
+  If this activity was not initiated by you, it may indicate unauthorized access. 
+  Please change your password immediately and contact your SACCO administrator.
+</p>
+
+<p style='font-family: Arial, sans-serif; font-size: 14px; color: #666; margin-top: 20px;'>
+  <i>This login event has been logged for your security and compliance purposes.</i>
+</p>
 ";
+
 
         // ✅ Store login audit record
         DB::table('sacco_system_notifications')->insert([
