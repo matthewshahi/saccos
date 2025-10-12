@@ -37,6 +37,8 @@
 
 <body class="text-start">
 
+@include('partials.password_change')
+
 
 @php $isLoginRoute = Route::currentRouteName() === 'login'; @endphp
 <div class="app-admin-wrap {{ $isLoginRoute ? '' : 'layout-sidebar-vertical sidebar-full' }}">

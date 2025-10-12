@@ -47,12 +47,12 @@ use App\Http\Controllers\TempLoanCalController;
 use App\Http\Controllers\EmailController;
 
 
-use App\Http\Controllers\LedgerRebuildController;
+// use App\Http\Controllers\LedgerRebuildController;
 
-Route::get('/rebuild/ledgers', [LedgerRebuildController::class, 'rebuild'])
-    ->name('rebuild.ledgers')
-    ->middleware('check_user_rights:rpt_acc_trans');
-    
+// Route::get('/rebuild/ledgers', [LedgerRebuildController::class, 'rebuild'])
+//     ->name('rebuild.ledgers')
+//     ->middleware('check_user_rights:rpt_acc_trans');
+
 // use App\Http\Controllers\TxnImportController;
 
 // // Upload form
