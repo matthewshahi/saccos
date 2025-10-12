@@ -56,9 +56,7 @@ $time      = Carbon::now()->format('Y-m-d H:i:s');
 
 // ✅ Build strong client-focused security message
 $auditMessage = "
-<p style='font-family: Arial, sans-serif; font-size: 15px; color: #333;'>
-  Dear <strong>{$member->member_name}</strong>,
-</p>
+
 
 <p style='font-family: Arial, sans-serif; font-size: 15px; color: #333;'>
   This is to notify you that a login to your SACCO account was recorded with the following details:
