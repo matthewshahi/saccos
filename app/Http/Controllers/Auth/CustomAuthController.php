@@ -84,7 +84,7 @@ Please change your password immediately and contact your SACCO administrator.<br
             'notif_message'         => $auditMessage,
             'notif_status'          => 'unread', // default status
             'notif_type'            => 'login_audit',
-            'notif_sent_at'         => $time,
+            'notif_sent_at'         => null, 
             'notif_member_id'       => $member->member_id,
             'notif_created_by'      => $member->member_id,
             'notif_ip'              => $ip,
