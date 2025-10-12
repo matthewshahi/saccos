@@ -45,44 +45,35 @@ class CustomAuthController extends Controller
         Auth::login($member);
 
         // ✅ Capture detailed audit info
-        $ip          = $request->ip();
-        $agent       = $request->header('User-Agent');
-        $hostname    = gethostbyaddr($ip) ?: 'Unknown Host';
-        $referer     = $request->headers->get('referer') ?: 'Direct Access';
-        $method      = $request->method();
-        $platform    = php_uname();
-        $serverIp    = $_SERVER['SERVER_ADDR'] ?? 'N/A';
-        $remotePort  = $_SERVER['REMOTE_PORT'] ?? 'N/A';
-        $protocol    = $_SERVER['SERVER_PROTOCOL'] ?? 'N/A';
-        $uri         = $request->getRequestUri();
-        $time        = Carbon::now()->format('Y-m-d H:i:s');
+        // ✅ Gather detailed client-side audit info
+$ip        = $request->ip();
+$agent     = $request->header('User-Agent');
+$hostname  = gethostbyaddr($ip) ?: 'Unknown Host';
+$referer   = $request->headers->get('referer') ?: 'Direct Access';
+$method    = $request->method();
+$uri       = $request->getRequestUri();
+$time      = Carbon::now()->format('Y-m-d H:i:s');
 
-        // ✅ Build structured audit message
-        $auditMessage = "
-        Dear {$member->member_name},<br><br>
-        This is to notify you that a login to your SACCO account was recorded with the following details:<br><br>
+// ✅ Build strong client-focused security message
+$auditMessage = "
+Dear {$member->member_name},<br><br>
+This is to notify you that a login to your SACCO account was recorded with the following details:<br><br>
 
-        <strong>📍 Login Details</strong><br>
-        IP Address: <code>{$ip}</code><br>
-        Hostname: <code>{$hostname}</code><br>
-        Device / Browser: <code>{$agent}</code><br>
-        Accessed URL: <code>{$uri}</code><br>
-        Request Method: <code>{$method}</code><br>
-        Referrer: <code>{$referer}</code><br>
-        Login Time: <code>{$time}</code><br><br>
+<strong>📍 Login Details</strong><br>
+IP Address: <code>{$ip}</code><br>
+Hostname: <code>{$hostname}</code><br>
+Device / Browser: <code>{$agent}</code><br>
+Accessed URL: <code>{$uri}</code><br>
+Request Method: <code>{$method}</code><br>
+Referrer: <code>{$referer}</code><br>
+Login Time: <code>{$time}</code><br><br>
 
-        <strong>🖥️ System Environment</strong><br>
-        Server IP: <code>{$serverIp}</code><br>
-        Remote Port: <code>{$remotePort}</code><br>
-        Protocol: <code>{$protocol}</code><br>
-        Server Platform: <code>{$platform}</code><br><br>
+⚠️ <strong>Security Notice:</strong><br>
+If this activity was not initiated by you, it may indicate unauthorized access. 
+Please change your password immediately and contact your SACCO administrator.<br><br>
 
-        ⚠️ <strong>Security Notice:</strong><br>
-        If this activity was not initiated by you, it may indicate unauthorized access. 
-        Please change your password immediately and contact your SACCO administrator.<br><br>
-
-        <i>This login event has been logged for security and compliance purposes.</i>
-        ";
+<i>This login event has been logged for your security and compliance purposes.</i>
+";
 
         // ✅ Store login audit record
         DB::table('sacco_system_notifications')->insert([
