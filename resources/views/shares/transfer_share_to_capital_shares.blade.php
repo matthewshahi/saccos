@@ -2,7 +2,7 @@
 
 @section('content')
 <div class="breadcrumb d-flex justify-content-between align-items-center">
-    <h1>Increase Capital  by moving funds from  share contributions </h1>
+    <h1>Increase Capital  by moving funds from  savings </h1>
     <div class="header-part-right">
             <ul>
                 @if(isset($currentPeriod))
@@ -48,7 +48,7 @@
                             <thead>
                                 <tr>
                                     <th>#</th>
-                                    <th>Reduce share deposits from:*</th>
+                                    <th>Reduce savings from:*</th>
                                     <th>Increase CAPITAL shares: *</th>
                                     <th>Amount*</th>
                                     <th>Doc. No.</th>
