@@ -131,35 +131,40 @@ class PublicLoansController extends Controller
         return $schedule;
     }
 
-     // 🔹 Fixed rate: monthly rate (no ÷ 12)
+     // ✅ Fixed (Flat) Interest — simple 6% ÷ months formula
 private function calculateFixedEMI($principal, $rate, $months)
 {
-    $monthlyRate = $rate / 100;
-    $totalInterest = $principal * $monthlyRate * $months;
-    return ($principal + $totalInterest) / $months;
+    // total interest for the full term
+    $totalInterest = $principal * ($rate / 100);
+
+    // monthly interest share
+    $monthlyInterest = $totalInterest / $months;
+
+    // monthly principal share
+    $monthlyPrincipal = $principal / $months;
+
+    // EMI per month = principal + interest portions
+    return $monthlyPrincipal + $monthlyInterest;
 }
 
 private function generateFixedSchedule($principal, $rate, $months, $emi)
 {
     $schedule = [];
-    $monthlyRate = $rate / 100;
-    $monthlyInterest = $principal * $monthlyRate;
+
+    $totalInterest   = $principal * ($rate / 100);
+    $monthlyInterest = $totalInterest / $months;
+    $monthlyPrincipal = $principal / $months;
 
     for ($i = 1; $i <= $months; $i++) {
-        $principalPayment = $emi - $monthlyInterest;
-        $principal -= $principalPayment;
+        $balance = $principal - ($monthlyPrincipal * $i);
 
         $schedule[] = [
-            'month' => $i,
-            'principal' => round($principalPayment, 2),
-            'interest' => round($monthlyInterest, 2),
-            'emi' => round($emi, 2),
-            'balance' => max(round($principal, 2), 0),
+            'month'     => $i,
+            'principal' => round($monthlyPrincipal, 2),
+            'interest'  => round($monthlyInterest, 2),
+            'emi'       => round($emi, 2),
+            'balance'   => max(round($balance, 2), 0),
         ];
-    }
-
-    if (count($schedule)) {
-        $schedule[count($schedule) - 1]['balance'] = 0;
     }
 
     return $schedule;
