@@ -139,28 +139,28 @@ class PublicLoansController extends Controller
 
     // 🔹 Generate Fixed (Flat) Schedule
     private function generateFixedSchedule($principal, $rate, $months, $emi)
-    {
-        $schedule = [];
-        $monthlyRate = $rate / 100;
-        $monthlyInterest = $principal * $monthlyRate;
+{
+    $schedule = [];
+    $monthlyRate = $rate / 100;
+    $monthlyInterest = $principal * $monthlyRate;
 
-        for ($i = 1; $i <= $months; $i++) {
-            $principalPayment = $emi - $monthlyInterest;
-            $principal -= $principalPayment;
+    for ($i = 1; $i <= $months; $i++) {
+        $principalPayment = $emi - $monthlyInterest;
+        $principal -= $principalPayment;
 
-            $schedule[] = [
-                'month' => $i,
-                'principal' => round($principalPayment, 2),
-                'interest' => round($monthlyInterest, 2),
-                'emi' => round($emi, 2),
-                'balance' => max(round($principal, 2), 0),
-            ];
-        }
-
-        if (count($schedule)) {
-            $schedule[count($schedule) - 1]['balance'] = 0;
-        }
-
-        return $schedule;
+        $schedule[] = [
+            'month' => $i,
+            'principal' => round($principalPayment, 2),
+            'interest' => round($monthlyInterest, 2),
+            'emi' => round($emi, 2),
+            'balance' => max(round($principal, 2), 0),
+        ];
     }
+
+    if (count($schedule)) {
+        $schedule[count($schedule) - 1]['balance'] = 0;
+    }
+
+    return $schedule;
+}
 }
