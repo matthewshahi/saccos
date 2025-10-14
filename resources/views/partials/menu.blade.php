@@ -342,6 +342,12 @@
                                             <span class="text-muted">Registration Fees</span>
                                         </a>
                                     </li>
+                                    <li class="item-name">
+                                        <a href="{{ url('/reports/loans/insurance') }}">
+                                            <span class="text-muted">Report - To Insurance</span>
+                                        </a>
+                                    </li>
+                                    
                                     
                                 </ul>
                             </li>

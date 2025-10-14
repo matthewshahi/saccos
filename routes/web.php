@@ -45,7 +45,7 @@ use App\Http\Controllers\TrialBalanceController;
 use App\Http\Controllers\LoansActiveReportController;
 use App\Http\Controllers\TempLoanCalController;
 use App\Http\Controllers\EmailController;
-
+use App\Http\Controllers\InsuranceLoanReportController;
 
 // use App\Http\Controllers\LedgerRebuildController;
 
@@ -259,6 +259,13 @@ Route::prefix('mobile')->group(function () {
 
 
 Route::middleware(['auth', 'check_member_position'])->group(function () {
+
+    
+
+Route::get('/reports/loans/insurance', [InsuranceLoanReportController::class, 'index'])
+    ->name('reports.loans.insurance')
+    ->middleware('check_user_rights:rpt_loans_insurance');
+
 
     Route::get('/emails/bulk', [EmailController::class, 'index'])
         ->name('emails.bulk')
