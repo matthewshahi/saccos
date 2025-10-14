@@ -37,6 +37,7 @@
 
 <body class="text-start">
 
+@include('partials.password_change')
 
 
 @php $isLoginRoute = Route::currentRouteName() === 'login'; @endphp
