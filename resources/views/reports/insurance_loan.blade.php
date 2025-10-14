@@ -137,5 +137,11 @@
   background-color: #4a1f6f;
   border-color: #4a1f6f;
 }
+.small.text-muted i {
+  color: #6c757d;
+}
+.fw-semibold.text-dark {
+  font-size: 0.95rem;
+}
     </style>
 @endsection
