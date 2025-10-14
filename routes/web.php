@@ -260,11 +260,21 @@ Route::prefix('mobile')->group(function () {
 
 Route::middleware(['auth', 'check_member_position'])->group(function () {
 
-    
+     
 
+
+ 
+
+// 📊 Main Insurance Loan Report (view + filter)
 Route::get('/reports/loans/insurance', [InsuranceLoanReportController::class, 'index'])
     ->name('reports.loans.insurance')
     ->middleware('check_user_rights:rpt_loans_insurance');
+
+// 📤 Export to CSV
+Route::get('/reports/loans/insurance/export', [InsuranceLoanReportController::class, 'export'])
+    ->name('reports.loans.insurance.export')
+    ->middleware('check_user_rights:rpt_loans_insurance');
+
 
 
     Route::get('/emails/bulk', [EmailController::class, 'index'])
