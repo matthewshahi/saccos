@@ -65,7 +65,7 @@
               <th>#</th>
               <th>Member Name</th>
               <th>Member ID</th>
-              <th>National ID</th>
+  
               <th>Gender</th>
               <th>Loan Type</th>
               <th class="text-end">Loan Amount (KES)</th>
@@ -90,12 +90,12 @@
                       <span class="mx-2">|</span><i class="bi bi-person-badge me-1"></i>{{ $rec['member_national_id'] }}
                     @endif
                     @if(!empty($rec['member_kra_pin']))
-                      <span class="mx-2">|</span><i class="bi bi-credit-card-2-front me-1"></i>{{ $rec['member_kra_pin'] }}
+                      <span class="mx-2">|</span><i class="bi bi-credit-card-2-front me-1"></i>KAR PIN:{{ $rec['member_kra_pin'] }}
                     @endif
                   </div>
                 </td>
                 <td>{{ $rec['member_sacco_id'] }}</td>
-                <td>{{ $rec['member_national_id'] }}</td>
+           
                 <td>{{ $rec['member_gender'] }}</td>
                 <td>{{ $rec['loan_type_name'] }}</td>
                 <td class="text-end text-success fw-semibold">{{ number_format($rec['loan_amount'], 2) }}</td>

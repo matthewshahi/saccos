@@ -20,7 +20,6 @@ class InsuranceLoanReportController extends Controller
 
     public function index(Request $request)
     {
-        // ✅ Default numeric current period (YYYYMM)
         $defaultPeriod = $this->currentPeriod ? $this->currentPeriod->period_name : date('Ym');
         $period        = $request->input('period', $defaultPeriod);
         $pms_srch      = '%' . ($request->input('pms_srch') ?? '') . '%';
@@ -44,7 +43,6 @@ class InsuranceLoanReportController extends Controller
             ->where('sacco_members.member_active', 'Y')
             ->where('sacco_loans.loan_taken_period', '<=', $period);
 
-        // ✅ Optional search filter
         if ($request->filled('pms_srch')) {
             $query->where(function ($q) use ($pms_srch) {
                 $q->where('sacco_members.member_name', 'like', $pms_srch)
@@ -55,31 +53,15 @@ class InsuranceLoanReportController extends Controller
 
         $loans = $query->orderBy('sacco_members.member_name', 'asc')->get();
 
-        // ✅ Compute balances
+        // ✅ Compute balances and remaining months
         $records = [];
         foreach ($loans as $loan) {
             $loanBalance = $this->getLoanBalance($loan->loan_id, $loan->loan_amount, $period);
             if ($loanBalance <= 1) continue;
 
-            // Compute remaining months using SACCO period rollover logic
-            $loanStart = (int)$loan->loan_taken_period;
-            $loanTerm  = (int)$loan->loan_payment_period;
-            $current   = (int)$period;
+            [$monthsRemaining, $loanEnd] = $this->calculateRemainingMonths($loan->loan_taken_period, $loan->loan_payment_period, $period);
 
-            // Calculate expected end period with rollover
-            $year  = floor($loanStart / 100);
-            $month = $loanStart % 100;
-            $month += $loanTerm;
-            while ($month > 12) {
-                $month -= 12;
-                $year++;
-            }
-
-            $loanEnd = (int)sprintf('%04d%02d', $year, $month);
-            $monthsRemaining = (($loanEnd / 100) * 12 + ($loanEnd % 100)) - (($current / 100) * 12 + ($current % 100));
-            $monthsRemaining = max(0, (int)$monthsRemaining);
-
-            if ($monthsRemaining == 0 && $loanEnd < $current) {
+            if ($monthsRemaining == 0 && $loanEnd < (int)$period) {
                 $monthsRemaining = "<span class='text-danger'>Overdue</span>";
             }
 
@@ -106,11 +88,9 @@ class InsuranceLoanReportController extends Controller
 
     /**
      * ✅ Compute loan balance as at the given accounting period
-     * Uses numeric period (YYYYMM) cutoff — not date.
      */
     private function getLoanBalance($loanId, $loanAmount, $period)
     {
-        // Sum all payments up to and including the selected period
         $payments = DB::table('sacco_loan_payments')
             ->where('loan_payments_loan_id', $loanId)
             ->where('loan_payments_period', '<=', $period)
@@ -121,7 +101,31 @@ class InsuranceLoanReportController extends Controller
     }
 
     /**
-     * 📤 Export report to CSV
+     * ✅ Shared helper: compute months remaining and end period
+     */
+    private function calculateRemainingMonths($loanStart, $loanTerm, $current)
+    {
+        $loanStart = (int)$loanStart;
+        $loanTerm  = (int)$loanTerm;
+        $current   = (int)$current;
+
+        $year  = floor($loanStart / 100);
+        $month = $loanStart % 100;
+        $month += $loanTerm;
+        while ($month > 12) {
+            $month -= 12;
+            $year++;
+        }
+
+        $loanEnd = (int)sprintf('%04d%02d', $year, $month);
+        $monthsRemaining = (($loanEnd / 100) * 12 + ($loanEnd % 100)) - (($current / 100) * 12 + ($current % 100));
+        $monthsRemaining = max(0, (int)$monthsRemaining);
+
+        return [$monthsRemaining, $loanEnd];
+    }
+
+    /**
+     * 📤 Export report to CSV (consistent with on-screen logic)
      */
     public function export(Request $request)
     {
@@ -129,7 +133,6 @@ class InsuranceLoanReportController extends Controller
         $period        = $request->input('period', $defaultPeriod);
         $pms_srch      = '%' . ($request->input('pms_srch') ?? '') . '%';
 
-        // Base query (same as index)
         $query = DB::table('sacco_loans')
             ->join('sacco_members', 'sacco_loans.loan_member', '=', 'sacco_members.member_id')
             ->join('sacco_loan_types', 'sacco_loans.loan_loan_type', '=', 'sacco_loan_types.loan_type_id')
@@ -159,16 +162,16 @@ class InsuranceLoanReportController extends Controller
 
         $loans = $query->orderBy('sacco_members.member_name', 'asc')->get();
 
-        // Build CSV headers
         $filename = "insurance_loans_report_{$period}.csv";
         $headers = [
             'Content-Type' => 'text/csv',
             'Content-Disposition' => "attachment; filename=\"$filename\"",
         ];
 
-        // Stream CSV output
         $callback = function () use ($loans, $period) {
             $handle = fopen('php://output', 'w');
+            // UTF-8 BOM for Excel
+            fwrite($handle, "\xEF\xBB\xBF");
 
             // Header row
             fputcsv($handle, [
@@ -179,21 +182,11 @@ class InsuranceLoanReportController extends Controller
 
             foreach ($loans as $loan) {
                 $balance = $this->getLoanBalance($loan->loan_id, $loan->loan_amount, $period);
+                [$monthsRemaining, $loanEnd] = $this->calculateRemainingMonths($loan->loan_taken_period, $loan->loan_payment_period, $period);
 
-                // Use same numeric rollover logic for remaining months
-                $loanStart = (int)$loan->loan_taken_period;
-                $loanTerm  = (int)$loan->loan_payment_period;
-                $current   = (int)$period;
-                $year  = floor($loanStart / 100);
-                $month = $loanStart % 100;
-                $month += $loanTerm;
-                while ($month > 12) {
-                    $month -= 12;
-                    $year++;
+                if ($monthsRemaining == 0 && $loanEnd < (int)$period) {
+                    $monthsRemaining = 'OVERDUE';
                 }
-                $loanEnd = (int)sprintf('%04d%02d', $year, $month);
-                $monthsRemaining = (($loanEnd / 100) * 12 + ($loanEnd % 100)) - (($current / 100) * 12 + ($current % 100));
-                $monthsRemaining = max(0, (int)$monthsRemaining);
 
                 fputcsv($handle, [
                     strtoupper($loan->member_name),

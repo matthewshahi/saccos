@@ -894,51 +894,50 @@ class LoanController extends Controller
 
         $commission = $data['batch_trans_commission_amount'] ?? 0;
 
-// ✅ Reuse your central calculator (same as ADD)
-$calc = $this->calculateLoanFinancials(
-    $data['batch_trans_loan_amount'],
-    $data['batch_trans_loan_duration'],
-    $loanType,
-    $member,
-    $commission
-);
+        // ✅ Reuse your central calculator (same as ADD)
+        $calc = $this->calculateLoanFinancials(
+            $data['batch_trans_loan_amount'],
+            $data['batch_trans_loan_duration'],
+            $loanType,
+            $member,
+            $commission
+        );
 
-// ✅ Merge calculations into data
-$data['batch_trans_monthly_payment']            = $calc['monthly_payment'];
-$data['batch_trans_monthly_payment_principal']  = $calc['monthly_payment_principal'];
-$data['batch_trans_expected_interest']          = $calc['expected_interest'];
-$data['batch_trans_insurance']                  = $calc['insurance'];
-$data['batch_trans_commission']                 = $commission;
-$data['batch_trans_by']                         = auth()->id();
-$data['batch_trans_ip']                         = $request->ip();
-$data['batch_trans_member_id']                  = $member->member_id;
+        // ✅ Merge calculations into data
+        $data['batch_trans_monthly_payment']            = $calc['monthly_payment'];
+        $data['batch_trans_monthly_payment_principal']  = $calc['monthly_payment_principal'];
+        $data['batch_trans_expected_interest']          = $calc['expected_interest'];
+        $data['batch_trans_insurance']                  = $calc['insurance'];
+        $data['batch_trans_commission']                 = $commission;
+        $data['batch_trans_by']                         = auth()->id();
+        $data['batch_trans_ip']                         = $request->ip();
+        $data['batch_trans_member_id']                  = $member->member_id;
 
-// ❌ Remove the form-only field before updating
-unset($data['batch_trans_commission_amount']);
+        // ❌ Remove the form-only field before updating
+        unset($data['batch_trans_commission_amount']);
 
-// ✅ Update transaction
-DB::table('sacco_loan_batch_trans')
-    ->where('batch_trans_id', $transaction_id)
-    ->update($data);
+        // ✅ Update transaction
+        DB::table('sacco_loan_batch_trans')
+            ->where('batch_trans_id', $transaction_id)
+            ->update($data);
 
-// 🔁 Delete old guarantors
-DB::table('sacco_loan_batch_guarantors')
-    ->where('guarantors_loan_batch_trans_id', $transaction_id)
-    ->delete();
+        // 🔁 Delete old guarantors
+        DB::table('sacco_loan_batch_guarantors')
+            ->where('guarantors_loan_batch_trans_id', $transaction_id)
+            ->delete();
 
-// 💾 Save new guarantors
-$this->saveGuarantors(
-    $request->input('guarantors', []),
-    $transaction_id,
-    $data['batch_trans_loan_amount'],
-    $loanType
-);
+        // 💾 Save new guarantors
+        $this->saveGuarantors(
+            $request->input('guarantors', []),
+            $transaction_id,
+            $data['batch_trans_loan_amount'],
+            $loanType
+        );
 
-return redirect()
-    ->route('loans.batch.transactions', $batch_id)
-    ->with('success', 'Transaction updated successfully.');
-
-     }
+        return redirect()
+            ->route('loans.batch.transactions', $batch_id)
+            ->with('success', 'Transaction updated successfully.');
+    }
 
     // private function validateLoanToTopUp($memberId, $loanToTopUpId, $newLoanAmount)
     // {
@@ -1051,14 +1050,14 @@ return redirect()
             $default_insurance_account = $this->getDefaultAccount('default_insurance_account');
             $default_commission_account = $this->getDefaultAccount('default_loan_commission_account');
             $default_loan_account = $this->getDefaultAccount('default_loan_account');
-            
- 
 
-if (!$default_bank_account || !$default_insurance_account || !$default_commission_account || !$default_loan_account) {
-    return back()->withErrors([
-        'defaults' => 'One or more required default accounts are missing. Please configure all default accounts before proceeding.',
-    ]);
-}
+
+
+            if (!$default_bank_account || !$default_insurance_account || !$default_commission_account || !$default_loan_account) {
+                return back()->withErrors([
+                    'defaults' => 'One or more required default accounts are missing. Please configure all default accounts before proceeding.',
+                ]);
+            }
 
 
             foreach ($transactions as $transaction) {
@@ -1101,8 +1100,8 @@ if (!$default_bank_account || !$default_insurance_account || !$default_commissio
                         'loan_loan_paid' => 0,
                         'loan_start_deduction_period' => $this->currentPeriod->period_name,
                         'loan_taken_start_period' => $this->currentPeriod->period_name,
-    
-                      
+
+
                         'loan_monthly_repayment_principal' => $transaction->batch_trans_monthly_payment_principal,
                         'loan_monthly_repayment_amount'    => $transaction->batch_trans_monthly_payment,
                         'loan_interest_payable'            => $transaction->batch_trans_expected_interest,
@@ -1163,55 +1162,64 @@ if (!$default_bank_account || !$default_insurance_account || !$default_commissio
                 // Ledger updates based on accounts retrieved
 
                 // Credit the loan account
+                // ----------------- LEDGER UPDATES -----------------
+
+                // ----------------- LEDGER UPDATES -----------------
+                $principal  = round((float) $transaction->batch_trans_loan_amount, 2);
+                $commission = round((float) ($transaction->batch_trans_commission ?? 0), 2);
+                $insurance  = round((float) ($transaction->batch_trans_insurance ?? 0), 2);
+                $total_loan = $principal + $insurance;
+
+                // --- 1️⃣ LOAN ACCOUNT (DR: Member owes full loan + insurance)
                 $this->updateSaccoAccountsTrans(
                     $loan_account,
-                    0,
-                    $transaction->batch_trans_loan_amount,
+                    $total_loan, // DR
+                    0,           // CR
                     $transaction->batch_trans_doc_no,
-                    'Loan Disbursement for ' . $transaction->batch_trans_member_id,
+                    'Loan Principal (+Insurance) for Member ' . $transaction->batch_trans_member_id,
                     now(),
                     $this->currentPeriod->period_name,
                     'Loan Disbursement'
                 );
 
-                // Debit the bank account, excluding commission and insurance
-                $bank_credit = $transaction->batch_trans_loan_amount - $transaction->batch_trans_commission - $transaction->batch_trans_insurance;
+                // --- 2️⃣ BANK ACCOUNT (CR: Cash out, less commission)
+                $bank_credit = $principal - $commission;
                 $this->updateSaccoAccountsTrans(
                     $bank_account,
-                    $bank_credit,
-                    0,
+                    0,              // DR
+                    $bank_credit,   // CR
                     $transaction->batch_trans_doc_no,
-                    'Loan Payout for ' . $transaction->batch_trans_member_id,
+                    'Loan Disbursement (Net of Commission) for Member ' . $transaction->batch_trans_member_id,
                     now(),
                     $this->currentPeriod->period_name,
                     'Loan Disbursement'
                 );
 
-                // Insurance account entry
-                if ($transaction->batch_trans_insurance > 0) {
-                    $this->updateSaccoAccountsTrans(
-                        $insurance_account,
-                        0,
-                        $transaction->batch_trans_insurance,
-                        $transaction->batch_trans_doc_no,
-                        'Insurance Fee for ' . $transaction->batch_trans_member_id,
-                        now(),
-                        $this->currentPeriod->period_name,
-                        'Loan Insurance Fee'
-                    );
-                }
-
-                // Commission account entry
-                if ($transaction->batch_trans_commission > 0) {
+                // --- 3️⃣ COMMISSION ACCOUNT (CR: SACCO Income)
+                if ($commission > 0) {
                     $this->updateSaccoAccountsTrans(
                         $commission_account,
-                        0,
-                        $transaction->batch_trans_commission,
+                        0,              // DR
+                        $commission,    // CR
                         $transaction->batch_trans_doc_no,
-                        'Commission Fee for ' . $transaction->batch_trans_member_id,
+                        'Loan Commission Income for Member ' . $transaction->batch_trans_member_id,
                         now(),
                         $this->currentPeriod->period_name,
                         'Loan Commission Fee'
+                    );
+                }
+
+                // --- 4️⃣ INSURANCE ACCOUNT (CR: Financed portion added to loan)
+                if ($insurance > 0) {
+                    $this->updateSaccoAccountsTrans(
+                        $insurance_account,
+                        0,              // DR
+                        $insurance,     // CR
+                        $transaction->batch_trans_doc_no,
+                        'Loan Insurance Financed for Member ' . $transaction->batch_trans_member_id,
+                        now(),
+                        $this->currentPeriod->period_name,
+                        'Loan Insurance Financing'
                     );
                 }
             }
@@ -2122,49 +2130,49 @@ if (!$default_bank_account || !$default_insurance_account || !$default_commissio
         return (float) $value;
     }
 
-   private function calc_loan_interest_insurance_dhl($loanAmount, $durationMonths, $loanType, $member = null, $commission = 0)
-{
-    $interestType = strtoupper(trim($loanType->loan_type_interest_type ?? 'FIXED INTEREST'));
-    $annualRate   = (float) ($loanType->loan_type_interest ?? 0);
-    $monthlyRate  = $annualRate / 12 / 100;
+    private function calc_loan_interest_insurance_dhl($loanAmount, $durationMonths, $loanType, $member = null, $commission = 0)
+    {
+        $interestType = strtoupper(trim($loanType->loan_type_interest_type ?? 'FIXED INTEREST'));
+        $annualRate   = (float) ($loanType->loan_type_interest ?? 0);
+        $monthlyRate  = $annualRate / 12 / 100;
 
-    // ✅ Insurance — only if insurable, 1% of loan amount
-    $insurance = ($loanType->loan_type_insurable == 'Y')
-        ? round($loanAmount * 0.01, 2)
-        : 0.0;
+        // ✅ Insurance — only if insurable, 1% of loan amount
+        $insurance = ($loanType->loan_type_insurable == 'Y')
+            ? round($loanAmount * 0.01, 2)
+            : 0.0;
 
-    // ✅ Include insurance and commission in total loan cost base
-    $loanAmountWithInsu = $loanAmount + $commission + $insurance;
+        // ✅ Include insurance and commission in total loan cost base
+        $loanAmountWithInsu = $loanAmount + $commission + $insurance;
 
-    $emi = 0;
-    $expectedInterest = 0;
-    $monthlyPrincipal = 0;
+        $emi = 0;
+        $expectedInterest = 0;
+        $monthlyPrincipal = 0;
 
-    if ($interestType === 'FIXED INTEREST') {
-        // ✅ Fixed interest calculation
-        $expectedInterest = round(($loanAmountWithInsu) * $annualRate / 100, 2);
-        $emi = ceil(($loanAmountWithInsu + $expectedInterest) / $durationMonths);
-        $monthlyPrincipal = ceil(($loanAmountWithInsu) / $durationMonths);
-    } else {
-        // ✅ Flat interest monthly (legacy SACCO method)
-        $interestPercent = $annualRate / 12 / 100;
+        if ($interestType === 'FIXED INTEREST') {
+            // ✅ Fixed interest calculation
+            $expectedInterest = round(($loanAmountWithInsu) * $annualRate / 100, 2);
+            $emi = ceil(($loanAmountWithInsu + $expectedInterest) / $durationMonths);
+            $monthlyPrincipal = ceil(($loanAmountWithInsu) / $durationMonths);
+        } else {
+            // ✅ Flat interest monthly (legacy SACCO method)
+            $interestPercent = $annualRate / 12 / 100;
 
-        $emi = ($loanAmountWithInsu / $durationMonths) + ($loanAmountWithInsu * $interestPercent);
-        $EMI = ceil($emi);
+            $emi = ($loanAmountWithInsu / $durationMonths) + ($loanAmountWithInsu * $interestPercent);
+            $EMI = ceil($emi);
 
-        $expectedInterest = $loanAmountWithInsu * $interestPercent;
-        $monthlyPrincipal = $EMI - ($loanAmountWithInsu * $interestPercent);
+            $expectedInterest = $loanAmountWithInsu * $interestPercent;
+            $monthlyPrincipal = $EMI - ($loanAmountWithInsu * $interestPercent);
 
-        // enforce consistent rounding
-        $emi = $EMI;
-        $monthlyPrincipal = ceil($monthlyPrincipal);
+            // enforce consistent rounding
+            $emi = $EMI;
+            $monthlyPrincipal = ceil($monthlyPrincipal);
+        }
+
+        return [
+            'monthly_payment'            => round($emi, 2),
+            'monthly_payment_principal'  => round($monthlyPrincipal, 2),
+            'expected_interest'          => round($expectedInterest, 2),
+            'insurance'                  => round($insurance, 2),
+        ];
     }
-
-    return [
-        'monthly_payment'            => round($emi, 2),
-        'monthly_payment_principal'  => round($monthlyPrincipal, 2),
-        'expected_interest'          => round($expectedInterest, 2),
-        'insurance'                  => round($insurance, 2),
-    ];
-}
 }
