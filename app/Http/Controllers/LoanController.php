@@ -1372,109 +1372,123 @@ class LoanController extends Controller
             ->where('default_name', $account_name)
             ->value('default_value');
     }
-    private function processLoanTopUp($transaction)
-    {
-        // Fetch the full remaining balance on the existing loan
-        $existingLoan = DB::table('sacco_loans')
-            ->where('loan_id', $transaction->batch_trans_loan_to_top_up)
-            ->value('loan_amount');
+   private function processLoanTopUp($transaction)
+{
+    // Fetch the existing loan record
+    $old = DB::table('sacco_loans')
+        ->select('loan_id','loan_amount','loan_loan_paid','loan_loan_type','loan_member')
+        ->where('loan_id', $transaction->batch_trans_loan_to_top_up)
+        ->first();
 
-        // Reduce the outstanding loan balance by the entire existing loan amount
-        DB::table('sacco_loans')
-            ->where('loan_id', $transaction->batch_trans_loan_to_top_up)
-            ->decrement('loan_loan_paid', $existingLoan);
+    if (!$old) {
+        // No old loan found
+        return;
+    }
 
-        // Prepare top-up payment details
-        $paidBy = "LOAN CLEARANCE - LNo." . $transaction->batch_trans_loan_to_top_up;
+    // Normalize nulls
+    $loanAmount = (float) ($old->loan_amount ?? 0);
+    $loanPaid   = (float) ($old->loan_loan_paid ?? 0);
+    $balance    = max(0, $loanAmount - $loanPaid);
 
-        // Insert top-up payment record
-        DB::table('sacco_loan_payments')->insert([
-            'loan_payments_amount' => $existingLoan,
-            'loan_payments_description' => $transaction->batch_trans_description,
-            'loan_payments_docno' => $transaction->batch_trans_doc_no,
-            'loan_payments_paid_in_by' => $paidBy,
-            'loan_payments_period' => $this->currentPeriod->period_name,
-            'loan_payments_paid_on' => now(),
-            'loan_payments_loan_id' => $transaction->batch_trans_loan_to_top_up,
-            'loan_payments_interest' => 0,
-            'loan_payments_by' => auth()->id(),
-            'loan_payments_ip' => request()->ip()
+    if ($balance <= 0) {
+        // Already cleared or invalid
+        return;
+    }
+
+    // Mark the old loan as paid
+    DB::table('sacco_loans')
+        ->where('loan_id', $old->loan_id)
+        ->increment('loan_loan_paid', $balance);
+
+    // Optional: close the old loan
+    DB::table('sacco_loans')
+        ->where('loan_id', $old->loan_id)
+        ->update([
+            'loan_stoped'    => 'Y',
+            'loan_stoped_on' => now(),
         ]);
 
-        // Adjust member's total loan balance
-        DB::table('sacco_members')
-            ->where('member_id', $transaction->batch_trans_member_id)
-            ->decrement('member_total_loan', $existingLoan);
+    // Record the internal payment for audit
+    DB::table('sacco_loan_payments')->insert([
+        'loan_payments_amount'      => $balance,
+        'loan_payments_description' => 'Top-up clearance for Loan #' . $old->loan_id,
+        'loan_payments_docno'       => $transaction->batch_trans_doc_no,
+        'loan_payments_paid_in_by'  => 'TOP-UP ' . $transaction->batch_trans_doc_no,
+        'loan_payments_period'      => $this->currentPeriod->period_name,
+        'loan_payments_paid_on'     => now(),
+        'loan_payments_loan_id'     => $old->loan_id,
+        'loan_payments_interest'    => 0,
+        'loan_payments_by'          => auth()->id(),
+        'loan_payments_ip'          => request()->ip(),
+    ]);
 
-        // Adjust guarantor obligations if any
-        $guarantors = DB::table('sacco_loan_guarantors')
-            ->where('loan_guar_loan_id', $transaction->batch_trans_loan_to_top_up)
-            ->where('loan_guar_deleted', 'N')
-            ->get();
+    // Reduce member’s total loan balance
+    DB::table('sacco_members')
+        ->where('member_id', $transaction->batch_trans_member_id)
+        ->decrement('member_total_loan', $balance);
 
-        foreach ($guarantors as $guarantor) {
-            $guaranteedAmount = $guarantor->loan_guar_amount_guaranteed - $guarantor->loan_guar_amount_freed;
+    // Release guarantors’ tied shares
+    $guarantors = DB::table('sacco_loan_guarantors')
+        ->where('loan_guar_loan_id', $old->loan_id)
+        ->where('loan_guar_deleted', 'N')
+        ->get();
 
-            // Skip if there's nothing to free
-            if ($guaranteedAmount <= 0) {
-                continue;
-            }
+    foreach ($guarantors as $g) {
+        $toFree = max(0, $g->loan_guar_amount_guaranteed - $g->loan_guar_amount_freed);
 
-            if ($transaction->batch_trans_member_id == $guarantor->loan_guar_guarantor_id) {
-                DB::table('sacco_members')
-                    ->where('member_id', $guarantor->loan_guar_guarantor_id)
-                    ->decrement('member_tied_shares_self', $guaranteedAmount);
-            } else {
-                DB::table('sacco_members')
-                    ->where('member_id', $guarantor->loan_guar_guarantor_id)
-                    ->decrement('member_tied_shares', $guaranteedAmount);
-            }
+        if ($toFree > 0) {
+            DB::table('sacco_members')
+                ->where('member_id', $g->loan_guar_guarantor_id)
+                ->decrement(
+                    ($transaction->batch_trans_member_id == $g->loan_guar_guarantor_id)
+                        ? 'member_tied_shares_self'
+                        : 'member_tied_shares',
+                    $toFree
+                );
 
-            // Mark guarantor entry as deleted
             DB::table('sacco_loan_guarantors')
-                ->where('loan_guar_loan_id', $transaction->batch_trans_loan_to_top_up)
-                ->where('loan_guar_guarantor_id', $guarantor->loan_guar_guarantor_id)
-                ->update([
-                    'loan_guar_deleted' => 'Y'
-                ]);
+                ->where('loan_guar_loan_id', $old->loan_id)
+                ->where('loan_guar_guarantor_id', $g->loan_guar_guarantor_id)
+                ->update(['loan_guar_deleted' => 'Y']);
         }
-
-        // Mark all amounts as freed for audit
-        DB::table('sacco_loan_guarantors')
-            ->where('loan_guar_loan_id', $transaction->batch_trans_loan_to_top_up)
-            ->update([
-                'loan_guar_amount_freed' => DB::raw('loan_guar_amount_guaranteed')
-            ]);
-
-        // Optional: log for audit
-        // Log::info("Loan top-up processed for loan ID {$transaction->batch_trans_loan_to_top_up}, member ID {$transaction->batch_trans_member_id}, amount cleared: {$existingLoan}");
-
-        // Ledger entries
-
-        // Credit the loan account
-        $this->updateSaccoAccountsTrans(
-            $transaction->batch_trans_loan_type,
-            0,
-            $existingLoan,
-            $transaction->batch_trans_doc_no,
-            'Loan Clearance for Member ID: ' . $transaction->batch_trans_member_id,
-            now(),
-            $this->currentPeriod->period_name,
-            'Loan Clearance'
-        );
-
-        // Debit the bank account
-        $this->updateSaccoAccountsTrans(
-            $transaction->batch_credit_account ?? $this->getDefaultAccount('default_bank_account'),
-            $existingLoan,
-            0,
-            $transaction->batch_trans_doc_no,
-            'Loan Clearance for Member ID: ' . $transaction->batch_trans_member_id,
-            now(),
-            $this->currentPeriod->period_name,
-            'Loan Clearance'
-        );
     }
+
+    // Mark all amounts as freed for audit
+    DB::table('sacco_loan_guarantors')
+        ->where('loan_guar_loan_id', $old->loan_id)
+        ->update(['loan_guar_amount_freed' => DB::raw('loan_guar_amount_guaranteed')]);
+
+    // Ledger Entries (internal settlement: DR Bank, CR Loan)
+    $loan_account = DB::table('sacco_loan_types')
+        ->where('loan_type_id', $old->loan_loan_type)
+        ->value('loan_type_acount') ?? $this->getDefaultAccount('default_loan_account');
+
+    $bank_account = $transaction->batch_credit_account ?? $this->getDefaultAccount('default_bank_account');
+
+    // Debit Bank (clearing)
+    $this->updateSaccoAccountsTrans(
+        $bank_account,
+        $balance, // DR
+        0,
+        $transaction->batch_trans_doc_no,
+        'Top-up clearance (DR Bank) for Loan #'.$old->loan_id,
+        now(),
+        $this->currentPeriod->period_name,
+        'Loan Top-up Clearance'
+    );
+
+    // Credit Loan Receivable
+    $this->updateSaccoAccountsTrans(
+        $loan_account,
+        0,
+        $balance, // CR
+        $transaction->batch_trans_doc_no,
+        'Old Loan cleared by Top-up (CR Loan) #'.$old->loan_id,
+        now(),
+        $this->currentPeriod->period_name,
+        'Loan Top-up Clearance'
+    );
+}
     // private function processLoanTopUp($transaction)
     // {
     //     // Fetch the full remaining balance on the existing loan
