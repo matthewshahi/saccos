@@ -447,12 +447,21 @@ Route::get('/reports/loans/insurance/export', [InsuranceLoanReportController::cl
             Route::get('/transactions/{id}/receipt', [CapitalShareTransactionController::class, 'receipt'])
                 ->name('capitalshares.transactions.receipt');
         });
-    Route::get('/new_members/list', [PublicRegistrationActionsController::class, 'listMembers'])->name('members.list')->middleware('check_user_rights:new_member_applications_list');
-    Route::post('/new_members/update/{id}', [PublicRegistrationActionsController::class, 'updateField'])->middleware('check_user_rights:new_member_applications_update');
-    Route::get('/new_members/details/{id}', [PublicRegistrationActionsController::class, 'getMemberDetails'])->name('members.details')->middleware('check_user_rights:new_member_applications_update');
-    Route::post('/new_members/export/live', [PublicRegistrationActionsImportController::class, 'exportLiveData'])->name('members.exportLive')->middleware('check_user_rights:new_member_applications_update');
+   
+        Route::get('/new_members/list', [PublicRegistrationActionsController::class, 'listMembers'])
+    ->name('members.list')
+    ->middleware('check_user_rights:new_member_applications_list');
 
+Route::post('/new_members/update/{id}', [PublicRegistrationActionsController::class, 'updateField'])
+    ->middleware('check_user_rights:new_member_applications_update');
 
+Route::get('/new_members/details/{id}', [PublicRegistrationActionsController::class, 'getMemberDetails'])
+    ->name('members.details')
+    ->middleware('check_user_rights:new_member_applications_update');
+
+Route::post('/new_members/export/live', [PublicRegistrationActionsController::class, 'exportLive'])
+    ->name('members.exportLive')
+    ->middleware('check_user_rights:new_member_applications_update');
 
 
     Route::middleware(['check_user_rights:FosaTransactions'])
