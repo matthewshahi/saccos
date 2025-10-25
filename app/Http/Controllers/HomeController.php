@@ -1591,7 +1591,7 @@ $data = [
                 'member_password_last_changed' => now(),
             ]);
 
-        return redirect()->route('profile.password')->with('success', 'Password changed successfully.');
+        return redirect()->route('member_dashboard')->with('success', 'Password changed successfully.');
     }
 
     public function adminPeriods()

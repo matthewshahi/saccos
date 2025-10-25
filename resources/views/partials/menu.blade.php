@@ -561,6 +561,14 @@
                                     <span class="text-muted">Change Password</span>
                                 </a>
                             </li>
+
+                            <li class="item-name">
+                                <a href="{{ url('/dashboard/member_dashboard') }}">
+                                    <span class="text-muted">View as a Member</span>
+                                </a>
+                            </li>
+
+                            
                             <li class="item-name">
                                 <a href="{{ url('/logout') }}" onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
                                     <span class="text-muted">Logout</span>

@@ -48,6 +48,25 @@
 </div>
 
 {{-- ================= PRINTABLE SECTION ================= --}}
+
+<div id="printableArea" class="statement-sections">
+
+    <!-- ✅ Member Info for PDF -->
+    <div class="text-center mb-4">
+        <h3 class="fw-bold text-primary mb-1">Member Statement</h3>
+        <h5 class="fw-normal mb-0">{{ $data['member']->member_name }}</h5>
+        <p class="small text-muted mb-0">
+            Member Sacco ID: <strong>{{ $data['member']->member_sacco_id }}</strong> |
+            National ID: <strong>{{ $data['member']->member_national_id ?? 'N/A' }}</strong>
+        </p>
+        <p class="small text-muted">
+            Email: {{ $data['member']->member_email ?? 'N/A' }} |
+            Phone: {{ $data['member']->member_phone_no ?? 'N/A' }}
+        </p>
+        <hr>
+    </div>
+
+    
 <div id="printableArea" class="statement-sections">
 
     {{-- SHARE CAPITAL --}}
@@ -122,7 +141,7 @@
 
     {{-- FOSA --}}
     <div class="card mb-4">
-        <div class="card-header bg-warning fw-bold">FOSA (Other Savings) Statement</div>
+        <div class="card-header bg-warning fw-bold">FOSA Statement</div>
         <div class="card-body p-0">
             <table class="table table-striped table-sm mb-0">
                 <thead class="bg-light">
