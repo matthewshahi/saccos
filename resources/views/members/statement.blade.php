@@ -3,50 +3,54 @@
 @section('content')
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
 
-<div class="statement-header d-flex justify-content-between align-items-center mb-4">
-    <h2 class="fw-bold text-primary">
-        Member Statement — {{ $data['member']->member_name }}
-    </h2>
-    <button id="downloadPDF" class="btn btn-primary">
-        <i class="fas fa-file-pdf"></i> Download PDF
-    </button>
-    <span id="loadingIndicator" class="loading-indicator">
-        <i class="fas fa-spinner fa-spin"></i> Generating PDF...
-    </span>
+{{-- ================= NON-PRINTABLE SECTION ================= --}}
+<div id="nonPrintable">
+    <div class="statement-header d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold text-primary">
+            Member Statement — {{ $data['member']->member_name }}
+        </h2>
+        <button id="downloadPDF" class="btn btn-primary">
+            <i class="fas fa-file-pdf"></i> Download PDF
+        </button>
+        <span id="loadingIndicator" class="loading-indicator">
+            <i class="fas fa-spinner fa-spin"></i> Generating PDF...
+        </span>
+    </div>
+
+    <div class="card mb-4 p-3 bg-light">
+        <form method="get" action="{{ route('members.statement', ['id' => $data['member']->member_id]) }}">
+            <div class="row align-items-end">
+                <div class="col-md-3 mb-2">
+                    <label class="form-label fw-bold">Period From (YYYYMM)</label>
+                    <input type="text" name="period_from" class="form-control form-control-sm"
+                        value="{{ request('period_from', '000000') }}">
+                </div>
+                <div class="col-md-3 mb-2">
+                    <label class="form-label fw-bold">Period To (YYYYMM)</label>
+                    <input type="text" name="period_to" class="form-control form-control-sm" value="999999" readonly>
+                </div>
+                <div class="col-md-3 mb-2">
+                    <label class="form-label fw-bold">Loan Status</label>
+                    <select name="cleared_loans" class="form-control form-control-sm">
+                        <option value="all" {{ request('cleared_loans', 'all') == 'all' ? 'selected' : '' }}>All</option>
+                        <option value="cleared" {{ request('cleared_loans') == 'cleared' ? 'selected' : '' }}>Cleared</option>
+                        <option value="uncleared" {{ request('cleared_loans') == 'uncleared' ? 'selected' : '' }}>Uncleared</option>
+                    </select>
+                </div>
+                <div class="col-md-3 mb-2">
+                    <button type="submit" class="btn btn-success w-100">
+                        <i class="fas fa-filter"></i> Apply Filter
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
 </div>
 
-<div class="card mb-4 p-3 bg-light">
-    <form method="get" action="{{ route('members.statement', ['id' => $data['member']->member_id]) }}">
-        <div class="row align-items-end">
-            <div class="col-md-3 mb-2">
-                <label class="form-label fw-bold">Period From (YYYYMM)</label>
-                <input type="text" name="period_from" class="form-control form-control-sm"
-                       value="{{ request('period_from', '000000') }}">
-            </div>
-            <div class="col-md-3 mb-2">
-                <label class="form-label fw-bold">Period To (YYYYMM)</label>
-                <input type="text" name="period_to" class="form-control form-control-sm" value="999999" readonly>
-            </div>
-            <div class="col-md-3 mb-2">
-                <label class="form-label fw-bold">Loan Status</label>
-                <select name="cleared_loans" class="form-control form-control-sm">
-                    <option value="all" {{ request('cleared_loans', 'all') == 'all' ? 'selected' : '' }}>All</option>
-                    <option value="cleared" {{ request('cleared_loans') == 'cleared' ? 'selected' : '' }}>Cleared</option>
-                    <option value="uncleared" {{ request('cleared_loans') == 'uncleared' ? 'selected' : '' }}>Uncleared</option>
-                </select>
-            </div>
-            <div class="col-md-3 mb-2">
-                <button type="submit" class="btn btn-success w-100">
-                    <i class="fas fa-filter"></i> Apply Filter
-                </button>
-            </div>
-        </div>
-    </form>
-</div>
+{{-- ================= PRINTABLE SECTION ================= --}}
+<div id="printableArea" class="statement-sections">
 
-<div class="statement-sections">
-
-    {{-- ========== SHARE CAPITAL ========== --}}
+    {{-- SHARE CAPITAL --}}
     <div class="card mb-4">
         <div class="card-header bg-primary text-white fw-bold">Share Capital Statement</div>
         <div class="card-body p-0">
@@ -81,7 +85,7 @@
         </div>
     </div>
 
-    {{-- ========== MEMBER DEPOSITS ========== --}}
+    {{-- MEMBER DEPOSITS --}}
     <div class="card mb-4">
         <div class="card-header bg-success text-white fw-bold">Deposit (Shares) Statement</div>
         <div class="card-body p-0">
@@ -116,9 +120,9 @@
         </div>
     </div>
 
-    {{-- ========== FOSA ========== --}}
+    {{-- FOSA --}}
     <div class="card mb-4">
-        <div class="card-header bg-warning fw-bold">FOSA Statement</div>
+        <div class="card-header bg-warning fw-bold">FOSA (Other Savings) Statement</div>
         <div class="card-body p-0">
             <table class="table table-striped table-sm mb-0">
                 <thead class="bg-light">
@@ -147,7 +151,7 @@
         </div>
     </div>
 
-    {{-- ========== LOANS ========== --}}
+    {{-- LOANS --}}
     <div class="card mb-5">
         <div class="card-header bg-danger text-white fw-bold">Loan Statement</div>
         <div class="card-body">
@@ -203,7 +207,7 @@
     </div>
 </div>
 
-{{-- ===== Styles ===== --}}
+{{-- ================= STYLES ================= --}}
 <style>
     body { background: #f7f9fc; }
     .statement-header h2 { color: #2c3e50; }
@@ -213,21 +217,22 @@
     .table th { font-weight: 600; }
     .loan-box { background: #fffdfd; }
     .loading-indicator { display: none; color: #6c63ff; font-weight: bold; margin-left: 10px; }
+    @media print { #nonPrintable { display: none !important; } }
 </style>
 
-{{-- ===== JS for PDF Export ===== --}}
+{{-- ================= JS FOR PDF EXPORT ================= --}}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script>
 document.getElementById("downloadPDF").addEventListener("click", function() {
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF('l','mm','a4');
-    const container = document.querySelector(".statement-sections");
+    const container = document.getElementById("printableArea");
     const btn = this, loader = document.getElementById("loadingIndicator");
 
     btn.disabled = true; loader.style.display = "inline-block";
 
-    html2canvas(container,{scale:2,useCORS:true}).then(canvas=>{
+    html2canvas(container,{scale:2,useCORS:true,backgroundColor:'#fff'}).then(canvas=>{
         const imgData = canvas.toDataURL("image/jpeg",0.5);
         const imgWidth=297, pageHeight=210;
         const imgHeight=(canvas.height*imgWidth)/canvas.width;
