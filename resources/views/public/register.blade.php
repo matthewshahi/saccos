@@ -126,8 +126,18 @@
                 </div>
             </div>
 
-            <h5 class="text-primary border-bottom pb-2 mt-4 mb-3">4. Next of Kin Details</h5>
-<p class="text-muted">You may add up to 3 next of kin.</p>
+            <h5 class="text-primary border-bottom pb-2 mt-4 mb-3">4. Next of Kin / Nominees / Emergency Contacts</h5>
+<p class="text-muted">
+    <strong>Note:</strong> In this SACCO, the terms <em>Next of Kin</em>, <em>Nominee</em>, and <em>Emergency Contact</em> refer to the same person(s).  
+    These are the individuals you authorize and trust to be contacted or to receive your SACCO benefits, savings, or shares in the event of your death, illness, or incapacitation.
+</p>
+<p class="text-muted mb-3">
+    You may list up to three (3) people and indicate the percentage share each should receive (totaling 100%).  
+    Please provide accurate information and ensure that the individuals named are aware of their designation.
+</p>
+<p class="text-muted">You may add up to 3 next of kin below.</p>
+
+
 
 @for ($i = 0; $i < 3; $i++)
     <div class="row border rounded p-3 mb-3">
