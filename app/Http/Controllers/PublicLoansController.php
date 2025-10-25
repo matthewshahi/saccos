@@ -51,44 +51,58 @@ class PublicLoansController extends Controller
     }
 
     public function calculateLoan(Request $request, $id)
-    {
-        $loan = DB::table('sacco_loan_types')
-            ->where('loan_type_id', $id)
-            ->where('loan_type_deleted', 'N')
-            ->first();
+{
+    $loan = DB::table('sacco_loan_types')
+        ->where('loan_type_id', $id)
+        ->where('loan_type_deleted', 'N')
+        ->first();
 
-        if (!$loan) {
-            return redirect()->route('loans.types.list')->with('error', 'Loan type not found.');
-        }
+    if (!$loan) {
+        return redirect()->route('loans.types.list')->with('error', 'Loan type not found.');
+    }
 
-        // ✅ Validate user inputs
-        $validator = \Validator::make($request->all(), [
-            'amount' => 'required|numeric|min:1|max:' . $loan->loan_type_max_amount,
-            'duration' => 'required|integer|min:1|max:' . $loan->loan_type_duration,
-        ]);
+    // Validate inputs
+    $validator = \Validator::make($request->all(), [
+        'amount' => 'required|numeric|min:1|max:' . $loan->loan_type_max_amount,
+        'duration' => 'required|integer|min:1|max:' . $loan->loan_type_duration,
+    ]);
 
-        if ($validator->fails()) {
-            return redirect()->route('loan.calculator', ['id' => $id])
-                ->withErrors($validator)
-                ->withInput();
-        }
+    if ($validator->fails()) {
+        return redirect()->route('loan.calculator', ['id' => $id])
+            ->withErrors($validator)
+            ->withInput();
+    }
 
-        $loanAmount = $request->input('amount');
-        $duration = $request->input('duration');
-        $interestRate = (float) $loan->loan_type_interest;
-        $interestType = strtolower(trim($loan->loan_type_interest_type));
+    $loanAmount = $request->input('amount');
+    $duration = $request->input('duration');
+    $interestRate = (float) $loan->loan_type_interest;
+    $interestType = strtolower(trim($loan->loan_type_interest_type));
 
-        // ✅ Determine calculation method
-        if ($interestType === 'reducing balance') {
+    // 🔹 Fetch the loan_calc_method from sacco_defaults table
+    $calcMethod = DB::table('sacco_defaults')
+        ->where('default_name', 'loan_calc_method')
+        ->value('default_value');
+
+    // 🔹 Determine which method to use
+    if ($interestType === 'reducing balance') {
+        if ($calcMethod === 'principle') {
+            // NEW: Principle-based reducing method
+            $repaymentSchedule = $this->generatePrincipleReducingSchedule($loanAmount, $interestRate, $duration);
+            $emi = null; // no equal EMI here
+        } else {
+            // Old standard EMI reducing balance
             $emi = $this->calculateReducingBalanceEMI($loanAmount, $interestRate, $duration);
             $repaymentSchedule = $this->generateReducingBalanceSchedule($loanAmount, $interestRate, $duration, $emi);
-        } else {
-            $emi = $this->calculateFixedEMI($loanAmount, $interestRate, $duration);
-            $repaymentSchedule = $this->generateFixedSchedule($loanAmount, $interestRate, $duration, $emi);
         }
-
-        return view('public.loan_calculator', compact('loan', 'emi', 'repaymentSchedule'));
+    } else {
+        // Fixed (Flat) interest
+        $emi = $this->calculateFixedEMI($loanAmount, $interestRate, $duration);
+        $repaymentSchedule = $this->generateFixedSchedule($loanAmount, $interestRate, $duration, $emi);
     }
+
+    return view('public.loan_calculator', compact('loan', 'emi', 'repaymentSchedule'));
+}
+
 
     // 🔹 Reducing balance: annual rate ÷ 12
     private function calculateReducingBalanceEMI($principal, $rate, $months)
@@ -169,4 +183,29 @@ private function generateFixedSchedule($principal, $rate, $months, $emi)
 
     return $schedule;
 }
+
+private function generatePrincipleReducingSchedule($principal, $rate, $months)
+{
+    $schedule = [];
+    $monthlyPrincipal = $principal / $months; // equal principal portions
+    $balance = $principal;
+    $monthlyRate = $rate / 12 / 100;
+
+    for ($i = 1; $i <= $months; $i++) {
+        $interest = $balance * $monthlyRate;
+        $payment = $monthlyPrincipal + $interest;
+        $balance -= $monthlyPrincipal;
+
+        $schedule[] = [
+            'month' => $i,
+            'principal' => round($monthlyPrincipal, 2),
+            'interest' => round($interest, 2),
+            'payment' => round($payment, 2),
+            'balance' => max(round($balance, 2), 0),
+        ];
+    }
+
+    return $schedule;
+}
+
 }

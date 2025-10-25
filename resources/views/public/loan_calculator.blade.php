@@ -48,14 +48,24 @@
     <div class="card">
         <div class="card-body">
             <h4 class="card-title">Repayment Schedule</h4>
-            <p><strong>EMI:</strong> Ksh {{ number_format($emi, 2) }}</p>
+ 
+
+
+<p class="text-danger small mb-3">
+    *Note: Figures shown are indicative and exclude insurance, commissions, and processing charges. 
+    The final repayment schedule will be confirmed upon loan approval.
+</p>
+
+
+            
             <table class="table table-bordered">
                 <thead>
                     <tr>
                         <th>Month</th>
                         <th>Principal</th>
                         <th>Interest</th>
-                        <th>EMI</th>
+                        <th>{{ isset($emi) ? 'EMI' : 'Monthly Payment' }}</th>
+
                         <th>Balance</th>
                     </tr>
                 </thead>
@@ -65,7 +75,10 @@
                             <td>{{ $payment['month'] }}</td>
                             <td>{{ number_format($payment['principal'], 2) }}</td>
                             <td>{{ number_format($payment['interest'], 2) }}</td>
-                            <td>{{ number_format($payment['emi'], 2) }}</td>
+                           <td>
+    {{ number_format($payment['emi'] ?? ($payment['payment'] ?? 0), 2) }}
+</td>
+
                             <td>{{ number_format($payment['balance'], 2) }}</td>
                         </tr>
                     @endforeach
