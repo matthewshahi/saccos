@@ -517,12 +517,17 @@
                         <ul class="mm-collapse">
                             <li class="item-name has-arrow">
                                 <a href="#">
-                                    <span class="text-muted">Rights & Modules</span>
+                                    <span class="text-muted">Rights</span>
                                 </a>
                                 <ul class="mm-collapse">
                                     <li class="item-name">
                                         <a href="{{ url('/admin/access-rights') }}">
                                             <span class="text-muted">Modify access rights</span>
+                                        </a>
+                                    </li>
+                                    <li class="item-name">
+                                        <a href="{{ url('/members/mass-password-reset') }}">
+                                            <span class="text-muted">Mass Reset Passwords</span>
                                         </a>
                                     </li>
                                 </ul>
@@ -562,6 +567,7 @@
                                 </a>
                             </li>
 
+                            
                             <li class="item-name">
                                 <a href="{{ url('/dashboard/member_dashboard') }}">
                                     <span class="text-muted">View as a Member</span>

@@ -46,7 +46,7 @@ use App\Http\Controllers\LoansActiveReportController;
 use App\Http\Controllers\TempLoanCalController;
 use App\Http\Controllers\EmailController;
 use App\Http\Controllers\InsuranceLoanReportController;
-
+use App\Http\Controllers\PasswordResetController;
 // use App\Http\Controllers\LedgerRebuildController;
 
 // Route::get('/rebuild/ledgers', [LedgerRebuildController::class, 'rebuild'])
@@ -274,6 +274,14 @@ Route::get('/reports/loans/insurance', [InsuranceLoanReportController::class, 'i
 Route::get('/reports/loans/insurance/export', [InsuranceLoanReportController::class, 'export'])
     ->name('reports.loans.insurance.export')
     ->middleware('check_user_rights:rpt_loans_insurance');
+
+Route::get('/members/mass-password-reset', [PasswordResetController::class, 'confirm'])
+    ->name('members.mass_password_reset.confirm')
+    ->middleware('check_user_rights:mass_password_reset');
+
+Route::post('/members/mass-password-reset', [PasswordResetController::class, 'execute'])
+    ->name('members.mass_password_reset.execute')
+    ->middleware('check_user_rights:mass_password_reset');
 
 
 
