@@ -17,7 +17,7 @@ class SendPendingNotificationsJob implements ShouldQueue
 
     public function handle(): void
     {
-        $limit = (int) env('NOTIF_EMAILS_PER_MIN', 10);
+        $limit = (int) env('NOTIF_EMAILS_PER_MIN', 30);
 
         // 🔹 Only unread or failed (not queued/sent/read)
         $notifications = DB::table('sacco_system_notifications')
