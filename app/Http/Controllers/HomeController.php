@@ -776,7 +776,7 @@ $data = [
             ->get();
 
         $relationTypes = DB::table('sacco_kin_type')
-            ->where('kin_type_deleted', '<>', 'Y')
+           // ->where('kin_type_deleted', '<>', 'Y')
             ->orderBy('kin_type_name')
             ->get();
 
