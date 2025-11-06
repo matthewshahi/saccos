@@ -298,10 +298,14 @@ class PublicRegistrationController extends Controller
         // dd($data);
 
         // Save Data to Database
+
+        $birthDate = \Carbon\Carbon::parse($request->birth_date)->format('Y-m-d');
+
         DB::table('sacco_members_new_applications')->insert([
             'first_name' => strtoupper($request->first_name),
             'last_name' => strtoupper($request->last_name),
-            'birth_date' => $request->birth_date,
+            // 'birth_date' => $request->birth_date,
+            'birth_date' => $birthDate,
             'national_id' => strtoupper($request->national_id),
             'kra_pin_no' => strtoupper($request->kra_pin_no),
             'gender' => $request->gender,
