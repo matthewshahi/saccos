@@ -52,68 +52,152 @@ class PublicRegistrationActionsController extends Controller
     }
 
     public function exportLive(Request $request)
-    {
-        $id = $request->input('member_id');
+{
+    $id = $request->input('member_id');
+
+    if (!$id) {
+        return response()->json(['success' => false, 'message' => 'No member ID provided.']);
+    }
+
+    $member = DB::table('sacco_members_new_applications')->find($id);
+    if (!$member) {
+        return response()->json(['success' => false, 'message' => 'Member not found.']);
+    }
+
+    $nid = trim($member->national_id ?? '');
+    $phone = trim($member->phone ?? '');
+    $email = trim($member->email ?? '');
+
+    // Check for duplicates
+    $duplicate = DB::table('sacco_members')
+        ->where(function ($q) use ($nid, $phone, $email) {
+            $q->where('member_national_id', $nid)
+              ->orWhere('member_phone_no', $phone)
+              ->orWhere('member_email', $email);
+        })
+        ->first();
+
+    if ($duplicate) {
+        return response()->json([
+            'success' => false,
+            'message' => "Duplicate record found: National ID ($nid), Phone ($phone), Email ($email)"
+        ]);
+    }
+
+    try {
+        // Generate next member_sacco_id (SA0001, SA0002, etc.)
+        $latest = DB::table('sacco_members')
+            ->where('member_sacco_id', 'LIKE', 'SA%')
+            ->orderByDesc('member_id')
+            ->value('member_sacco_id');
+
+        if ($latest && preg_match('/^SA(\d+)$/', $latest, $matches)) {
+            $nextNumber = (int)$matches[1] + 1;
+        } else {
+            $nextNumber = 1;
+        }
+
+        $memberSaccoId = 'SA' . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+
+        // Insert into sacco_members
+        DB::table('sacco_members')->insert([
+            'member_sacco_id'       => $memberSaccoId,
+            'member_dept'           => 1, // hard-coded
+            'member_name'           => trim(($member->first_name ?? '') . ' ' . ($member->last_name ?? '')),
+            'member_email'          => $email,
+            'member_phone_no'       => $phone,
+            'member_national_id'    => $nid,
+            'member_postal_address' => $member->physical_location ?? '',
+            'member_kra_pin'        => $member->kra_pin_no ?? '',
+            'member_date_joined'    => now()->toDateString(),
+            'member_transdate'      => now(),
+            'member_ip'             => $request->ip(),
+            'member_user_id'        => auth()->id() ?? 0,
+            'member_active'         => 'Y',
+        ]);
+
+        // Mark the application as exported
+        DB::table('sacco_members_new_applications')
+            ->where('id', $id)
+            ->update(['exported' => 'Y', 'exported_on' => now()]);
+
+        return response()->json(['success' => true, 'message' => "Member exported successfully as {$memberSaccoId}"]);
+    } catch (\Throwable $e) {
+        Log::error('Export to live failed', [
+            'id' => $id,
+            'error' => $e->getMessage()
+        ]);
+        return response()->json([
+            'success' => false,
+            'message' => 'Database error: ' . $e->getMessage()
+        ]);
+    }
+}
+
+
+    // public function exportLive(Request $request)
+    // {
+    //     $id = $request->input('member_id');
 
          
 
-        if (!$id) {
-            return response()->json(['success' => false, 'message' => 'No member ID provided.']);
-        }
+    //     if (!$id) {
+    //         return response()->json(['success' => false, 'message' => 'No member ID provided.']);
+    //     }
 
-        $member = DB::table('sacco_members_new_applications')->find($id);
-        if (!$member) {
-            return response()->json(['success' => false, 'message' => 'Member not found.']);
-        }
+    //     $member = DB::table('sacco_members_new_applications')->find($id);
+    //     if (!$member) {
+    //         return response()->json(['success' => false, 'message' => 'Member not found.']);
+    //     }
 
-        $nid = trim($member->national_id ?? '');
-        $phone = trim($member->phone ?? '');
-        $email = trim($member->email ?? '');
+    //     $nid = trim($member->national_id ?? '');
+    //     $phone = trim($member->phone ?? '');
+    //     $email = trim($member->email ?? '');
 
-        $duplicate = DB::table('sacco_members')
-            ->where(function ($q) use ($nid, $phone, $email) {
-                $q->where('member_national_id', $nid)
-                  ->orWhere('member_phone_no', $phone)
-                  ->orWhere('member_email', $email);
-            })
-            ->first();
+    //     $duplicate = DB::table('sacco_members')
+    //         ->where(function ($q) use ($nid, $phone, $email) {
+    //             $q->where('member_national_id', $nid)
+    //               ->orWhere('member_phone_no', $phone)
+    //               ->orWhere('member_email', $email);
+    //         })
+    //         ->first();
 
-        if ($duplicate) {
-            return response()->json([
-                'success' => false,
-                'message' => "Duplicate record found: National ID ($nid), Phone ($phone), Email ($email)"
-            ]);
-        }
+    //     if ($duplicate) {
+    //         return response()->json([
+    //             'success' => false,
+    //             'message' => "Duplicate record found: National ID ($nid), Phone ($phone), Email ($email)"
+    //         ]);
+    //     }
 
-        try {
-            DB::table('sacco_members')->insert([
-                'member_name'           => trim(($member->first_name ?? '') . ' ' . ($member->last_name ?? '')),
-                'member_email'          => $email,
-                'member_phone_no'       => $phone,
-                'member_national_id'    => $nid,
-                'member_postal_address' => $member->physical_location ?? '',
-                'member_kra_pin'        => $member->kra_pin_no ?? '',
-                'member_date_joined'    => now()->toDateString(),
-                'member_transdate'      => now(),
-                'member_ip'             => $request->ip(),
-                'member_user_id'        => auth()->id() ?? 0,
-                'member_active'         => 'Y',
-            ]);
+    //     try {
+    //         DB::table('sacco_members')->insert([
+    //             'member_name'           => trim(($member->first_name ?? '') . ' ' . ($member->last_name ?? '')),
+    //             'member_email'          => $email,
+    //             'member_phone_no'       => $phone,
+    //             'member_national_id'    => $nid,
+    //             'member_postal_address' => $member->physical_location ?? '',
+    //             'member_kra_pin'        => $member->kra_pin_no ?? '',
+    //             'member_date_joined'    => now()->toDateString(),
+    //             'member_transdate'      => now(),
+    //             'member_ip'             => $request->ip(),
+    //             'member_user_id'        => auth()->id() ?? 0,
+    //             'member_active'         => 'Y',
+    //         ]);
 
-            DB::table('sacco_members_new_applications')
-                ->where('id', $id)
-                ->update(['exported' => 'Y', 'exported_on' => now()]);
+    //         DB::table('sacco_members_new_applications')
+    //             ->where('id', $id)
+    //             ->update(['exported' => 'Y', 'exported_on' => now()]);
 
-            return response()->json(['success' => true]);
-        } catch (\Throwable $e) {
-            Log::error('Export to live failed', [
-                'id' => $id,
-                'error' => $e->getMessage()
-            ]);
-            return response()->json([
-                'success' => false,
-                'message' => 'Database error: ' . $e->getMessage()
-            ]);
-        }
-    }
+    //         return response()->json(['success' => true]);
+    //     } catch (\Throwable $e) {
+    //         Log::error('Export to live failed', [
+    //             'id' => $id,
+    //             'error' => $e->getMessage()
+    //         ]);
+    //         return response()->json([
+    //             'success' => false,
+    //             'message' => 'Database error: ' . $e->getMessage()
+    //         ]);
+    //     }
+    // }
 }
