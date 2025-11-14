@@ -6670,9 +6670,9 @@ public function membersListCsv(Request $request)
     $sort_order = 'asc';
     $search = $request->input('pms_srch', '');
 
-    $members = $this->getMembers($orderby, $sort_order, $search, 50000); // big limit
+    $members = $this->getMembers($orderby, $sort_order, $search, 50000); // large export
 
-    $filename = "members_export_" . date('Y-m-d_H-i-s') . ".csv";
+    $filename = "members_" . date('Ymd_His') . ".csv";
 
     $headers = [
         "Content-Type"        => "text/csv",
@@ -6683,15 +6683,16 @@ public function membersListCsv(Request $request)
     ];
 
     $columns = [
-        'Member Name',
+        'Name',
         'Sacco ID',
         'National ID',
-        'Phone No',
+        'Phone',
         'Email',
         'Company',
         'Department',
         'Position',
-        'Active'
+        'Status',
+        'Account Type',
     ];
 
     $callback = function() use ($members, $columns) {
@@ -6701,16 +6702,23 @@ public function membersListCsv(Request $request)
         fputcsv($file, $columns);
 
         foreach ($members as $m) {
+
+            // Ensure Excel treats these values as TEXT
+            $saccoId     = '="' . $m->member_sacco_id . '"';
+            $nationalId  = '="' . $m->member_national_id . '"';
+            $phone       = '="' . $m->member_phone_no . '"';
+
             fputcsv($file, [
                 $m->member_name,
-                $m->member_sacco_id,
-                $m->member_national_id,
-                $m->member_phone_no,
+                $saccoId,
+                $nationalId,
+                $phone,
                 $m->member_email,
                 $m->company_name,
                 $m->department_name,
                 $m->position_name,
-                $m->member_active,
+                $m->member_active == 'Y' ? 'Active' : 'Inactive',
+                $m->member_is_junior ? 'Junior' : 'Standard',
             ]);
         }
 
