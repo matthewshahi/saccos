@@ -37,20 +37,24 @@
   <div class="col-md-12 mb-4">
     <div class="card text-start">
       <div class="card-body">
-        {{-- Search --}}
-        <form action="{{ url()->current() }}" method="get" class="custom-search-form mb-3">
-          <div class="input-group">
-            <input name="pms_srch" type="text" id="pms_srch" 
-                   value="{{ str_replace('%', '', $pms_srch) }}" 
-                   class="form-control" 
-                   placeholder="Search by name, ID, phone, email, etc.">
-            <button class="btn btn-primary" type="submit">Search</button>
-          </div>
-          <a href="{{ route('members.list.csv', request()->query()) }}" class="btn btn-outline-success mb-3">
-    <i class="fa fa-file-csv"></i> Export CSV
-</a>
+       <form action="{{ url()->current() }}" method="get" class="custom-search-form mb-3">
+    <div class="input-group">
 
-        </form>
+        <input name="pms_srch" type="text" id="pms_srch"
+               value="{{ str_replace('%', '', $pms_srch) }}"
+               class="form-control"
+               placeholder="Search by name, ID, phone, email, etc.">
+
+        <button class="btn btn-primary" type="submit">Search</button>
+
+        <a href="{{ route('members.list.csv', request()->query()) }}"
+           class="btn btn-outline-success">
+            <i class="fa fa-file-csv"></i> CSV
+        </a>
+
+    </div>
+</form>
+
 
         <div class="table-responsive" style="
     min-height: 500px;
