@@ -49,7 +49,7 @@
 
         <a href="{{ route('members.list.csv', request()->query()) }}"
            class="btn btn-outline-success">
-            <i class="fa fa-file-csv"></i> CSV
+          <i class="fa fa-download"></i> CSV
         </a>
 
     </div>
