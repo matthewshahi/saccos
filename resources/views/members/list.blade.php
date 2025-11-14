@@ -47,10 +47,10 @@
 
         <button class="btn btn-primary" type="submit">Search</button>
 
-        <a href="{{ route('members.list.csv', request()->query()) }}"
-           class="btn btn-outline-success">
-          <i class="fa fa-download"></i> CSV
-        </a>
+       <a href="{{ route('members.list.csv', request()->query()) }}" class="btn btn-outline-success">
+    <i class="i-Download me-1"></i> CSV
+</a>
+
 
     </div>
 </form>
