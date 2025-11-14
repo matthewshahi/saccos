@@ -15,6 +15,35 @@
     </ul>
   </div>
 </div>
+<div class="export-buttons mb-3">
+    <div class="btn-group">
+        <a href="{{ route('members.export.excel', request()->all()) }}" class="btn btn-success">
+            <i class="fas fa-file-excel"></i> Export Excel
+        </a>
+        <a href="{{ route('members.export.csv', request()->all()) }}" class="btn btn-info">
+            <i class="fas fa-file-csv"></i> Export CSV
+        </a>
+    </div>
+</div>
+
+<!-- Or if you want a dropdown -->
+<div class="dropdown mb-3">
+    <button class="btn btn-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+        <i class="fas fa-download"></i> Export Data
+    </button>
+    <ul class="dropdown-menu">
+        <li>
+            <a class="dropdown-item" href="{{ route('members.export.excel', request()->all()) }}">
+                <i class="fas fa-file-excel text-success"></i> Export as Excel
+            </a>
+        </li>
+        <li>
+            <a class="dropdown-item" href="{{ route('members.export.csv', request()->all()) }}">
+                <i class="fas fa-file-csv text-info"></i> Export as CSV
+            </a>
+        </li>
+    </ul>
+</div>
 <div class="separator-breadcrumb border-top"></div>
 
 <div class="row mb-4">

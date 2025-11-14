@@ -15,6 +15,11 @@ use DateTime;
 use Illuminate\Support\Facades\Route;
 
 
+    use App\Exports\MembersExport;
+use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
+
+
 class HomeController extends Controller
 {
     protected $recordLimit;
@@ -6664,4 +6669,90 @@ $data = [
 
         return response()->json(['data' => $loanRepayments]);
     }
+
+
+// Add these methods to your controller
+
+public function exportExcel(Request $request)
+{
+    $orderby = $request->input('orderby', 'member_name');
+    $sort_order = $request->input('sort_order', 'asc');
+    $search = $request->input('pms_srch', '');
+    $status = $request->input('status');
+
+    $members = $this->getMembers($orderby, $sort_order, $search, null, $status);
+
+    return Excel::download(new MembersExport($members), 'members-' . date('Y-m-d') . '.xlsx');
+}
+
+public function exportCsv(Request $request)
+{
+    $orderby = $request->input('orderby', 'member_name');
+    $sort_order = $request->input('sort_order', 'asc');
+    $search = $request->input('pms_srch', '');
+    $status = $request->input('status');
+
+    $members = $this->getMembers($orderby, $sort_order, $search, null, $status);
+
+    return Excel::download(new MembersExport($members), 'members-' . date('Y-m-d') . '.csv', \Maatwebsite\Excel\Excel::CSV, [
+        'Content-Type' => 'text/csv',
+    ]);
+}
+
+// Simple CSV export without package (alternative)
+public function exportCsvSimple(Request $request)
+{
+    $orderby = $request->input('orderby', 'member_name');
+    $sort_order = $request->input('sort_order', 'asc');
+    $search = $request->input('pms_srch', '');
+    $status = $request->input('status');
+
+    $members = $this->getMembers($orderby, $sort_order, $search, null, $status);
+
+    $fileName = 'members-' . date('Y-m-d') . '.csv';
+    
+    $headers = [
+        'Content-Type' => 'text/csv',
+        'Content-Disposition' => "attachment; filename=\"$fileName\"",
+        'Pragma' => 'no-cache',
+        'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
+        'Expires' => '0'
+    ];
+
+    $callback = function() use ($members) {
+        $file = fopen('php://output', 'w');
+        
+        // Add headers
+        fputcsv($file, [
+            'SACCO ID',
+            'Member Name',
+            'National ID',
+            'Email',
+            'Phone Number',
+            'Department',
+            'Position',
+            'Company',
+            'Status'
+        ]);
+        
+        // Add data
+        foreach ($members as $member) {
+            fputcsv($file, [
+                $member->member_sacco_id,
+                $member->member_name,
+                $member->member_national_id,
+                $member->member_email,
+                $member->member_phone_no,
+                $member->department_name,
+                $member->position_name,
+                $member->company_name,
+                $member->member_active ? 'Active' : 'Inactive'
+            ]);
+        }
+        
+        fclose($file);
+    };
+
+    return response()->stream($callback, 200, $headers);
+}
 }
