@@ -75,6 +75,10 @@
                    placeholder="Search by name, ID, phone, email, etc.">
             <button class="btn btn-primary" type="submit">Search</button>
           </div>
+          <a href="{{ route('members.list.csv', request()->query()) }}" class="btn btn-outline-success mb-3">
+    <i class="fa fa-file-csv"></i> Export CSV
+</a>
+
         </form>
 
         <div class="table-responsive" style="

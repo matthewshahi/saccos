@@ -490,13 +490,10 @@ Route::post('/new_members/export/live', [PublicRegistrationActionsController::cl
 
     //Route::get('/members/list', [HomeController::class, 'membersList'])->name('members.list')->middleware('check_user_rights:list_sacco_member');
     Route::get('/members/list', [HomeController::class, 'membersList'])->name('members.listing')->middleware('check_user_rights:list_sacco_member');
+Route::get('/members/list/csv', [HomeController::class, 'membersListCsv'])
+    ->name('members.list.csv')
+    ->middleware('check_user_rights:list_sacco_member');
 
-
-    
-    Route::get('/members/export/excel', [MemberController::class, 'exportExcel'])->middleware('check_user_rights:list_sacco_member')->name('members.export.excel');
-Route::get('/members/export/csv', [MemberController::class, 'exportCsv'])->middleware('check_user_rights:list_sacco_member')->name('members.export.csv');
-// Or use the simple version:
-Route::get('/members/export/csv-simple', [MemberController::class, 'exportCsvSimple'])->middleware('check_user_rights:list_sacco_member')->name('members.export.csv-simple');
 
     Route::get('/members/add', [HomeController::class, 'addNewMember'])->name('members.add')->middleware('check_user_rights:add_new_sacco_member');
     Route::post('/members/store', [HomeController::class, 'storeNewMember'])->name('members.store')->middleware('check_user_rights:add_new_sacco_member');
