@@ -5151,6 +5151,7 @@ $data = [
             'loan_type_int_account' => 'required|integer',
             'loan_type_comm_account' => 'required|integer',
             'loan_type_insurable' => 'required|string|max:1',
+             'loan_type_instant_qualification' => 'nullable|in:1',
         ]);
 
         DB::table('sacco_loan_types')->insert([
@@ -5166,6 +5167,9 @@ $data = [
             'loan_type_int_account' => $request->loan_type_int_account,
             'loan_type_comm_account' => $request->loan_type_comm_account,
             'loan_type_insurable' => $request->loan_type_insurable,
+
+            'loan_type_instant_qualification' => $request->has('loan_type_instant_qualification') ? 1 : 0,
+            
             'loan_type_by' => auth()->id(),
             'loan_type_ip' => $request->ip(),
         ]);
