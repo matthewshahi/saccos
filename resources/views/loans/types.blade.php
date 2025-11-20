@@ -39,109 +39,121 @@
 
             <div>
                 <div class="table-responsive">
-                    <table class="table text-center table-striped">
-                        <thead>
-                            <tr>
-                                <th>Name</th>
-                                <th>Interest</th>
-                                <th>Type</th>
-                                <th>Duration</th>
-                                <th>Guarantee</th>
-                                <th>Code</th>
-                                <th>Max Amount</th>
-                                <th>Qualification</th>
-                                <th>Loan Account</th>
-                                <th>Interest Account</th>
-                                <th>Commission Account</th>
-                                <th>Insurable</th>
+                   <table class="table table-striped text-center">
+    <thead>
+        <tr>
+            <th class="text-left">Name</th>
+            <th class="text-right">Interest</th>
+            <th class="text-left">Type</th>
+            <th class="text-right">Duration</th>
+            <th class="text-right">Guarantee</th>
+            <th class="text-left">Code</th>
+            <th class="text-right">Max Amount</th>
+            <th class="text-right">Qualification</th>
+            <th class="text-left">Loan Account</th>
+            <th class="text-left">Interest Account</th>
+            <th class="text-left">Commission Account</th>
+            <th class="text-center">Insurable</th>
+            <th class="text-center">Instant</th>
+            <th class="text-center">Action</th>
+        </tr>
+    </thead>
 
-                                {{-- ⭐ NEW COLUMN --}}
-                                <th>Instant</th>
+    <tbody>
+        @foreach($loanTypes as $loanType)
+        <tr>
 
-                                <th>Action</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach($loanTypes as $loanType)
-                            <tr>
-                                <td>{{ $loanType->loan_type_name }}</td>
-                                <td>{{ number_format($loanType->loan_type_interest, 2) }}%</td>
-                                <td>{{ $loanType->loan_type_interest_type }}</td>
-                                <td>{{ $loanType->loan_type_duration }} months</td>
-                                <td>{{ $loanType->loan_type_guaranteable_percent }}%</td>
-                                <td>{{ $loanType->loan_type_code }}</td>
-                                <td>{{ number_format($loanType->loan_type_max_amount, 2) }}</td>
-                                <td>{{ $loanType->loan_type_qualification_period }} months</td>
+            {{-- TEXT LEFT --}}
+            <td class="text-left">{{ $loanType->loan_type_name }}</td>
 
-                                {{-- Loan Account --}}
-                                <td>
-                                    @php $acc = $subAccountDetails[$loanType->loan_type_acount] ?? null; @endphp
-                                    @if($acc)
-                                        {{ $acc->sub_account_name }}
-                                        ({{ $acc->main_account_code }}/{{ $acc->sub_account_code }})
-                                    @else
-                                        <span class="text-muted">None</span>
-                                    @endif
-                                </td>
+            {{-- NUMBERS RIGHT --}}
+            <td class="text-right">{{ number_format($loanType->loan_type_interest, 2) }}%</td>
 
-                                {{-- Interest Account --}}
-                                <td>
-                                    @php $iac = $subAccountDetails[$loanType->loan_type_int_account] ?? null; @endphp
-                                    @if($iac)
-                                        {{ $iac->sub_account_name }}
-                                        ({{ $iac->main_account_code }}/{{ $iac->sub_account_code }})
-                                    @else
-                                        <span class="text-muted">None</span>
-                                    @endif
-                                </td>
+            {{-- TEXT LEFT --}}
+            <td class="text-left">{{ $loanType->loan_type_interest_type }}</td>
 
-                                {{-- Commission Account --}}
-                                <td>
-                                    @php $cac = $subAccountDetails[$loanType->loan_type_comm_account] ?? null; @endphp
-                                    @if($cac)
-                                        {{ $cac->sub_account_name }}
-                                        ({{ $cac->main_account_code }}/{{ $cac->sub_account_code }})
-                                    @else
-                                        <span class="text-muted">None</span>
-                                    @endif
-                                </td>
+            {{-- NUMBERS RIGHT --}}
+            <td class="text-right">{{ $loanType->loan_type_duration }}</td>
 
-                                <td>
-                                    <span class="badge {{ $loanType->loan_type_insurable == 'Y' ? 'text-bg-success' : 'text-bg-danger' }}">
-                                        {{ $loanType->loan_type_insurable == 'Y' ? 'Yes' : 'No' }}
-                                    </span>
-                                </td>
+            <td class="text-right">{{ $loanType->loan_type_guaranteable_percent }}%</td>
 
-                                {{-- ⭐ NEW BADGE FOR INSTANT LOANS --}}
-                                <td>
-                                    @if($loanType->loan_type_instant_qualification == 1)
-                                        <span class="badge text-bg-primary">Instant</span>
-                                    @else
-                                        <span class="badge text-bg-secondary">Normal</span>
-                                    @endif
-                                </td>
+            {{-- TEXT LEFT --}}
+            <td class="text-left">{{ $loanType->loan_type_code }}</td>
 
-                                {{-- ACTION ICONS --}}
-                                <td>
-                                    <a href="{{ url('/loans/types/edit/' . $loanType->loan_type_id) }}"
-                                        class="text-success me-2" title="Edit">
-                                        <i class="nav-icon i-Pen-2 font-weight-bold"></i>
-                                    </a>
+            {{-- MONEY RIGHT --}}
+            <td class="text-right">{{ number_format($loanType->loan_type_max_amount, 2) }}</td>
 
-                                    <form action="{{ url('/loans/types/delete/' . $loanType->loan_type_id) }}"
-                                        method="POST" style="display:inline;">
-                                        @csrf @method('DELETE')
-                                        <button type="submit" class="text-danger border-0 bg-transparent" title="Delete"
-                                            onclick="return confirm('Delete this loan type?');">
-                                            <i class="nav-icon i-Close-Window font-weight-bold"></i>
-                                        </button>
-                                    </form>
-                                </td>
+            {{-- NUMBERS RIGHT --}}
+            <td class="text-right">{{ $loanType->loan_type_qualification_period }} months</td>
 
-                            </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
+            {{-- LEFT ALIGNED ACCOUNTS --}}
+            <td class="text-left">
+                @php $acc = $subAccountDetails[$loanType->loan_type_acount] ?? null; @endphp
+                @if($acc)
+                    {{ $acc->sub_account_name }}
+                    ({{ $acc->main_account_code }}/{{ $acc->sub_account_code }})
+                @else
+                    <span class="text-muted">None</span>
+                @endif
+            </td>
+
+            <td class="text-left">
+                @php $iac = $subAccountDetails[$loanType->loan_type_int_account] ?? null; @endphp
+                @if($iac)
+                    {{ $iac->sub_account_name }}
+                    ({{ $iac->main_account_code }}/{{ $iac->sub_account_code }})
+                @else
+                    <span class="text-muted">None</span>
+                @endif
+            </td>
+
+            <td class="text-left">
+                @php $cac = $subAccountDetails[$loanType->loan_type_comm_account] ?? null; @endphp
+                @if($cac)
+                    {{ $cac->sub_account_name }}
+                    ({{ $cac->main_account_code }}/{{ $cac->sub_account_code }})
+                @else
+                    <span class="text-muted">None</span>
+                @endif
+            </td>
+
+            {{-- BADGE CENTER --}}
+            <td class="text-center">
+                <span class="badge {{ $loanType->loan_type_insurable == 'Y' ? 'text-bg-success' : 'text-bg-danger' }}">
+                    {{ $loanType->loan_type_insurable == 'Y' ? 'Yes' : 'No' }}
+                </span>
+            </td>
+
+            {{-- INSTANT BADGE CENTER --}}
+            <td class="text-center">
+                @if($loanType->loan_type_instant_qualification == 1)
+                    <span class="badge text-bg-primary">Instant</span>
+                @else
+                    <span class="badge text-bg-secondary">Normal</span>
+                @endif
+            </td>
+
+            {{-- ACTION ICONS CENTER --}}
+            <td class="text-center">
+                <a href="{{ url('/loans/types/edit/' . $loanType->loan_type_id) }}"
+                    class="text-success me-2" title="Edit">
+                    <i class="nav-icon i-Pen-2 font-weight-bold"></i>
+                </a>
+
+                <form action="{{ url('/loans/types/delete/' . $loanType->loan_type_id) }}"
+                    method="POST" style="display:inline;">
+                    @csrf @method('DELETE')
+                    <button type="submit" class="text-danger border-0 bg-transparent" title="Delete"
+                        onclick="return confirm('Delete this loan type?');">
+                        <i class="nav-icon i-Close-Window font-weight-bold"></i>
+                    </button>
+                </form>
+            </td>
+        </tr>
+        @endforeach
+    </tbody>
+</table>
+
                 </div> 
             </div>
 
