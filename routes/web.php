@@ -47,6 +47,7 @@ use App\Http\Controllers\TempLoanCalController;
 use App\Http\Controllers\EmailController;
 use App\Http\Controllers\InsuranceLoanReportController;
 use App\Http\Controllers\PasswordResetController;
+use App\Http\Controllers\LoanRepaymentImportController;
 // use App\Http\Controllers\LedgerRebuildController;
 
 // Route::get('/rebuild/ledgers', [LedgerRebuildController::class, 'rebuild'])
@@ -684,7 +685,7 @@ Route::get('/loans/repayments/sample',
     [LoanRepaymentImportController::class, 'sample'])
     ->name('loans.repayments.csv.sample');
 
-    
+
 
 
     Route::get('/modify/member/loans', [LoanPaymentController::class, 'index'])
