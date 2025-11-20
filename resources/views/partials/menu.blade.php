@@ -2,40 +2,42 @@
     <div class="gull-brand pe-3 text-center mt-4 mb-2 d-flex justify-content-center align-items-center">
         <a href="{{ url('/') }}" style="text-decoration: none;">
             @php
-            // Extract the domain name
-            $currentDomain = parse_url(url('/'), PHP_URL_HOST);
+                // Extract the domain name
+                $currentDomain = parse_url(url('/'), PHP_URL_HOST);
 
-            // Check if it's localhost or 127.0.0.1
-            if ($currentDomain === '127.0.0.1' || $currentDomain === 'localhost') {
-            $currentDomain = 'default'; // Use 'default' as a placeholder
-            }
+                // Check if it's localhost or 127.0.0.1
+if ($currentDomain === '127.0.0.1' || $currentDomain === 'localhost') {
+    $currentDomain = 'default'; // Use 'default' as a placeholder
+}
 
-            // Construct logo paths
-            $domainLogoPath = '/image/' . $currentDomain . '.jpg'; // Domain-specific logo
-            $defaultLogoPath = '/image/logo.jpg'; // Default logo
+// Construct logo paths
+$domainLogoPath = '/image/' . $currentDomain . '.jpg'; // Domain-specific logo
+$defaultLogoPath = '/image/logo.jpg'; // Default logo
             @endphp
 
-            @if (file_exists(public_path($domainLogoPath))) <!-- Check if the domain-specific logo exists -->
-            <img src="{{ asset($domainLogoPath) }}" alt="Logo" style="height: 50px;">
-
+            @if (file_exists(public_path($domainLogoPath)))
+                <!-- Check if the domain-specific logo exists -->
+                <img src="{{ asset($domainLogoPath) }}" alt="Logo" style="height: 50px;">
             @else
-            <span style="margin-left: 10px; font-size: 19px; color: rebeccapurple; font-weight: 900; font-family: 'Montserrat', sans-serif; background: linear-gradient(to right, rebeccapurple, indigo); -webkit-background-clip: text; color: transparent; text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);">
-                @php
-                $nameParts = explode(' ', $defaultCompanyName);
-                $first = $nameParts[0] ?? '';
-                $second = $nameParts[1] ?? '';
-                @endphp
+                <span
+                    style="margin-left: 10px; font-size: 19px; color: rebeccapurple; font-weight: 900; font-family: 'Montserrat', sans-serif; background: linear-gradient(to right, rebeccapurple, indigo); -webkit-background-clip: text; color: transparent; text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);">
+                    @php
+                        $nameParts = explode(' ', $defaultCompanyName);
+                        $first = $nameParts[0] ?? '';
+                        $second = $nameParts[1] ?? '';
+                    @endphp
 
-                <div class="logo-container">
-                    <span class="adom">{{ $first }}</span>
-                    <span class="sacco">{{ $second }}</span>
-                </div>
-            </span>
+                    <div class="logo-container">
+                        <span class="adom">{{ $first }}</span>
+                        <span class="sacco">{{ $second }}</span>
+                    </div>
+                </span>
             @endif
         </a>
         <div class="sidebar-compact-switch ms-auto"><span></span></div>
     </div>
-    <div class="scroll-nav ps ps--active-y" data-perfect-scrollbar="data-perfect-scrollbar" data-suppress-scroll-x="true" style="height: 75%;">
+    <div class="scroll-nav ps ps--active-y" data-perfect-scrollbar="data-perfect-scrollbar"
+        data-suppress-scroll-x="true" style="height: 75%;">
         <div class="side-nav">
             <div class="main-menu">
                 <ul class="metismenu" id="menu">
@@ -46,55 +48,55 @@
                         </a>
                         <ul class="mm-collapse">
 
-    {{-- 🧍 Member Management --}}
-    <li class="item-name">
-        <a href="{{ url('/members/list') }}">
-            <span class="text-muted">All Members</span>
-        </a>
-    </li>
-    <li class="item-name">
-        <a href="{{ url('/members/active/y') }}">
-            <span class="text-muted">Active Members</span>
-        </a>
-    </li>
-    <li class="item-name">
-        <a href="{{ url('/members/active/n') }}">
-            <span class="text-muted">Inactive Members</span>
-        </a>
-    </li>
-    <li class="item-name">
-        <a href="{{ url('/members/add') }}">
-            <span class="text-muted">Register New Member</span>
-        </a>
-    </li>
+                            {{-- 🧍 Member Management --}}
+                            <li class="item-name">
+                                <a href="{{ url('/members/list') }}">
+                                    <span class="text-muted">All Members</span>
+                                </a>
+                            </li>
+                            <li class="item-name">
+                                <a href="{{ url('/members/active/y') }}">
+                                    <span class="text-muted">Active Members</span>
+                                </a>
+                            </li>
+                            <li class="item-name">
+                                <a href="{{ url('/members/active/n') }}">
+                                    <span class="text-muted">Inactive Members</span>
+                                </a>
+                            </li>
+                            <li class="item-name">
+                                <a href="{{ url('/members/add') }}">
+                                    <span class="text-muted">Register New Member</span>
+                                </a>
+                            </li>
 
-    {{-- 🏛️ Institution Management --}}
-    <li class="item-name">
-        <a href="{{ url('/institutions/list') }}">
-            <span class="text-muted">All Institutions</span>
-        </a>
-    </li>
-    <li class="item-name">
-        <a href="{{ url('/institutions/add') }}">
-            <span class="text-muted">Add Institution</span>
-        </a>
-    </li>
+                            {{-- 🏛️ Institution Management --}}
+                            <li class="item-name">
+                                <a href="{{ url('/institutions/list') }}">
+                                    <span class="text-muted">All Institutions</span>
+                                </a>
+                            </li>
+                            <li class="item-name">
+                                <a href="{{ url('/institutions/add') }}">
+                                    <span class="text-muted">Add Institution</span>
+                                </a>
+                            </li>
 
-    {{-- 💰 Financial Actions --}}
-    <li class="item-name">
-        <a href="{{ url('/registration-fees/create') }}">
-            <span class="text-muted">Record Registration Fee</span>
-        </a>
-    </li>
+                            {{-- 💰 Financial Actions --}}
+                            <li class="item-name">
+                                <a href="{{ url('/registration-fees/create') }}">
+                                    <span class="text-muted">Record Registration Fee</span>
+                                </a>
+                            </li>
 
-    {{-- 📨 Membership Requests --}}
-    <li class="item-name">
-        <a href="{{ url('new_members/list') }}">
-            <span class="text-muted">Pending Membership Requests</span>
-        </a>
-    </li>
+                            {{-- 📨 Membership Requests --}}
+                            <li class="item-name">
+                                <a href="{{ url('new_members/list') }}">
+                                    <span class="text-muted">Pending Membership Requests</span>
+                                </a>
+                            </li>
 
-</ul>
+                        </ul>
                     </li>
                     <li class="Ul_li--hover">
                         <a class="has-arrow" href="#">
@@ -135,7 +137,7 @@
                             <i class="i-Business-Mens text-20 me-2" style="color: #663399;"></i>
                             <span class="item-name text-15 text-muted">Capital</span>
                         </a>
-                        
+
                         <ul class="mm-collapse">
                             <li class="item-name">
                                 <a href="{{ route('capitalshares.transactions.index') }}">
@@ -181,7 +183,7 @@
                                     <span class="text-muted">End Month Proc</span>
                                 </a>
                             </li>
-                            
+
                             <li class="item-name">
                                 <a href="{{ route('fosa.index') }}">
                                     <span class="text-muted">Types</span>
@@ -238,13 +240,20 @@
                                     <span class="text-muted">Increase/Reduce Loans</span>
                                 </a>
                             </li>
-<li class="item-name">
+
+                             <li class="item-name">
+            <a href="{{ route('loans.repayments.import') }}">
+                <span class="text-muted">Import Loan Repayments (CSV)</span>
+            </a>
+        </li>
+        
+                            <li class="item-name">
                                 <a href="{{ url('/reports/loans/active') }}">
                                     <span class="text-muted">Monthly Contributions</span>
                                 </a>
                             </li>
 
-                            
+
 
                             <li class="item-name">
                                 <a href="{{ url('/admin/loans/pending/approval') }}">
@@ -263,17 +272,17 @@
                                 </a>
                             </li>
                             <li class="item-name">
-                        <a href="{{ url('/loans/types/list') }}">
-                            <span class="text-muted">Loans & Loan Calculator</span>
-                        </a>
-                    </li>
+                                <a href="{{ url('/loans/types/list') }}">
+                                    <span class="text-muted">Loans & Loan Calculator</span>
+                                </a>
+                            </li>
                             <li class="item-name">
                                 <a href="{{ url('/loans/categories') }}">
                                     <span class="text-muted">Loan categories</span>
                                 </a>
                             </li>
 
-                            
+
                         </ul>
                     </li>
                     @include('partials.menu_matatu')
@@ -347,8 +356,8 @@
                                             <span class="text-muted">Report - To Insurance</span>
                                         </a>
                                     </li>
-                                    
-                                    
+
+
                                 </ul>
                             </li>
 
@@ -392,19 +401,20 @@
                                 </a>
                                 <ul class="mm-collapse">
                                     <li class="item-name">
-                                        <a href="{{url('/reports/loans/issued')}}">Loans Given</a>
+                                        <a href="{{ url('/reports/loans/issued') }}">Loans Given</a>
                                     </li>
                                     <li class="item-name">
-                                        <a href="{{url('/reports/loans/repayments')}}">Loan Repayments</a>
+                                        <a href="{{ url('/reports/loans/repayments') }}">Loan Repayments</a>
                                     </li>
                                     <li class="item-name">
-                                        <a href="{{url('/members/report')}}">Member Contributions and Loan Balances Report</a>
+                                        <a href="{{ url('/members/report') }}">Member Contributions and Loan Balances
+                                            Report</a>
                                     </li>
                                     <!-- <li class="item-name">
-                                        <a href="{{url('/reports/loans/repayments/data')}}">Loans Given</a>
+                                        <a href="{{ url('/reports/loans/repayments/data') }}">Loans Given</a>
                                     </li>
                                     <li class="item-name">
-                                        <a href="{{url('/reports/loans/repayments/download')}}">Loans Given</a>
+                                        <a href="{{ url('/reports/loans/repayments/download') }}">Loans Given</a>
                                     </li> -->
 
                                 </ul>
@@ -438,7 +448,7 @@
                                         </a>
                                     </li>
 
-                                 
+
 
 
 
@@ -452,25 +462,29 @@
                                 </a>
                                 <ul class="mm-collapse">
                                     <li class="item-name">
-                                        <a href="{{url('/reports/sasra/outstandingloans/n/active')}}">OutStanding Loans - Inactive Members</a>
+                                        <a href="{{ url('/reports/sasra/outstandingloans/n/active') }}">OutStanding
+                                            Loans - Inactive Members</a>
                                     </li>
                                     <li class="item-name">
-                                        <a href="{{url('/reports/sasra/outstandingloans/y/active')}}">OutStanding Loans - Active Members</a>
+                                        <a href="{{ url('/reports/sasra/outstandingloans/y/active') }}">OutStanding
+                                            Loans - Active Members</a>
                                     </li>
                                     <li class="item-name">
-                                        <a href="{{url('/reports/sasra/outstandingloans/n')}}">Fully Paid Loans</a>
+                                        <a href="{{ url('/reports/sasra/outstandingloans/n') }}">Fully Paid Loans</a>
                                     </li>
                                     <li class="item-name">
-                                        <a href="{{url('/reports/sasra/share')}}">Balances - Shares </a>
+                                        <a href="{{ url('/reports/sasra/share') }}">Balances - Shares </a>
                                     </li>
                                     <li class="item-name">
-                                        <a href="{{url('/reports/profit_and_loss')}}">ROI</a>
+                                        <a href="{{ url('/reports/profit_and_loss') }}">ROI</a>
                                     </li>
                                     <li class="item-name">
-                                        <a href="{{url('/reports/sasra/loan_performance')}}">Loans Performance / RISK classifications</a>
+                                        <a href="{{ url('/reports/sasra/loan_performance') }}">Loans Performance /
+                                            RISK classifications</a>
                                     </li>
                                     <li class="item-name">
-                                        <a href="{{url('/reports/sasra/loan_performance/1')}}">Loans Performance / RISK classifications / Officia;s</a>
+                                        <a href="{{ url('/reports/sasra/loan_performance/1') }}">Loans Performance /
+                                            RISK classifications / Officia;s</a>
                                     </li>
                                 </ul>
                             </li>
@@ -478,35 +492,35 @@
                     </li>
 
                     <li class="Ul_li--hover">
-                        <a class="has-arrow" href="{{url('/file-upload')}}">
+                        <a class="has-arrow" href="{{ url('/file-upload') }}">
                             <i class="i-Download text-20 me-2" style="color: #663399;"></i>
                             <span class="item-name text-15 text-muted">Downloads</span>
                         </a>
                     </li>
-                    
-                    
-                    <li class="Ul_li--hover">
-    <a class="has-arrow" href="#">
-        <i class="i-Mail text-20 me-2" style="color: #663399;"></i>
-        <span class="item-name text-15 text-muted">Communications</span>
-    </a>
-    <ul class="mm-collapse">
-        <li class="item-name">
-            <a href="{{ route('emails.bulk') }}">
-    <i class="i-Mail text-15 me-2" style="color: #663399;"></i>
-    <span class="text-muted">Bulk Email</span>
-</a>
 
-        </li>
-        <li class="item-name">
-            <a href="?}">
-                <i class="i-Speach-Bubble-3 text-15 me-2" style="color: #663399;"></i>
-                <span class="text-muted">Bulk SMS</span>
-            </a>
-        </li>
-         
-    </ul>
-</li>
+
+                    <li class="Ul_li--hover">
+                        <a class="has-arrow" href="#">
+                            <i class="i-Mail text-20 me-2" style="color: #663399;"></i>
+                            <span class="item-name text-15 text-muted">Communications</span>
+                        </a>
+                        <ul class="mm-collapse">
+                            <li class="item-name">
+                                <a href="{{ route('emails.bulk') }}">
+                                    <i class="i-Mail text-15 me-2" style="color: #663399;"></i>
+                                    <span class="text-muted">Bulk Email</span>
+                                </a>
+
+                            </li>
+                            <li class="item-name">
+                                <a href="?}">
+                                    <i class="i-Speach-Bubble-3 text-15 me-2" style="color: #663399;"></i>
+                                    <span class="text-muted">Bulk SMS</span>
+                                </a>
+                            </li>
+
+                        </ul>
+                    </li>
 
 
                     <li class="Ul_li--hover">
@@ -567,19 +581,21 @@
                                 </a>
                             </li>
 
-                            
+
                             <li class="item-name">
                                 <a href="{{ url('/dashboard/member_dashboard') }}">
                                     <span class="text-muted">View as a Member</span>
                                 </a>
                             </li>
 
-                            
+
                             <li class="item-name">
-                                <a href="{{ url('/logout') }}" onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
+                                <a href="{{ url('/logout') }}"
+                                    onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
                                     <span class="text-muted">Logout</span>
                                 </a>
-                                <form id="logout-form" action="{{ url('/logout') }}" method="POST" style="display: none;">
+                                <form id="logout-form" action="{{ url('/logout') }}" method="POST"
+                                    style="display: none;">
                                     @csrf
                                 </form>
                             </li>
@@ -594,7 +610,8 @@
             font-size: 14px; border-top: 1px solid rgba(102, 51, 153, 0.2);">
         <div style="font-size: 13px; color: rgba(102, 51, 153, 1); font-weight: 600;">
             <strong>ERP provided by:</strong> <br> Shahi Services,
-            <a href="tel:+254722400737" style="text-decoration: none; color: rgba(102, 51, 153, 1); font-weight: bold;">
+            <a href="tel:+254722400737"
+                style="text-decoration: none; color: rgba(102, 51, 153, 1); font-weight: bold;">
                 +254722400737
             </a>
         </div>
