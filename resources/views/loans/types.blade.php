@@ -110,18 +110,20 @@
             </td>
 
             <td class="text-center">
-                <span class="badge {{ $loanType->loan_type_insurable == 'Y' ? 'badge-success' : 'badge-danger' }}">
-                    {{ $loanType->loan_type_insurable == 'Y' ? 'Yes' : 'No' }}
-                </span>
-            </td>
+    <span class="badge badge-{{ $loanType->loan_type_insurable == 'Y' ? 'success' : 'danger' }}">
+        {{ $loanType->loan_type_insurable == 'Y' ? 'Yes' : 'No' }}
+    </span>
+</td>
 
-            <td class="text-center">
-                @if($loanType->loan_type_instant_qualification == 1)
-                    <span class="badge badge-primary">Instant</span>
-                @else
-                    <span class="badge badge-secondary">Normal</span>
-                @endif
-            </td>
+
+           <td class="text-center">
+    @if($loanType->loan_type_instant_qualification == 1)
+        <span class="badge badge-primary">Instant</span>
+    @else
+        <span class="badge badge-secondary">Normal</span>
+    @endif
+</td>
+
 
             <td class="text-center">
                 <a href="{{ url('/loans/types/edit/' . $loanType->loan_type_id) }}"
