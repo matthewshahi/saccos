@@ -112,10 +112,11 @@
                     </tbody>
                 </table>
 
-                <a href="{{ route('loans.repayments.csv.sample') }}" 
-                   class="btn btn-primary btn-sm">
-                    <i class="i-Download"></i> Download Sample CSV
-                </a>
+              <a href="{{ asset('sample_loan_repayments.csv') }}" 
+   class="btn btn-primary btn-sm" download>
+    <i class="i-Download"></i> Download Sample CSV
+</a>
+
 
             </div>
         </div>

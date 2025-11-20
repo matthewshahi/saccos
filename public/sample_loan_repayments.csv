@@ -1,0 +1,4 @@
+loan_id,amount,interest,description,docno,paid_on
+123,5000,300,Monthly repayment,MPESA123X,2025-11-20
+124,2000,150,Weekly repayment,MPESA88HH,2025-11-20
+129,1500,120,Overpayment,MPESA7070,2025-11-18
