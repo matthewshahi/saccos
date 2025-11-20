@@ -5088,41 +5088,49 @@ $data = [
     }
 
     public function updateLoanType(Request $request, $id)
-    {
-        $request->validate([
-            'loan_type_name' => 'required|string|max:250',
-            'loan_type_interest' => 'required|numeric',
-            'loan_type_interest_type' => 'required|string|max:100',
-            'loan_type_duration' => 'required|integer',
-            'loan_type_guaranteable_percent' => 'required|integer',
-            'loan_type_code' => 'required|string|max:100',
-            'loan_type_max_amount' => 'required|numeric',
-            'loan_type_qualification_period' => 'required|integer',
-            'loan_type_acount' => 'required|integer',
-            'loan_type_int_account' => 'required|integer',
-            'loan_type_comm_account' => 'required|integer',
-            'loan_type_insurable' => 'required|string|max:1',
+{
+    $request->validate([
+        'loan_type_name' => 'required|string|max:250',
+        'loan_type_interest' => 'required|numeric',
+        'loan_type_interest_type' => 'required|string|max:100',
+        'loan_type_duration' => 'required|integer',
+        'loan_type_guaranteable_percent' => 'required|integer',
+        'loan_type_code' => 'required|string|max:100',
+        'loan_type_max_amount' => 'required|numeric',
+        'loan_type_qualification_period' => 'required|integer',
+        'loan_type_acount' => 'required|integer',
+        'loan_type_int_account' => 'required|integer',
+        'loan_type_comm_account' => 'required|integer',
+        'loan_type_insurable' => 'required|string|max:1',
+
+        // ⭐ NEW FIELD
+        'loan_type_instant_qualification' => 'nullable|in:1'
+    ]);
+
+    DB::table('sacco_loan_types')
+        ->where('loan_type_id', $id)
+        ->update([
+            'loan_type_name' => $request->loan_type_name,
+            'loan_type_interest' => $request->loan_type_interest,
+            'loan_type_interest_type' => $request->loan_type_interest_type,
+            'loan_type_duration' => $request->loan_type_duration,
+            'loan_type_guaranteable_percent' => $request->loan_type_guaranteable_percent,
+            'loan_type_code' => $request->loan_type_code,
+            'loan_type_max_amount' => $request->loan_type_max_amount,
+            'loan_type_qualification_period' => $request->loan_type_qualification_period,
+            'loan_type_acount' => $request->loan_type_acount,
+            'loan_type_int_account' => $request->loan_type_int_account,
+            'loan_type_comm_account' => $request->loan_type_comm_account,
+            'loan_type_insurable' => $request->loan_type_insurable,
+
+            // ⭐ SAVE AS 1 OR 0
+            'loan_type_instant_qualification' =>
+                $request->has('loan_type_instant_qualification') ? 1 : 0,
         ]);
 
-        DB::table('sacco_loan_types')
-            ->where('loan_type_id', $id)
-            ->update([
-                'loan_type_name' => $request->input('loan_type_name'),
-                'loan_type_interest' => $request->input('loan_type_interest'),
-                'loan_type_interest_type' => $request->input('loan_type_interest_type'),
-                'loan_type_duration' => $request->input('loan_type_duration'),
-                'loan_type_guaranteable_percent' => $request->input('loan_type_guaranteable_percent'),
-                'loan_type_code' => $request->input('loan_type_code'),
-                'loan_type_max_amount' => $request->input('loan_type_max_amount'),
-                'loan_type_qualification_period' => $request->input('loan_type_qualification_period'),
-                'loan_type_acount' => $request->input('loan_type_acount'),
-                'loan_type_int_account' => $request->input('loan_type_int_account'),
-                'loan_type_comm_account' => $request->input('loan_type_comm_account'),
-                'loan_type_insurable' => $request->input('loan_type_insurable'),
-            ]);
+    return redirect()->route('loans.types')->with('success', 'Loan type updated successfully.');
+}
 
-        return redirect()->route('loans.types')->with('success', 'Loan type updated successfully.');
-    }
 
     public function createLoanType()
     {
@@ -5169,7 +5177,7 @@ $data = [
             'loan_type_insurable' => $request->loan_type_insurable,
 
             'loan_type_instant_qualification' => $request->has('loan_type_instant_qualification') ? 1 : 0,
-            
+
             'loan_type_by' => auth()->id(),
             'loan_type_ip' => $request->ip(),
         ]);
