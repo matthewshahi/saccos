@@ -663,6 +663,29 @@ Route::get('/members/list/csv', [HomeController::class, 'membersListCsv'])
     Route::delete('/loans/categories/delete/{id}', [HomeController::class, 'deleteLoanCategory'])->name('loans.categories.delete')->middleware('check_user_rights:add_loan_type');
 
 
+    // Loan Repayments CSV Upload
+Route::get('/loans/repayments/import', 
+    [LoanRepaymentImportController::class, 'index'])
+    ->name('loans.repayments.import')
+    ->middleware('check_user_rights:add_loan_payment');
+
+Route::post('/loans/repayments/import/upload', 
+    [LoanRepaymentImportController::class, 'upload'])
+    ->name('loans.repayments.csv.upload')
+    ->middleware('check_user_rights:add_loan_payment');
+
+Route::post('/loans/repayments/import/process', 
+    [LoanRepaymentImportController::class, 'process'])
+    ->name('loans.repayments.csv.process')
+    ->middleware('check_user_rights:add_loan_payment');
+
+// Download Sample CSV
+Route::get('/loans/repayments/sample', 
+    [LoanRepaymentImportController::class, 'sample'])
+    ->name('loans.repayments.csv.sample');
+
+    
+
 
     Route::get('/modify/member/loans', [LoanPaymentController::class, 'index'])
         ->name('modify.member.loans')
