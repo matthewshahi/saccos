@@ -39,7 +39,7 @@
 
             <div>
                 <div class="table-responsive">
-                   <table class="table table-striped">
+                   <table class="table table-striped text-center">
     <thead>
         <tr>
             <th class="text-start">Name</th>
@@ -63,31 +63,22 @@
         @foreach($loanTypes as $loanType)
         <tr>
 
-            <!-- TEXT LEFT -->
             <td class="text-start">{{ $loanType->loan_type_name }}</td>
 
-            <!-- NUMBER RIGHT -->
             <td class="text-end">{{ number_format($loanType->loan_type_interest, 2) }}%</td>
 
-            <!-- TEXT LEFT -->
             <td class="text-start">{{ $loanType->loan_type_interest_type }}</td>
 
-            <!-- NUMBER RIGHT -->
             <td class="text-end">{{ $loanType->loan_type_duration }}</td>
 
-            <!-- NUMBER RIGHT -->
             <td class="text-end">{{ $loanType->loan_type_guaranteable_percent }}%</td>
 
-            <!-- TEXT LEFT -->
             <td class="text-start">{{ $loanType->loan_type_code }}</td>
 
-            <!-- MONEY RIGHT -->
             <td class="text-end">{{ number_format($loanType->loan_type_max_amount, 2) }}</td>
 
-            <!-- NUMBER RIGHT -->
             <td class="text-end">{{ $loanType->loan_type_qualification_period }} months</td>
 
-            <!-- LEFT ACCOUNTS -->
             <td class="text-start">
                 @php $acc = $subAccountDetails[$loanType->loan_type_acount] ?? null; @endphp
                 @if($acc)
@@ -118,14 +109,12 @@
                 @endif
             </td>
 
-            <!-- BADGES CENTER -->
             <td class="text-center">
                 <span class="badge {{ $loanType->loan_type_insurable == 'Y' ? 'badge-success' : 'badge-danger' }}">
                     {{ $loanType->loan_type_insurable == 'Y' ? 'Yes' : 'No' }}
                 </span>
             </td>
 
-            <!-- INSTANT CENTER -->
             <td class="text-center">
                 @if($loanType->loan_type_instant_qualification == 1)
                     <span class="badge badge-primary">Instant</span>
@@ -134,7 +123,6 @@
                 @endif
             </td>
 
-            <!-- ACTION CENTER -->
             <td class="text-center">
                 <a href="{{ url('/loans/types/edit/' . $loanType->loan_type_id) }}"
                    class="text-success me-2" title="Edit">
