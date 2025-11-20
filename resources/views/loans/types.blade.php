@@ -39,20 +39,20 @@
 
             <div>
                 <div class="table-responsive">
-                   <table class="table table-striped text-center">
+                   <table class="table table-striped">
     <thead>
         <tr>
-            <th class="text-left">Name</th>
-            <th class="text-right">Interest</th>
-            <th class="text-left">Type</th>
-            <th class="text-right">Duration</th>
-            <th class="text-right">Guarantee</th>
-            <th class="text-left">Code</th>
-            <th class="text-right">Max Amount</th>
-            <th class="text-right">Qualification</th>
-            <th class="text-left">Loan Account</th>
-            <th class="text-left">Interest Account</th>
-            <th class="text-left">Commission Account</th>
+            <th class="text-start">Name</th>
+            <th class="text-end">Interest</th>
+            <th class="text-start">Type</th>
+            <th class="text-end">Duration</th>
+            <th class="text-end">Guarantee</th>
+            <th class="text-start">Code</th>
+            <th class="text-end">Max Amount</th>
+            <th class="text-end">Qualification</th>
+            <th class="text-start">Loan Account</th>
+            <th class="text-start">Interest Account</th>
+            <th class="text-start">Commission Account</th>
             <th class="text-center">Insurable</th>
             <th class="text-center">Instant</th>
             <th class="text-center">Action</th>
@@ -63,31 +63,32 @@
         @foreach($loanTypes as $loanType)
         <tr>
 
-            {{-- TEXT LEFT --}}
-            <td class="text-left">{{ $loanType->loan_type_name }}</td>
+            <!-- TEXT LEFT -->
+            <td class="text-start">{{ $loanType->loan_type_name }}</td>
 
-            {{-- NUMBERS RIGHT --}}
-            <td class="text-right">{{ number_format($loanType->loan_type_interest, 2) }}%</td>
+            <!-- NUMBER RIGHT -->
+            <td class="text-end">{{ number_format($loanType->loan_type_interest, 2) }}%</td>
 
-            {{-- TEXT LEFT --}}
-            <td class="text-left">{{ $loanType->loan_type_interest_type }}</td>
+            <!-- TEXT LEFT -->
+            <td class="text-start">{{ $loanType->loan_type_interest_type }}</td>
 
-            {{-- NUMBERS RIGHT --}}
-            <td class="text-right">{{ $loanType->loan_type_duration }}</td>
+            <!-- NUMBER RIGHT -->
+            <td class="text-end">{{ $loanType->loan_type_duration }}</td>
 
-            <td class="text-right">{{ $loanType->loan_type_guaranteable_percent }}%</td>
+            <!-- NUMBER RIGHT -->
+            <td class="text-end">{{ $loanType->loan_type_guaranteable_percent }}%</td>
 
-            {{-- TEXT LEFT --}}
-            <td class="text-left">{{ $loanType->loan_type_code }}</td>
+            <!-- TEXT LEFT -->
+            <td class="text-start">{{ $loanType->loan_type_code }}</td>
 
-            {{-- MONEY RIGHT --}}
-            <td class="text-right">{{ number_format($loanType->loan_type_max_amount, 2) }}</td>
+            <!-- MONEY RIGHT -->
+            <td class="text-end">{{ number_format($loanType->loan_type_max_amount, 2) }}</td>
 
-            {{-- NUMBERS RIGHT --}}
-            <td class="text-right">{{ $loanType->loan_type_qualification_period }} months</td>
+            <!-- NUMBER RIGHT -->
+            <td class="text-end">{{ $loanType->loan_type_qualification_period }} months</td>
 
-            {{-- LEFT ALIGNED ACCOUNTS --}}
-            <td class="text-left">
+            <!-- LEFT ACCOUNTS -->
+            <td class="text-start">
                 @php $acc = $subAccountDetails[$loanType->loan_type_acount] ?? null; @endphp
                 @if($acc)
                     {{ $acc->sub_account_name }}
@@ -97,7 +98,7 @@
                 @endif
             </td>
 
-            <td class="text-left">
+            <td class="text-start">
                 @php $iac = $subAccountDetails[$loanType->loan_type_int_account] ?? null; @endphp
                 @if($iac)
                     {{ $iac->sub_account_name }}
@@ -107,7 +108,7 @@
                 @endif
             </td>
 
-            <td class="text-left">
+            <td class="text-start">
                 @php $cac = $subAccountDetails[$loanType->loan_type_comm_account] ?? null; @endphp
                 @if($cac)
                     {{ $cac->sub_account_name }}
@@ -117,38 +118,38 @@
                 @endif
             </td>
 
-            {{-- BADGE CENTER --}}
+            <!-- BADGES CENTER -->
             <td class="text-center">
-                <span class="badge {{ $loanType->loan_type_insurable == 'Y' ? 'text-bg-success' : 'text-bg-danger' }}">
+                <span class="badge {{ $loanType->loan_type_insurable == 'Y' ? 'badge-success' : 'badge-danger' }}">
                     {{ $loanType->loan_type_insurable == 'Y' ? 'Yes' : 'No' }}
                 </span>
             </td>
 
-            {{-- INSTANT BADGE CENTER --}}
+            <!-- INSTANT CENTER -->
             <td class="text-center">
                 @if($loanType->loan_type_instant_qualification == 1)
-                    <span class="badge text-bg-primary">Instant</span>
+                    <span class="badge badge-primary">Instant</span>
                 @else
-                    <span class="badge text-bg-secondary">Normal</span>
+                    <span class="badge badge-secondary">Normal</span>
                 @endif
             </td>
 
-            {{-- ACTION ICONS CENTER --}}
+            <!-- ACTION CENTER -->
             <td class="text-center">
                 <a href="{{ url('/loans/types/edit/' . $loanType->loan_type_id) }}"
-                    class="text-success me-2" title="Edit">
+                   class="text-success me-2" title="Edit">
                     <i class="nav-icon i-Pen-2 font-weight-bold"></i>
                 </a>
 
                 <form action="{{ url('/loans/types/delete/' . $loanType->loan_type_id) }}"
-                    method="POST" style="display:inline;">
+                      method="POST" style="display:inline;">
                     @csrf @method('DELETE')
-                    <button type="submit" class="text-danger border-0 bg-transparent" title="Delete"
-                        onclick="return confirm('Delete this loan type?');">
+                    <button type="submit" class="bg-transparent border-0 text-danger" title="Delete">
                         <i class="nav-icon i-Close-Window font-weight-bold"></i>
                     </button>
                 </form>
             </td>
+
         </tr>
         @endforeach
     </tbody>
