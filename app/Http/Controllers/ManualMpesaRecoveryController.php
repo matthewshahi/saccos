@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 
 class ManualMpesaRecoveryController extends Controller
@@ -28,7 +27,7 @@ class ManualMpesaRecoveryController extends Controller
 
         $sms = $request->sms_message;
 
-        // Extract required details from SMS
+        // Extract values from SMS
         preg_match('/\b([A-Z0-9]{10})\b/', $sms, $receiptMatch);
         preg_match('/Ksh([\d,\.]+)/i', $sms, $amountMatch);
         preg_match('/account\s+([A-Z0-9]+)/i', $sms, $accountMatch);
@@ -42,45 +41,31 @@ class ManualMpesaRecoveryController extends Controller
             return back()->withErrors('Invalid or unsupported M-Pesa message format.');
         }
 
-        // Parse SMS timestamp
+        // ✅ Parse real SMS timestamp
         $smsTime = Carbon::createFromFormat('d/m/y g:i A', $timeMatch[1] . ' ' . $timeMatch[2]);
 
         /**
-         * ✅ PRIMARY: Receipt must not already exist
+         * ✅ ONLY CHECK: Does transaction already exist in C2B table?
          */
-        if (DB::table('stk_push_responses')
-            ->where('mpesa_receipt_number', $receipt)
-            ->exists()) {
-            return back()->withErrors('This receipt has already been used.');
-        }
-
-        /**
-         * ✅ SECONDARY: Prevent similar duplicate within ±5 minutes
-         */
-        $windowStart = $smsTime->copy()->subMinutes(5);
-        $windowEnd   = $smsTime->copy()->addMinutes(5);
-
-        $duplicateNearTime = DB::table('stk_push_logs')
-            ->where('unique_number', $account)
-            ->where('amount', $amount)
-            ->whereBetween('created_at', [$windowStart, $windowEnd])
+        $existsInC2B = DB::table('c2b_payments')
+            ->where('transaction_id', $receipt)
             ->exists();
 
-        if ($duplicateNearTime) {
+        if ($existsInC2B) {
             return back()->withErrors(
-                "A similar transaction already exists for $account within 5 minutes of this time."
+                "This M-Pesa transaction ($receipt) already exists and cannot be recovered again."
             );
         }
 
         /**
-         * ✅ Ensure related STK order exists
+         * ✅ Ensure related order exists for reference integrity
          */
         $order = DB::table('stk_push_logs')
             ->where('unique_number', $account)
             ->first();
 
         if (!$order) {
-            return back()->withErrors('No matching STK order found for this account reference.');
+            return back()->withErrors('No matching transaction order found for this account reference.');
         }
 
         return view('mpesa.manual_preview', [
@@ -88,7 +73,8 @@ class ManualMpesaRecoveryController extends Controller
             'receipt'   => $receipt,
             'amount'    => $amount,
             'account'   => $account,
-            'sms_time'  => $smsTime->format('Y-m-d H:i:s')
+            'sms_time'  => $smsTime->format('Y-m-d H:i:s'),
+            'phone'     => null
         ]);
     }
 
@@ -122,10 +108,10 @@ class ManualMpesaRecoveryController extends Controller
                 'checkout_request_id'  => $order->checkout_request_id,
                 'mpesa_receipt_number' => $request->receipt,
                 'amount'               => $request->amount,
-                'phone_number'         => $request->phone ?? null,
+                'phone_number'         => $request->phone,
                 'result_code'          => 0,
                 'result_description'   => 'Manual SMS Recovered by ' . $adminName,
-                'transaction_date'     => $transactionTime,  // ✅ REAL SMS TIME
+                'transaction_date'     => $transactionTime,
                 'created_at'           => now(),
                 'updated_at'           => now(),
             ]);
