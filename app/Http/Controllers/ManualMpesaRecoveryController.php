@@ -80,17 +80,20 @@ class ManualMpesaRecoveryController extends Controller
 
             // ✅ 1. Insert into stk_push_responses
             DB::table('stk_push_responses')->insert([
-                'unique_number'        => $request->account,
-                'checkout_request_id'  => $order->checkout_request_id,
-                'mpesa_receipt_number' => $request->receipt,
-                'amount'               => $request->amount,
-                'phone_number'         => $request->phone,
-                'result_code'          => 0,
-                'result_description'   => 'Manual SMS Recovery by ' . $adminName,
-                'transaction_date'     => $transactionTime,
-                'created_at'           => now(),
-                'updated_at'           => now(),
-            ]);
+    'unique_number'        => $request->account,
+    'checkout_request_id'  => $order->checkout_request_id,
+    'mpesa_receipt_number' => $request->receipt,
+    'amount'               => $request->amount,
+    'phone_number'         => $request->phone,
+    'result_code'          => 0,
+    'result_description'   => 'Manual SMS Recovery by ' . $adminName,
+    'transaction_date'     => $transactionTime,
+    'processed'            => 'N',
+    'processed_date'       => null,
+    'created_at'           => now(),
+    'updated_at'           => now(),
+]);
+
 
             // ✅ 2. Update stk_push_logs
             DB::table('stk_push_logs')
