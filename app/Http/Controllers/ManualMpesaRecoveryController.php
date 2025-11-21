@@ -8,17 +8,11 @@ use Carbon\Carbon;
 
 class ManualMpesaRecoveryController extends Controller
 {
-    /**
-     * Show manual recovery form
-     */
     public function showForm()
     {
         return view('mpesa.manual_recovery');
     }
 
-    /**
-     * Validate SMS and show preview
-     */
     public function validateSms(Request $request)
     {
         $request->validate([
@@ -27,7 +21,6 @@ class ManualMpesaRecoveryController extends Controller
 
         $sms = $request->sms_message;
 
-        // Extract values from SMS
         preg_match('/\b([A-Z0-9]{10})\b/', $sms, $receiptMatch);
         preg_match('/Ksh([\d,\.]+)/i', $sms, $amountMatch);
         preg_match('/account\s+([A-Z0-9]+)/i', $sms, $accountMatch);
@@ -41,48 +34,30 @@ class ManualMpesaRecoveryController extends Controller
             return back()->withErrors('Invalid or unsupported M-Pesa message format.');
         }
 
-        // ✅ Parse real SMS timestamp
         $smsTime = Carbon::createFromFormat('d/m/y g:i A', $timeMatch[1] . ' ' . $timeMatch[2]);
 
-        /**
-         * ✅ ONLY CHECK: Does transaction already exist in C2B table?
-         */
-        $existsInC2B = DB::table('c2b_payments')
-            ->where('transaction_id', $receipt)
-            ->exists();
-
-        if ($existsInC2B) {
-            return back()->withErrors(
-                "This M-Pesa transaction ($receipt) already exists and cannot be recovered again."
-            );
+        // ✅ BLOCK if already exists in C2B table
+        if (DB::table('c2b_payments')->where('transaction_id', $receipt)->exists()) {
+            return back()->withErrors("Transaction $receipt already exists in C2B records.");
         }
 
-        /**
-         * ✅ Ensure related order exists for reference integrity
-         */
-        $order = DB::table('stk_push_logs')
-            ->where('unique_number', $account)
-            ->first();
+        $order = DB::table('stk_push_logs')->where('unique_number', $account)->first();
 
         if (!$order) {
-            return back()->withErrors('No matching transaction order found for this account reference.');
+            return back()->withErrors('No matching order found for this account reference.');
         }
 
         return view('mpesa.manual_preview', [
-    'sms'       => $sms,
-    'receipt'  => $receipt,
-    'amount'   => $amount,
-    'account'  => $account,
-    'sms_time' => $smsTime->format('Y-m-d H:i:s'),
-    'phone'    => null,
-    'posted_by'=> auth()->user()->member_name ?? 'System User'
-]);
-
+            'sms'       => $sms,
+            'receipt'   => $receipt,
+            'amount'    => $amount,
+            'account'   => $account,
+            'sms_time'  => $smsTime->format('Y-m-d H:i:s'),
+            'phone'     => null,
+            'posted_by' => auth()->user()->member_name ?? 'System User'
+        ]);
     }
 
-    /**
-     * Final posting into system
-     */
     public function processSms(Request $request)
     {
         $request->validate([
@@ -92,20 +67,18 @@ class ManualMpesaRecoveryController extends Controller
             'sms_time'  => 'required'
         ]);
 
-        $order = DB::table('stk_push_logs')
-            ->where('unique_number', $request->account)
-            ->first();
+        $order = DB::table('stk_push_logs')->where('unique_number', $request->account)->first();
 
         if (!$order) {
-            return redirect()->back()->withErrors('Order not found for this account.');
+            return back()->withErrors('Order not found for this account.');
         }
 
         $adminName = auth()->user()->member_name ?? 'System User';
-
         $transactionTime = Carbon::parse($request->sms_time);
 
         DB::transaction(function () use ($request, $order, $adminName, $transactionTime) {
 
+            // ✅ 1. Insert into stk_push_responses
             DB::table('stk_push_responses')->insert([
                 'unique_number'        => $request->account,
                 'checkout_request_id'  => $order->checkout_request_id,
@@ -113,21 +86,49 @@ class ManualMpesaRecoveryController extends Controller
                 'amount'               => $request->amount,
                 'phone_number'         => $request->phone,
                 'result_code'          => 0,
-                'result_description'   => 'Manual SMS Recovered by ' . $adminName,
+                'result_description'   => 'Manual SMS Recovery by ' . $adminName,
                 'transaction_date'     => $transactionTime,
                 'created_at'           => now(),
                 'updated_at'           => now(),
             ]);
 
+            // ✅ 2. Update stk_push_logs
             DB::table('stk_push_logs')
                 ->where('unique_number', $request->account)
                 ->update([
                     'status' => 'completed',
                     'updated_at' => now()
                 ]);
+
+            // ✅ 3. INSERT INTO c2b_payments (CORRECT STRUCTURE)
+            DB::table('c2b_payments')->insert([
+                'transaction_type' => 'Pay Bill',
+                'transaction_id' => $request->receipt,
+                'transaction_time' => $transactionTime,
+                'transaction_amount' => $request->amount,
+                'business_shortcode' => $order->shortcode ?? '4185373',
+                'bill_ref_number' => $request->account,
+                'invoice_number' => null,
+                'org_account_balance' => null,
+                'third_party_transaction_id' => null,
+                'msisdn' => $request->phone ?? 'N/A',
+                'first_name' => 'Manual',
+                'middle_name' => null,
+                'last_name' => $adminName,
+                'raw_payload' => json_encode([
+                    'source' => 'manual_sms_recovery',
+                    'sms' => $request->sms
+                ]),
+                'ip_address' => request()->ip(),
+                'processed' => 'Yes',
+                'processed_date' => now(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
         });
 
         return redirect()->route('mpesa.manual.form')
-            ->with('success', 'Transaction successfully recovered and posted.');
+            ->with('success', '✅ Transaction successfully recovered and recorded in C2B ledger.');
     }
 }
