@@ -9,9 +9,13 @@ use Illuminate\Support\Facades\Log;
 class CheckSafaricomIP
 {
     private $allowedRanges = [
-        '196.201.212.', // Safaricom /24 range
-        '196.201.213.',
-        '196.201.214.',
+        '196.201.212.0/24',
+        '196.201.213.0/24',
+        '196.201.214.0/24',
+        '102.219.172.0/24',
+        '102.219.173.0/24',
+        '197.248.94.0/24',
+        '197.248.95.0/24',
     ];
 
     public function handle(Request $request, Closure $next)
@@ -19,27 +23,42 @@ class CheckSafaricomIP
         $clientIP = $request->ip();
 
         $allowed = false;
-        foreach ($this->allowedRanges as $prefix) {
-            if (str_starts_with($clientIP, $prefix)) {
+        foreach ($this->allowedRanges as $range) {
+            if ($this->ipInRange($clientIP, $range)) {
                 $allowed = true;
                 break;
             }
         }
 
-        if (! $allowed) {
-            // Default log
-            Log::warning('Unauthorized Safaricom IP attempt', ['ip' => $clientIP]);
-
-            // Optional: log to safaricom channel (must be defined in config/logging.php)
-            try {
-                Log::channel('safaricom')->warning('Unauthorized Safaricom IP attempt', ['ip' => $clientIP]);
-            } catch (\Exception $e) {
-                // Fail silently if channel doesn't exist
-            }
+        if (!$allowed) {
+            Log::warning('Unauthorized Safaricom IP attempt', [
+                'ip' => $clientIP,
+                'url' => $request->fullUrl()
+            ]);
 
             return response()->json(['error' => 'Unauthorized IP'], 403);
         }
 
         return $next($request);
+    }
+
+    /**
+     * Proper CIDR range checker
+     */
+    private function ipInRange($ip, $range)
+    {
+        if (strpos($range, '/') === false) {
+            return $ip === $range;
+        }
+
+        [$subnet, $bits] = explode('/', $range);
+
+        $ip = ip2long($ip);
+        $subnet = ip2long($subnet);
+        $mask = -1 << (32 - $bits);
+
+        $subnet &= $mask;
+
+        return ($ip & $mask) === $subnet;
     }
 }

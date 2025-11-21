@@ -25,7 +25,7 @@ class MpesaTheController extends Controller
     public function __construct()
     {
         $this->resetCredentials();
-         
+          
     }
 
     /**
