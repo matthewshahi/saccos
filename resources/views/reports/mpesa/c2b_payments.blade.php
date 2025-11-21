@@ -3,12 +3,20 @@
 @section('content')
 <div class="container mt-4">
     <h2 class="mb-4">Payments Received (C2B)</h2>
-    <a href="{{ route('reports.mpesa.paymentsreceived') }}" class="btn btn-primary mb-3">View STK Payments</a>
+   <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
+    <div class="mb-2">
+        <a href="{{ route('reports.mpesa.paymentsreceived') }}" class="btn btn-primary">
+            <i class="i-Eye"></i> View STK Payments
+        </a>
+    </div>
 
-       <a href="{{ route('mpesa.manual.form') }}" class="btn btn-danger">
+    <div class="mb-2">
+        <a href="{{ route('mpesa.manual.form') }}" class="btn btn-danger">
             <i class="i-Repair"></i> Manual SMS Recovery
         </a>
-        
+    </div>
+</div>
+
     <form method="GET" class="mb-3">
         <input type="text" name="search" class="form-control" placeholder="Search by transaction ID, MSISDN, bill reference, or first name" value="{{ request('search') }}">
         <button type="submit" class="btn btn-secondary mt-2">Search</button>
