@@ -48,6 +48,7 @@ use App\Http\Controllers\EmailController;
 use App\Http\Controllers\InsuranceLoanReportController;
 use App\Http\Controllers\PasswordResetController;
 use App\Http\Controllers\LoanRepaymentImportController;
+use App\Http\Controllers\ManualMpesaRecoveryController;
 // use App\Http\Controllers\LedgerRebuildController;
 
 // Route::get('/rebuild/ledgers', [LedgerRebuildController::class, 'rebuild'])
@@ -229,6 +230,29 @@ Route::prefix('mobile')->group(function () {
             Route::post('/update/{id}', [MpesaConfigController::class, 'update'])->name('mpesa_config.update')->middleware('check_user_rights:mpesa_admin');; // Update configuration
         });
     });
+});
+
+
+
+ 
+
+Route::middleware(['auth', 'check_member_position'])->group(function () {
+
+    // Show manual recovery form
+    Route::get('/mpesa/manual-recovery', 
+        [ManualMpesaRecoveryController::class, 'showForm']
+    )->name('mpesa.manual.form')->middleware('check_user_rights:add_mpesa_manual_recovery');
+
+    // Validate SMS message and show preview
+    Route::post('/mpesa/manual-recovery/validate', 
+        [ManualMpesaRecoveryController::class, 'validateSms']
+    )->name('mpesa.manual.validate')->middleware('check_user_rights:add_mpesa_manual_recovery');
+
+    // Final approve & post transaction
+    Route::post('/mpesa/manual-recovery/process', 
+        [ManualMpesaRecoveryController::class, 'processSms']
+    )->name('mpesa.manual.process')->middleware('check_user_rights:add_mpesa_manual_recovery');
+
 });
 
 
