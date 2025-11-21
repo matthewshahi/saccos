@@ -8,30 +8,29 @@ use Illuminate\Support\Facades\Log;
 
 class CheckSafaricomIP
 {
-    private $allowedRanges = [
-        '196.201.212.0/24',
-        '196.201.213.0/24',
-        '196.201.214.0/24',
-        '102.219.172.0/24',
-        '102.219.173.0/24',
-        '197.248.94.0/24',
-        '197.248.95.0/24',
+    private $allowedIPs = [
+        '196.201.214.200',
+        '196.201.214.206',
+        '196.201.213.114',
+        '196.201.214.207',
+        '196.201.214.208',
+        '196.201.213.44',
+        '196.201.212.127',
+        '196.201.212.128',
+        '196.201.212.129',
+        '196.201.212.132',
+        '196.201.212.136',
+        '196.201.212.138',
+        '196.201.212.69',
+        '196.201.212.74',
     ];
 
     public function handle(Request $request, Closure $next)
     {
         $clientIP = $request->ip();
 
-        $allowed = false;
-        foreach ($this->allowedRanges as $range) {
-            if ($this->ipInRange($clientIP, $range)) {
-                $allowed = true;
-                break;
-            }
-        }
-
-        if (!$allowed) {
-            Log::warning('Unauthorized Safaricom IP attempt', [
+        if (!in_array($clientIP, $this->allowedIPs, true)) {
+            Log::warning('Blocked non-whitelisted IP for M-Pesa callback', [
                 'ip' => $clientIP,
                 'url' => $request->fullUrl()
             ]);
@@ -40,25 +39,5 @@ class CheckSafaricomIP
         }
 
         return $next($request);
-    }
-
-    /**
-     * Proper CIDR range checker
-     */
-    private function ipInRange($ip, $range)
-    {
-        if (strpos($range, '/') === false) {
-            return $ip === $range;
-        }
-
-        [$subnet, $bits] = explode('/', $range);
-
-        $ip = ip2long($ip);
-        $subnet = ip2long($subnet);
-        $mask = -1 << (32 - $bits);
-
-        $subnet &= $mask;
-
-        return ($ip & $mask) === $subnet;
     }
 }
