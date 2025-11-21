@@ -29,7 +29,8 @@ class ManualMpesaRecoveryController extends Controller
         $sms = $request->sms_message;
 
         // Extract values using regex
-        preg_match('/([A-Z0-9]{10})/i', $sms, $receiptMatch);
+        // preg_match('/([A-Z0-9]{10})/i', $sms, $receiptMatch);
+        preg_match('/\b([A-Z0-9]{10})\b/', $sms, $receiptMatch);
         preg_match('/Ksh([\d,\.]+)/i', $sms, $amountMatch);
         preg_match('/account\s+([A-Z0-9]+)/i', $sms, $accountMatch);
         preg_match('/2547\d{8}/', $sms, $phoneMatch);
