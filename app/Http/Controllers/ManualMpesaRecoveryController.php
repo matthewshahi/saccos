@@ -69,13 +69,15 @@ class ManualMpesaRecoveryController extends Controller
         }
 
         return view('mpesa.manual_preview', [
-            'sms'       => $sms,
-            'receipt'   => $receipt,
-            'amount'    => $amount,
-            'account'   => $account,
-            'sms_time'  => $smsTime->format('Y-m-d H:i:s'),
-            'phone'     => null
-        ]);
+    'sms'       => $sms,
+    'receipt'  => $receipt,
+    'amount'   => $amount,
+    'account'  => $account,
+    'sms_time' => $smsTime->format('Y-m-d H:i:s'),
+    'phone'    => null,
+    'posted_by'=> auth()->user()->member_name ?? 'System User'
+]);
+
     }
 
     /**
@@ -98,7 +100,8 @@ class ManualMpesaRecoveryController extends Controller
             return redirect()->back()->withErrors('Order not found for this account.');
         }
 
-        $adminName = auth()->user()->name ?? 'System User';
+        $adminName = auth()->user()->member_name ?? 'System User';
+
         $transactionTime = Carbon::parse($request->sms_time);
 
         DB::transaction(function () use ($request, $order, $adminName, $transactionTime) {
