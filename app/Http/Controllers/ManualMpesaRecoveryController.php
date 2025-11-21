@@ -120,6 +120,8 @@ class ManualMpesaRecoveryController extends Controller
                     'sms' => $request->sms
                 ]),
                 'ip_address' => request()->ip(),
+                'processed' => 'No',               
+                'processed_date' => null,          
                 'processed' => 'Yes',
                 'processed_date' => now(),
                 'created_at' => now(),
