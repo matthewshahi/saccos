@@ -11,8 +11,14 @@
     </div>
 
     <div class="mb-2">
+        <a href="{{ route('mpesa.manual.list') }}" class="btn btn-danger">
+            <i class="i-Repair"></i> Manual Recoveries
+        </a>
+    </div>
+
+    <div class="mb-2">
         <a href="{{ route('mpesa.manual.form') }}" class="btn btn-danger">
-            <i class="i-Repair"></i> Manual SMS Recovery
+            <i class="i-Repair"></i> Add Manual Recovery by SMS
         </a>
     </div>
 </div>

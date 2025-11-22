@@ -12,6 +12,8 @@
        <a href="{{ route('reports.mpesa.paymentsreceived.c2b') }}" class="btn btn-primary mb-3">View C2B Payments</a>
     </div>
 
+    
+
     <div @class(['mb-2'])>
         <a href="{{ route('mpesa.manual.form') }}" @class(['btn', 'btn-danger'])>
             <i @class(['i-Repair'])></i> Manual SMS Recovery
