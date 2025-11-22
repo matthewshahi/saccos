@@ -3,25 +3,28 @@
 @section('content')
 <div class="container mt-4">
     <h2 class="mb-4">Payments Received (C2B)</h2>
-   <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
-    <div class="mb-2">
-        <a href="{{ route('reports.mpesa.paymentsreceived') }}" class="btn btn-primary">
-            <i class="i-Eye"></i> View STK Payments
-        </a>
-    </div>
+   <div class="d-flex flex-column flex-md-row align-items-stretch align-items-md-center justify-content-between gap-2 mb-3">
 
-    <div class="mb-2">
-        <a href="{{ route('mpesa.manual.list') }}" class="btn btn-danger">
-            <i class="i-Repair"></i> Manual Recoveries
-        </a>
-    </div>
+    <a href="{{ route('reports.mpesa.paymentsreceived') }}" 
+       class="btn btn-outline-primary d-flex align-items-center justify-content-center px-3 py-2">
+        <i class="i-Eye me-2"></i>
+        <span>View STK Payments</span>
+    </a>
 
-    <div class="mb-2">
-        <a href="{{ route('mpesa.manual.form') }}" class="btn btn-danger">
-            <i class="i-Repair"></i> Add Manual Recovery by SMS
-        </a>
-    </div>
+    <a href="{{ route('mpesa.manual.list') }}" 
+       class="btn btn-outline-secondary d-flex align-items-center justify-content-center px-3 py-2">
+        <i class="i-File-Clipboard me-2"></i>
+        <span>Manual Recoveries</span>
+    </a>
+
+    <a href="{{ route('mpesa.manual.form') }}" 
+       class="btn btn-danger d-flex align-items-center justify-content-center px-3 py-2">
+        <i class="i-Repair me-2"></i>
+        <span>Add Manual Recovery by SMS</span>
+    </a>
+
 </div>
+
 
     <form method="GET" class="mb-3">
         <input type="text" name="search" class="form-control" placeholder="Search by transaction ID, MSISDN, bill reference, or first name" value="{{ request('search') }}">
