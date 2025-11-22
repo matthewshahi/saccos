@@ -271,11 +271,12 @@
             <div class="col-md-12 mt-3">
                 <button type="submit" class="btn btn-primary w-100">Submit Registration</button>
             </div>
+            <input type="hidden" name="recaptcha_token" id="recaptcha_token">
         </form>
     </div>
 </div>
 
-<input type="hidden" name="recaptcha_token" id="recaptcha_token">
+
 
 <script src="https://www.google.com/recaptcha/api.js?render={{ env('RECAPTCHA_SITE_KEY') }}"></script>
 <script>
@@ -284,6 +285,39 @@
             document.getElementById('recaptcha_token').value = token;
         });
     });
+
+    grecaptcha.ready(function () {
+    function refreshToken() {
+        grecaptcha.execute('{{ env('RECAPTCHA_SITE_KEY') }}', {action: 'register'})
+            .then(function (token) {
+                document.getElementById('recaptcha_token').value = token;
+            });
+    }
+
+    refreshToken();
+    setInterval(refreshToken, 30000); // every 30 seconds
+});
+
+document.addEventListener("DOMContentLoaded", function () {
+    const submitBtn = document.querySelector("#registration-form button[type='submit']");
+    submitBtn.disabled = true;
+
+    function enableSubmit(token) {
+        if (token) {
+            submitBtn.disabled = false;
+        }
+    }
+
+    grecaptcha.ready(function () {
+        grecaptcha.execute('{{ env('RECAPTCHA_SITE_KEY') }}', {action: 'register'}).then(function (token) {
+            document.getElementById('recaptcha_token').value = token;
+            enableSubmit(token);
+        });
+    });
+});
+
 </script>
+
+
 
 @endsection
