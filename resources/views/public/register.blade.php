@@ -266,7 +266,7 @@
                 <input type="checkbox" id="terms" name="terms" required>
                 <label for="terms">I agree to the <a href="#">terms and conditions</a>. <span class="text-danger">*</span></label>
             </div>
-            <input type="hidden" name="g-recaptcha-response" id="g-recaptcha-response">
+          
 
             <div class="col-md-12 mt-3">
                 <button type="submit" class="btn btn-primary w-100">Submit Registration</button>
@@ -275,12 +275,15 @@
     </div>
 </div>
 
+<input type="hidden" name="recaptcha_token" id="recaptcha_token">
+
 <script src="https://www.google.com/recaptcha/api.js?render={{ env('RECAPTCHA_SITE_KEY') }}"></script>
 <script>
     grecaptcha.ready(function() {
-        grecaptcha.execute('{{ env('RECAPTCHA_SITE_KEY') }}', {action: 'submit'}).then(function(token) {
-            document.getElementById('g-recaptcha-response').value = token;
+        grecaptcha.execute('{{ env('RECAPTCHA_SITE_KEY') }}', {action: 'register'}).then(function(token) {
+            document.getElementById('recaptcha_token').value = token;
         });
     });
 </script>
+
 @endsection

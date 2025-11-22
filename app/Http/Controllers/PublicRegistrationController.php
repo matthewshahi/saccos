@@ -213,7 +213,9 @@ class PublicRegistrationController extends Controller
             // Terms and Conditions
             'certification_statement' => 'accepted',
             'terms' => 'accepted',
-            'g-recaptcha-response' => 'required',
+            // 'g-recaptcha-response' => 'required',
+            'recaptcha_token' => 'required',
+
         ]);
 
         // Validate Total Share Percentage
@@ -232,16 +234,52 @@ class PublicRegistrationController extends Controller
         }
 
         // reCAPTCHA Validation
-        $recaptchaResponse = Http::asForm()->post('https://www.google.com/recaptcha/api/siteverify', [
-            'secret' => env('RECAPTCHA_SECRET_KEY'),
-            'response' => $request->input('g-recaptcha-response'),
-            'remoteip' => $request->ip(),
-        ]);
+      // ==============================
+// reCAPTCHA v3 VERIFICATION
+// ==============================
 
-        $recaptchaData = $recaptchaResponse->json();
-        if (!($recaptchaData['success'] ?? false)) {
-            return redirect()->back()->withErrors(['captcha' => 'reCAPTCHA verification failed.'])->withInput();
-        }
+$recaptchaToken = $request->input('recaptcha_token');
+
+if (!$recaptchaToken) {
+    return back()->withErrors([
+        'captcha' => 'Captcha verification failed. Please refresh and try again.'
+    ])->withInput();
+}
+
+$recaptchaResponse = Http::asForm()->post(
+    'https://www.google.com/recaptcha/api/siteverify',
+    [
+        'secret'   => env('RECAPTCHA_SECRET_KEY'),
+        'response' => $recaptchaToken,
+        'remoteip' => $request->ip(),
+    ]
+);
+
+$recaptcha = $recaptchaResponse->json();
+
+// Log for debugging (optional):
+// logger()->info('Recaptcha response', $recaptcha);
+
+if (!($recaptcha['success'] ?? false)) {
+    return back()->withErrors([
+        'captcha' => 'Captcha verification failed.'
+    ])->withInput();
+}
+
+// Action check — MUST MATCH your JS action "register"
+if (($recaptcha['action'] ?? '') !== 'register') {
+    return back()->withErrors([
+        'captcha' => 'Captcha action mismatch.'
+    ])->withInput();
+}
+
+// Score check (Google recommends 0.5 threshold)
+if (($recaptcha['score'] ?? 0) < 0.5) {
+    return back()->withErrors([
+        'captcha' => 'Suspicious activity detected. Please try again.'
+    ])->withInput();
+}
+
 
         // File Upload Handling
         $fileFields = [
