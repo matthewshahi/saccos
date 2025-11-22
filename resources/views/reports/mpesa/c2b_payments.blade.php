@@ -4,16 +4,9 @@
 <div @class(['container', 'mt-4'])>
     <h2 @class(['mb-4'])>Payments Received (C2B)</h2>
    <div @class(['d-flex', 'flex-wrap', 'justify-content-between', 'align-items-center', 'mb-3'])>
-
     <div @class(['mb-2'])>
         <a href="{{ route('reports.mpesa.paymentsreceived') }}" @class(['btn', 'btn-primary'])>
             <i @class(['i-Eye'])></i> View STK Payments
-        </a>
-    </div>
-
-    <div @class(['mb-2'])>
-        <a href="{{ route('mpesa.manual.list') }}" @class(['btn', 'btn-info'])>
-            <i @class(['i-File-Clipboard'])></i> Manual Recoveries
         </a>
     </div>
 
@@ -22,7 +15,6 @@
             <i @class(['i-Repair'])></i> Manual SMS Recovery
         </a>
     </div>
-
 </div>
 
     <form method="GET" @class(['mb-3'])>
