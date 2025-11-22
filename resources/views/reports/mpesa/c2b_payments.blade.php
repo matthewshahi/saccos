@@ -1,31 +1,39 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="container mt-4">
-    <h2 class="mb-4">Payments Received (C2B)</h2>
-   <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
-    <div class="mb-2">
-        <a href="{{ route('reports.mpesa.paymentsreceived') }}" class="btn btn-primary">
-            <i class="i-Eye"></i> View STK Payments
+<div @class(['container', 'mt-4'])>
+    <h2 @class(['mb-4'])>Payments Received (C2B)</h2>
+   <div @class(['d-flex', 'flex-wrap', 'justify-content-between', 'align-items-center', 'mb-3'])>
+
+    <div @class(['mb-2'])>
+        <a href="{{ route('reports.mpesa.paymentsreceived') }}" @class(['btn', 'btn-primary'])>
+            <i @class(['i-Eye'])></i> View STK Payments
         </a>
     </div>
 
-    <div class="mb-2">
-        <a href="{{ route('mpesa.manual.form') }}" class="btn btn-danger">
-            <i class="i-Repair"></i> Manual SMS Recovery
+    <div @class(['mb-2'])>
+        <a href="{{ route('mpesa.manual.list') }}" @class(['btn', 'btn-info'])>
+            <i @class(['i-File-Clipboard'])></i> Manual Recoveries
         </a>
     </div>
+
+    <div @class(['mb-2'])>
+        <a href="{{ route('mpesa.manual.form') }}" @class(['btn', 'btn-danger'])>
+            <i @class(['i-Repair'])></i> Manual SMS Recovery
+        </a>
+    </div>
+
 </div>
 
-    <form method="GET" class="mb-3">
-        <input type="text" name="search" class="form-control" placeholder="Search by transaction ID, MSISDN, bill reference, or first name" value="{{ request('search') }}">
-        <button type="submit" class="btn btn-secondary mt-2">Search</button>
+    <form method="GET" @class(['mb-3'])>
+        <input type="text" name="search" @class(['form-control']) placeholder="Search by transaction ID, MSISDN, bill reference, or first name" value="{{ request('search') }}">
+        <button type="submit" @class(['btn', 'btn-secondary', 'mt-2'])>Search</button>
     </form>
 
-    <div class="card">
-        <div class="card-body">
-            <div class="table-responsive">
-                <table class="table table-bordered text-center">
+    <div @class(['card'])>
+        <div @class(['card-body'])>
+            <div @class(['table-responsive'])>
+                <table @class(['table', 'table-bordered', 'text-center'])>
                     <thead>
                         <tr>
                             <th>#</th>
@@ -49,7 +57,7 @@
                                 <td>{{ $payment->transaction_time }}</td>
                                 <td>{{ $payment->first_name }}</td>
                                 <td>
-                                    <span class="badge bg-{{ $payment->processed === 'Yes' ? 'success' : 'warning' }}">
+                                    <span @class(['badge', 'bg-{{', '$payment->processed', '===', ''Yes'', '?', ''success'', ':', ''warning'', '}}'])>
                                         {{ $payment->processed === 'Yes' ? 'Yes' : 'No' }}
                                     </span>
                                 </td>
@@ -62,7 +70,7 @@
                     </tbody>
                 </table>
             </div>
-            <div class="mt-3">
+            <div @class(['mt-3'])>
                 {{ $c2bPayments->withQueryString()->links() }}
             </div>
         </div>
