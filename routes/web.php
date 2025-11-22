@@ -582,6 +582,14 @@ Route::get('/members/list/csv', [HomeController::class, 'membersListCsv'])
         Route::get('/c2b', [MpesaReportController::class, 'c2bPayments'])->name('reports.mpesa.paymentsreceived.c2b');
     });
 
+    // List manually recovered M-Pesa transactions
+Route::get('/mpesa/manual-recoveries', 
+    [ManualMpesaRecoveryController::class, 'manualRecoveries']
+)->name('mpesa.manual.list')
+ ->middleware(['auth', 'check_member_position', 'check_user_rights:add_mpesa_manual_recovery']);
+
+ 
+
     Route::get('/reports/sasra/outstandingloans/{status}/{active?}', [HomeController::class, 'reportSasraLoans'])->name('reports.sasra.loans')->middleware('check_user_rights:rpt_loans_issued');
     Route::post('/reports/sasra/outstandingloans/{status}/{active?}', [HomeController::class, 'reportSasraLoans'])->name('reports.sasra.loans.post')->middleware('check_user_rights:rpt_loans_issued');
     Route::get('/reports/sasra/loans/data', [HomeController::class, 'fetchSasraLoansData'])->name('reports.sasra.loans.data')->middleware('check_user_rights:rpt_loans_issued');

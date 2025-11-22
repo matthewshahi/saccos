@@ -135,4 +135,27 @@ class ManualMpesaRecoveryController extends Controller
         return redirect()->route('mpesa.manual.form')
             ->with('success', '✅ Transaction successfully recovered and recorded in C2B ledger.');
     }
+
+    public function manualRecoveries(Request $request)
+{
+    $query = DB::table('c2b_payments')
+        ->where('raw_payload', 'LIKE', '%manual_sms_recovery%')
+        ->orderByDesc('transaction_time');
+
+    if ($request->filled('search')) {
+        $search = $request->search;
+        $query->where(function ($q) use ($search) {
+            $q->where('transaction_id', 'LIKE', "%{$search}%")
+              ->orWhere('bill_ref_number', 'LIKE', "%{$search}%")
+              ->orWhere('msisdn', 'LIKE', "%{$search}%")
+              ->orWhere('last_name', 'LIKE', "%{$search}%");
+        });
+    }
+
+    $manualPayments = $query->paginate(20);
+
+    return view('reports.mpesa.manual_recoveries', compact('manualPayments'));
+}
+
+
 }
