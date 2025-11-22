@@ -8,18 +8,27 @@
 
 
     <div @class(['d-flex', 'flex-wrap', 'justify-content-between', 'align-items-center', 'mb-3'])>
+
     <div @class(['mb-2'])>
-       <a href="{{ route('reports.mpesa.paymentsreceived.c2b') }}" class="btn btn-primary mb-3">View C2B Payments</a>
+        <a href="{{ route('reports.mpesa.paymentsreceived.c2b') }}" class="btn btn-primary">
+            <i class="i-Eye me-1"></i> View C2B Payments
+        </a>
     </div>
 
-    
+    <div @class(['mb-2'])>
+        <a href="{{ route('mpesa.manual.list') }}" class="btn btn-outline-secondary">
+            <i class="i-File-Clipboard me-1"></i> Manual Recoveries
+        </a>
+    </div>
 
     <div @class(['mb-2'])>
         <a href="{{ route('mpesa.manual.form') }}" @class(['btn', 'btn-danger'])>
             <i @class(['i-Repair'])></i> Manual SMS Recovery
         </a>
     </div>
+
 </div>
+
 
     <form method="GET" class="mb-3">
         <input type="text" name="search" class="form-control" placeholder="Search by unique number, checkout request ID, phone number, or receipt number" value="{{ request('search') }}">
