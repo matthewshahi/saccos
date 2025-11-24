@@ -164,11 +164,12 @@ class PublicRegistrationController extends Controller
             'physical_location' => 'nullable|string|max:100',
 
             // File Uploads (All Optional)
-            'passport_photo' => 'nullable|mimes:jpeg,jpg,pdf|max:300',
-            'signature' => 'nullable|mimes:jpeg,jpg,pdf|max:300',
-            'id_copy_front' => 'nullable|mimes:jpeg,jpg,pdf|max:300',
-            'id_copy_back' => 'nullable|mimes:jpeg,jpg,pdf|max:300',
-            'payslips_bank_statements' => 'nullable|mimes:jpeg,jpg,pdf|max:300',
+'passport_photo'          => 'nullable|mimes:jpeg,jpg,pdf|max:1024',
+'signature'               => 'nullable|mimes:jpeg,jpg,pdf|max:1024',
+'id_copy_front'           => 'nullable|mimes:jpeg,jpg,pdf|max:1024',
+'id_copy_back'            => 'nullable|mimes:jpeg,jpg,pdf|max:1024',
+'payslips_bank_statements'=> 'nullable|mimes:jpeg,jpg,pdf|max:1024',
+
 
 
 
