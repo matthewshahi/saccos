@@ -118,7 +118,7 @@ use App\Http\Controllers\ManualMpesaRecoveryController;
 
 // Route::view('/members/import-kin-form', 'import.next_of_kin')->name('members.import.kin.form');
 // Route::post('/members/import-next-of-kin', [MemberImportController::class, 'importNextOfKin'])->name('members.import.kin');
-//==============
+//=============
 
 Route::get('/home', [HomeController::class, 'redirectBasedOnAuth'])->name('home');
 Route::get('/', [HomeController::class, 'redirectBasedOnAuth'])->name('home1');
