@@ -227,6 +227,11 @@
 </div>
 
 {{-- ================= STYLES ================= --}}
+
+<script>
+    const memberName = @json($data['member']->member_name);
+</script>
+
 <style>
     body { background: #f7f9fc; }
     .statement-header h2 { color: #2c3e50; }
@@ -263,7 +268,10 @@ document.getElementById("downloadPDF").addEventListener("click", function() {
             pdf.addImage(imgData,'JPEG',0,position,imgWidth,imgHeight);
             heightLeft-=pageHeight;
         }
-        pdf.save("member_statement.pdf");
+        // pdf.save("member_statement.pdf");
+        const safeName = memberName.replace(/[^a-z0-9]+/gi, '_').toLowerCase();
+pdf.save(`${safeName}_member_statement.pdf`);
+
     }).finally(()=>{btn.disabled=false;loader.style.display="none";});
 });
 </script>
