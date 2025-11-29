@@ -733,18 +733,31 @@ class ProcessTransactionsJob implements ShouldQueue
     $vehicleId = $assignment->v_assignment_vehicle_id ?? null;
 
     // 3. Record operator payment (name used in description)
+    // DB::table('sacco_matatus_collections')->insert([
+    //     'coll_operator_id' => $opId,
+    //     'coll_vehicle_id'  => $vehicleId,
+    //     'coll_amount'      => $transaction->transaction_amount,
+    //     'coll_type'        => strtolower($prefix),
+    //     'coll_period'      => $this->getCurrentPeriod(),
+    //     'coll_description' => "Payment by Operator {$operator->full_name}",
+    //     'coll_ip'          => request()->ip(),
+    //     'coll_transdate'   => now(),
+    //     'created_at'       => now(),
+    //     'updated_at'       => now(),
+    // ]);
+
     DB::table('sacco_matatus_collections')->insert([
-        'coll_operator_id' => $opId,
-        'coll_vehicle_id'  => $vehicleId,
-        'coll_amount'      => $transaction->transaction_amount,
-        'coll_type'        => strtolower($prefix),
-        'coll_period'      => $this->getCurrentPeriod(),
-        'coll_description' => "Payment by Operator {$operator->full_name}",
-        'coll_ip'          => request()->ip(),
-        'coll_transdate'   => now(),
-        'created_at'       => now(),
-        'updated_at'       => now(),
-    ]);
+    'coll_operator_id' => $opId,
+    'coll_vehicle_id'  => $vehicleId,
+    'coll_amount'      => $transaction->transaction_amount,
+    'coll_reference'   => $reference,  // 🔥 correct column name
+    'coll_notes'       => "Payment by Operator {$operator->full_name}", 
+    'coll_type'        => $this->mapOperatorType($prefix),  // explained below
+    'coll_mode'        => 'mpesa',
+    'coll_date'        => now()->toDateString(),       // 🔥 correct date column
+    'created_at'       => now(),
+    'updated_at'       => now(),
+]);
 
     // 4. Rewrite reference → SACCO internal format (NO NAME IN REFERENCE)
     switch ($prefix) {
@@ -776,6 +789,20 @@ class ProcessTransactionsJob implements ShouldQueue
     }
 
     // SACCO routing will now process rewritten $reference normally.
+}
+
+private function mapOperatorType($prefix)
+{
+    switch ($prefix) {
+        case 'OPSH': return 'share';
+        case 'OPCA': return 'share';
+        case 'OPLN': return 'loan_repayment';
+        case 'OPRF': return 'deposit';
+        case 'OPDT': return 'daily_target';
+        case 'OPOT': return 'other';
+        case 'OPPN': return 'penalty';
+        default:     return 'other';
+    }
 }
 
 }
