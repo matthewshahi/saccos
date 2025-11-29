@@ -20,14 +20,17 @@ class SendPendingNotificationsJob implements ShouldQueue
         $limit = (int) env('NOTIF_EMAILS_PER_MIN', 50);
 
         // 🔹 Only unread or failed (not queued/sent/read)
-        $notifications = DB::table('sacco_system_notifications')
-            ->where('notif_status', 'unread')
-            ->whereNotNull('notif_recipient_email')
-            ->whereNull('notif_sent_at')
-            ->where('notif_created_at', '>=', now()->subDays(2))
-            ->orderBy('notif_created_at', 'asc')
-            ->limit($limit)
-            ->get();
+       $notifications = DB::table('sacco_system_notifications')
+    ->where('notif_status', 'unread')
+    ->whereNotNull('notif_recipient_email')
+    ->where('notif_recipient_email', 'LIKE', '%@%.%')   // Must look real
+    ->whereNull('notif_sent_at')
+    ->where('notif_created_at', '>=', now()->subDays(2))
+    ->orderBy('notif_created_at', 'asc')
+    ->limit($limit)
+    ->get();
+
+
 
 
         $queued = 0;
