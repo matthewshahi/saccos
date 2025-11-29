@@ -496,6 +496,11 @@ Route::post('/new_members/export/live', [PublicRegistrationActionsController::cl
     ->name('members.exportLive')
     ->middleware('check_user_rights:new_member_applications_update');
 
+    Route::post('/new_members/delete', [PublicRegistrationActionsController::class, 'deleteMember'])
+    ->name('new_members.delete')
+    ->middleware('check_user_rights:new_member_applications_update');
+
+
 
     Route::middleware(['check_user_rights:FosaTransactions'])
         ->prefix('fosa/endmonth')

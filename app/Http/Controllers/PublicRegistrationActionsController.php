@@ -8,10 +8,14 @@ use Illuminate\Support\Facades\Log;
 
 class PublicRegistrationActionsController extends Controller
 {
-   public function listMembers(Request $request)
+  public function listMembers(Request $request)
 {
     $search = $request->input('search');
-    $query = DB::table('sacco_members_new_applications');
+    $query = DB::table('sacco_members_new_applications')
+                ->where(function ($q) {
+                    $q->whereNull('deleted')
+                      ->orWhere('deleted', '!=', 'Y');
+                });
 
     if ($search) {
         $query->where(function ($q) use ($search) {
@@ -34,6 +38,7 @@ class PublicRegistrationActionsController extends Controller
 
     return view('public.new_member_applications', compact('members', 'search'));
 }
+
 
 
     public function getMemberDetails($id)
@@ -369,5 +374,51 @@ private function saveNextOfKin($member, $memberId, $ip = null, $userId = null)
         ]);
     }
 }
+
+public function deleteMember(Request $request)
+{
+    $id = $request->input('id');
+
+    if (!$id) {
+        return response()->json([
+            'success' => false,
+            'message' => 'No ID provided.'
+        ]);
+    }
+
+    // Fetch record
+    $member = DB::table('sacco_members_new_applications')
+        ->where('id', $id)
+        ->first();
+
+    if (!$member) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Application not found.'
+        ]);
+    }
+
+    // Only delete if NOT exported
+    if ($member->exported === 'Y') {
+        return response()->json([
+            'success' => false,
+            'message' => 'This application has already been exported and cannot be deleted.'
+        ]);
+    }
+
+    // Perform soft delete
+    DB::table('sacco_members_new_applications')
+        ->where('id', $id)
+        ->update([
+            'deleted'    => 'Y',
+            'deleted_at' => now()
+        ]);
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Application deleted successfully.'
+    ]);
+}
+
 
 }
