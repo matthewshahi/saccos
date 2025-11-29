@@ -10,10 +10,10 @@ class MemberDashboardController extends Controller
     public function index()
     {
 
-        
+
         // Fetch the logged-in member's data
         $member = DB::table('sacco_members')
-            
+
             ->where('member_id', Auth::user()->id)
             ->where('member_active', 'Y')
             ->first();
@@ -42,7 +42,7 @@ class MemberDashboardController extends Controller
         $pendingLoans = DB::table('sacco_loans')
             ->join('sacco_loan_types', 'sacco_loans.loan_loan_type', '=', 'sacco_loan_types.loan_type_id')
             ->select(
-                'sacco_loans.loan_id', 
+                'sacco_loans.loan_id',
                 'sacco_loan_types.loan_type_name', // Fetch the loan type name
                 'sacco_loans.loan_amount',
                 'sacco_loans.loan_loan_paid',
@@ -69,11 +69,11 @@ class MemberDashboardController extends Controller
             )
             ->get();
 
-       // Dynamic FOSA types (active, alphabetical)
-    $paymentOptions = DB::table('sacco_fosa_types')
-        ->where('type_active', 'Y')
-        ->orderBy('type_prefix')
-        ->get();
+        // Dynamic FOSA types (active, alphabetical)
+        $paymentOptions = DB::table('sacco_fosa_types')
+            ->where('type_active', 'Y')
+            ->orderBy('type_prefix')
+            ->get();
 
         $operators = [];
 
@@ -94,6 +94,7 @@ if (config('sacco.transport_sacco') === 'Y') {
             'sacco_matatus_vehicles.id'
         )
         ->where('sacco_matatus_operators.status', 'active')
+        ->where('sacco_matatus_vehicles.vehicles_member_id', Auth::user()->id)   // 🔥 KEY FILTER
         ->select(
             'sacco_matatus_operators.id AS operator_id',
             'sacco_matatus_operators.full_name',
@@ -111,166 +112,166 @@ if (config('sacco.transport_sacco') === 'Y') {
 
 
 
-    // Package all data for the view
-    $data = [
-        'member'        => $member,
-        'pendingLoans'  => $pendingLoans,
-        'nextOfKin'     => $nextOfKin,
-        'labels'        => $labels,
-        'amounts'       => $amounts,
-        'paymentOptions'=> $paymentOptions,
-        'operators'=> $operators,
-    ];
-      
+
+        // Package all data for the view
+        $data = [
+            'member'        => $member,
+            'pendingLoans'  => $pendingLoans,
+            'nextOfKin'     => $nextOfKin,
+            'labels'        => $labels,
+            'amounts'       => $amounts,
+            'paymentOptions' => $paymentOptions,
+            'operators' => $operators,
+        ];
+
 
         return view('dashboard.member_dashboard', compact('data'));
     }
     public function shareListings()
-        {
-            $shares = DB::table('sacco_shares')
-                ->select(
-                    'share_id',
-                    'share_amount_paying',
-                    'share_paid_by',
-                    'share_period',
-                    'share_description',
-                    'share_doc_no',
-                    'share_date_paid'
-                )
-                ->where('share_member_id', Auth::user()->id)
-                ->orderBy('share_period', 'asc')
-                ->get();
+    {
+        $shares = DB::table('sacco_shares')
+            ->select(
+                'share_id',
+                'share_amount_paying',
+                'share_paid_by',
+                'share_period',
+                'share_description',
+                'share_doc_no',
+                'share_date_paid'
+            )
+            ->where('share_member_id', Auth::user()->id)
+            ->orderBy('share_period', 'asc')
+            ->get();
 
-            // Calculate running balance
-            $runningBalance = 0;
-            foreach ($shares as $share) {
-                $runningBalance += $share->share_amount_paying;
-                $share->running_balance = $runningBalance; // Add running balance to each record
-            }
-
-            $data = [
-                'shares' => $shares,
-            ];
-
-            return view('members.share_listings', compact('data'));
-        }
-        public function capitalListings()
-        {
-            $capitalShares = DB::table('sacco_capital_shares')
-                ->select(
-                    'share_capitalid',
-                    'share_capitalamount_paying',
-                    'share_capitalpaid_by',
-                    'share_capitalperiod',
-                    'share_capitaldescription',
-                    'share_capitaldoc_no',
-                    'share_capitaldate_paid'
-                )
-                ->where('share_capitalmember_id', Auth::user()->id)
-                ->orderBy('share_capitalperiod', 'asc')
-                ->get();
-        
-            // Calculate running balance
-            $runningBalance = 0;
-            foreach ($capitalShares as $capital) {
-                $runningBalance += $capital->share_capitalamount_paying;
-                $capital->running_balance = $runningBalance; // Add running balance to each record
-            }
-        
-            $data = [
-                'capitalShares' => $capitalShares,
-            ];
-        
-            return view('members.capital_listings', compact('data'));
-        }
-        public function fosaListings()
-        {
-            $fosaContributions = DB::table('sacco_fosas')
-                ->select(
-                    'fosa_id',
-                    'fosa_amount_paying',
-                    'fosa_paid_by',
-                    'fosa_period',
-                    'fosa_description',
-                    'fosa_doc_no',
-                    'fosa_date_paid'
-                )
-                ->where('fosa_member_id', Auth::user()->id)
-                ->orderBy('fosa_period', 'asc')
-                ->get();
-        
-            // Calculate running balance
-            $runningBalance = 0;
-            foreach ($fosaContributions as $fosa) {
-                $runningBalance += $fosa->fosa_amount_paying;
-                $fosa->running_balance = $runningBalance; // Add running balance to each record
-            }
-        
-            $data = [
-                'fosaContributions' => $fosaContributions,
-            ];
-        
-            return view('members.fosa_listings', compact('data'));
+        // Calculate running balance
+        $runningBalance = 0;
+        foreach ($shares as $share) {
+            $runningBalance += $share->share_amount_paying;
+            $share->running_balance = $runningBalance; // Add running balance to each record
         }
 
-        public function loansTaken()
-        {
-            // Fetch outstanding loans for the logged-in member
-            $loans = DB::table('sacco_loans')
-                ->join('sacco_loan_types', 'sacco_loans.loan_loan_type', '=', 'sacco_loan_types.loan_type_id')
-                ->join('sacco_loan_category', 'sacco_loans.loan_loan_category', '=', 'sacco_loan_category.loan_category_id')
-                ->select(
-                    'sacco_loans.loan_id',
-                    'sacco_loan_types.loan_type_name',
-                    'sacco_loan_category.loan_category_name',
-                    'sacco_loans.loan_amount',
-                    'sacco_loans.loan_commision',
-                    'sacco_loans.loan_insurance',
-                    'sacco_loans.loan_loan_paid',
-                    'sacco_loans.loan_taken_period',
-                    'sacco_loans.loan_doc_no',
-                    'sacco_loans.loan_description',
-                    DB::raw('loan_amount - loan_loan_paid AS loan_balance') // Calculate loan balance
-                )
-                ->where('loan_member', Auth::user()->id)
-                // ->whereRaw('loan_amount - loan_loan_paid > 1') // Only outstanding loans
-                ->orderBy('loan_taken_period', 'desc')
-                ->get();
-        
-            // Fetch loan repayments for each loan
-            $repayments = DB::table('sacco_loan_payments')
-                ->whereIn('loan_payments_loan_id', $loans->pluck('loan_id'))
-                ->select(
-                    'loan_payments_loan_id',
-                    'loan_payments_amount',
-                    'loan_payments_description',
-                    'loan_payments_docno',
-                    'loan_payments_period',
-                    'loan_payments_paid_on',
-                    'loan_payments_interest'
-                )
-                ->orderBy('loan_payments_period', 'asc')
-                ->get();
-        
-            // Group repayments by loan ID and dynamically calculate balances
-            $repaymentsByLoan = $repayments->groupBy('loan_payments_loan_id');
-            foreach ($loans as $loan) {
-                $loan->repayments = $repaymentsByLoan[$loan->loan_id] ?? [];
-                $runningBalance = $loan->loan_amount; // Start with the loan amount
-        
-                foreach ($loan->repayments as $repayment) {
-                    // Subtract principal immediately from the initial balance
-                    $runningBalance -= $repayment->loan_payments_amount;
-                    $repayment->outstanding_balance = $runningBalance; // Set the current balance
-                }
-            }
-        
-            // Prepare data for the view
-            $data = [
-                'loans' => $loans,
-            ];
-        
-            return view('members.loans_taken', compact('data'));
+        $data = [
+            'shares' => $shares,
+        ];
+
+        return view('members.share_listings', compact('data'));
+    }
+    public function capitalListings()
+    {
+        $capitalShares = DB::table('sacco_capital_shares')
+            ->select(
+                'share_capitalid',
+                'share_capitalamount_paying',
+                'share_capitalpaid_by',
+                'share_capitalperiod',
+                'share_capitaldescription',
+                'share_capitaldoc_no',
+                'share_capitaldate_paid'
+            )
+            ->where('share_capitalmember_id', Auth::user()->id)
+            ->orderBy('share_capitalperiod', 'asc')
+            ->get();
+
+        // Calculate running balance
+        $runningBalance = 0;
+        foreach ($capitalShares as $capital) {
+            $runningBalance += $capital->share_capitalamount_paying;
+            $capital->running_balance = $runningBalance; // Add running balance to each record
         }
 
+        $data = [
+            'capitalShares' => $capitalShares,
+        ];
+
+        return view('members.capital_listings', compact('data'));
+    }
+    public function fosaListings()
+    {
+        $fosaContributions = DB::table('sacco_fosas')
+            ->select(
+                'fosa_id',
+                'fosa_amount_paying',
+                'fosa_paid_by',
+                'fosa_period',
+                'fosa_description',
+                'fosa_doc_no',
+                'fosa_date_paid'
+            )
+            ->where('fosa_member_id', Auth::user()->id)
+            ->orderBy('fosa_period', 'asc')
+            ->get();
+
+        // Calculate running balance
+        $runningBalance = 0;
+        foreach ($fosaContributions as $fosa) {
+            $runningBalance += $fosa->fosa_amount_paying;
+            $fosa->running_balance = $runningBalance; // Add running balance to each record
+        }
+
+        $data = [
+            'fosaContributions' => $fosaContributions,
+        ];
+
+        return view('members.fosa_listings', compact('data'));
+    }
+
+    public function loansTaken()
+    {
+        // Fetch outstanding loans for the logged-in member
+        $loans = DB::table('sacco_loans')
+            ->join('sacco_loan_types', 'sacco_loans.loan_loan_type', '=', 'sacco_loan_types.loan_type_id')
+            ->join('sacco_loan_category', 'sacco_loans.loan_loan_category', '=', 'sacco_loan_category.loan_category_id')
+            ->select(
+                'sacco_loans.loan_id',
+                'sacco_loan_types.loan_type_name',
+                'sacco_loan_category.loan_category_name',
+                'sacco_loans.loan_amount',
+                'sacco_loans.loan_commision',
+                'sacco_loans.loan_insurance',
+                'sacco_loans.loan_loan_paid',
+                'sacco_loans.loan_taken_period',
+                'sacco_loans.loan_doc_no',
+                'sacco_loans.loan_description',
+                DB::raw('loan_amount - loan_loan_paid AS loan_balance') // Calculate loan balance
+            )
+            ->where('loan_member', Auth::user()->id)
+            // ->whereRaw('loan_amount - loan_loan_paid > 1') // Only outstanding loans
+            ->orderBy('loan_taken_period', 'desc')
+            ->get();
+
+        // Fetch loan repayments for each loan
+        $repayments = DB::table('sacco_loan_payments')
+            ->whereIn('loan_payments_loan_id', $loans->pluck('loan_id'))
+            ->select(
+                'loan_payments_loan_id',
+                'loan_payments_amount',
+                'loan_payments_description',
+                'loan_payments_docno',
+                'loan_payments_period',
+                'loan_payments_paid_on',
+                'loan_payments_interest'
+            )
+            ->orderBy('loan_payments_period', 'asc')
+            ->get();
+
+        // Group repayments by loan ID and dynamically calculate balances
+        $repaymentsByLoan = $repayments->groupBy('loan_payments_loan_id');
+        foreach ($loans as $loan) {
+            $loan->repayments = $repaymentsByLoan[$loan->loan_id] ?? [];
+            $runningBalance = $loan->loan_amount; // Start with the loan amount
+
+            foreach ($loan->repayments as $repayment) {
+                // Subtract principal immediately from the initial balance
+                $runningBalance -= $repayment->loan_payments_amount;
+                $repayment->outstanding_balance = $runningBalance; // Set the current balance
+            }
+        }
+
+        // Prepare data for the view
+        $data = [
+            'loans' => $loans,
+        ];
+
+        return view('members.loans_taken', compact('data'));
+    }
 }
