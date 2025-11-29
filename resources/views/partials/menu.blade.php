@@ -466,7 +466,7 @@ $defaultLogoPath = '/image/logo.jpg'; // Default logo
 
         <!-- MPESA Collections -->
         <li class="item-name">
-            <a href="{{ url('/reports/mpesa') }}">
+            <a href="{{ url('/reports/transport/mpesa') }}">
                 <span class="text-muted">mPesa Collections</span>
             </a>
         </li>
