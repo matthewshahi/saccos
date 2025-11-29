@@ -24,9 +24,11 @@ class SendPendingNotificationsJob implements ShouldQueue
             ->where('notif_status', 'unread')
             ->whereNotNull('notif_recipient_email')
             ->whereNull('notif_sent_at')
+            ->where('notif_created_at', '>=', now()->subDays(2))
             ->orderBy('notif_created_at', 'asc')
             ->limit($limit)
             ->get();
+
 
         $queued = 0;
 
@@ -44,9 +46,10 @@ class SendPendingNotificationsJob implements ShouldQueue
             $queued++;
         }
 
-        Log::info($queued > 0
-            ? "📧 SendPendingNotificationsJob queued {$queued} email(s) for sending."
-            : "📧 No new notifications to queue."
+        Log::info(
+            $queued > 0
+                ? "📧 SendPendingNotificationsJob queued {$queued} email(s) for sending."
+                : "📧 No new notifications to queue."
         );
     }
 }
