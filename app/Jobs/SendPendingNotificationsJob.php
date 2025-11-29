@@ -21,7 +21,7 @@ class SendPendingNotificationsJob implements ShouldQueue
 
         // 🔹 Only unread or failed (not queued/sent/read)
         $notifications = DB::table('sacco_system_notifications')
-            ->whereIn('notif_status', ['unread', 'failed'])
+            ->where('notif_status', 'unread')
             ->whereNotNull('notif_recipient_email')
             ->whereNull('notif_sent_at')
             ->orderBy('notif_created_at', 'asc')
