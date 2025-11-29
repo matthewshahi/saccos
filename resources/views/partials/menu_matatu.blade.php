@@ -2,7 +2,7 @@
     <li class="Ul_li--hover">
         <a class="has-arrow" href="#">
             <i class="i-Car-Items text-20 me-2" style="color: #663399;"></i>
-            <span class="item-name text-15 text-muted">Matatu SACCO</span>
+            <span class="item-name text-15 text-muted">Transport</span>
         </a>
         <ul class="mm-collapse">
             <li class="item-name">

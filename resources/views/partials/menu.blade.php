@@ -241,12 +241,12 @@ $defaultLogoPath = '/image/logo.jpg'; // Default logo
                                 </a>
                             </li>
 
-                             <li class="item-name">
-            <a href="{{ route('loans.repayments.import') }}">
-                <span class="text-muted">Import Loan Repayments (CSV)</span>
-            </a>
-        </li>
-        
+                            <li class="item-name">
+                                <a href="{{ route('loans.repayments.import') }}">
+                                    <span class="text-muted">Import Loan Repayments (CSV)</span>
+                                </a>
+                            </li>
+
                             <li class="item-name">
                                 <a href="{{ url('/reports/loans/active') }}">
                                     <span class="text-muted">Monthly Contributions</span>
@@ -455,6 +455,28 @@ $defaultLogoPath = '/image/logo.jpg'; // Default logo
 
                                 </ul>
                             </li>
+
+                           <li class="Ul_li--hover">
+    <a class="has-arrow" href="#">
+        <i class="i-Bar-Chart text-20 me-2" style="color: #663399;"></i>
+        <span class="item-name text-15 text-muted">Transport</span>
+    </a>
+
+    <ul class="mm-collapse">
+
+        <!-- MPESA Collections -->
+        <li class="item-name">
+            <a href="{{ url('/reports/mpesa') }}">
+                <span class="text-muted">mPesa Collections</span>
+            </a>
+        </li>
+
+         
+
+    </ul>
+</li>
+
+
                             <li class="Ul_li--hover">
                                 <a class="has-arrow" href="#">
                                     <i class="i-Bar-Chart text-20 me-2" style="color: #663399;"></i>
