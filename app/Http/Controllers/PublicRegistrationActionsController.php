@@ -8,25 +8,33 @@ use Illuminate\Support\Facades\Log;
 
 class PublicRegistrationActionsController extends Controller
 {
-    public function listMembers(Request $request)
-    {
-        $search = $request->input('search');
-        $query = DB::table('sacco_members_new_applications');
+   public function listMembers(Request $request)
+{
+    $search = $request->input('search');
+    $query = DB::table('sacco_members_new_applications');
 
-        if ($search) {
-            $query->where(function ($q) use ($search) {
-                $q->where('first_name', 'LIKE', "%{$search}%")
-                  ->orWhere('last_name', 'LIKE', "%{$search}%")
-                  ->orWhere('email', 'LIKE', "%{$search}%")
-                  ->orWhere('phone', 'LIKE', "%{$search}%")
-                  ->orWhere('national_id', 'LIKE', "%{$search}%")
-                  ->orWhere('physical_location', 'LIKE', "%{$search}%");
-            });
-        }
-
-        $members = $query->orderByDesc('created_at')->paginate(10);
-        return view('public.new_member_applications', compact('members', 'search'));
+    if ($search) {
+        $query->where(function ($q) use ($search) {
+            $q->where('first_name', 'LIKE', "%{$search}%")
+              ->orWhere('last_name', 'LIKE', "%{$search}%")
+              ->orWhere('email', 'LIKE', "%{$search}%")
+              ->orWhere('phone', 'LIKE', "%{$search}%")
+              ->orWhere('national_id', 'LIKE', "%{$search}%")
+              ->orWhere('physical_location', 'LIKE', "%{$search}%");
+        });
     }
+
+    // PRIORITY ORDER:
+    // 1) exported ASC (not exported first)
+    // 2) created_at ASC (oldest first)
+    $members = $query
+        ->orderByRaw("CASE WHEN exported = 'Y' THEN 1 ELSE 0 END ASC")
+        ->orderBy('created_at', 'ASC')
+        ->paginate(50);
+
+    return view('public.new_member_applications', compact('members', 'search'));
+}
+
 
     public function getMemberDetails($id)
     {
