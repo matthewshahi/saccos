@@ -35,6 +35,7 @@ class ProcessTransactionsJob implements ShouldQueue
         // Fetch unprocessed C2B transactions (limit to 100 records)
         $c2bTransactions = DB::table('c2b_payments')
             ->where('processed', 'No')
+            ->where('picked', 'No')
             ->orderBy('created_at', 'asc')
             ->limit(60)
             ->get();
@@ -55,9 +56,39 @@ class ProcessTransactionsJob implements ShouldQueue
 
     private function processTransaction($transaction)
     {
+
+
+
+
+        $updated = DB::table('c2b_payments')
+            ->where('id', $transaction->id)
+            ->where('picked', 'No')
+            ->update(['picked' => 'Yes']);
+
+        if (!$updated) {
+            // Another job already claimed this one
+            return;
+        }
+
+
         // Clean and normalize the reference
         $reference = strtoupper(trim(str_replace(' ', '', $transaction->bill_ref_number)));
         Log::info("Normalized transaction reference: $reference");
+
+
+
+
+        // =====================================================
+        // 1. CHECK IF OPERATOR PAYMENT (OPxxx-...)
+        // =====================================================
+      if (preg_match('/^OP[A-Z]{2}-\d+(-\d+)?$/', $reference)) {
+    $this->processOperatorTransaction($reference, $transaction);
+}
+
+
+
+       
+
 
         if (str_starts_with($reference, 'SH')) {
             Log::info("Identified as a Share transaction for reference: $reference");
@@ -68,26 +99,23 @@ class ProcessTransactionsJob implements ShouldQueue
         } elseif (str_starts_with($reference, 'CA')) {
             Log::info("Identified as a Capital Shares transaction for reference: $reference");
             $this->processCapital($reference, $transaction);
-        } 
-        elseif (str_starts_with($reference, 'RF')) {
-        Log::info("Identified as a Registration Fee transaction for reference: $reference");
+        } elseif (str_starts_with($reference, 'RF')) {
+            Log::info("Identified as a Registration Fee transaction for reference: $reference");
 
-        $memberId = ltrim($reference, 'RF'); // strip "RF" prefix
-        $period   = $this->getCurrentPeriod();
-        $now      = Carbon::now();
-        $docNo    = "Paybill {$transaction->business_shortcode} - {$transaction->transaction_id}";
-        $ip       = request()->ip() ?? '127.0.0.1';
-        $userId   = auth()->id() ?? 999;
-        $desc     = "Mpesa By {$transaction->first_name} - {$transaction->bill_ref_number}";
+            $memberId = ltrim($reference, 'RF'); // strip "RF" prefix
+            $period   = $this->getCurrentPeriod();
+            $now      = Carbon::now();
+            $docNo    = "Paybill {$transaction->business_shortcode} - {$transaction->transaction_id}";
+            $ip       = request()->ip() ?? '127.0.0.1';
+            $userId   = auth()->id() ?? 999;
+            $desc     = "Mpesa By {$transaction->first_name} - {$transaction->bill_ref_number}";
 
-        $mpesaAccount = DB::table('sacco_defaults')
-            ->where('default_name', 'default_mpesa_in_account')
-            ->value('default_value');
+            $mpesaAccount = DB::table('sacco_defaults')
+                ->where('default_name', 'default_mpesa_in_account')
+                ->value('default_value');
 
-        $this->processRegistrationFee($memberId, $transaction, $desc, $docNo, $period, $now, $userId, $ip, $mpesaAccount);
-
-    }
-    else {
+            $this->processRegistrationFee($memberId, $transaction, $desc, $docNo, $period, $now, $userId, $ip, $mpesaAccount);
+        } else {
             Log::info("Trying FOSA/fallback for reference: $reference");
             $this->processFallbackTransaction($reference, $transaction);
         }
@@ -104,90 +132,91 @@ class ProcessTransactionsJob implements ShouldQueue
     }
 
     private function processShares($reference, $transaction)
-{
-    $memberId = ltrim($reference, 'SH');
-    Log::info("Processing shares for Member ID: $memberId");
+    {
+        $memberId = ltrim($reference, 'SH');
+        Log::info("Processing shares for Member ID: $memberId");
 
-    // Validate default accounts
-    $defaultMpesaIn = DB::table('sacco_defaults')
-        ->where('default_name', 'default_mpesa_in_account')
-        ->value('default_value');
-    $defaultShareAccount = DB::table('sacco_defaults')
-        ->where('default_name', 'default_share_account')
-        ->value('default_value');
+        // Validate default accounts
+        $defaultMpesaIn = DB::table('sacco_defaults')
+            ->where('default_name', 'default_mpesa_in_account')
+            ->value('default_value');
+        $defaultShareAccount = DB::table('sacco_defaults')
+            ->where('default_name', 'default_share_account')
+            ->value('default_value');
 
-    if (!$defaultMpesaIn || !$defaultShareAccount) {
-        Log::error("Missing default accounts for processing shares: Member ID {$memberId}");
-        return;
-    }
-
-    try {
-        // 1️⃣ Update member's shares
-        $affected = DB::table('sacco_members')
-            ->where('member_id', $memberId)
-            ->increment('member_total_share', $transaction->transaction_amount);
-
-        if ($affected === 0) {
-            throw new \Exception("No sacco_members row updated for Member ID {$memberId}");
+        if (!$defaultMpesaIn || !$defaultShareAccount) {
+            Log::error("Missing default accounts for processing shares: Member ID {$memberId}");
+            return;
         }
-        Log::info("Updated shares for Member ID: $memberId by Amount: {$transaction->transaction_amount}");
 
-        // 2️⃣ Insert into sacco_shares
-        $currentPeriod = $this->getCurrentPeriod();
-        $description = "Mpesa By {$transaction->first_name} - {$transaction->bill_ref_number}";
-        $docNo = "Paybill {$transaction->business_shortcode} - {$transaction->transaction_id}";
+        try {
+            // 1️⃣ Update member's shares
+            $affected = DB::table('sacco_members')
+                ->where('member_id', $memberId)
+                ->increment('member_total_share', $transaction->transaction_amount);
 
-        DB::table('sacco_shares')->insert([
-            'share_member_id'      => $memberId,
-            'share_amount_paying'  => $transaction->transaction_amount,
-            'share_paid_by'        => 'MPesa',
-            'share_period'         =>  $this->getCurrentPeriod(),
-            'share_description'    => $description,
-            'share_doc_no'         => $docNo,
-            'share_date_paid'      => Carbon::now(),
-            'share_end_month_proc' => 'N',
-            'share_by'             => auth()->id() ?? null,
-            'share_ip'             => request()->ip() ?? '127.0.0.1',
-            'share_transdate'      => Carbon::now(), // ✅ ensure column exists
-        ]);
+            if ($affected === 0) {
+                throw new \Exception("No sacco_members row updated for Member ID {$memberId}");
+            }
+            Log::info("Updated shares for Member ID: $memberId by Amount: {$transaction->transaction_amount}");
 
-        Log::info("Inserted sacco_shares record for Member ID: $memberId, Amount: {$transaction->transaction_amount}");
+            // 2️⃣ Insert into sacco_shares
+            $currentPeriod = $this->getCurrentPeriod();
+            $description = "Mpesa By {$transaction->first_name} - {$transaction->bill_ref_number}";
+            $docNo = "Paybill {$transaction->business_shortcode} - {$transaction->transaction_id}";
 
-        // 3️⃣ Update ledger entries
-        $this->updateSaccoAccountsTrans(
-            $defaultMpesaIn,
-            $transaction->transaction_amount,
-            0,
-            $docNo,
-            "Shares Deposit - $description",
-            $transaction->transaction_time
-        );
-        $this->updateSaccoAccountsTrans(
-            $defaultShareAccount,
-            0,
-            $transaction->transaction_amount,
-            $docNo,
-            "Shares Deposit - $description",
-            $transaction->transaction_time
-        );
+            DB::table('sacco_shares')->insert([
+                'share_member_id'      => $memberId,
+                'share_amount_paying'  => $transaction->transaction_amount,
+                'share_paid_by'        => 'MPesa',
+                'share_period'         =>  $this->getCurrentPeriod(),
+                'share_description'    => $description,
+                'share_doc_no'         => $docNo,
+                'share_date_paid'      => Carbon::now(),
+                'share_end_month_proc' => 'N',
+                'share_by'             => auth()->id() ?? null,
+                'share_ip'             => request()->ip() ?? '127.0.0.1',
+                'share_transdate'      => Carbon::now(), // ✅ ensure column exists
+            ]);
 
-    } catch (\Illuminate\Database\QueryException $e) {
-        // Logs SQL error message + bindings
-        Log::error("DB error in processShares()", [
-            'memberId' => $memberId,
-            'error'    => $e->getMessage(),
-            'sql'      => $e->getSql(),
-            'bindings' => $e->getBindings(),
-        ]);
-        throw $e; // rethrow so job fails visibly
-    } catch (\Exception $e) {
-        Log::error("processShares failed: " . $e->getMessage(), ['memberId' => $memberId]);
-        throw $e;
+            Log::info("Inserted sacco_shares record for Member ID: $memberId, Amount: {$transaction->transaction_amount}");
+
+            // 3️⃣ Update ledger entries
+            $this->updateSaccoAccountsTrans(
+                $defaultMpesaIn,
+                $transaction->transaction_amount,
+                0,
+                $docNo,
+                "Shares Deposit - $description",
+                $transaction->transaction_time
+            );
+            $this->updateSaccoAccountsTrans(
+                $defaultShareAccount,
+                0,
+                $transaction->transaction_amount,
+                $docNo,
+                "Shares Deposit - $description",
+                $transaction->transaction_time
+            );
+        } catch (\Illuminate\Database\QueryException $e) {
+            // Logs SQL error message + bindings
+            Log::error("DB error in processShares()", [
+                'memberId' => $memberId,
+                'error'    => $e->getMessage(),
+                'sql'      => $e->getSql(),
+                'bindings' => $e->getBindings(),
+            ]);
+            throw $e; // rethrow so job fails visibly
+        } catch (\Exception $e) {
+            Log::error("processShares failed: " . $e->getMessage(), ['memberId' => $memberId]);
+            throw $e;
+        }
     }
-}
     private function processLoans($reference, $transaction)
     {
-        $loanId = ltrim($reference, 'LN');
+        // $loanId = ltrim($reference, 'LN');
+        $loanId = (int) substr($reference, 2);
+
         Log::info("Processing loan payment for Loan ID: $loanId");
 
         $defaultMpesaIn = DB::table('sacco_defaults')->where('default_name', 'default_mpesa_in_account')->value('default_value');
@@ -302,10 +331,10 @@ class ProcessTransactionsJob implements ShouldQueue
         }
     }
 
-private function getCurrentPeriod(): string
-{
-    return now()->format('Ym'); // e.g. "202509"
-}
+    private function getCurrentPeriod(): string
+    {
+        return now()->format('Ym'); // e.g. "202509"
+    }
 
 
     private function processFallbackTransaction($reference, $transaction)
@@ -322,43 +351,43 @@ private function getCurrentPeriod(): string
             return;
         }
 
-    // Detect prefix usage
-$prefix = strtoupper(substr($idPart, 0, 2));
-Log::info("Fallback prefix detected: {$prefix} from idPart={$idPart}");
+        // Detect prefix usage
+        $prefix = strtoupper(substr($idPart, 0, 2));
+        Log::info("Fallback prefix detected: {$prefix} from idPart={$idPart}");
 
-// ✅ Check for known prefixes (hardcoded + sacco_fosa_types)
-$isKnownPrefix = in_array($prefix, ['SH', 'LN', 'CA']) ||
-    DB::table('sacco_fosa_types')
-        ->whereRaw('UPPER(type_prefix) = ?', [$prefix])
-        ->where('type_active', 'Y')
-        ->exists();
+        // ✅ Check for known prefixes (hardcoded + sacco_fosa_types)
+        $isKnownPrefix = in_array($prefix, ['SH', 'LN', 'CA']) ||
+            DB::table('sacco_fosa_types')
+            ->whereRaw('UPPER(type_prefix) = ?', [$prefix])
+            ->where('type_active', 'Y')
+            ->exists();
 
-Log::info("Fallback: prefix {$prefix}, isKnownPrefix=" . ($isKnownPrefix ? 'YES' : 'NO'));
+        Log::info("Fallback: prefix {$prefix}, isKnownPrefix=" . ($isKnownPrefix ? 'YES' : 'NO'));
 
-if ($isKnownPrefix) {
-    // ✅ Always use member_id lookup for known prefixes
-    $members = DB::table('sacco_members')
-        ->where('member_id', $cleanedId)
-        ->get();
-    Log::info("Fallback: Using member_id lookup with prefix {$prefix}, value {$cleanedId}");
-} else {
-    // 🔎 Fallback to national_id lookup if prefix is unknown
-    $members = DB::table('sacco_members')
-        ->where('member_national_id', $cleanedId)
-        ->get();
-    Log::info("Fallback: Using national_id lookup, value {$cleanedId}");
-}
+        if ($isKnownPrefix) {
+            // ✅ Always use member_id lookup for known prefixes
+            $members = DB::table('sacco_members')
+                ->where('member_id', $cleanedId)
+                ->get();
+            Log::info("Fallback: Using member_id lookup with prefix {$prefix}, value {$cleanedId}");
+        } else {
+            // 🔎 Fallback to national_id lookup if prefix is unknown
+            $members = DB::table('sacco_members')
+                ->where('member_national_id', $cleanedId)
+                ->get();
+            Log::info("Fallback: Using national_id lookup, value {$cleanedId}");
+        }
 
 
 
-// ✅ Handle case where no match or multiple matches
-if ($members->count() !== 1) {
-    Log::warning("Fallback: Found {$members->count()} matches for ID '$cleanedId'. Skipping.");
-    return;
-}
+        // ✅ Handle case where no match or multiple matches
+        if ($members->count() !== 1) {
+            Log::warning("Fallback: Found {$members->count()} matches for ID '$cleanedId'. Skipping.");
+            return;
+        }
 
-$member   = $members->first();
-$memberId = $member->member_id;
+        $member   = $members->first();
+        $memberId = $member->member_id;
         // $period = (object)['period_name' => now()->format('Ym')];
         $period = $this->getCurrentPeriod(); // returns "202509"
         $amount = $transaction->transaction_amount;
@@ -538,54 +567,140 @@ $memberId = $member->member_id;
     }
 
     private function processRegistrationFee($memberId, $transaction, $description, $docNo, $period, $now, $userId, $ip, $mpesaAccount)
-{
-    $amount = $transaction->transaction_amount;
+    {
+        $amount = $transaction->transaction_amount;
 
-    // Insert into sacco_registration_fees
-    DB::table('sacco_registration_fees')->insert([
-        'regfee_member_id'      => $memberId,
-        'regfee_amount'         => $amount,
-        'regfee_doc_no'         => $docNo,
-        'regfee_description'    => "Registration Fee - $description",
-        'regfee_date_paid'      => $now->toDateString(),
-        'regfee_paid_by'        => $userId,
-        'regfee_ip'             => $ip,
-        'regfee_by'             => $userId,
-        'regfee_created_ip'     => $ip,
-        'regfee_transdate'      => $now,
-        'regfee_end_month_proc' => $period,
-        'created_at'            => $now,
-        'updated_at'            => $now,
-    ]);
+        // Insert into sacco_registration_fees
+        DB::table('sacco_registration_fees')->insert([
+            'regfee_member_id'      => $memberId,
+            'regfee_amount'         => $amount,
+            'regfee_doc_no'         => $docNo,
+            'regfee_description'    => "Registration Fee - $description",
+            'regfee_date_paid'      => $now->toDateString(),
+            'regfee_paid_by'        => $userId,
+            'regfee_ip'             => $ip,
+            'regfee_by'             => $userId,
+            'regfee_created_ip'     => $ip,
+            'regfee_transdate'      => $now,
+            'regfee_end_month_proc' => $period,
+            'created_at'            => $now,
+            'updated_at'            => $now,
+        ]);
 
-    
 
-    // Ledger update (using default_member_ship_fee_account)
-    $regFeeAccount = DB::table('sacco_defaults')
-        ->where('default_name', 'default_member_ship_fee_account')
-        ->value('default_value');
 
-    if ($regFeeAccount) {
-        $this->updateSaccoAccountsTrans(
-            $mpesaAccount,
-            $amount,
-            0,
-            $docNo,
-            "Registration Fee - $description",
-            $transaction->transaction_time
-        );
+        // Ledger update (using default_member_ship_fee_account)
+        $regFeeAccount = DB::table('sacco_defaults')
+            ->where('default_name', 'default_member_ship_fee_account')
+            ->value('default_value');
 
-        $this->updateSaccoAccountsTrans(
-            $regFeeAccount,
-            0,
-            $amount,
-            $docNo,
-            "Registration Fee - $description",
-            $transaction->transaction_time
-        );
+        if ($regFeeAccount) {
+            $this->updateSaccoAccountsTrans(
+                $mpesaAccount,
+                $amount,
+                0,
+                $docNo,
+                "Registration Fee - $description",
+                $transaction->transaction_time
+            );
+
+            $this->updateSaccoAccountsTrans(
+                $regFeeAccount,
+                0,
+                $amount,
+                $docNo,
+                "Registration Fee - $description",
+                $transaction->transaction_time
+            );
+        }
+
+        Log::info("REGISTRATION FEE processed for Member ID: $memberId, Amount: $amount");
     }
 
-    Log::info("REGISTRATION FEE processed for Member ID: $memberId, Amount: $amount");
-}
+    private function processOperatorTransaction(string &$reference, $transaction)
+    {
+        // Example formats:
+        // OPSH-15
+        // OPCA-22
+        // OPLN-15-26 (loan)
+        // OPRF-19
+        // OPDT-33   (fallback)
+        // OPOT-33   (fallback)
+        // OPPN-33   (fallback)
 
+        $parts = explode('-', $reference);
+
+        $prefix = strtoupper($parts[0] ?? null);   // OPSH, OPLN, OPDT...
+        $opId   = $parts[1] ?? null;               // operator ID
+        $loanId = $parts[2] ?? null;               // only for OPLN
+
+        if (!$prefix || !$opId || !is_numeric($opId)) {
+            return $this->failTransaction($transaction->id, "Invalid operator reference: $reference");
+        }
+
+        // Load operator
+        $operator = DB::table('sacco_operators')
+            ->where('operator_id', $opId)
+            ->first();
+
+        if (!$operator) {
+            return $this->failTransaction($transaction->id, "Operator ID {$opId} not found");
+        }
+
+        // ALWAYS record operator deposits
+        DB::table('sacco_matatus_collections')->insert([
+            'coll_operator_id' => $operator->operator_id,
+            'coll_vehicle_id'  => $operator->operator_vehicle_id,
+            'coll_amount'      => $transaction->transaction_amount,
+            'coll_type'        => strtolower($prefix),
+            'coll_period'      => $this->getCurrentPeriod(),
+            'coll_description' => "$prefix Payment from Operator {$operator->operator_name}",
+            'coll_ip'          => request()->ip(),
+            'coll_transdate'   => now(),
+        ]);
+
+        // =====================================================
+        // REWRITE OPERATOR PREFIX TO SACCO PREFIX
+        // =====================================================
+
+        switch ($prefix) {
+
+            // Operator Share → SH<member_id>
+            case "OPSH":
+                $reference = "SH" . $operator->operator_member_id;
+                break;
+
+            // Operator Capital → CA<member_id>
+            case "OPCA":
+                $reference = "CA" . $operator->operator_member_id;
+                break;
+
+            // Operator Registration Fee → RF<member_id>
+            case "OPRF":
+                $reference = "RF" . $operator->operator_member_id;
+                break;
+
+            // Operator Loan → LN<loan_id>
+            case "OPLN":
+                if (!$loanId) {
+                    return $this->failTransaction($transaction->id, "OPLN missing loan ID in $reference");
+                }
+                $reference = "LN" . $loanId; // SACCO routing will process this
+                break;
+
+            // All other OP prefixes go to fallback:
+            // OPDT-xx (daily target)
+            // OPOT-xx (other)
+            // OPPN-xx (penalty)
+            default:
+                // Remove OP → e.g. OPDT-15 → DT15
+                $core = substr($prefix, 2);
+                $reference = $core . $opId;
+                break;
+        }
+
+        // IMPORTANT:
+        // Do NOT process anything here.
+        // Main SACCO routing will process rewritten $reference.
+    }
 }
