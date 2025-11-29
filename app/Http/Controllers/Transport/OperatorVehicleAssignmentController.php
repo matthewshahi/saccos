@@ -54,6 +54,17 @@ public function store(Request $request)
         'v_assignment_status' => 'required|string',
     ]);
 
+    // 🔥 Prevent duplicate operator → vehicle assignment
+    $exists = DB::table('sacco_matatus_operator_vehicle_assignments')
+        ->where('v_assignment_operator_id', $request->v_assignment_operator_id)
+        ->where('v_assignment_vehicle_id', $request->v_assignment_vehicle_id)
+        ->exists();
+
+    if ($exists) {
+        return back()->with('error', 'This operator is already assigned to this vehicle.');
+    }
+
+    // Insert new assignment
     DB::table('sacco_matatus_operator_vehicle_assignments')->insert([
         'v_assignment_operator_id' => $request->v_assignment_operator_id,
         'v_assignment_vehicle_id' => $request->v_assignment_vehicle_id,
@@ -64,8 +75,10 @@ public function store(Request $request)
         'updated_at' => now(),
     ]);
 
-    return redirect()->route('assignments.index')->with('success', 'Assignment added successfully.');
+    return redirect()->route('assignments.index')
+        ->with('success', 'Assignment added successfully.');
 }
+
 
 public function edit($id)
 {

@@ -18,86 +18,157 @@
   </div>
 </div>
 
+{{-- SESSION & VALIDATION FEEDBACK --}}
+@if(session('success'))
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="fa fa-check-circle"></i> {{ session('success') }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+@endif
+
+@if(session('error'))
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="fa fa-exclamation-triangle"></i> {{ session('error') }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+@endif
+
+@if ($errors->any())
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <strong>There were errors with your submission:</strong>
+        <ul class="mb-0 mt-1">
+            @foreach ($errors->all() as $error)
+                <li>• {{ $error }}</li>
+            @endforeach
+        </ul>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+@endif
+{{-- END FEEDBACK --}}
+
          
         <form method="POST" action="{{ route('fleet.store') }}">
-          @csrf
-          <div class="row">
-            <div class="col-md-6 form-group mb-3">
-              <label for="vehicles_registration_number">Registration Number *</label>
-              <input class="form-control" name="vehicles_registration_number" required type="text" placeholder="e.g. KDH 123A">
-            </div>
-            <div class="col-md-6 form-group mb-3">
-              <label for="vehicles_make">Make</label>
-              <input class="form-control" name="vehicles_make" type="text" placeholder="e.g. Toyota">
-            </div>
-            <div class="col-md-6 form-group mb-3">
-              <label for="vehicles_model">Model</label>
-              <input class="form-control" name="vehicles_model" type="text" placeholder="e.g. Hiace">
-            </div>
-            <div class="col-md-6 form-group mb-3">
-              <label for="vehicles_year">Year</label>
-              <input class="form-control" name="vehicles_year" type="number" placeholder="e.g. 2015">
-            </div>
-            <div class="col-md-6 form-group mb-3">
-              <label for="vehicles_chassis_number">Chassis Number</label>
-              <input class="form-control" name="vehicles_chassis_number" type="text">
-            </div>
-            <div class="col-md-6 form-group mb-3">
-              <label for="vehicles_insurance_provider">Insurance Provider</label>
-              <input class="form-control" name="vehicles_insurance_provider" type="text">
-            </div>
-            <div class="col-md-6 form-group mb-3">
-              <label for="vehicles_insurance_expiry">Insurance Expiry</label>
-              <input class="form-control" name="vehicles_insurance_expiry" type="date">
-            </div>
-            <div class="col-md-6 form-group mb-3">
-              <label for="vehicles_last_inspection_date">Last Inspection Date</label>
-              <input class="form-control" name="vehicles_last_inspection_date" type="date">
-            </div>
-            <div class="col-md-6 form-group mb-3">
-              <label for="vehicles_psv_license_number">PSV License Number</label>
-              <input class="form-control" name="vehicles_psv_license_number" type="text">
-            </div>
-            <div class="col-md-6 form-group mb-3">
-              <label for="vehicles_psv_expiry">PSV Expiry</label>
-              <input class="form-control" name="vehicles_psv_expiry" type="date">
-            </div>
-            <div class="col-md-6 form-group mb-3">
-              <label for="vehicles_route_name">Route</label>
-              <select class="form-control" name="vehicles_route_name">
+    @csrf
+
+    <div class="row">
+        <div class="col-md-6 form-group mb-3">
+            <label>Registration Number *</label>
+            <input class="form-control" name="vehicles_registration_number"
+                   value="{{ old('vehicles_registration_number') }}"
+                   required type="text" placeholder="e.g. KDH 123A">
+        </div>
+
+        <div class="col-md-6 form-group mb-3">
+            <label>Make</label>
+            <input class="form-control" name="vehicles_make"
+                   value="{{ old('vehicles_make') }}"
+                   type="text" placeholder="e.g. Toyota">
+        </div>
+
+        <div class="col-md-6 form-group mb-3">
+            <label>Model</label>
+            <input class="form-control" name="vehicles_model"
+                   value="{{ old('vehicles_model') }}"
+                   type="text" placeholder="e.g. Hiace">
+        </div>
+
+        <div class="col-md-6 form-group mb-3">
+            <label>Year</label>
+            <input class="form-control" name="vehicles_year"
+                   value="{{ old('vehicles_year') }}"
+                   type="number" placeholder="e.g. 2015">
+        </div>
+
+        <div class="col-md-6 form-group mb-3">
+            <label>Chassis Number</label>
+            <input class="form-control" name="vehicles_chassis_number"
+                   value="{{ old('vehicles_chassis_number') }}"
+                   type="text">
+        </div>
+
+        <div class="col-md-6 form-group mb-3">
+            <label>Insurance Provider</label>
+            <input class="form-control" name="vehicles_insurance_provider"
+                   value="{{ old('vehicles_insurance_provider') }}"
+                   type="text">
+        </div>
+
+        <div class="col-md-6 form-group mb-3">
+            <label>Insurance Expiry</label>
+            <input class="form-control" name="vehicles_insurance_expiry"
+                   value="{{ old('vehicles_insurance_expiry') }}"
+                   type="date">
+        </div>
+
+        <div class="col-md-6 form-group mb-3">
+            <label>Last Inspection Date</label>
+            <input class="form-control" name="vehicles_last_inspection_date"
+                   value="{{ old('vehicles_last_inspection_date') }}"
+                   type="date">
+        </div>
+
+        <div class="col-md-6 form-group mb-3">
+            <label>PSV License Number</label>
+            <input class="form-control" name="vehicles_psv_license_number"
+                   value="{{ old('vehicles_psv_license_number') }}"
+                   type="text">
+        </div>
+
+        <div class="col-md-6 form-group mb-3">
+            <label>PSV Expiry</label>
+            <input class="form-control" name="vehicles_psv_expiry"
+                   value="{{ old('vehicles_psv_expiry') }}"
+                   type="date">
+        </div>
+
+        <div class="col-md-6 form-group mb-3">
+            <label>Route</label>
+            <select class="form-control" name="vehicles_route_name">
                 <option value="">-- Select Route --</option>
                 @foreach($routes as $route)
-                  <option value="{{ $route->route_name }}">{{ $route->route_name }}</option>
+                    <option value="{{ $route->route_name }}"
+                        {{ old('vehicles_route_name') == $route->route_name ? 'selected' : '' }}>
+                        {{ $route->route_name }}
+                    </option>
                 @endforeach
-              </select>
-            </div>
-            <div class="col-md-6 form-group mb-3">
-              <label for="vehicles_member_id">Owner (Member)</label>
-              <select class="form-control" name="vehicles_member_id">
+            </select>
+        </div>
+
+        <div class="col-md-6 form-group mb-3">
+            <label>Owner (Member)</label>
+            <select class="form-control" name="vehicles_member_id">
                 <option value="">-- Select Member --</option>
                 @foreach($members as $member)
-                  <option value="{{ $member->member_id }}">{{ $member->member_name }} - {{ $member->member_sacco_id }}</option>
+                    <option value="{{ $member->member_id }}"
+                        {{ old('vehicles_member_id') == $member->member_id ? 'selected' : '' }}>
+                        {{ $member->member_name }} - {{ $member->member_sacco_id }}
+                    </option>
                 @endforeach
-              </select>
-            </div>
-            <div class="col-md-6 form-group mb-3">
-              <label for="vehicles_status">Status</label>
-              <select class="form-control" name="vehicles_status">
-                <option value="pending_approval">Pending Approval</option>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-                <option value="suspended">Suspended</option>
-                <option value="under_maintenance">Under Maintenance</option>
-                <option value="decommissioned">Decommissioned</option>
-                <option value="blacklisted">Blacklisted</option>
-              </select>
-            </div>
-            <div class="col-md-12">
-              <button class="btn btn-primary">Submit</button>
-              <a href="{{ route('fleet') }}" class="btn btn-secondary ms-2">Cancel</a>
-            </div>
-          </div>
-        </form>
+            </select>
+        </div>
+
+        <div class="col-md-6 form-group mb-3">
+            <label>Status</label>
+            <select class="form-control" name="vehicles_status">
+                @php $status = old('vehicles_status'); @endphp
+                <option value="pending_approval" {{ $status=='pending_approval'?'selected':'' }}>Pending Approval</option>
+                <option value="active" {{ $status=='active'?'selected':'' }}>Active</option>
+                <option value="inactive" {{ $status=='inactive'?'selected':'' }}>Inactive</option>
+                <option value="suspended" {{ $status=='suspended'?'selected':'' }}>Suspended</option>
+                <option value="under_maintenance" {{ $status=='under_maintenance'?'selected':'' }}>Under Maintenance</option>
+                <option value="decommissioned" {{ $status=='decommissioned'?'selected':'' }}>Decommissioned</option>
+                <option value="blacklisted" {{ $status=='blacklisted'?'selected':'' }}>Blacklisted</option>
+            </select>
+        </div>
+
+        <div class="col-md-12">
+            <button class="btn btn-primary">Submit</button>
+            <a href="{{ route('fleet') }}" class="btn btn-secondary ms-2">Cancel</a>
+        </div>
+    </div>
+
+</form>
+
       </div>
     </div>
   </div>

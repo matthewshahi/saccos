@@ -43,16 +43,16 @@ class FleetController extends Controller
         return view('transport.fleet.create', compact('routes', 'members'));
     }
 
-    public function store(Request $request)
+   public function store(Request $request)
 {
-    // Sanitize registration number first
+    // 1. Sanitize registration number (uppercase + remove spaces)
     $request->merge([
         'vehicles_registration_number' => strtoupper(str_replace(' ', '', $request->vehicles_registration_number)),
     ]);
 
-    // Validate after formatting
+    // 2. Validate fields (ownership now mandatory)
     $validated = $request->validate([
-        'vehicles_registration_number' => 'required|unique:sacco_matatus_vehicles',
+        'vehicles_registration_number' => 'required|string',
         'vehicles_make' => 'nullable|string',
         'vehicles_model' => 'nullable|string',
         'vehicles_year' => 'nullable|numeric',
@@ -63,11 +63,26 @@ class FleetController extends Controller
         'vehicles_psv_license_number' => 'nullable|string',
         'vehicles_psv_expiry' => 'nullable|date',
         'vehicles_route_name' => 'nullable|string',
-        'vehicles_member_id' => 'nullable|exists:sacco_members,member_id',
+
+        // 🔥 Ownership is now MANDATORY
+        'vehicles_member_id' => 'required|exists:sacco_members,member_id',
+
         'vehicles_status' => 'required|string',
     ]);
 
-    // Insert into DB
+   // 3. Manual duplicate check (DB query builder only)
+$exists = DB::table('sacco_matatus_vehicles')
+    ->where('vehicles_registration_number', $validated['vehicles_registration_number'])
+    ->exists();
+
+if ($exists) {
+    return back()
+        ->with('error', 'This vehicle is already registered in the system.')
+        ->withInput(); // ✅ VERY IMPORTANT
+}
+
+
+    // 4. Insert sanitized + validated data
     DB::table('sacco_matatus_vehicles')->insert($validated);
 
     return redirect()->route('fleet')->with('success', 'Vehicle added successfully.');
@@ -75,8 +90,13 @@ class FleetController extends Controller
 
      
 
-  public function edit($id)
+ public function edit($id)
 {
+    // Validate that ID is numeric and exists in DB
+    if (!is_numeric($id) || $id <= 0) {
+        return redirect()->route('fleet')->with('error', 'Invalid vehicle selection.');
+    }
+
     $vehicle = DB::table('sacco_matatus_vehicles as v')
         ->leftJoin('sacco_members as m', 'v.vehicles_member_id', '=', 'm.member_id')
         ->leftJoin('sacco_matatus_routes as r', 'v.vehicles_route_name', '=', 'r.route_name')
@@ -89,7 +109,13 @@ class FleetController extends Controller
         ->where('v.id', $id)
         ->first();
 
+    // If vehicle not found
+    if (!$vehicle) {
+        return redirect()->route('fleet')->with('error', 'Vehicle not found.');
+    }
+
     $routes = DB::table('sacco_matatus_routes')->orderBy('route_name')->get();
+
     $members = DB::table('sacco_members')
         ->where('member_active', 'Y')
         ->orderBy('member_name')
@@ -98,16 +124,22 @@ class FleetController extends Controller
     return view('transport.fleet.edit', compact('vehicle', 'routes', 'members'));
 }
 
-    public function update(Request $request, $id)
+
+   public function update(Request $request, $id)
 {
-    // Sanitize the registration number
+    // 1. Ensure valid ID
+    if (!is_numeric($id) || $id <= 0) {
+        return redirect()->route('fleet')->with('error', 'Invalid vehicle.');
+    }
+
+    // 2. Sanitize REG number first
     $request->merge([
         'vehicles_registration_number' => strtoupper(str_replace(' ', '', $request->vehicles_registration_number)),
     ]);
 
-    // Validate input
+    // 3. Validation
     $validated = $request->validate([
-        'vehicles_registration_number' => 'required|unique:sacco_matatus_vehicles,vehicles_registration_number,' . $id,
+        'vehicles_registration_number' => 'required|string',
         'vehicles_make' => 'nullable|string',
         'vehicles_model' => 'nullable|string',
         'vehicles_year' => 'nullable|numeric',
@@ -118,17 +150,35 @@ class FleetController extends Controller
         'vehicles_psv_license_number' => 'nullable|string',
         'vehicles_psv_expiry' => 'nullable|date',
         'vehicles_route_name' => 'nullable|string',
-        'vehicles_member_id' => 'nullable|exists:sacco_members,member_id',
+
+        // Now mandatory
+        'vehicles_member_id' => 'required|exists:sacco_members,member_id',
+
         'vehicles_status' => 'required|string',
     ]);
 
-    // Update record
+    // 4. Manual duplicate check (AFTER sanitization)
+    $duplicate = DB::table('sacco_matatus_vehicles')
+        ->where('vehicles_registration_number', $validated['vehicles_registration_number'])
+        ->where('id', '!=', $id)  // ignore itself
+        ->exists();
+
+    if ($duplicate) {
+        return back()
+            ->with('error', 'This registration number already exists in the system.')
+            ->withInput();
+    }
+
+    // 5. Update
     DB::table('sacco_matatus_vehicles')
         ->where('id', $id)
-        ->update(array_merge($validated, ['updated_at' => now()]));
+        ->update(array_merge($validated, [
+            'updated_at' => now()
+        ]));
 
     return redirect()->route('fleet')->with('success', 'Vehicle updated successfully.');
 }
+
 
     public function destroy($id)
     {

@@ -6,7 +6,25 @@
     <div class="card-header d-flex justify-content-between">
         
         <h5 class="mb-0">Vehicle Assignments</h5>
-        
+        {{-- ===================== SESSION ALERTS ===================== --}}
+    <div class="px-3 mt-3">
+
+        @if(session('success'))
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <i class="fa fa-check-circle"></i> {{ session('success') }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        @endif
+
+        @if(session('error'))
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="fa fa-exclamation-triangle"></i> {{ session('error') }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        @endif
+
+    </div>
+    {{-- ========================================================== --}}
 
         <a href="{{ route('assignments.create') }}" class="btn btn-primary btn-sm">+ Assign Vehicle</a>
     </div>
