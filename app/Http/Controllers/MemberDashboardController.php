@@ -9,6 +9,8 @@ class MemberDashboardController extends Controller
 {
     public function index()
     {
+
+        
         // Fetch the logged-in member's data
         $member = DB::table('sacco_members')
             
@@ -73,6 +75,42 @@ class MemberDashboardController extends Controller
         ->orderBy('type_prefix')
         ->get();
 
+        $operators = [];
+
+
+if (config('sacco.transport_sacco') === 'Y') {
+
+    $operators = DB::table('sacco_matatus_operators')
+        ->leftJoin(
+            'sacco_matatus_operator_vehicle_assignments',
+            'sacco_matatus_operators.id',
+            '=',
+            'sacco_matatus_operator_vehicle_assignments.v_assignment_operator_id'
+        )
+        ->leftJoin(
+            'sacco_matatus_vehicles',
+            'sacco_matatus_operator_vehicle_assignments.v_assignment_vehicle_id',
+            '=',
+            'sacco_matatus_vehicles.id'
+        )
+        ->where('sacco_matatus_operators.status', 'active')
+        ->select(
+            'sacco_matatus_operators.id AS operator_id',
+            'sacco_matatus_operators.full_name',
+            'sacco_matatus_operators.phone',
+            'sacco_matatus_operators.operator_type',
+            'sacco_matatus_operator_vehicle_assignments.v_assignment_start_date',
+            'sacco_matatus_operator_vehicle_assignments.v_assignment_end_date',
+            'sacco_matatus_vehicles.vehicles_registration_number AS vehicle_reg_no',
+            'sacco_matatus_vehicles.id AS vehicle_id'
+        )
+        ->orderBy('sacco_matatus_operators.full_name')
+        ->get();
+}
+
+
+
+
     // Package all data for the view
     $data = [
         'member'        => $member,
@@ -81,6 +119,7 @@ class MemberDashboardController extends Controller
         'labels'        => $labels,
         'amounts'       => $amounts,
         'paymentOptions'=> $paymentOptions,
+        'operators'=> $operators,
     ];
       
 

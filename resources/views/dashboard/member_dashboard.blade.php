@@ -6,6 +6,7 @@
 
 
 @include('dashboard.payment_options')
+ 
 
 <div class="row">
     <!-- Icon Cards Section -->
@@ -198,10 +199,75 @@
         </div>
     </div>
 </div>
+@if (config('sacco.transport_sacco') === 'Y')
+<div class="col-lg-12 col-md-12">
+    <div class="card o-hidden mb-4">
+        <div class="card-header d-flex align-items-center border-0">
+            <h3 class="w-50 float-start card-title m-0">Assigned Operators</h3>
+        </div>
 
-  
+        <div>
+            <div class="table-responsive">
+                <table class="table text-center" id="assigned_operators_table">
+                    <thead>
+                        <tr>
+                            <th scope="col">#</th>
+                            <th scope="col">Operator Name</th>
+                            <th scope="col">Type</th>
+                            <th scope="col">Phone</th>
+                            <th scope="col">Assigned Vehicle</th>
+                            <th>Pay As Operator</th>
+
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        @forelse($data['operators'] as $index => $op)
+                            <tr>
+                                <th scope="row">{{ $index + 1 }}</th>
+                                <td>{{ $op->full_name }}</td>
+                                <td>{{ ucfirst($op->operator_type) }}</td>
+                                <td>{{ $op->phone }}</td>
+                                <td>
+                                    @if($op->vehicle_reg_no)
+                                        <span class="badge bg-success">{{ $op->vehicle_reg_no }}</span>
+                                    @else
+                                        <span class="badge bg-secondary">No Vehicle</span>
+                                    @endif
+                                </td>
+                                <td>
+    <button class="btn btn-sm btn-primary"
+        data-bs-toggle="modal"
+        data-bs-target="#operatorPaymentModal{{ $op->operator_id }}">
+        View Codes
+    </button>
+</td>
+
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="5" class="text-muted">No operators found</td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+@endif
+
+
      
 </div>
+
+@include('dashboard.operator_options')
+ 
+
+
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
 <!-- Line Chart for Share Payments -->
 <script src="https://cdn.jsdelivr.net/npm/echarts/dist/echarts.min.js"></script>
