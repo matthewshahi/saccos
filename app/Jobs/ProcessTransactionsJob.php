@@ -617,90 +617,165 @@ class ProcessTransactionsJob implements ShouldQueue
         Log::info("REGISTRATION FEE processed for Member ID: $memberId, Amount: $amount");
     }
 
+    // private function processOperatorTransaction(string &$reference, $transaction)
+    // {
+    //     // Example formats:
+    //     // OPSH-15
+    //     // OPCA-22
+    //     // OPLN-15-26 (loan)
+    //     // OPRF-19
+    //     // OPDT-33   (fallback)
+    //     // OPOT-33   (fallback)
+    //     // OPPN-33   (fallback)
+
+    //     $parts = explode('-', $reference);
+
+    //     $prefix = strtoupper($parts[0] ?? null);   // OPSH, OPLN, OPDT...
+    //     $opId   = $parts[1] ?? null;               // operator ID
+    //     $loanId = $parts[2] ?? null;               // only for OPLN
+
+    //     if (!$prefix || !$opId || !is_numeric($opId)) {
+    //         return $this->failTransaction($transaction->id, "Invalid operator reference: $reference");
+    //     }
+
+    //     // Load operator
+    //     $operator = DB::table('sacco_operators')
+    //         ->where('operator_id', $opId)
+    //         ->first();
+
+    //     if (!$operator) {
+    //         return $this->failTransaction($transaction->id, "Operator ID {$opId} not found");
+    //     }
+
+    //     // ALWAYS record operator deposits
+    //     DB::table('sacco_matatus_collections')->insert([
+    //         'coll_operator_id' => $operator->operator_id,
+    //         'coll_vehicle_id'  => $operator->operator_vehicle_id,
+    //         'coll_amount'      => $transaction->transaction_amount,
+    //         'coll_type'        => strtolower($prefix),
+    //         'coll_period'      => $this->getCurrentPeriod(),
+    //         'coll_description' => "$prefix Payment from Operator {$operator->operator_name}",
+    //         'coll_ip'          => request()->ip(),
+    //         'coll_transdate'   => now(),
+    //     ]);
+
+    //     // =====================================================
+    //     // REWRITE OPERATOR PREFIX TO SACCO PREFIX
+    //     // =====================================================
+
+    //     switch ($prefix) {
+
+    //         // Operator Share → SH<member_id>
+    //         case "OPSH":
+    //             $reference = "SH" . $operator->operator_member_id;
+    //             break;
+
+    //         // Operator Capital → CA<member_id>
+    //         case "OPCA":
+    //             $reference = "CA" . $operator->operator_member_id;
+    //             break;
+
+    //         // Operator Registration Fee → RF<member_id>
+    //         case "OPRF":
+    //             $reference = "RF" . $operator->operator_member_id;
+    //             break;
+
+    //         // Operator Loan → LN<loan_id>
+    //         case "OPLN":
+    //             if (!$loanId) {
+    //                 return $this->failTransaction($transaction->id, "OPLN missing loan ID in $reference");
+    //             }
+    //             $reference = "LN" . $loanId; // SACCO routing will process this
+    //             break;
+
+    //         // All other OP prefixes go to fallback:
+    //         // OPDT-xx (daily target)
+    //         // OPOT-xx (other)
+    //         // OPPN-xx (penalty)
+    //         default:
+    //             // Remove OP → e.g. OPDT-15 → DT15
+    //             $core = substr($prefix, 2);
+    //             $reference = $core . $opId;
+    //             break;
+    //     }
+
+    //     // IMPORTANT:
+    //     // Do NOT process anything here.
+    //     // Main SACCO routing will process rewritten $reference.
+    // }
     private function processOperatorTransaction(string &$reference, $transaction)
-    {
-        // Example formats:
-        // OPSH-15
-        // OPCA-22
-        // OPLN-15-26 (loan)
-        // OPRF-19
-        // OPDT-33   (fallback)
-        // OPOT-33   (fallback)
-        // OPPN-33   (fallback)
+{
+    $parts = explode('-', $reference);
 
-        $parts = explode('-', $reference);
+    $prefix = strtoupper($parts[0] ?? null);
+    $opId   = $parts[1] ?? null;
+    $loanId = $parts[2] ?? null;
 
-        $prefix = strtoupper($parts[0] ?? null);   // OPSH, OPLN, OPDT...
-        $opId   = $parts[1] ?? null;               // operator ID
-        $loanId = $parts[2] ?? null;               // only for OPLN
-
-        if (!$prefix || !$opId || !is_numeric($opId)) {
-            return $this->failTransaction($transaction->id, "Invalid operator reference: $reference");
-        }
-
-        // Load operator
-        $operator = DB::table('sacco_operators')
-            ->where('operator_id', $opId)
-            ->first();
-
-        if (!$operator) {
-            return $this->failTransaction($transaction->id, "Operator ID {$opId} not found");
-        }
-
-        // ALWAYS record operator deposits
-        DB::table('sacco_matatus_collections')->insert([
-            'coll_operator_id' => $operator->operator_id,
-            'coll_vehicle_id'  => $operator->operator_vehicle_id,
-            'coll_amount'      => $transaction->transaction_amount,
-            'coll_type'        => strtolower($prefix),
-            'coll_period'      => $this->getCurrentPeriod(),
-            'coll_description' => "$prefix Payment from Operator {$operator->operator_name}",
-            'coll_ip'          => request()->ip(),
-            'coll_transdate'   => now(),
-        ]);
-
-        // =====================================================
-        // REWRITE OPERATOR PREFIX TO SACCO PREFIX
-        // =====================================================
-
-        switch ($prefix) {
-
-            // Operator Share → SH<member_id>
-            case "OPSH":
-                $reference = "SH" . $operator->operator_member_id;
-                break;
-
-            // Operator Capital → CA<member_id>
-            case "OPCA":
-                $reference = "CA" . $operator->operator_member_id;
-                break;
-
-            // Operator Registration Fee → RF<member_id>
-            case "OPRF":
-                $reference = "RF" . $operator->operator_member_id;
-                break;
-
-            // Operator Loan → LN<loan_id>
-            case "OPLN":
-                if (!$loanId) {
-                    return $this->failTransaction($transaction->id, "OPLN missing loan ID in $reference");
-                }
-                $reference = "LN" . $loanId; // SACCO routing will process this
-                break;
-
-            // All other OP prefixes go to fallback:
-            // OPDT-xx (daily target)
-            // OPOT-xx (other)
-            // OPPN-xx (penalty)
-            default:
-                // Remove OP → e.g. OPDT-15 → DT15
-                $core = substr($prefix, 2);
-                $reference = $core . $opId;
-                break;
-        }
-
-        // IMPORTANT:
-        // Do NOT process anything here.
-        // Main SACCO routing will process rewritten $reference.
+    if (!$prefix || !$opId || !is_numeric($opId)) {
+        return $this->failTransaction($transaction->id, "Invalid operator reference: $reference");
     }
+
+    // 1. Load operator from correct table
+    $operator = DB::table('sacco_matatus_operators')
+        ->where('id', $opId)
+        ->first();
+
+    if (!$operator) {
+        return $this->failTransaction($transaction->id, "Operator ID {$opId} not found");
+    }
+
+    // 2. Get latest vehicle assignment (optional)
+    $assignment = DB::table('sacco_matatus_operator_vehicle_assignments')
+        ->where('v_assignment_operator_id', $opId)
+        ->orderBy('v_assignment_start_date', 'desc')
+        ->first();
+
+    $vehicleId = $assignment->v_assignment_vehicle_id ?? null;
+
+    // 3. Record operator payment (name used in description)
+    DB::table('sacco_matatus_collections')->insert([
+        'coll_operator_id' => $opId,
+        'coll_vehicle_id'  => $vehicleId,
+        'coll_amount'      => $transaction->transaction_amount,
+        'coll_type'        => strtolower($prefix),
+        'coll_period'      => $this->getCurrentPeriod(),
+        'coll_description' => "Payment by Operator {$operator->full_name}",
+        'coll_ip'          => request()->ip(),
+        'coll_transdate'   => now(),
+        'created_at'       => now(),
+        'updated_at'       => now(),
+    ]);
+
+    // 4. Rewrite reference → SACCO internal format (NO NAME IN REFERENCE)
+    switch ($prefix) {
+
+        case "OPSH": // operator paying shares
+            $reference = "SH" . $operator->introduced_by_member_id; 
+            break;
+
+        case "OPCA": // capital shares
+            $reference = "CA" . $operator->introduced_by_member_id;
+            break;
+
+        case "OPRF": // registration fee
+            $reference = "RF" . $operator->introduced_by_member_id;
+            break;
+
+        case "OPLN": // loan
+            if (!$loanId) {
+                return $this->failTransaction($transaction->id, "OPLN missing loan ID in $reference");
+            }
+            $reference = "LN" . $loanId; // stays numeric
+            break;
+
+        default:
+            // fallback e.g. OPDT-1 → DT1
+            $core = substr($prefix, 2);  
+            $reference = $core . $opId; 
+            break;
+    }
+
+    // SACCO routing will now process rewritten $reference normally.
+}
+
 }
