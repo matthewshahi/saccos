@@ -217,3 +217,58 @@ Route::post('/operators/add-from-dashboard', [OperatorDashBoardSlefAddController
     ->middleware('auth:web');
 
 
+    // ============================
+// STAGES MANAGEMENT
+// ============================
+Route::get('/stages', [MatatuRouteController::class, 'stagesIndex'])
+    ->name('stages.index')
+    ->middleware('check_user_rights:add_new_sacco_member');
+
+Route::get('/stages/create', [MatatuRouteController::class, 'stagesCreate'])
+    ->name('stages.create')
+    ->middleware('check_user_rights:add_new_sacco_member');
+
+Route::post('/stages/store', [MatatuRouteController::class, 'stagesStore'])
+    ->name('stages.store')
+    ->middleware('check_user_rights:add_new_sacco_member');
+
+Route::get('/stages/edit/{id}', [MatatuRouteController::class, 'stagesEdit'])
+    ->name('stages.edit')
+    ->middleware('check_user_rights:add_new_sacco_member');
+
+Route::post('/stages/update/{id}', [MatatuRouteController::class, 'stagesUpdate'])
+    ->name('stages.update')
+    ->middleware('check_user_rights:add_new_sacco_member');
+
+Route::get('/stages/delete/{id}', [MatatuRouteController::class, 'stagesDelete'])
+    ->name('stages.delete')
+    ->middleware('check_user_rights:add_new_sacco_member');
+
+
+// ============================
+// STAGE CHAIRS MANAGEMENT
+// ============================
+Route::get('/stage-chairs', [MatatuRouteController::class, 'chairsIndex'])
+    ->name('chairs.index')
+    ->middleware('check_user_rights:add_new_sacco_member');
+
+Route::get('/stage-chairs/create', [MatatuRouteController::class, 'chairsCreate'])
+    ->name('chairs.create')
+    ->middleware('check_user_rights:add_new_sacco_member');
+
+Route::post('/stage-chairs/store', [MatatuRouteController::class, 'chairsStore'])
+    ->name('chairs.store')
+    ->middleware('check_user_rights:add_new_sacco_member');
+
+Route::get('/stage-chairs/edit/{id}', [MatatuRouteController::class, 'chairsEdit'])
+    ->name('chairs.edit')
+    ->middleware('check_user_rights:add_new_sacco_member');
+
+Route::post('/stage-chairs/update/{id}', [MatatuRouteController::class, 'chairsUpdate'])
+    ->name('chairs.update')
+    ->middleware('check_user_rights:add_new_sacco_member');
+
+Route::get('/stage-chairs/delete/{id}', [MatatuRouteController::class, 'chairsDelete'])
+    ->name('chairs.delete')
+    ->middleware('check_user_rights:add_new_sacco_member');
+
