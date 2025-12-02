@@ -23,7 +23,7 @@ class OperatorDashBoardSlefAddController extends Controller
 ],
 
 
-            'id_number'   => 'required|string|max:20',
+            'national_id'   => 'required|string|max:20',
             'kra_pin'     => 'required|string|max:20',
 
             'ntsa_number'     => 'required|string|max:50',
@@ -46,8 +46,9 @@ class OperatorDashBoardSlefAddController extends Controller
         ],
         [
             // Custom SACCO-friendly messages
-            'phone.regex' => 'Please enter a valid Kenyan phone number.',
-            'stage_chair_phone.regex' => 'Stage chair phone must be a valid Kenyan number.',
+            'phone.regex' => 'Enter a valid phone number (7–15 digits, with or without +).',
+'stage_chair_phone.regex' => 'Enter a valid stage chair phone number.',
+
             'vehicle_reg_no.required' => 'Vehicle registration number is required.',
             'start_stage.required' => 'Stage name is required.',
         ]);
@@ -86,7 +87,7 @@ class OperatorDashBoardSlefAddController extends Controller
         // 3. DUPLICATE OPERATOR CHECK
         // ----------------------------------------------
         $duplicate = DB::table('sacco_matatus_operators')
-            ->where('id_number', $validated['id_number'])
+            ->where('national_id', $validated['national_id'])
             ->orWhere('kra_pin', $kra)
             ->orWhere('ntsa_number', $ntsa)
             ->first();
@@ -169,7 +170,8 @@ class OperatorDashBoardSlefAddController extends Controller
                 'phone'         => $phone,
                 'operator_type' => $validated['operator_type'],
 
-                'id_number'     => $validated['id_number'],
+                'national_id'     => $validated['national_id'],
+                
                 'kra_pin'       => $kra,
                 'ntsa_number'   => $ntsa,
                 'driving_licence' => $licence,

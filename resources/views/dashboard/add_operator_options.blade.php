@@ -67,8 +67,8 @@
                         <!-- ID NUMBER -->
                         <div class="col-md-6 mb-3">
                             <label class="form-label">National ID Number *</label>
-                            <input type="text" name="id_number" class="form-control"
-                                   required maxlength="12" value="{{ old('id_number') }}">
+                            <input type="text" name="national_id" class="form-control"
+                                   required maxlength="12" value="{{ old('national_id') }}">
                         </div>
 
                         <!-- KRA PIN -->
