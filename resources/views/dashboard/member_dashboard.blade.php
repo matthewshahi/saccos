@@ -203,8 +203,17 @@
 <div class="col-lg-12 col-md-12">
     <div class="card o-hidden mb-4">
         <div class="card-header d-flex align-items-center border-0">
-            <h3 class="w-50 float-start card-title m-0">Assigned Operators</h3>
-        </div>
+    <h3 class="w-50 float-start card-title m-0">Assigned Operators</h3>
+
+    <div class="w-50 text-end">
+        <button class="btn btn-sm btn-success"
+            data-bs-toggle="modal"
+            data-bs-target="#addOperatorModal">
+            <i class="i-Add"></i> Add Your Operators
+        </button>
+    </div>
+</div>
+
 
         <div>
             <div class="table-responsive">
@@ -261,9 +270,10 @@
 
      
 </div>
-
+@if (config('sacco.transport_sacco') === 'Y')
 @include('dashboard.operator_options')
- 
+@include('dashboard.add_operator_options')
+@endif
 
 
 

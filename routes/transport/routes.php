@@ -9,7 +9,7 @@ use App\Http\Controllers\Transport\PenaltyController;
 use App\Http\Controllers\Transport\TargetController;
 use App\Http\Controllers\Transport\MaintenanceController;
 use App\Http\Controllers\Transport\OperatorVehicleAssignmentController;
- 
+use App\Http\Controllers\Transport\OperatorDashBoardSlefAddController;
 
 Route::get('/routes', [MatatuRouteController::class, 'index'])
     ->name('routes')
@@ -211,3 +211,9 @@ Route::get('/assignments/edit/{id}', [OperatorVehicleAssignmentController::class
 Route::post('/assignments/update/{id}', [OperatorVehicleAssignmentController::class, 'update'])
     ->name('assignments.update')
     ->middleware('check_user_rights:add_new_sacco_member');
+
+Route::post('/operators/add-from-dashboard', [OperatorDashBoardSlefAddController::class, 'addFromDashboard'])
+    ->name('operators.addFromDashboard')
+    ->middleware('auth:web');
+
+

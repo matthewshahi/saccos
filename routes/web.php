@@ -854,13 +854,9 @@ Route::get('/loans/repayments/sample',
     Route::get('/files/download/{file}', [FileUploadController::class, 'download'])->name('file.download')->middleware('check_user_rights:file_upload');
     Route::delete('/files/delete/{file}', [FileUploadController::class, 'delete'])->name('file.delete')->middleware('check_user_rights:file_delete');
 
-    Route::get(
-    '/reports/transport/mpesa',
-    [\App\Http\Controllers\TransportReportsController::class, 'mpesa']
-)->name('reports.transport.mpesa')
- ->middleware('check_user_rights:rpt_transport_mpesa');
+    Route::get('/reports/transport/mpesa',[TransportReportsController::class, 'mpesa'])->name('reports.transport.mpesa')->middleware('check_user_rights:rpt_transport_mpesa');
 
- 
+
     if (config('sacco.transport_sacco') === 'Y') {
         Route::prefix('transport')->group(function () {
             require __DIR__ . '/transport/routes.php';
