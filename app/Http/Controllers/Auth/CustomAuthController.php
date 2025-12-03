@@ -23,6 +23,33 @@ class CustomAuthController extends Controller
             'password' => 'required|string',
         ]);
 
+
+        // ------------------------------------------------------
+// 🔒 Verify reCAPTCHA v3
+// ------------------------------------------------------
+$recaptchaToken = $request->input('recaptcha_token');
+
+$secret = env('RECAPTCHA_SECRET_KEY');
+$verifyUrl = 'https://www.google.com/recaptcha/api/siteverify';
+$response = @file_get_contents($verifyUrl . '?secret=' . $secret . '&response=' . $recaptchaToken);
+
+if (!$response) {
+    return back()->withErrors([
+        'login' => 'Unable to verify reCAPTCHA. Please refresh and try again.',
+    ]);
+}
+
+
+ $responseData = json_decode($response);
+
+if (!$responseData->success || $responseData->score < 0.5) {
+    return back()->withErrors([
+        'login' => 'Suspicious activity detected. Please try again.',
+    ])->withInput($request->only('login'));
+}
+
+
+
         $login    = $request->input('login');
         $password = md5($request->input('password'));
 

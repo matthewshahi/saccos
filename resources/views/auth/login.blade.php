@@ -100,6 +100,21 @@
             <div class="text-center mb-3">
                 <a href="{{ url('/register') }}" class="text-decoration-none">Click here to apply for membership</a>
             </div>
+
+
+            <input type="hidden" name="recaptcha_token" id="recaptcha_token">
+
+<script src="https://www.google.com/recaptcha/api.js?render={{ env('RECAPTCHA_SITE_KEY') }}"></script>
+<script>
+grecaptcha.ready(function() {
+    grecaptcha.execute('{{ env('RECAPTCHA_SITE_KEY') }}', {action: 'login'})
+        .then(function(token) {
+            document.getElementById('recaptcha_token').value = token;
+        });
+});
+</script>
+
+
         </form>
 
         <div class="login-footer">

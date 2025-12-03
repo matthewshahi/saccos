@@ -93,9 +93,7 @@ class OperatorDashBoardSlefAddController extends Controller
         // ----------------------------------------------
         // 3. DUPLICATE OPERATOR CHECK
         // ----------------------------------------------
-       // ----------------------------------------------
-// 3. DUPLICATE OPERATOR CHECKS (Specific)
-// ----------------------------------------------
+ 
 
 $existingById = DB::table('sacco_matatus_operators')
     ->where('national_id', $validated['national_id'])
