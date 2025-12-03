@@ -212,8 +212,7 @@ Route::post('/assignments/update/{id}', [OperatorVehicleAssignmentController::cl
     ->name('assignments.update')
     ->middleware('check_user_rights:add_new_sacco_member');
 
-Route::post('/operators/add-from-dashboard', [OperatorDashBoardSlefAddController::class, 'addFromDashboard'])
-    ->name('operators.addFromDashboard');
+
 
 
     // ============================

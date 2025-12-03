@@ -143,6 +143,8 @@ Route::post('/public/loan-calculator/{id}/calculate', [PublicLoansController::cl
 
 
 Route::middleware(['auth'])->group(function () {
+    Route::post('/operators/add-from-dashboard', [OperatorDashBoardSlefAddController::class, 'addFromDashboard'])
+    ->name('operators.addFromDashboard');
 
     Route::get('/dashboard/member_dashboard', [MemberDashboardController::class, 'index'])->name('member_dashboard');
     Route::get('contributions/member-shares', [MemberDashboardController::class, 'shareListings'])->name('member.sharelistings');
@@ -863,3 +865,4 @@ Route::get('/loans/repayments/sample',
         });
     }
 });
+
