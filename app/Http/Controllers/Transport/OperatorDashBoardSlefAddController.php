@@ -8,7 +8,14 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class OperatorDashBoardSlefAddController extends Controller
+
 {
+
+    public function __construct()
+    {
+        // Only allow access if the user is logged in
+        $this->middleware('auth');
+    }
     public function addFromDashboard(Request $request)
     {
         // ----------------------------------------------
