@@ -93,18 +93,42 @@ class OperatorDashBoardSlefAddController extends Controller
         // ----------------------------------------------
         // 3. DUPLICATE OPERATOR CHECK
         // ----------------------------------------------
-        $duplicate = DB::table('sacco_matatus_operators')
-            ->where('national_id', $validated['national_id'])
-            ->orWhere('kra_pin', $kra)
-            ->orWhere('ntsa_number', $ntsa)
-            ->first();
+       // ----------------------------------------------
+// 3. DUPLICATE OPERATOR CHECKS (Specific)
+// ----------------------------------------------
 
-        if ($duplicate) {
-            return back()
-                ->withErrors(['error' => 'This operator already exists in the system.'])
-                ->withInput()
-                ->with('openModal', 'addOperatorModal');
-        }
+$existingById = DB::table('sacco_matatus_operators')
+    ->where('national_id', $validated['national_id'])
+    ->first();
+
+if ($existingById) {
+    return back()
+        ->withErrors(['error' => 'An operator with this National ID already exists in the system.'])
+        ->withInput()
+        ->with('openModal', 'addOperatorModal');
+}
+
+$existingByKra = DB::table('sacco_matatus_operators')
+    ->where('kra_pin', $kra)
+    ->first();
+
+if ($existingByKra) {
+    return back()
+        ->withErrors(['error' => 'The KRA PIN you entered is already registered for another operator.'])
+        ->withInput()
+        ->with('openModal', 'addOperatorModal');
+}
+
+$existingByNtsa = DB::table('sacco_matatus_operators')
+    ->where('ntsa_number', $ntsa)
+    ->first();
+
+if ($existingByNtsa) {
+    return back()
+        ->withErrors(['error' => 'The NTSA Number provided is already in the system.'])
+        ->withInput()
+        ->with('openModal', 'addOperatorModal');
+}
 
         DB::beginTransaction();
 
