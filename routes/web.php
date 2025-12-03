@@ -194,6 +194,12 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/check-payment', [PaymentInquiryController::class, 'index'])->name('payment.check');
     Route::post('/check-payment', [PaymentInquiryController::class, 'check'])->name('payment.check.submit');
+
+   Route::post('/transport/operators/add-from-dashboard', 
+    [\App\Http\Controllers\Transport\OperatorDashBoardSlefAddController::class, 'addFromDashboard']
+)->name('operators.addFromDashboard');
+
+
 });
 
 
