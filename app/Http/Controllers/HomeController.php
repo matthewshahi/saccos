@@ -1115,6 +1115,7 @@ $data = [
             $nmsg = "Error, this member has been under guaranteed<br>";
         }
 
+        $g_factor = 1;
         if ($val > 0) {
             $g_factor = $batch_tied_shares_to_pay / $val;
         }
