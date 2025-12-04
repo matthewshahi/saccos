@@ -1115,7 +1115,7 @@ $data = [
             $nmsg = "Error, this member has been under guaranteed<br>";
         }
 
-        $g_factor = 1;
+       $g_factor = 1;
         if ($val > 0) {
             $g_factor = $batch_tied_shares_to_pay / $val;
         }
@@ -3810,7 +3810,7 @@ $data = [
 
         // Under-guarantee check
         $batch_trans_loan_guaranteed = $loanAmount * $loanType->loan_type_guaranteable_percent / 100;
-
+$g_factor = 1;
         if ($loanType->loan_type_guaranteable_percent > 0) {
             if ($batch_trans_loan_guaranteed > $totalGuaranteed) {
                 $nmsg .= "Error, this member has been under guaranteed. ";
