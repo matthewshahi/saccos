@@ -49,24 +49,7 @@ class KassMigrationController extends Controller
                      ->with('folder', $extractTo);
     }
 
-    // Parse selected file OR batch folder
-    public function process(Request $request)
-    {
-        $file = $request->input('file_path');
-        $folder = $request->input('folder_path');
-
-        if ($file) {
-            $this->parseFile($file);
-        }
-
-        if ($folder) {
-            foreach (glob($folder.'/*.csv') as $csv) {
-                $this->parseFile($csv);
-            }
-        }
-
-        return back()->with('success', 'Processing complete.');
-    }
+    
 
     private function parseFile($filePath)
     {
