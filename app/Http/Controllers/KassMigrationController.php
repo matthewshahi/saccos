@@ -172,4 +172,79 @@ class KassMigrationController extends Controller
 
         return back()->with('success', 'Staging tables cleared.');
     }
+    public function process(Request $request)
+{
+    $filePath = $request->input('file_path');
+
+    if (!$filePath || !Storage::exists($filePath)) {
+        return back()->with('error', 'File not found.');
+    }
+
+    $fullPath = storage_path('app/' . $filePath);
+
+    // Detect Savings or Loans based on column headers
+    $handle = fopen($fullPath, 'r');
+
+    $header = fgetcsv($handle);
+
+    // Normalize headers
+    $normalized = array_map(function ($h) {
+        return strtolower(trim(str_replace([' ', '/', '-'], '_', $h)));
+    }, $header);
+
+    if (in_array('shares/depost', $normalized) || in_array('memb', $normalized)) {
+        $type = 'savings';
+    } elseif (in_array('loan_1', $normalized) || in_array('dr', $normalized)) {
+        $type = 'loans';
+    } else {
+        return back()->with('error', 'Unknown file format.');
+    }
+
+    // PROCESS SAVINGS FILE
+    if ($type == 'savings') {
+        while (($row = fgetcsv($handle)) !== false) {
+
+            DB::table('kass_staging_contributions')->insert([
+                'raw_name'     => $row[1] ?? null,  // NAME col
+                'member_identifier' => $row[2] ?? null, // PFNO
+                'adm_no'       => $row[3] ?? null,
+                'company'      => $row[4] ?? null,
+                'year'         => $row[5] ?? null,
+                'month'        => $row[6] ?? null,
+                'raw_type'     => 'savings',
+                'amount'       => $row[7] ?? 0,
+                'source_file'  => $filePath,
+                'created_at'   => now(),
+                'updated_at'   => now()
+            ]);
+        }
+    }
+
+    // PROCESS LOANS FILE
+    if ($type == 'loans') {
+        while (($row = fgetcsv($handle)) !== false) {
+
+            DB::table('kass_staging_loans')->insert([
+                'raw_name'     => $row[1] ?? null,
+                'member_identifier' => $row[2] ?? null,
+                'adm_no'       => $row[3] ?? null,
+                'company'      => $row[4] ?? null,
+                'loan_type'    => 'NORMAL', // Later auto-detect per section
+                'year'         => $row[5] ?? null,
+                'month'        => $row[6] ?? null,
+                'principal_disbursed' => $row[7] ?? 0,
+                'repayment_amount'    => $row[8] ?? 0,
+                'interest_amount'     => $row[9] ?? 0,
+                'source_file'  => $filePath,
+                'created_at'   => now(),
+                'updated_at'   => now()
+            ]);
+        }
+    }
+
+    fclose($handle);
+
+    return back()->with('success', 'Processing complete.');
+}
+
 }
