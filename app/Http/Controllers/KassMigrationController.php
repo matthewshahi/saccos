@@ -170,11 +170,15 @@ class KassMigrationController extends Controller
         }
 
         // SHAREMPA
-        if (isset($sheets['SHAREMPA'])) {
-            $this->processContributionSheet($sheets['SHAREMPA'], $filePath);
-        } else {
-            $this->logFileEvent($filePath, "MISSING_SHAREMPA", "SHAREMPA sheet not found.");
-        }
+        $share = $this->findSharempaSheet($sheets);
+
+if ($share) {
+    $this->logFileEvent($filePath, "SHAREMPA_MATCH", "Matched using: " . $share['match']);
+    $this->processContributionSheet($share['sheet'], $filePath);
+} else {
+    $this->logFileEvent($filePath, "MISSING_SHAREMPA", "No sheet resembling SHAREMPA was found.");
+}
+
 
         // LOANMPA
         if (isset($sheets['LOANMPA'])) {
@@ -575,6 +579,63 @@ if (!in_array('year', $headerNorm)) {
     }
 
     return $norm;
+}
+
+
+private function findSharempaSheet(array $sheets)
+{
+    $candidates = [];
+
+    foreach ($sheets as $title => $sheetObj) {
+
+        // Clean title: remove NBSP, trim, uppercase
+        $clean = strtoupper(trim(str_replace("\xC2\xA0", ' ', $title)));
+
+        // 1️⃣ STRICT MATCH
+        if ($clean === 'SHAREMPA') {
+            return ['sheet' => $sheetObj, 'match' => "STRICT: $title"];
+        }
+
+        // 2️⃣ CASE-INSENSITIVE / TRIMMED
+        if ($clean === 'SHARE MPA' || $clean === 'SHAREMPA ') {
+            $candidates["CASE"] = $sheetObj;
+        }
+
+        // 3️⃣ SPACE / SYMBOL / UNDERSCORE VARIANTS
+        $variant = str_replace([' ', '_', '-'], '', $clean);
+        if ($variant === 'SHAREMPA') {
+            $candidates["VARIANT:$title"] = $sheetObj;
+        }
+
+        // 4️⃣ PREFIX-SUFFIX MATCH
+        if (str_starts_with($clean, 'SHAREMPA') || str_ends_with($clean, 'SHAREMPA')) {
+            $candidates["PREFIX_SUFFIX:$title"] = $sheetObj;
+        }
+
+        // 5️⃣ CONTAINS MATCH
+        if (str_contains($clean, 'SHARE') && str_contains($clean, 'MPA')) {
+            $candidates["CONTAINS:$title"] = $sheetObj;
+        }
+    }
+
+    // 6️⃣ If multiple candidates, pick the closest using levenshtein
+    if (!empty($candidates)) {
+        $best = null;
+        $bestDist = 999;
+
+        foreach ($candidates as $label => $sheetObj) {
+            $dist = levenshtein($label, 'SHAREMPA');
+            if ($dist < $bestDist) {
+                $bestDist = $dist;
+                $best = ['sheet' => $sheetObj, 'match' => "LEVENSHTEIN:$label"];
+            }
+        }
+
+        return $best;
+    }
+
+    // Nothing found
+    return null;
 }
 
 
