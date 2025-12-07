@@ -188,79 +188,72 @@ class KassMigrationController extends Controller
      |  - amount = DR (if present) else MEMB else CR
      --------------------------------------------------------------*/
     private function processContributionSheet($sheet, string $sourceFile): void
-    {
-        $rows  = $sheet->toArray(null, true, true, true);
-        $clean = array_map(fn ($r) => array_values($r), $rows);
+{
+    $highestRow = $sheet->getHighestRow();
 
-        [$headerRaw, $startIndex] = $this->extractHeader($clean);
-        $header = $this->normalizeHeaders($headerRaw);
+    $lastName = null;
+    $lastAdm  = null;
+    $lastComp = null;
 
-        $lastName  = null;
-        $lastAdm   = null;
-        $lastComp  = null;
+    for ($row = 1; $row <= $highestRow; $row++) {
 
-        for ($i = $startIndex; $i < count($clean); $i++) {
-            $row = $clean[$i];
-            if (!$this->rowHasValues($row)) {
-                continue;
-            }
+        // Read exact columns (A..J)
+        $data = $sheet->rangeToArray("A{$row}:J{$row}", null, true, true, true)[0];
 
-            $data = $this->mapRow($header, $row);
+        // Skip rows with no money and no dates and no name
+        if ($this->rowIsEmpty($data)) continue;
 
-            // Carry-forward NAME / ADM NO / COMP
-            if (!empty(trim((string)($data['name'] ?? '')))) {
-                $lastName = $data['name'];
-            } else {
-                $data['name'] = $lastName;
-            }
+        // Extract + carry-forward
+        $name = trim($data['B'] ?? '');
+        $adm  = trim($data['C'] ?? '');
+        $comp = trim($data['D'] ?? '');
 
-            if (!empty(trim((string)($data['adm_no'] ?? '')))) {
-                $lastAdm = $data['adm_no'];
-            } else {
-                $data['adm_no'] = $lastAdm;
-            }
+        if ($name !== '') $lastName = $name;
+        if ($adm  !== '') $lastAdm  = $adm;
+        if ($comp !== '') $lastComp = $comp;
 
-            if (!empty(trim((string)($data['comp'] ?? '')))) {
-                $lastComp = $data['comp'];
-            } else {
-                $data['comp'] = $lastComp;
-            }
+        $year  = trim($data['E'] ?? '');
+        $month = trim($data['F'] ?? '');
 
-            // If still completely meaningless, skip
-            $year  = $data['year']  ?? null;
-            $month = $data['month'] ?? null;
+        // Money fields
+        $memb = $this->numOrNull($data['G'] ?? null);
+        $dr   = $this->numOrNull($data['H'] ?? null);
+        $cr   = $this->numOrNull($data['I'] ?? null);
+        $run  = $this->numOrNull($data['J'] ?? null);
 
-            $hasMoney = $this->hasAnyMoney($data, ['memb', 'dr', 'cr', 'run_bal', 'run_balance']);
-
-            if (empty($year) && empty($month) && !$hasMoney) {
-                continue;
-            }
-
-            // Normalise numeric amounts
-            $membership = $this->numOrNull($data['memb'] ?? null);
-            $dr         = $this->numOrNull($data['dr'] ?? null);
-            $cr         = $this->numOrNull($data['cr'] ?? null);
-            $runBal     = $this->numOrNull($data['run_bal'] ?? ($data['run_balance'] ?? null));
-
-            // Single "amount" column for now: prefer DR, then MEMB, then CR
-            $amount = $dr ?? $membership ?? $cr ?? 0;
-
-            DB::table('kass_staging_contributions')->insert([
-                'raw_name'          => $data['name'] ?? null,
-                'member_identifier' => $data['pfno'] ?? null,
-                'adm_no'            => $data['adm_no'] ?? null,
-                'company'           => $data['comp'] ?? null,
-                'year'              => $year,
-                'month'             => $month,
-                'raw_type'          => $this->detectContributionTypeSmart($membership, $dr, $cr),
-                'amount'            => $amount,
-                'source_file'       => $sourceFile,
-                'raw_row_json'      => json_encode($data),
-                'created_at'        => now(),
-                'updated_at'        => now(),
-            ]);
+        // Ignore useless rows
+        if ($year === '' && $month === '' && $memb === null && $dr === null && $cr === null) {
+            continue;
         }
+
+        // Determine amount (priority: DR → MEMB → CR)
+        $amount = $dr ?? $memb ?? $cr ?? 0;
+
+        DB::table('kass_staging_contributions')->insert([
+            'raw_name'          => $lastName,
+            'member_identifier' => null,
+            'adm_no'            => $lastAdm,
+            'company'           => $lastComp,
+            'year'              => $year,
+            'month'             => $month,
+            'raw_type'          => $this->detectContributionTypeSmart($memb, $dr, $cr),
+            'amount'            => $amount,
+            'source_file'       => $sourceFile,
+            'raw_row_json'      => json_encode($data),
+            'created_at'        => now(),
+            'updated_at'        => now(),
+        ]);
     }
+}
+
+private function rowIsEmpty($data): bool
+{
+    foreach ($data as $v) {
+        if (trim((string)$v) !== '') return false;
+    }
+    return true;
+}
+
 
     private function hasAnyMoney(array $row, array $keys): bool
     {
