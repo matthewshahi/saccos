@@ -292,7 +292,16 @@ if (!in_array('year', $headerNorm)) {
 
             // If still missing key identifiers – log and skip row
             if (empty($mapped['name']) || empty($mapped['adm_no'])) {
-                $this->logIssue($sourceFile, 'MISSING_NAME_OR_ADM_AFTER_CARRY', $mapped);
+               $this->logIssue(
+    $sourceFile,
+    'ANOMALY_MISSING_KEY_FIELDS',
+    array_merge($mapped, [
+        '_carry_name' => $carryName,
+        '_carry_adm'  => $carryAdm,
+        '_carry_comp' => $carryComp
+    ])
+);
+
                 continue;
             }
 
