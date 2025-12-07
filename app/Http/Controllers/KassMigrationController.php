@@ -10,9 +10,18 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
 class KassMigrationController extends Controller
 {
     public function __construct()
-    {
-        $this->middleware('auth');
-    }
+{
+    $this->middleware('auth');
+
+    // EXTEND TIME & MEMORY FOR HEAVY MIGRATIONS
+    ini_set('max_execution_time', '1800');  // 30 minutes
+    ini_set('request_terminate_timeout', '1800'); 
+    ini_set('memory_limit', '2048M');      // 2GB
+    ini_set('max_input_time', '1800');     // 30 minutes
+    ini_set('post_max_size', '500M');
+    ini_set('upload_max_filesize', '500M');
+}
+
 
     /*===========================================================
      |
