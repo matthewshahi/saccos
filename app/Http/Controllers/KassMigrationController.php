@@ -10,7 +10,22 @@ class KassMigrationController extends Controller
 {
     public function index()
     {
-        return view('kass.index');
+        $files = collect(Storage::files('kass_uploads'))
+        ->sortByDesc(function ($f) {
+            return Storage::lastModified($f);
+        })
+        ->take(10)   // latest 10
+        ->map(function ($f) {
+            return [
+                'name' => basename($f),
+                'path' => $f,
+                'time' => date('Y-m-d H:i:s', Storage::lastModified($f)),
+            ];
+        });
+
+    return view('kass.index', compact('files'));
+
+   
     }
 
     /**

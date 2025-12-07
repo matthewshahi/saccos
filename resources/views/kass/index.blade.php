@@ -46,5 +46,45 @@
 
     <a href="{{ route('kass.staging') }}" class="btn btn-dark">View Staging Tables</a>
 
+    <hr>
+
+<h4>Recently Uploaded Files</h4>
+
+<table class="table table-bordered table-sm">
+    <thead>
+        <tr>
+            <th>File Name</th>
+            <th>Full Path</th>
+            <th>Uploaded</th>
+            <th>Select</th>
+        </tr>
+    </thead>
+    <tbody>
+        @forelse($files as $file)
+            <tr>
+                <td>{{ $file['name'] }}</td>
+                <td>
+                    <code>{{ 'storage/' . $file['path'] }}</code>
+                </td>
+                <td>{{ $file['time'] }}</td>
+                <td>
+                    <button class="btn btn-sm btn-primary"
+                        onclick="document.getElementById('file_path').value = '{{ $file['path'] }}'">
+                        Use This File
+                    </button>
+                </td>
+            </tr>
+        @empty
+            <tr>
+                <td colspan="4">No uploaded files.</td>
+            </tr>
+        @endforelse
+    </tbody>
+</table>
+
+
+
 </div>
+
+
 @endsection
