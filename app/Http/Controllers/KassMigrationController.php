@@ -588,55 +588,89 @@ private function findSharempaSheet(array $sheets)
 
     foreach ($sheets as $title => $sheetObj) {
 
-        // Clean title: remove NBSP, trim, uppercase
+        // Clean sheet title
         $clean = strtoupper(trim(str_replace("\xC2\xA0", ' ', $title)));
 
+        // Remove inner spaces to allow "SHARE MPA"
+        $noSpace = str_replace(' ', '', $clean);
+
+        // -----------------------------
         // 1️⃣ STRICT MATCH
-        if ($clean === 'SHAREMPA') {
-            return ['sheet' => $sheetObj, 'match' => "STRICT: $title"];
+        // -----------------------------
+        if ($clean === 'SHAREMPA' || $noSpace === 'SHAREMPA') {
+            return [
+                'sheet' => $sheetObj,
+                'match' => "STRICT: $title"
+            ];
         }
 
-        // 2️⃣ CASE-INSENSITIVE / TRIMMED
-        if ($clean === 'SHARE MPA' || $clean === 'SHAREMPA ') {
-            $candidates["CASE"] = $sheetObj;
-        }
-
-        // 3️⃣ SPACE / SYMBOL / UNDERSCORE VARIANTS
-        $variant = str_replace([' ', '_', '-'], '', $clean);
+        // -----------------------------
+        // 2️⃣ VARIANTS using symbols
+        // -----------------------------
+        $variant = str_replace([' ', '_', '-', '.'], '', $clean);
         if ($variant === 'SHAREMPA') {
             $candidates["VARIANT:$title"] = $sheetObj;
         }
 
-        // 4️⃣ PREFIX-SUFFIX MATCH
+        // -----------------------------
+        // 3️⃣ PREFIX / SUFFIX
+        // (e.g. SHAREMPA 2015, 2012 SHAREMPA)
+        // -----------------------------
         if (str_starts_with($clean, 'SHAREMPA') || str_ends_with($clean, 'SHAREMPA')) {
             $candidates["PREFIX_SUFFIX:$title"] = $sheetObj;
         }
 
-        // 5️⃣ CONTAINS MATCH
+        // -----------------------------
+        // 4️⃣ CONTAINS BOTH WORDS
+        // (e.g. SHARE MPA, SHARE-MPA2020)
+        // -----------------------------
         if (str_contains($clean, 'SHARE') && str_contains($clean, 'MPA')) {
-            $candidates["CONTAINS:$title"] = $sheetObj;
+
+            // Guard against reversed names like "MPA SHARES"
+            // Must keep "SHARE" before "MPA"
+            $posShare = strpos($clean, 'SHARE');
+            $posMpa   = strpos($clean, 'MPA');
+
+            if ($posShare !== false && $posMpa !== false && $posShare < $posMpa) {
+                $candidates["CONTAINS:$title"] = $sheetObj;
+            }
         }
     }
 
-    // 6️⃣ If multiple candidates, pick the closest using levenshtein
+    // -----------------------------
+    // 5️⃣ Resolve multiple candidates
+    // -----------------------------
     if (!empty($candidates)) {
+
         $best = null;
         $bestDist = 999;
 
         foreach ($candidates as $label => $sheetObj) {
-            $dist = levenshtein($label, 'SHAREMPA');
+
+            // Compare cleaned label ONLY to the target word
+            $dist = levenshtein(
+                str_replace(['VARIANT:', 'PREFIX_SUFFIX:', 'CONTAINS:'], '', $label),
+                'SHAREMPA'
+            );
+
             if ($dist < $bestDist) {
                 $bestDist = $dist;
-                $best = ['sheet' => $sheetObj, 'match' => "LEVENSHTEIN:$label"];
+                $best = [
+                    'sheet' => $sheetObj,
+                    'match' => "LEVENSHTEIN:$label"
+                ];
             }
         }
 
         return $best;
     }
 
-    // Nothing found
+    // -----------------------------
+    // 6️⃣ Nothing matched
+    // -----------------------------
     return null;
 }
+
 
 
 
