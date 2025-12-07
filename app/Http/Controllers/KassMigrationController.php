@@ -22,9 +22,9 @@ class KassMigrationController extends Controller
     public function index()
     {
         $files = collect(Storage::files('kass_uploads'))
-            ->sortByDesc(fn($f) => Storage::lastModified($f))
+            ->sortByDesc(fn ($f) => Storage::lastModified($f))
             ->take(20)
-            ->map(fn($f) => [
+            ->map(fn ($f) => [
                 'name' => basename($f),
                 'path' => $f,
                 'time' => date('Y-m-d H:i:s', Storage::lastModified($f)),
@@ -61,7 +61,7 @@ class KassMigrationController extends Controller
         mkdir($extractTo, 0775, true);
 
         $zip = new \ZipArchive;
-        if ($zip->open(storage_path("app/{$zipPath}")) === TRUE) {
+        if ($zip->open(storage_path("app/{$zipPath}")) === true) {
             $zip->extractTo($extractTo);
             $zip->close();
         }
@@ -70,7 +70,7 @@ class KassMigrationController extends Controller
     }
 
     /*===========================================================
-     |  PROCESS A SINGLE FILE
+     |  PROCESS A SINGLE FILE (manual button)
      ===========================================================*/
     public function process(Request $request)
     {
@@ -90,6 +90,7 @@ class KassMigrationController extends Controller
             }
 
         } catch (\Exception $e) {
+            $this->logFileEvent($file, 'PROCESS_ERROR', $e->getMessage());
             return back()->with('error', "Error: " . $e->getMessage());
         }
 
@@ -98,53 +99,56 @@ class KassMigrationController extends Controller
 
     /*===========================================================
      |
-     |   PROCESS ALL FILES IN FOLDER
+     |   PROCESS ALL FILES – ONE PER HIT (used by auto-refresh)
      |
      ===========================================================*/
-  public function processAll()
-{
-    // Only pick Excel files
-    $files = array_values(array_filter(Storage::files('kass_uploads'), function ($file) {
-        return in_array(strtolower(pathinfo($file, PATHINFO_EXTENSION)), ['xls', 'xlsx']);
-    }));
+    public function processAll()
+    {
+        // Only pick Excel files
+        $files = array_values(array_filter(Storage::files('kass_uploads'), function ($file) {
+            return in_array(strtolower(pathinfo($file, PATHINFO_EXTENSION)), ['xls', 'xlsx']);
+        }));
 
-    $remaining = count($files);
+        $remaining = count($files);
 
-    if ($remaining === 0) {
-        return view('kass.auto', [
-            'message' => "🎉 All files processed! No remaining files.",
-            'remaining' => 0,
-            'next' => false
-        ]);
+        // Nothing left
+        if ($remaining === 0) {
+            return view('kass.auto', [
+                'message'   => "🎉 All files processed! No remaining files.",
+                'remaining' => 0,
+                'next'      => false,
+            ]);
+        }
+
+        // Always process only the FIRST file
+        $file = $files[0];
+
+        try {
+            $this->processExcel($file);
+            Storage::delete($file);
+
+            $this->logFileEvent($file, 'FILE_PROCESSED', 'File imported and deleted from kass_uploads.');
+
+            return view('kass.auto', [
+                'message'   => "✅ Processed: {$file}",
+                'remaining' => $remaining - 1,
+                'next'      => true,
+            ]);
+        } catch (\Exception $e) {
+
+            // Log at file level
+            $this->logFileEvent($file, 'PROCESS_ERROR', $e->getMessage());
+
+            // Delete problematic file so we don’t loop forever
+            Storage::delete($file);
+
+            return view('kass.auto', [
+                'message'   => "❌ Failed on {$file}: " . $e->getMessage(),
+                'remaining' => $remaining - 1,
+                'next'      => true,
+            ]);
+        }
     }
-
-    // Process only first file
-    $file = $files[0];
-
-    try {
-        $this->processExcel($file);
-        Storage::delete($file);
-
-        return view('kass.auto', [
-            'message' => "✅ Processed: {$file}",
-            'remaining' => $remaining - 1,
-            'next' => true
-        ]);
-    }
-    catch (\Exception $e) {
-
-        $this->logMissingSheet($file, "PROCESS_ERROR", $e->getMessage());
-
-        Storage::delete($file);
-
-        return view('kass.auto', [
-            'message' => "❌ Failed on {$file}: " . $e->getMessage(),
-            'remaining' => $remaining - 1,
-            'next' => true
-        ]);
-    }
-}
-
 
     /*===========================================================
      |
@@ -155,9 +159,10 @@ class KassMigrationController extends Controller
      |      LOANMPA  => loans
      |
      ===========================================================*/
-    private function processExcel(string $filePath)
+    private function processExcel(string $filePath): void
     {
-        $spreadsheet = IOFactory::load(storage_path("app/{$filePath}"));
+        $fullPath    = storage_path("app/{$filePath}");
+        $spreadsheet = IOFactory::load($fullPath);
 
         $sheets = [];
         foreach ($spreadsheet->getAllSheets() as $sheet) {
@@ -168,34 +173,34 @@ class KassMigrationController extends Controller
         if (isset($sheets['SHAREMPA'])) {
             $this->processContributionSheet($sheets['SHAREMPA'], $filePath);
         } else {
-            $this->logMissingSheet($filePath, "CONTRIBUTION", "SHAREMPA");
+            $this->logFileEvent($filePath, "MISSING_SHAREMPA", "SHAREMPA sheet not found.");
         }
 
         // LOANMPA
         if (isset($sheets['LOANMPA'])) {
             $this->processLoanSheet($sheets['LOANMPA'], $filePath);
         } else {
-            $this->logMissingSheet($filePath, "LOAN", "LOANMPA");
+            $this->logFileEvent($filePath, "MISSING_LOANMPA", "LOANMPA sheet not found.");
         }
+    }
+
+    /* If someone uploads CSV/TXT – log and ignore (no fatal error) */
+    private function processCsv(string $filePath): void
+    {
+        $this->logFileEvent($filePath, 'CSV_IGNORED', 'CSV/TXT not supported for structured import.');
     }
 
     /*===========================================================
      |
-     |   SHAREMPA  —  Contributions Sheet
-     |
-     |   Fixes include:
-     |   - Carry down NAME / ADM NO / COMPANY
-     |   - MEMB = membership fee
-     |   - DR/CR = deposit movement
-     |   - raw JSON stored
+     |   SHAREMPA — Contributions Sheet
      |
      ===========================================================*/
-    private function processContributionSheet($sheet, string $sourceFile)
+    private function processContributionSheet($sheet, string $sourceFile): void
     {
-        $rows = $sheet->toArray(null, true, true, true);
-        $clean = array_map(fn($r) => array_values($r), $rows);
+        $rows  = $sheet->toArray(null, true, true, true);
+        $clean = array_map(fn ($r) => array_values($r), $rows);
 
-        // detect header row
+        // Detect header row
         [$headerRaw, $start] = $this->extractHeader($clean);
         $header = $this->normalizeHeaders($headerRaw);
 
@@ -204,74 +209,88 @@ class KassMigrationController extends Controller
         $carryComp = null;
 
         for ($i = $start; $i < count($clean); $i++) {
-
             $row = $clean[$i];
-            if (!$this->rowHasValues($row)) continue;
+
+            if (!$this->rowHasValues($row)) {
+                continue;
+            }
 
             $mapped = $this->mapRow($header, $row);
 
-            // === CARRY-DOWN FIX ===
-            if (!empty($mapped['name'])) $carryName = $mapped['name'];
-            else $mapped['name'] = $carryName;
+            // --- Skip duplicated header rows inside data ---
+            if ($this->looksLikeHeaderRow($mapped)) {
+                $this->logIssue($sourceFile, 'HEADER_ROW_IN_DATA', $mapped);
+                continue;
+            }
 
-            if (!empty($mapped['adm_no'])) $carryAdm = $mapped['adm_no'];
-            else $mapped['adm_no'] = $carryAdm;
+            // Carry down repeated values
+            if (!empty($mapped['name'])) {
+                $carryName = $mapped['name'];
+            } else {
+                $mapped['name'] = $carryName;
+            }
 
-            if (!empty($mapped['comp'])) $carryComp = $mapped['comp'];
-            else $mapped['comp'] = $carryComp;
+            if (!empty($mapped['adm_no'])) {
+                $carryAdm = $mapped['adm_no'];
+            } else {
+                $mapped['adm_no'] = $carryAdm;
+            }
 
-            // detect amount
+            if (!empty($mapped['comp'])) {
+                $carryComp = $mapped['comp'];
+            } else {
+                $mapped['comp'] = $carryComp;
+            }
+
+            // If still missing key identifiers – log and skip
+            if (empty($mapped['name']) || empty($mapped['adm_no'])) {
+                $this->logIssue($sourceFile, 'MISSING_NAME_OR_ADM_AFTER_CARRY', $mapped);
+                continue;
+            }
+
+            // Clean year / month
+            $year  = $this->cleanYear($mapped['year'] ?? null, $sourceFile, $mapped);
+            $month = $this->cleanMonth($mapped['month'] ?? null, $sourceFile, $mapped);
+
+            // Detect amount: DR → MEMB → CR
             $memb = $this->num($mapped['memb'] ?? null);
             $dr   = $this->num($mapped['dr'] ?? null);
             $cr   = $this->num($mapped['cr'] ?? null);
 
             $amount = $dr ?? $memb ?? $cr ?? 0;
 
-            DB::table('kass_staging_contributions')->insert([
-                'raw_name'          => $mapped['name'],
-                'member_identifier' => $mapped['pfno'] ?? null,
-                'adm_no'            => $mapped['adm_no'],
-                'company'           => $mapped['comp'],
-                'year'              => $mapped['year'] ?? null,
-                'month'             => $mapped['month'] ?? null,
-                'raw_type'          => $this->detectContributionType($mapped),
-                'amount'            => $amount,
-                'source_file'       => $sourceFile,
-                'raw_row_json'      => json_encode($mapped),
-                'created_at'        => now(),
-                'updated_at'        => now(),
-            ]);
+            try {
+                DB::table('kass_staging_contributions')->insert([
+                    'raw_name'          => $mapped['name'],
+                    'member_identifier' => $mapped['pfno'] ?? null,
+                    'adm_no'            => $mapped['adm_no'],
+                    'company'           => $mapped['comp'],
+                    'year'              => $year,
+                    'month'             => $month,
+                    'raw_type'          => $this->detectContributionType($mapped),
+                    'amount'            => $amount,
+                    'source_file'       => $sourceFile,
+                    'raw_row_json'      => json_encode($mapped),
+                    'created_at'        => now(),
+                    'updated_at'        => now(),
+                ]);
+            } catch (\Exception $e) {
+                // Log row-level DB failure and continue
+                $this->logIssue($sourceFile, 'DB_INSERT_ERROR_CONTRIBUTION: ' . $e->getMessage(), $mapped);
+                continue;
+            }
         }
-    }
-
-    private function num($v)
-    {
-        if ($v === null || $v === '') return null;
-        $v = str_replace([',',' '], '', $v);
-        return is_numeric($v) ? floatval($v) : null;
-    }
-
-    private function detectContributionType($row): string
-    {
-        if ($this->num($row['memb'] ?? null)) return "MEMBERSHIP";
-        if ($this->num($row['dr'] ?? null)) return "DEPOSIT_DR";
-        if ($this->num($row['cr'] ?? null)) return "DEPOSIT_CR";
-        return "UNKNOWN";
     }
 
     /*===========================================================
      |
      |   LOANMPA — Loan Sheet
      |
-     |   Note:
-     |   - Carry down NAME / ADM / COMPANY same as contributions
-     |   - We only store raw details for future processing
-     |
      ===========================================================*/
-    private function processLoanSheet($sheet, string $sourceFile)
+    private function processLoanSheet($sheet, string $sourceFile): void
     {
         $rows  = $sheet->toArray(null, true, true, true);
-        $clean = array_map(fn($r) => array_values($r), $rows);
+        $clean = array_map(fn ($r) => array_values($r), $rows);
 
         [$headerRaw, $start] = $this->extractHeader($clean);
         $header = $this->normalizeHeaders($headerRaw);
@@ -281,39 +300,73 @@ class KassMigrationController extends Controller
         $carryComp = null;
 
         for ($i = $start; $i < count($clean); $i++) {
-
             $row = $clean[$i];
-            if (!$this->rowHasValues($row)) continue;
+
+            if (!$this->rowHasValues($row)) {
+                continue;
+            }
 
             $mapped = $this->mapRow($header, $row);
 
-            // CARRY DOWN
-            if (!empty($mapped['name'])) $carryName = $mapped['name'];
-            else $mapped['name'] = $carryName;
+            // Skip header-like rows
+            if ($this->looksLikeHeaderRow($mapped)) {
+                $this->logIssue($sourceFile, 'HEADER_ROW_IN_DATA_LOAN', $mapped);
+                continue;
+            }
 
-            if (!empty($mapped['adm_no'])) $carryAdm = $mapped['adm_no'];
-            else $mapped['adm_no'] = $carryAdm;
+            // Carry down
+            if (!empty($mapped['name'])) {
+                $carryName = $mapped['name'];
+            } else {
+                $mapped['name'] = $carryName;
+            }
 
-            if (!empty($mapped['comp'])) $carryComp = $mapped['comp'];
-            else $mapped['comp'] = $carryComp;
+            if (!empty($mapped['adm_no'])) {
+                $carryAdm = $mapped['adm_no'];
+            } else {
+                $mapped['adm_no'] = $carryAdm;
+            }
 
-            DB::table('kass_staging_loans')->insert([
-                'raw_name'            => $mapped['name'],
-                'member_identifier'   => $mapped['pfno'] ?? null,
-                'adm_no'              => $mapped['adm_no'],
-                'company'             => $mapped['comp'],
-                'loan_type'           => 'LOANMPA',
-                'year'                => $mapped['year'] ?? null,
-                'month'               => $mapped['month'] ?? null,
-                'principal_disbursed' => $this->num($mapped['cr'] ?? null),
-                'repayment_amount'    => $this->num($mapped['dr'] ?? null),
-                'interest_amount'     => $this->num($mapped['int'] ?? null),
-                'period_index'        => $mapped['period'] ?? null,
-                'source_file'         => $sourceFile,
-                'raw_row_json'        => json_encode($mapped),
-                'created_at'          => now(),
-                'updated_at'          => now(),
-            ]);
+            if (!empty($mapped['comp'])) {
+                $carryComp = $mapped['comp'];
+            } else {
+                $mapped['comp'] = $carryComp;
+            }
+
+            if (empty($mapped['name']) || empty($mapped['adm_no'])) {
+                $this->logIssue($sourceFile, 'MISSING_NAME_OR_ADM_AFTER_CARRY_LOAN', $mapped);
+                continue;
+            }
+
+            $year  = $this->cleanYear($mapped['year'] ?? null, $sourceFile, $mapped);
+            $month = $this->cleanMonth($mapped['month'] ?? null, $sourceFile, $mapped);
+
+            $principal = $this->num($mapped['cr'] ?? null);
+            $repay     = $this->num($mapped['dr'] ?? null);
+            $interest  = $this->num($mapped['int'] ?? null);
+
+            try {
+                DB::table('kass_staging_loans')->insert([
+                    'raw_name'            => $mapped['name'],
+                    'member_identifier'   => $mapped['pfno'] ?? null,
+                    'adm_no'              => $mapped['adm_no'],
+                    'company'             => $mapped['comp'],
+                    'loan_type'           => 'LOANMPA',
+                    'year'                => $year,
+                    'month'               => $month,
+                    'principal_disbursed' => $principal,
+                    'repayment_amount'    => $repay,
+                    'interest_amount'     => $interest,
+                    'period_index'        => $mapped['period'] ?? null,
+                    'source_file'         => $sourceFile,
+                    'raw_row_json'        => json_encode($mapped),
+                    'created_at'          => now(),
+                    'updated_at'          => now(),
+                ]);
+            } catch (\Exception $e) {
+                $this->logIssue($sourceFile, 'DB_INSERT_ERROR_LOAN: ' . $e->getMessage(), $mapped);
+                continue;
+            }
         }
     }
 
@@ -322,7 +375,7 @@ class KassMigrationController extends Controller
      |   GENERIC HELPERS
      |
      ===========================================================*/
-    private function extractHeader(array $rows)
+    private function extractHeader(array $rows): array
     {
         foreach ($rows as $i => $row) {
             $upper = array_map('strtoupper', $row);
@@ -333,23 +386,25 @@ class KassMigrationController extends Controller
         throw new \Exception("Header row not found.");
     }
 
-    private function rowHasValues($row)
+    private function rowHasValues($row): bool
     {
         foreach ($row as $x) {
-            if (trim((string)$x) !== "") return true;
+            if (trim((string) $x) !== '') {
+                return true;
+            }
         }
         return false;
     }
 
-    private function normalizeHeaders($row)
+    private function normalizeHeaders($row): array
     {
         return array_map(
-            fn($h) => strtolower(str_replace([' ', '/', '.', '-', "\t"], '_', trim($h))),
+            fn ($h) => strtolower(str_replace([' ', '/', '.', '-', "\t"], '_', trim($h))),
             $row
         );
     }
 
-    private function mapRow($header, $row)
+    private function mapRow($header, $row): array
     {
         $out = [];
         foreach ($header as $i => $col) {
@@ -358,10 +413,107 @@ class KassMigrationController extends Controller
         return $out;
     }
 
-    private function logMissingSheet(string $file, string $type, string $note)
+    /* Header-like row detection inside data region */
+    private function looksLikeHeaderRow(array $mapped): bool
     {
-        $line = "[" . now() . "] {$file} missing {$type} → {$note}\n";
+        $candidates = [
+            'name', 'adm_no', 'comp', 'company',
+            'year', 'month', 'memb', 'dr', 'cr', 'run_bal',
+        ];
+
+        $score = 0;
+
+        foreach ($candidates as $key) {
+            if (!isset($mapped[$key])) {
+                continue;
+            }
+            $val = strtoupper(trim((string) $mapped[$key]));
+            if (in_array($val, ['NAME','ADM NO','COMP','COMPANY','YEAR','MONTH','MEMB','DR','CR','RUN BAL'])) {
+                $score++;
+            }
+        }
+
+        // If several columns look like headers → treat as header row
+        return $score >= 2;
+    }
+
+    /* Year cleaner – converts to int or null, logs bad values */
+    private function cleanYear($value, string $file, array $row)
+    {
+        $value = trim((string) $value);
+
+        if ($value === '') {
+            return null;
+        }
+
+        if (is_numeric($value)) {
+            return (int) $value;
+        }
+
+        $this->logIssue($file, 'INVALID_YEAR_VALUE', array_merge($row, ['_year_raw' => $value]));
+        return null;
+    }
+
+    /* Month cleaner – uppercase string, logs weird ones (but still stores) */
+    private function cleanMonth($value, string $file, array $row)
+    {
+        $value = trim((string) $value);
+
+        if ($value === '') {
+            return null;
+        }
+
+        $month = strtoupper($value);
+        $valid = ['JAN','FEB','MAR','APR','MAY','JUNE','JULY','AUG','SEP','OCT','NOV','DEC'];
+
+        if (!in_array($month, $valid)) {
+            $this->logIssue($file, 'UNEXPECTED_MONTH_VALUE', array_merge($row, ['_month_raw' => $value]));
+        }
+
+        return $month;
+    }
+
+    private function num($v)
+    {
+        if ($v === null || $v === '') {
+            return null;
+        }
+        $v = str_replace([',', ' '], '', $v);
+        return is_numeric($v) ? (float) $v : null;
+    }
+
+    private function detectContributionType($row): string
+    {
+        if ($this->num($row['memb'] ?? null)) {
+            return "MEMBERSHIP";
+        }
+        if ($this->num($row['dr'] ?? null)) {
+            return "DEPOSIT_DR";
+        }
+        if ($this->num($row['cr'] ?? null)) {
+            return "DEPOSIT_CR";
+        }
+        return "UNKNOWN";
+    }
+
+    /*===========================================================
+     |
+     |   LOGGING HELPERS
+     |
+     ===========================================================*/
+
+    // File-level events (missing sheets, process errors, etc.)
+    private function logFileEvent(string $file, string $type, string $note): void
+    {
+        $line = "[" . now() . "] FILE: {$file} | TYPE: {$type} | NOTE: {$note}\n";
         Storage::append('logs/kass_missing_sheets.log', $line);
+    }
+
+    // Row-level issues (bad data, DB insert failures, misaligned rows, etc.)
+    private function logIssue(string $file, string $message, array $row = []): void
+    {
+        $line = "[" . now() . "] FILE: {$file} | ISSUE: {$message} | ROW: " . json_encode($row) . "\n";
+        Storage::append('logs/kass_migration_issues.log', $line);
     }
 
     /*===========================================================
@@ -383,67 +535,61 @@ class KassMigrationController extends Controller
         return back()->with('success', 'Staging cleared.');
     }
 
+    /*===========================================================
+     |  (OPTIONAL) Tracker-based one-by-one endpoint
+     |  – you can keep or delete this if not using
+     ===========================================================*/
     public function processNext()
-{
-    $trackerPath = storage_path('app/kass_tracker.json');
+    {
+        $trackerPath = storage_path('app/kass_tracker.json');
 
-    // Load tracker file or initialize
-    if (!file_exists($trackerPath)) {
-        file_put_contents($trackerPath, json_encode([
-            'last_file' => null,
-            'status' => 'IDLE'
-        ], JSON_PRETTY_PRINT));
-    }
+        if (!file_exists($trackerPath)) {
+            file_put_contents($trackerPath, json_encode([
+                'last_file' => null,
+                'status'    => 'IDLE',
+            ], JSON_PRETTY_PRINT));
+        }
 
-    $tracker = json_decode(file_get_contents($trackerPath), true);
+        $tracker = json_decode(file_get_contents($trackerPath), true);
 
-    // Get all Excel files
-    $files = array_values(array_filter(Storage::files('kass_uploads'), function($file) {
-        return in_array(strtolower(pathinfo($file, PATHINFO_EXTENSION)), ['xls', 'xlsx']);
-    }));
+        $files = array_values(array_filter(Storage::files('kass_uploads'), function ($file) {
+            return in_array(strtolower(pathinfo($file, PATHINFO_EXTENSION)), ['xls', 'xlsx']);
+        }));
 
-    if (empty($files)) {
-        return "No XLS/XLSX files found.";
-    }
+        if (empty($files)) {
+            return "No XLS/XLSX files found.";
+        }
 
-    // If last_file exists, pick the next
-    $index = 0;
+        $index = 0;
 
-    if ($tracker['last_file']) {
-        $index = array_search($tracker['last_file'], $files);
-        if ($index === false) $index = 0;
-        else $index++;
-    }
+        if (!empty($tracker['last_file'])) {
+            $index = array_search($tracker['last_file'], $files);
+            $index = ($index === false) ? 0 : $index + 1;
+        }
 
-    // If we've reached end of list
-    if ($index >= count($files)) {
-        return "All files processed.";
-    }
+        if ($index >= count($files)) {
+            return "All files processed.";
+        }
 
-    $fileToProcess = $files[$index];
-
-    // Update tracker BEFORE processing
-    $tracker['last_file'] = $fileToProcess;
-    $tracker['status'] = "PROCESSING";
-    file_put_contents($trackerPath, json_encode($tracker, JSON_PRETTY_PRINT));
-
-    try {
-        $this->processExcel($fileToProcess);
-
-        // Mark success
-        $tracker['status'] = "SUCCESS";
+        $fileToProcess          = $files[$index];
+        $tracker['last_file']   = $fileToProcess;
+        $tracker['status']      = "PROCESSING";
         file_put_contents($trackerPath, json_encode($tracker, JSON_PRETTY_PRINT));
 
-        return "Processed: {$fileToProcess}";
+        try {
+            $this->processExcel($fileToProcess);
+            $tracker['status'] = "SUCCESS";
+            file_put_contents($trackerPath, json_encode($tracker, JSON_PRETTY_PRINT));
+            Storage::delete($fileToProcess);
 
-    } catch (\Exception $e) {
+            return "Processed: {$fileToProcess}";
+        } catch (\Exception $e) {
+            $tracker['status'] = "FAILED: " . $e->getMessage();
+            file_put_contents($trackerPath, json_encode($tracker, JSON_PRETTY_PRINT));
+            $this->logFileEvent($fileToProcess, 'PROCESS_ERROR_TRACKER', $e->getMessage());
+            Storage::delete($fileToProcess);
 
-        // Mark failure
-        $tracker['status'] = "FAILED: " . $e->getMessage();
-        file_put_contents($trackerPath, json_encode($tracker, JSON_PRETTY_PRINT));
-
-        return "FAILED: " . $e->getMessage();
+            return "FAILED: " . $e->getMessage();
+        }
     }
-}
-
 }
