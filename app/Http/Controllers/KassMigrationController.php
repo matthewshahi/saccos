@@ -506,16 +506,31 @@ class KassMigrationController extends Controller
      |
      ===========================================================*/
 
-    private function extractHeader(array $rows): array
-    {
-        foreach ($rows as $i => $row) {
-            $upper = array_map('strtoupper', $row);
-            if (in_array('NAME', $upper)) {
-                return [$row, $i + 1];
-            }
+  private function extractHeader(array $rows): array
+{
+    foreach ($rows as $i => $row) {
+
+        // Skip completely empty rows
+        if (!$this->rowHasValues($row)) {
+            continue;
         }
-        throw new \Exception("Header row not found.");
+
+        // Normalize aggressively
+        $cleaned = array_map(function ($v) {
+            $v = str_replace("\xC2\xA0", ' ', (string)$v); // Fix NBSP
+            $v = strtoupper(trim($v));
+            $v = preg_replace('/\s+/', ' ', $v);
+            return $v;
+        }, $row);
+
+        if (in_array('NAME', $cleaned)) {
+            return [$row, $i + 1];
+        }
     }
+
+    throw new \Exception("Header row not found.");
+}
+
 
     private function rowHasValues($row): bool
     {
