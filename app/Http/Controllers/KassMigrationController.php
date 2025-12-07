@@ -9,18 +9,29 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
 
 class KassMigrationController extends Controller
 {
-    public function __construct()
+  public function __construct()
 {
     $this->middleware('auth');
 
-    // EXTEND TIME & MEMORY FOR HEAVY MIGRATIONS
-    ini_set('max_execution_time', '1800');  // 30 minutes
-    ini_set('request_terminate_timeout', '1800'); 
-    ini_set('memory_limit', '2048M');      // 2GB
-    ini_set('max_input_time', '1800');     // 30 minutes
-    ini_set('post_max_size', '500M');
+    // Allow long-running migrations (30 minutes)
+    ini_set('max_execution_time', '1800');     // Script run time
+    ini_set('max_input_time', '1800');         // Upload parsing time
+    ini_set('request_terminate_timeout', '1800'); // FPM/Apache timeout if supported
+
+    // Increase memory
+    ini_set('memory_limit', '2048M');
+
+    // Increase upload limits (Excel, ZIP, CSV, etc.)
     ini_set('upload_max_filesize', '500M');
+    ini_set('post_max_size', '500M');
+
+    // Avoid partial uploads
+    ini_set('max_file_uploads', '50');
+
+    // Increase socket timeout (CSV/Excel reads)
+    ini_set('default_socket_timeout', '1800');
 }
+
 
 
     /*===========================================================
