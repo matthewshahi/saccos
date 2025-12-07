@@ -194,16 +194,50 @@ class KassMigrationController extends Controller
      |
      |   SHAREMPA — Contributions Sheet
      |
+     |   New rules:
+     |   - Only transaction columns between MONTH and RUN BAL / RUNBAL
+     |   - Each non-zero numeric transaction => separate row
+     |   - raw_type = original column label (e.g. "CAPITAL", "NEW WEL", "DR", "CR")
+     |   - Amount stored exactly as numeric (no sign manipulation)
+     |   - Opening balance:
+     |        opening = run_bal + dr - cr
+     |        stored once per (company + adm_no + year)
+     |        month = month where RUN BAL first appears
+     |   - RUN BAL never stored as a transaction row
+     |   - Empty / zero values skipped
+     |
      ===========================================================*/
     private function processContributionSheet($sheet, string $sourceFile): void
     {
         $rows  = $sheet->toArray(null, true, true, true);
         $clean = array_map(fn ($r) => array_values($r), $rows);
 
-        // Detect header row
+        // 1) Detect header row (the one that contains "NAME")
         [$headerRaw, $start] = $this->extractHeader($clean);
-        $header = $this->normalizeHeaders($headerRaw);
+        $headerNorm          = $this->normalizeHeaders($headerRaw);
 
+        // 2) Locate critical columns by normalized name
+        $monthIndex = $this->getMonthIndex($headerNorm);
+        $runBalInfo = $this->getRunBalIndexAndKey($headerNorm);
+        $runBalIndex = $runBalInfo['index'];  // can be null
+        $runBalKey   = $runBalInfo['key'];    // normalized key, e.g. "run_bal"
+
+        if ($monthIndex === null) {
+            $this->logFileEvent($sourceFile, 'MISSING_MONTH_COLUMN', 'No MONTH column detected in SHAREMPA.');
+        }
+        if ($runBalIndex === null) {
+            $this->logFileEvent($sourceFile, 'MISSING_RUN_BAL_COLUMN', 'No RUN BAL / RUNBAL column detected in SHAREMPA.');
+        }
+
+        // 3) Determine which header indexes are "transaction" columns.
+        //    Rule: strictly between MONTH and RUN BAL.
+        $transactionIndexes = $this->getTransactionColumnIndexes($headerNorm, $monthIndex, $runBalIndex);
+
+        // 4) Track opening balance per member + year so we only insert once
+        //    Key: company|adm_no|year
+        $openingDone = [];
+
+        // 5) Carry-down buffers
         $carryName = null;
         $carryAdm  = null;
         $carryComp = null;
@@ -215,7 +249,8 @@ class KassMigrationController extends Controller
                 continue;
             }
 
-            $mapped = $this->mapRow($header, $row);
+            // Map row by normalized header keys (name, adm_no, comp, year, month, dr, cr, run_bal, etc.)
+            $mapped = $this->mapRow($headerNorm, $row);
 
             // --- Skip duplicated header rows inside data ---
             if ($this->looksLikeHeaderRow($mapped)) {
@@ -223,7 +258,7 @@ class KassMigrationController extends Controller
                 continue;
             }
 
-            // Carry down repeated values
+            // ---- Carry down NAME / ADM / COMPANY (per Excel pattern) ----
             if (!empty($mapped['name'])) {
                 $carryName = $mapped['name'];
             } else {
@@ -242,42 +277,135 @@ class KassMigrationController extends Controller
                 $mapped['comp'] = $carryComp;
             }
 
-            // If still missing key identifiers – log and skip
+            // If still missing key identifiers – log and skip row
             if (empty($mapped['name']) || empty($mapped['adm_no'])) {
                 $this->logIssue($sourceFile, 'MISSING_NAME_OR_ADM_AFTER_CARRY', $mapped);
                 continue;
             }
 
-            // Clean year / month
+            // Clean year / month (month stored as uppercase JAN, FEB, ...)
             $year  = $this->cleanYear($mapped['year'] ?? null, $sourceFile, $mapped);
             $month = $this->cleanMonth($mapped['month'] ?? null, $sourceFile, $mapped);
 
-            // Detect amount: DR → MEMB → CR
-            $memb = $this->num($mapped['memb'] ?? null);
-            $dr   = $this->num($mapped['dr'] ?? null);
-            $cr   = $this->num($mapped['cr'] ?? null);
+            // Key for opening-balance control: company + adm + year
+            $openingKey = ($carryComp ?? '') . '|' . ($carryAdm ?? '') . '|' . (string) $year;
 
-            $amount = $dr ?? $memb ?? $cr ?? 0;
+            // Numeric DR/CR for this row (used for both transactions & opening calc)
+            $dr = $this->num($mapped['dr'] ?? null);
+            $cr = $this->num($mapped['cr'] ?? null);
 
-            try {
-                DB::table('kass_staging_contributions')->insert([
-                    'raw_name'          => $mapped['name'],
-                    'member_identifier' => $mapped['pfno'] ?? null,
-                    'adm_no'            => $mapped['adm_no'],
-                    'company'           => $mapped['comp'],
-                    'year'              => $year,
-                    'month'             => $month,
-                    'raw_type'          => $this->detectContributionType($mapped),
-                    'amount'            => $amount,
-                    'source_file'       => $sourceFile,
-                    'raw_row_json'      => json_encode($mapped),
-                    'created_at'        => now(),
-                    'updated_at'        => now(),
-                ]);
-            } catch (\Exception $e) {
-                // Log row-level DB failure and continue
-                $this->logIssue($sourceFile, 'DB_INSERT_ERROR_CONTRIBUTION: ' . $e->getMessage(), $mapped);
-                continue;
+            // Numeric RUN BAL for this row (if column exists)
+            $runBal = null;
+            if ($runBalKey !== null && array_key_exists($runBalKey, $mapped)) {
+                $runBal = $this->num($mapped[$runBalKey]);
+            }
+
+            // ================== OPENING BALANCE ==================
+            //
+            // Rule:
+            //   opening = run_bal + dr - cr
+            //
+            // - Only computed the FIRST time we see a numeric RUN BAL
+            //   for a (company, adm_no, year) combination.
+            // - Stored under the same YEAR + MONTH as that row.
+            // - Amount stored exactly as computed (can be + / -).
+            // - If result is 0 or year is null → skip.
+            // =====================================================
+            if ($runBal !== null && !isset($openingDone[$openingKey])) {
+
+                // Use 0 when dr/cr are null
+                $drOpening = $dr ?? 0;
+                $crOpening = $cr ?? 0;
+
+                $openingAmount = $runBal + $drOpening - $crOpening;
+
+                if ($openingAmount != 0 && $year !== null) {
+                    try {
+                        DB::table('kass_staging_contributions')->insert([
+                            'raw_name'          => $mapped['name'],
+                            'member_identifier' => $mapped['pfno'] ?? null,
+                            'adm_no'            => $mapped['adm_no'],
+                            'company'           => $mapped['comp'],
+                            'year'              => $year,
+                            'month'             => $month,                  // month where RUN BAL first appears
+                            'raw_type'          => 'OPENING_BALANCE',
+                            'amount'            => $openingAmount,
+                            'source_file'       => $sourceFile,
+                            'raw_row_json'      => json_encode($mapped),
+                            'created_at'        => now(),
+                            'updated_at'        => now(),
+                        ]);
+                    } catch (\Exception $e) {
+                        $this->logIssue(
+                            $sourceFile,
+                            'DB_INSERT_ERROR_OPENING_BALANCE: ' . $e->getMessage(),
+                            array_merge($mapped, ['_opening_amount' => $openingAmount])
+                        );
+                    }
+                }
+
+                // Mark opening as done for this member+year
+                $openingDone[$openingKey] = true;
+            }
+
+            // ================== TRANSACTION ROWS ==================
+            //
+            // Now we loop over all transaction columns between MONTH and RUN BAL.
+            // For each numeric, non-zero value we insert a row with:
+            //   raw_type = original column label (as it appears in Excel)
+            //   amount   = numeric value (positive or negative, we don't flip sign)
+            //
+            // Empty values or zero => skipped entirely.
+            // ======================================================
+            foreach ($transactionIndexes as $colIndex) {
+
+                // Safety: ensure we have header & row cell for this index
+                if (!array_key_exists($colIndex, $row) || !array_key_exists($colIndex, $headerRaw)) {
+                    continue;
+                }
+
+                $rawHeaderLabel = trim((string) $headerRaw[$colIndex]);  // e.g. "CAPITAL", "NEW WEL", "DR", "CR"
+                $rawCellValue   = $row[$colIndex];
+
+                // Clean to numeric (remove commas, spaces, but keep minus sign if any)
+                $amount = $this->num($rawCellValue);
+
+                // Skip if not numeric or zero (avoid bloating DB with junk rows)
+                if ($amount === null || $amount == 0) {
+                    continue;
+                }
+
+                // If the header label is blank, fall back to normalized key name
+                $normalizedKey = $headerNorm[$colIndex] ?? 'unknown';
+                $rawType       = $rawHeaderLabel !== '' ? strtoupper($rawHeaderLabel) : strtoupper($normalizedKey);
+
+                try {
+                    DB::table('kass_staging_contributions')->insert([
+                        'raw_name'          => $mapped['name'],
+                        'member_identifier' => $mapped['pfno'] ?? null,
+                        'adm_no'            => $mapped['adm_no'],
+                        'company'           => $mapped['comp'],
+                        'year'              => $year,
+                        'month'             => $month,
+                        'raw_type'          => $rawType,          // EXACTLY the transaction type as per column
+                        'amount'            => $amount,           // store numeric as-is (can be + or -)
+                        'source_file'       => $sourceFile,
+                        'raw_row_json'      => json_encode($mapped),
+                        'created_at'        => now(),
+                        'updated_at'        => now(),
+                    ]);
+                } catch (\Exception $e) {
+                    $this->logIssue(
+                        $sourceFile,
+                        'DB_INSERT_ERROR_TRANSACTION: ' . $e->getMessage(),
+                        array_merge($mapped, [
+                            '_col_index' => $colIndex,
+                            '_raw_type'  => $rawType,
+                            '_amount'    => $amount,
+                        ])
+                    );
+                    continue;
+                }
             }
         }
     }
@@ -285,6 +413,8 @@ class KassMigrationController extends Controller
     /*===========================================================
      |
      |   LOANMPA — Loan Sheet
+     |
+     |   (Left mostly unchanged; loans logic is simpler)
      |
      ===========================================================*/
     private function processLoanSheet($sheet, string $sourceFile): void
@@ -375,6 +505,7 @@ class KassMigrationController extends Controller
      |   GENERIC HELPERS
      |
      ===========================================================*/
+
     private function extractHeader(array $rows): array
     {
         foreach ($rows as $i => $row) {
@@ -428,13 +559,72 @@ class KassMigrationController extends Controller
                 continue;
             }
             $val = strtoupper(trim((string) $mapped[$key]));
-            if (in_array($val, ['NAME','ADM NO','COMP','COMPANY','YEAR','MONTH','MEMB','DR','CR','RUN BAL'])) {
+            if (in_array($val, ['NAME', 'ADM NO', 'COMP', 'COMPANY', 'YEAR', 'MONTH', 'MEMB', 'DR', 'CR', 'RUN BAL', 'RUNBAL'])) {
                 $score++;
             }
         }
 
         // If several columns look like headers → treat as header row
         return $score >= 2;
+    }
+
+    /* Locate MONTH column index */
+    private function getMonthIndex(array $headerNorm): ?int
+    {
+        foreach ($headerNorm as $i => $col) {
+            if ($col === 'month') {
+                return $i;
+            }
+        }
+        return null;
+    }
+
+    /* Locate RUN BAL / RUNBAL column index & key */
+    private function getRunBalIndexAndKey(array $headerNorm): array
+    {
+        foreach ($headerNorm as $i => $col) {
+            // Accept any normalized header that combines "run" and "bal"
+            if (str_contains($col, 'run') && str_contains($col, 'bal')) {
+                return ['index' => $i, 'key' => $col];
+            }
+        }
+
+        return ['index' => null, 'key' => null];
+    }
+
+    /**
+     * Transaction columns = those STRICTLY between MONTH and RUN BAL.
+     * - If monthIndex is null → we just consider all columns except obvious non-data ones.
+     * - If runBalIndex is null → we consider columns after MONTH up to end.
+     */
+    private function getTransactionColumnIndexes(array $headerNorm, ?int $monthIndex, ?int $runBalIndex): array
+    {
+        $indexes = [];
+        $max     = count($headerNorm);
+
+        for ($i = 0; $i < $max; $i++) {
+
+            // Skip columns that are clearly structural
+            $key = $headerNorm[$i];
+
+            if (in_array($key, ['name', 'adm_no', 'comp', 'company', 'pfno', 'year', 'month', 'period'])) {
+                continue;
+            }
+
+            // If we know where MONTH is, enforce "after month"
+            if ($monthIndex !== null && $i <= $monthIndex) {
+                continue;
+            }
+
+            // If we know where RUN BAL is, enforce "before run bal"
+            if ($runBalIndex !== null && $i >= $runBalIndex) {
+                continue;
+            }
+
+            $indexes[] = $i;
+        }
+
+        return $indexes;
     }
 
     /* Year cleaner – converts to int or null, logs bad values */
@@ -464,7 +654,7 @@ class KassMigrationController extends Controller
         }
 
         $month = strtoupper($value);
-        $valid = ['JAN','FEB','MAR','APR','MAY','JUNE','JULY','AUG','SEP','OCT','NOV','DEC'];
+        $valid = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUNE', 'JULY', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 
         if (!in_array($month, $valid)) {
             $this->logIssue($file, 'UNEXPECTED_MONTH_VALUE', array_merge($row, ['_month_raw' => $value]));
@@ -473,27 +663,23 @@ class KassMigrationController extends Controller
         return $month;
     }
 
+    /**
+     * Numeric normaliser:
+     * - Removes commas and spaces.
+     * - Keeps minus sign if present.
+     * - Returns float or null if not numeric.
+     */
     private function num($v)
     {
         if ($v === null || $v === '') {
             return null;
         }
-        $v = str_replace([',', ' '], '', $v);
-        return is_numeric($v) ? (float) $v : null;
-    }
 
-    private function detectContributionType($row): string
-    {
-        if ($this->num($row['memb'] ?? null)) {
-            return "MEMBERSHIP";
-        }
-        if ($this->num($row['dr'] ?? null)) {
-            return "DEPOSIT_DR";
-        }
-        if ($this->num($row['cr'] ?? null)) {
-            return "DEPOSIT_CR";
-        }
-        return "UNKNOWN";
+        // Convert e.g. " 12,000 " → "12000"
+        $v = str_replace([',', ' '], '', (string) $v);
+
+        // After cleaning, must be numeric to be valid
+        return is_numeric($v) ? (float) $v : null;
     }
 
     /*===========================================================
@@ -536,8 +722,7 @@ class KassMigrationController extends Controller
     }
 
     /*===========================================================
-     |  (OPTIONAL) Tracker-based one-by-one endpoint
-     |  – you can keep or delete this if not using
+     |  Tracker-based one-by-one endpoint (optional)
      ===========================================================*/
     public function processNext()
     {
@@ -571,9 +756,9 @@ class KassMigrationController extends Controller
             return "All files processed.";
         }
 
-        $fileToProcess          = $files[$index];
-        $tracker['last_file']   = $fileToProcess;
-        $tracker['status']      = "PROCESSING";
+        $fileToProcess        = $files[$index];
+        $tracker['last_file'] = $fileToProcess;
+        $tracker['status']    = "PROCESSING";
         file_put_contents($trackerPath, json_encode($tracker, JSON_PRETTY_PRINT));
 
         try {
