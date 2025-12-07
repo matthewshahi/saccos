@@ -7,24 +7,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 
-/**
- * ------------------------------------------------------------
- * KASS SACCO – BASIC MIGRATION CONTROLLER (CLEAN + COMPLETE)
- * ------------------------------------------------------------
- *
- * This controller:
- *   ✔ Uploads files (CSV/XLS/XLSX)
- *   ✔ Processes a single file
- *   ✔ Processes all files in kass_uploads/
- *   ✔ Reads Sheet1 (Contributions) and Sheet2 (Loans)
- *   ✔ Extracts header dynamically
- *   ✔ Maps rows into staging tables
- *   ✔ Stores raw JSON for later processing
- *
- * NOTE: This is the "stable base version".
- *       You can now open a new thread and ask for STRICT
- *       SHAREMPA/LOANMPA formatting improvements.
- */
 class KassMigrationController extends Controller
 {
     public function __construct()
@@ -32,9 +14,11 @@ class KassMigrationController extends Controller
         $this->middleware('auth');
     }
 
-    /*--------------------------------------------------------------
-     | INDEX PAGE (view uploads)
-     --------------------------------------------------------------*/
+    /*===========================================================
+     |
+     |   MAIN SCREEN
+     |
+     ===========================================================*/
     public function index()
     {
         $files = collect(Storage::files('kass_uploads'))
@@ -49,9 +33,9 @@ class KassMigrationController extends Controller
         return view('kass.index', compact('files'));
     }
 
-    /*--------------------------------------------------------------
-     | UPLOAD SINGLE FILE
-     --------------------------------------------------------------*/
+    /*===========================================================
+     |  UPLOAD SINGLE FILE
+     ===========================================================*/
     public function uploadSingle(Request $request)
     {
         $request->validate([
@@ -63,302 +47,312 @@ class KassMigrationController extends Controller
         return back()->with('success', "File uploaded successfully.");
     }
 
-    /*--------------------------------------------------------------
-     | UPLOAD ZIP OF MANY FILES
-     --------------------------------------------------------------*/
+    /*===========================================================
+     |  UPLOAD ZIP OF FILES
+     ===========================================================*/
     public function uploadBatch(Request $request)
     {
         $request->validate([
             'zip_file' => 'required|mimes:zip',
         ]);
 
-        $zipPath = $request->file('zip_file')->store('kass_zips');
+        $zipPath   = $request->file('zip_file')->store('kass_zips');
         $extractTo = storage_path('app/kass_batch_' . time());
-        mkdir($extractTo);
+        mkdir($extractTo, 0775, true);
 
         $zip = new \ZipArchive;
-        if ($zip->open(storage_path('app/' . $zipPath)) === TRUE) {
+        if ($zip->open(storage_path("app/{$zipPath}")) === TRUE) {
             $zip->extractTo($extractTo);
             $zip->close();
         }
 
-        return back()->with('success', "ZIP extracted. Files ready for processing.");
+        return back()->with('success', "ZIP extracted successfully.");
     }
 
-    /*--------------------------------------------------------------
-     | PROCESS A SELECTED FILE
-     --------------------------------------------------------------*/
+    /*===========================================================
+     |  PROCESS A SINGLE FILE
+     ===========================================================*/
     public function process(Request $request)
     {
-        $filePath = $request->input('file_path');
+        $file = $request->input('file_path');
 
-        if (!$filePath || !Storage::exists($filePath)) {
+        if (!$file || !Storage::exists($file)) {
             return back()->with('error', 'File not found.');
         }
 
         try {
-            $ext = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+            $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
 
             if (in_array($ext, ['xls', 'xlsx'])) {
-                $this->processExcel($filePath);
+                $this->processExcel($file);
             } else {
-                $this->processCsv($filePath);
+                $this->processCsv($file);
             }
 
         } catch (\Exception $e) {
-            return back()->with('error', "Processing error: {$e->getMessage()}");
+            return back()->with('error', "Error: " . $e->getMessage());
         }
 
-        return back()->with('success', "Import completed.");
+        return back()->with('success', "File processed.");
     }
 
-    /*--------------------------------------------------------------
-     | PROCESS ALL UPLOADED FILES
-     --------------------------------------------------------------*/
+    /*===========================================================
+     |
+     |   PROCESS ALL FILES IN FOLDER
+     |
+     ===========================================================*/
     public function processAll()
     {
         $files = Storage::files('kass_uploads');
 
         if (empty($files)) {
-            return back()->with('error', 'No files found in kass_uploads.');
+            return back()->with('error', "No files in kass_uploads.");
         }
 
         $summary = [];
 
-        foreach ($files as $filePath) {
+        foreach ($files as $file) {
             try {
-                $ext = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+                $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
 
                 if (in_array($ext, ['xls', 'xlsx'])) {
-                    $this->processExcel($filePath);
+                    $this->processExcel($file);
                 } else {
-                    $this->processCsv($filePath);
+                    $this->processCsv($file);
                 }
 
-                $summary[] = ['file' => $filePath, 'status' => 'IMPORTED'];
+                $summary[] = ['file' => $file, 'status' => 'IMPORTED'];
 
             } catch (\Exception $e) {
-                $summary[] = ['file' => $filePath, 'status' => 'FAILED: ' . $e->getMessage()];
+                $summary[] = ['file' => $file, 'status' => 'FAILED: ' . $e->getMessage()];
+                $this->logMissingSheet($file, "ERROR", $e->getMessage());
             }
         }
 
-        return back()->with('success', 'Batch import completed.')
-                     ->with('summary', $summary);
+        return back()->with('success', 'Batch completed')->with('summary', $summary);
     }
 
-    /*--------------------------------------------------------------
-     | PROCESS EXCEL (Sheet 1 = contributions, Sheet 2 = loans)
-     --------------------------------------------------------------*/
-    private function processExcel($filePath)
+    /*===========================================================
+     |
+     |   EXCEL HANDLING
+     |
+     |   Valid sheets ONLY:
+     |      SHAREMPA => contributions (shares)
+     |      LOANMPA  => loans
+     |
+     ===========================================================*/
+    private function processExcel(string $filePath)
     {
-        $fullPath = storage_path("app/{$filePath}");
-        $spreadsheet = IOFactory::load($fullPath);
+        $spreadsheet = IOFactory::load(storage_path("app/{$filePath}"));
 
-        // Sheet 1 = Contributions
-        if ($spreadsheet->getSheetCount() >= 1) {
-            $this->processContributionSheet($spreadsheet->getSheet(0), $filePath);
+        $sheets = [];
+        foreach ($spreadsheet->getAllSheets() as $sheet) {
+            $sheets[strtoupper(trim($sheet->getTitle()))] = $sheet;
         }
 
-        // Sheet 2 = Loans
-        if ($spreadsheet->getSheetCount() >= 2) {
-            $this->processLoanSheet($spreadsheet->getSheet(1), $filePath);
+        // SHAREMPA
+        if (isset($sheets['SHAREMPA'])) {
+            $this->processContributionSheet($sheets['SHAREMPA'], $filePath);
+        } else {
+            $this->logMissingSheet($filePath, "CONTRIBUTION", "SHAREMPA");
+        }
+
+        // LOANMPA
+        if (isset($sheets['LOANMPA'])) {
+            $this->processLoanSheet($sheets['LOANMPA'], $filePath);
+        } else {
+            $this->logMissingSheet($filePath, "LOAN", "LOANMPA");
         }
     }
 
-    /*--------------------------------------------------------------
-     | EXTRACT HEADER (must contain NAME)
-     --------------------------------------------------------------*/
-    private function extractHeader($rows)
+    /*===========================================================
+     |
+     |   SHAREMPA  —  Contributions Sheet
+     |
+     |   Fixes include:
+     |   - Carry down NAME / ADM NO / COMPANY
+     |   - MEMB = membership fee
+     |   - DR/CR = deposit movement
+     |   - raw JSON stored
+     |
+     ===========================================================*/
+    private function processContributionSheet($sheet, string $sourceFile)
+    {
+        $rows = $sheet->toArray(null, true, true, true);
+        $clean = array_map(fn($r) => array_values($r), $rows);
+
+        // detect header row
+        [$headerRaw, $start] = $this->extractHeader($clean);
+        $header = $this->normalizeHeaders($headerRaw);
+
+        $carryName = null;
+        $carryAdm  = null;
+        $carryComp = null;
+
+        for ($i = $start; $i < count($clean); $i++) {
+
+            $row = $clean[$i];
+            if (!$this->rowHasValues($row)) continue;
+
+            $mapped = $this->mapRow($header, $row);
+
+            // === CARRY-DOWN FIX ===
+            if (!empty($mapped['name'])) $carryName = $mapped['name'];
+            else $mapped['name'] = $carryName;
+
+            if (!empty($mapped['adm_no'])) $carryAdm = $mapped['adm_no'];
+            else $mapped['adm_no'] = $carryAdm;
+
+            if (!empty($mapped['comp'])) $carryComp = $mapped['comp'];
+            else $mapped['comp'] = $carryComp;
+
+            // detect amount
+            $memb = $this->num($mapped['memb'] ?? null);
+            $dr   = $this->num($mapped['dr'] ?? null);
+            $cr   = $this->num($mapped['cr'] ?? null);
+
+            $amount = $dr ?? $memb ?? $cr ?? 0;
+
+            DB::table('kass_staging_contributions')->insert([
+                'raw_name'          => $mapped['name'],
+                'member_identifier' => $mapped['pfno'] ?? null,
+                'adm_no'            => $mapped['adm_no'],
+                'company'           => $mapped['comp'],
+                'year'              => $mapped['year'] ?? null,
+                'month'             => $mapped['month'] ?? null,
+                'raw_type'          => $this->detectContributionType($mapped),
+                'amount'            => $amount,
+                'source_file'       => $sourceFile,
+                'raw_row_json'      => json_encode($mapped),
+                'created_at'        => now(),
+                'updated_at'        => now(),
+            ]);
+        }
+    }
+
+    private function num($v)
+    {
+        if ($v === null || $v === '') return null;
+        $v = str_replace([',',' '], '', $v);
+        return is_numeric($v) ? floatval($v) : null;
+    }
+
+    private function detectContributionType($row): string
+    {
+        if ($this->num($row['memb'] ?? null)) return "MEMBERSHIP";
+        if ($this->num($row['dr'] ?? null)) return "DEPOSIT_DR";
+        if ($this->num($row['cr'] ?? null)) return "DEPOSIT_CR";
+        return "UNKNOWN";
+    }
+
+    /*===========================================================
+     |
+     |   LOANMPA — Loan Sheet
+     |
+     |   Note:
+     |   - Carry down NAME / ADM / COMPANY same as contributions
+     |   - We only store raw details for future processing
+     |
+     ===========================================================*/
+    private function processLoanSheet($sheet, string $sourceFile)
+    {
+        $rows  = $sheet->toArray(null, true, true, true);
+        $clean = array_map(fn($r) => array_values($r), $rows);
+
+        [$headerRaw, $start] = $this->extractHeader($clean);
+        $header = $this->normalizeHeaders($headerRaw);
+
+        $carryName = null;
+        $carryAdm  = null;
+        $carryComp = null;
+
+        for ($i = $start; $i < count($clean); $i++) {
+
+            $row = $clean[$i];
+            if (!$this->rowHasValues($row)) continue;
+
+            $mapped = $this->mapRow($header, $row);
+
+            // CARRY DOWN
+            if (!empty($mapped['name'])) $carryName = $mapped['name'];
+            else $mapped['name'] = $carryName;
+
+            if (!empty($mapped['adm_no'])) $carryAdm = $mapped['adm_no'];
+            else $mapped['adm_no'] = $carryAdm;
+
+            if (!empty($mapped['comp'])) $carryComp = $mapped['comp'];
+            else $mapped['comp'] = $carryComp;
+
+            DB::table('kass_staging_loans')->insert([
+                'raw_name'            => $mapped['name'],
+                'member_identifier'   => $mapped['pfno'] ?? null,
+                'adm_no'              => $mapped['adm_no'],
+                'company'             => $mapped['comp'],
+                'loan_type'           => 'LOANMPA',
+                'year'                => $mapped['year'] ?? null,
+                'month'               => $mapped['month'] ?? null,
+                'principal_disbursed' => $this->num($mapped['cr'] ?? null),
+                'repayment_amount'    => $this->num($mapped['dr'] ?? null),
+                'interest_amount'     => $this->num($mapped['int'] ?? null),
+                'period_index'        => $mapped['period'] ?? null,
+                'source_file'         => $sourceFile,
+                'raw_row_json'        => json_encode($mapped),
+                'created_at'          => now(),
+                'updated_at'          => now(),
+            ]);
+        }
+    }
+
+    /*===========================================================
+     |
+     |   GENERIC HELPERS
+     |
+     ===========================================================*/
+    private function extractHeader(array $rows)
     {
         foreach ($rows as $i => $row) {
             $upper = array_map('strtoupper', $row);
-
-            if ($this->rowHasValues($row) && in_array('NAME', $upper)) {
+            if (in_array('NAME', $upper)) {
                 return [$row, $i + 1];
             }
         }
-
-        // fallback: first non-empty row
-        foreach ($rows as $i => $row) {
-            if ($this->rowHasValues($row)) {
-                return [$row, $i + 1];
-            }
-        }
-
-        throw new \Exception("Header not found in sheet.");
+        throw new \Exception("Header row not found.");
     }
 
-    /*--------------------------------------------------------------
-     | PROCESS CONTRIBUTIONS SHEET
-     --------------------------------------------------------------*/
-    private function processContributionSheet($sheet, $sourceFile)
-    {
-        $rows = $sheet->toArray(null, true, true, true);
-        $clean = array_map(fn($r) => array_values($r), $rows);
-
-        [$headerRaw, $startIndex] = $this->extractHeader($clean);
-        $header = $this->normalizeHeaders($headerRaw);
-
-        foreach (array_slice($clean, $startIndex) as $row) {
-
-            if (!$this->rowHasValues($row)) continue;
-
-            $data = $this->mapRow($header, $row);
-
-            DB::table('kass_staging_contributions')->insert([
-                'raw_name'          => $data['name'] ?? null,
-                'member_identifier' => $data['pfno'] ?? null,
-                'adm_no'            => $data['adm_no'] ?? null,
-                'company'           => $data['comp'] ?? null,
-                'year'              => $data['year'] ?? null,
-                'month'             => $data['month'] ?? null,
-                'raw_type'          => $this->detectContributionType($data),
-                'amount'            => $this->extractNumericAmount($data),
-                'source_file'       => $sourceFile,
-                'raw_row_json'      => json_encode($data),
-                'created_at'        => now(),
-                'updated_at'        => now()
-            ]);
-        }
-    }
-
-    /*--------------------------------------------------------------
-     | PROCESS LOAN SHEET
-     --------------------------------------------------------------*/
-    private function processLoanSheet($sheet, $sourceFile)
-    {
-        $rows = $sheet->toArray(null, true, true, true);
-        $clean = array_map(fn($r) => array_values($r), $rows);
-
-        [$headerRaw, $startIndex] = $this->extractHeader($clean);
-        $header = $this->normalizeHeaders($headerRaw);
-
-        foreach (array_slice($clean, $startIndex) as $row) {
-
-            if (!$this->rowHasValues($row)) continue;
-
-            $data = $this->mapRow($header, $row);
-
-            DB::table('kass_staging_loans')->insert([
-                'raw_name'             => $data['name'] ?? null,
-                'member_identifier'    => $data['pfno'] ?? null,
-                'adm_no'               => $data['adm_no'] ?? null,
-                'company'              => $data['comp'] ?? null,
-                'loan_type'            => $this->detectLoanType($header),
-                'year'                 => $data['year'] ?? null,
-                'month'                => $data['month'] ?? null,
-                'principal_disbursed'  => $data['cr'] ?? null,
-                'repayment_amount'     => $data['dr'] ?? null,
-                'interest_amount'      => $data['int'] ?? null,
-                'period_index'         => $data['period'] ?? null,
-                'source_file'          => $sourceFile,
-                'raw_row_json'         => json_encode($data),
-                'created_at'           => now(),
-                'updated_at'           => now()
-            ]);
-        }
-    }
-
-    /*--------------------------------------------------------------
-     | CSV PROCESSOR (simple fallback)
-     --------------------------------------------------------------*/
-    private function processCsv($filePath)
-    {
-        $fullPath = storage_path("app/{$filePath}");
-        $rows = array_map('str_getcsv', file($fullPath));
-
-        if (!$rows || count($rows) < 2) {
-            throw new \Exception("CSV file appears empty.");
-        }
-
-        [$headerRaw, $startIndex] = $this->extractHeader($rows);
-        $header = $this->normalizeHeaders($headerRaw);
-
-        foreach (array_slice($rows, $startIndex) as $row) {
-
-            if (!$this->rowHasValues($row)) continue;
-
-            $data = $this->mapRow($header, $row);
-
-            DB::table('kass_staging_contributions')->insert([
-                'raw_name'          => $data['name'] ?? null,
-                'member_identifier' => $data['pfno'] ?? null,
-                'adm_no'            => $data['adm_no'] ?? null,
-                'company'           => $data['comp'] ?? null,
-                'year'              => $data['year'] ?? null,
-                'month'             => $data['month'] ?? null,
-                'raw_type'          => $this->detectContributionType($data),
-                'amount'            => $this->extractNumericAmount($data),
-                'source_file'       => $filePath,
-                'raw_row_json'      => json_encode($data),
-                'created_at'        => now(),
-                'updated_at'        => now()
-            ]);
-        }
-    }
-
-    /*--------------------------------------------------------------
-     | HELPERS
-     --------------------------------------------------------------*/
     private function rowHasValues($row)
     {
-        foreach ($row as $cell) {
-            if (trim((string)$cell) !== "") return true;
+        foreach ($row as $x) {
+            if (trim((string)$x) !== "") return true;
         }
         return false;
     }
 
-    private function normalizeHeaders($header)
+    private function normalizeHeaders($row)
     {
-        return array_map(fn($h) =>
-            strtolower(str_replace([' ', '/', '-', '.', "\t"], '_', trim($h))),
-            $header
+        return array_map(
+            fn($h) => strtolower(str_replace([' ', '/', '.', '-', "\t"], '_', trim($h))),
+            $row
         );
     }
 
     private function mapRow($header, $row)
     {
-        $mapped = [];
+        $out = [];
         foreach ($header as $i => $col) {
-            $mapped[$col] = $row[$i] ?? null;
+            $out[$col] = $row[$i] ?? null;
         }
-        return $mapped;
+        return $out;
     }
 
-    private function detectContributionType($row)
+    private function logMissingSheet(string $file, string $type, string $note)
     {
-        $fields = ['capital', 'n_capital', 'kasico', 'new_wel', 'welfare', 'wel_reg', 'memb'];
-
-        foreach ($fields as $f) {
-            if (isset($row[$f]) && is_numeric($row[$f]) && floatval($row[$f]) != 0) {
-                return strtoupper($f);
-            }
-        }
-        return 'UNKNOWN';
+        $line = "[" . now() . "] {$file} missing {$type} → {$note}\n";
+        Storage::append('logs/kass_missing_sheets.log', $line);
     }
 
-    private function extractNumericAmount($row)
-    {
-        foreach ($row as $v) {
-            if (is_numeric($v)) return floatval($v);
-        }
-        return 0;
-    }
-
-    private function detectLoanType($header)
-    {
-        $str = implode(',', $header);
-
-        if (str_contains($str, 'loan_1')) return 'LOAN_1';
-        if (str_contains($str, 'loan_2')) return 'LOAN_2';
-        if (str_contains($str, 'loan_3')) return 'LOAN_3';
-
-        return 'UNKNOWN';
-    }
-
-    /*--------------------------------------------------------------
-     | VIEW STAGING TABLES
-     --------------------------------------------------------------*/
+    /*===========================================================
+     | STAGING SCREEN
+     ===========================================================*/
     public function staging()
     {
         return view('kass.staging', [
