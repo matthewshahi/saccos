@@ -528,7 +528,7 @@ if (!in_array('year', $headerNorm)) {
      |
      ===========================================================*/
 
-  private function extractHeader(array $rows): array
+ private function extractHeader(array $rows): array
 {
     foreach ($rows as $i => $row) {
 
@@ -536,56 +536,19 @@ if (!in_array('year', $headerNorm)) {
             continue;
         }
 
-        // Clean header row values (remove NBSP, trim)
+        // Clean header row values
         $trimmed = array_map(function ($v) {
             return trim(str_replace("\xC2\xA0", ' ', (string)$v));
         }, $row);
 
-        // Detect row containing NAME (header row)
+        // Detect row containing NAME
         $upper = array_map('strtoupper', $trimmed);
         if (!in_array('NAME', $upper)) {
             continue;
         }
 
-        // ======================================================
-        // SMART BLANK-COLUMN DETECTION USING FIRST 20 ROWS
-        // ======================================================
-        $cleanHeader = [];
-        $columnCount = count($trimmed);
-
-        for ($col = 0; $col < $columnCount; $col++) {
-
-            $headerVal = $trimmed[$col];
-
-            // If header cell is not blank → KEEP column
-            if ($headerVal !== '') {
-                $cleanHeader[] = $headerVal;
-                continue;
-            }
-
-            // Header blank → check first 20 data rows
-            $isTrulyBlank = true;
-
-            for ($r = $i + 1; $r <= $i + 20 && $r < count($rows); $r++) {
-
-                $cell = isset($rows[$r][$col]) ? trim((string)$rows[$r][$col]) : '';
-
-                if ($cell !== '') {
-                    $isTrulyBlank = false;
-                    break;
-                }
-            }
-
-            // If column is blank in all 20 scanned rows → REMOVE it
-            if ($isTrulyBlank) {
-                continue;
-            }
-
-            // Otherwise → KEEP the blank header column (structural)
-            $cleanHeader[] = '';
-        }
-
-        return [$cleanHeader, $i + 1];
+        // 🔥 IMPORTANT: DO NOT REMOVE ANY COLUMNS
+        return [$trimmed, $i + 1];
     }
 
     throw new \Exception("Header row not found.");
@@ -608,11 +571,15 @@ if (!in_array('year', $headerNorm)) {
 {
     $norm = [];
 
-    foreach ($row as $h) {
+    foreach ($row as $i => $h) {
 
         $clean = trim(str_replace("\xC2\xA0", ' ', (string)$h));
 
-        if ($clean === '') continue; // <-- Skip blanks completely
+        if ($clean === '') {
+            // keep placeholder key so indexes never shift
+            $norm[] = "_col{$i}";
+            continue;
+        }
 
         $clean = strtolower(str_replace([' ', '/', '.', '-', "\t"], '_', $clean));
 
@@ -621,6 +588,7 @@ if (!in_array('year', $headerNorm)) {
 
     return $norm;
 }
+
 
 
 private function findSharempaSheet(array $sheets)
