@@ -16,26 +16,30 @@
 
     <div class="row">
 
-        <form action="{{ route('kass.process.all') }}" method="POST">
-    @csrf
-    <button class="btn btn-lg btn-success w-100 my-3">
-        🚀 Import ALL Uploaded Files into Staging
-    </button>
-</form>
-@if(session('summary'))
-    <div class="card p-3 mt-3">
-        <h5>Import Summary</h5>
-        <ul class="list-group mt-2">
-            @foreach(session('summary') as $item)
-                <li class="list-group-item d-flex justify-content-between">
-                    <span>{{ $item['file'] }}</span>
-                    <strong>{{ $item['status'] }}</strong>
-                </li>
-            @endforeach
-        </ul>
-    </div>
-@endif
+        {{-- =======================================
+             IMPORT ALL (AUTO-PROCESS MODE)
+        ======================================== --}}
+        <div class="col-12">
+            <form action="{{ route('kass.process.all') }}" method="GET">
+                <button class="btn btn-lg btn-success w-100 my-3">
+                    🚀 Import ALL Uploaded Excel Files into Staging
+                </button>
+            </form>
 
+            @if(session('summary'))
+                <div class="card p-3 mt-3">
+                    <h5>Import Summary</h5>
+                    <ul class="list-group mt-2">
+                        @foreach(session('summary') as $item)
+                            <li class="list-group-item d-flex justify-content-between">
+                                <span>{{ $item['file'] }}</span>
+                                <strong>{{ $item['status'] }}</strong>
+                            </li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+        </div>
 
         {{-- ===========================
              UPLOAD SINGLE FILE
@@ -43,7 +47,7 @@
         <div class="col-md-6 mb-4">
             <div class="card shadow-sm">
                 <div class="card-header bg-primary text-white">
-                    Upload Single File (CSV, XLS, XLSX)
+                    Upload Single File (XLS / XLSX / CSV / TXT)
                 </div>
                 <div class="card-body">
                     <form action="{{ route('kass.upload.single') }}" method="POST" enctype="multipart/form-data">
@@ -57,7 +61,7 @@
         </div>
 
         {{-- ===========================
-             UPLOAD ZIP
+             UPLOAD ZIP FILES
         ============================ --}}
         <div class="col-md-6 mb-4">
             <div class="card shadow-sm">
@@ -74,14 +78,15 @@
                 </div>
             </div>
         </div>
+
     </div>
 
     {{-- ===========================
-         IMPORT SECTION
+         IMPORT SELECTED FILE
     ============================ --}}
     <div class="card shadow-sm mb-4">
         <div class="card-header bg-success text-white">
-            Step 3 — Import Selected File
+            Step 3 — Import One Specific File
         </div>
         <div class="card-body">
 
@@ -92,11 +97,12 @@
 
                 <div class="mb-3">
                     <label class="fw-bold">Selected File Path</label>
-                    <input type="text" class="form-control" id="file_path_display" placeholder="Click 'Use This File' from the list below" readonly>
+                    <input type="text" class="form-control" id="file_path_display"
+                           placeholder="Click 'Use This File' from the list below" readonly>
                 </div>
 
                 <button class="btn btn-success w-100 py-2">
-                    🚀 Start Import into Staging
+                    🚀 Start Import of This File
                 </button>
             </form>
         </div>
@@ -107,14 +113,14 @@
     ============================ --}}
     <div class="card shadow-sm">
         <div class="card-header bg-dark text-white">
-            Recently Uploaded Files (Last 10)
+            Recently Uploaded Files (Last 20)
         </div>
         <div class="card-body p-0">
             <table class="table table-striped table-hover mb-0">
                 <thead class="table-light">
                     <tr>
                         <th>File Name</th>
-                        <th>Path</th>
+                        <th>Storage Path</th>
                         <th>Uploaded</th>
                         <th>Select</th>
                     </tr>

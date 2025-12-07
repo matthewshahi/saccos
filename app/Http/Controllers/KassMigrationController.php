@@ -101,36 +101,46 @@ class KassMigrationController extends Controller
      |   PROCESS ALL FILES IN FOLDER
      |
      ===========================================================*/
-    public function processAll()
-    {
-        $files = Storage::files('kass_uploads');
+   public function processAll()
+{
+    // Only pick Excel files
+    $files = array_values(array_filter(Storage::files('kass_uploads'), function ($file) {
+        return in_array(strtolower(pathinfo($file, PATHINFO_EXTENSION)), ['xls', 'xlsx']);
+    }));
 
-        if (empty($files)) {
-            return back()->with('error', "No files in kass_uploads.");
-        }
-
-        $summary = [];
-
-        foreach ($files as $file) {
-            try {
-                $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
-
-                if (in_array($ext, ['xls', 'xlsx'])) {
-                    $this->processExcel($file);
-                } else {
-                    $this->processCsv($file);
-                }
-
-                $summary[] = ['file' => $file, 'status' => 'IMPORTED'];
-
-            } catch (\Exception $e) {
-                $summary[] = ['file' => $file, 'status' => 'FAILED: ' . $e->getMessage()];
-                $this->logMissingSheet($file, "ERROR", $e->getMessage());
-            }
-        }
-
-        return back()->with('success', 'Batch completed')->with('summary', $summary);
+    // No files left → Done
+    if (empty($files)) {
+        return back()->with('success', "🎉 All files processed — no remaining files.");
     }
+
+    // Process ONLY the first file
+    $file = $files[0];
+
+    try {
+        $this->processExcel($file);
+
+        // Delete after successful processing
+        Storage::delete($file);
+
+        return redirect()
+            ->route('kass.process.all')
+            ->with('success', "✅ Processed: {$file} — moving to next...");
+    }
+
+    catch (\Exception $e) {
+
+        // Log for review
+        $this->logMissingSheet($file, "PROCESS_ERROR", $e->getMessage());
+
+        // Delete problematic file so the loop does not get stuck
+        Storage::delete($file);
+
+        return redirect()
+            ->route('kass.process.all')
+            ->with('error', "❌ Failed on {$file}: " . $e->getMessage());
+    }
+}
+
 
     /*===========================================================
      |
