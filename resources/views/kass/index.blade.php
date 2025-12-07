@@ -16,6 +16,27 @@
 
     <div class="row">
 
+        <form action="{{ route('kass.process.all') }}" method="POST">
+    @csrf
+    <button class="btn btn-lg btn-success w-100 my-3">
+        🚀 Import ALL Uploaded Files into Staging
+    </button>
+</form>
+@if(session('summary'))
+    <div class="card p-3 mt-3">
+        <h5>Import Summary</h5>
+        <ul class="list-group mt-2">
+            @foreach(session('summary') as $item)
+                <li class="list-group-item d-flex justify-content-between">
+                    <span>{{ $item['file'] }}</span>
+                    <strong>{{ $item['status'] }}</strong>
+                </li>
+            @endforeach
+        </ul>
+    </div>
+@endif
+
+
         {{-- ===========================
              UPLOAD SINGLE FILE
         ============================ --}}

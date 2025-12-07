@@ -288,4 +288,41 @@ class KassMigrationController extends Controller
 
         return back()->with('success', 'Staging cleared.');
     }
+    public function processAll()
+{
+    $files = Storage::files('kass_uploads');
+
+    if (count($files) === 0) {
+        return back()->with('error', 'No files found in kass_uploads.');
+    }
+
+    $summary = [];
+
+    foreach ($files as $filePath) {
+        try {
+            $extension = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+
+            if (in_array($extension, ['xls', 'xlsx'])) {
+                $this->processExcel($filePath);
+            } else {
+                $this->parseCsv($filePath);
+            }
+
+            $summary[] = [
+                'file' => $filePath,
+                'status' => 'IMPORTED'
+            ];
+
+        } catch (\Exception $e) {
+            $summary[] = [
+                'file' => $filePath,
+                'status' => 'FAILED: ' . $e->getMessage()
+            ];
+        }
+    }
+
+    return back()->with('success', 'Batch import completed.')
+                 ->with('summary', $summary);
+}
+
 }

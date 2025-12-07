@@ -78,6 +78,10 @@ Route::middleware(['auth'])->prefix('kass-migration')->group(function () {
     // Clear staging tables
     Route::delete('/staging/clear', [KassMigrationController::class, 'clearStaging'])
         ->name('kass.staging.clear');
+
+        Route::post('/kass/process-all', [KassMigrationController::class, 'processAll'])
+    ->name('kass.process.all');
+
 });
 
 
