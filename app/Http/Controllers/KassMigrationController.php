@@ -527,29 +527,61 @@ if (!in_array('year', $headerNorm)) {
             continue;
         }
 
-        // Force-remove trailing & inner empty columns
+        // Clean header row values (remove NBSP, trim)
         $trimmed = array_map(function ($v) {
             return trim(str_replace("\xC2\xA0", ' ', (string)$v));
         }, $row);
 
-        // Identify header rows by NAME
-        $upper = array_map(fn($v) => strtoupper($v), $trimmed);
+        // Detect row containing NAME (header row)
+        $upper = array_map('strtoupper', $trimmed);
+        if (!in_array('NAME', $upper)) {
+            continue;
+        }
 
-        if (in_array('NAME', $upper)) {
+        // ======================================================
+        // SMART BLANK-COLUMN DETECTION USING FIRST 20 ROWS
+        // ======================================================
+        $cleanHeader = [];
+        $columnCount = count($trimmed);
 
-            // 🎯 FIX BLANK COLUMNS HERE
-            $cleanHeader = [];
-            foreach ($trimmed as $colVal) {
-                if ($colVal === '') continue; // <-- REMOVE BLANK COLUMNS
-                $cleanHeader[] = $colVal;
+        for ($col = 0; $col < $columnCount; $col++) {
+
+            $headerVal = $trimmed[$col];
+
+            // If header cell is not blank → KEEP column
+            if ($headerVal !== '') {
+                $cleanHeader[] = $headerVal;
+                continue;
             }
 
-            return [$cleanHeader, $i + 1];
+            // Header blank → check first 20 data rows
+            $isTrulyBlank = true;
+
+            for ($r = $i + 1; $r <= $i + 20 && $r < count($rows); $r++) {
+
+                $cell = isset($rows[$r][$col]) ? trim((string)$rows[$r][$col]) : '';
+
+                if ($cell !== '') {
+                    $isTrulyBlank = false;
+                    break;
+                }
+            }
+
+            // If column is blank in all 20 scanned rows → REMOVE it
+            if ($isTrulyBlank) {
+                continue;
+            }
+
+            // Otherwise → KEEP the blank header column (structural)
+            $cleanHeader[] = '';
         }
+
+        return [$cleanHeader, $i + 1];
     }
 
     throw new \Exception("Header row not found.");
 }
+
 
 
 
