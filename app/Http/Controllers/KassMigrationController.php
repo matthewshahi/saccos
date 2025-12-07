@@ -13,19 +13,24 @@ class KassMigrationController extends Controller
         return view('kass.index');
     }
 
-    // Upload one CSV (Savings or Loans)
+    /**
+     * Upload Single CSV File
+     */
     public function uploadSingle(Request $request)
     {
         $request->validate([
-            'file' => 'required|mimes:csv,txt,xlsx,xls',
+            'file' => 'required|mimes:csv,txt',
         ]);
 
         $path = $request->file('file')->store('kass_uploads');
 
-        return back()->with('success', "File uploaded: $path")->with('path', $path);
+        return back()->with('success', "File uploaded successfully.")
+                     ->with('path', $path);
     }
 
-    // Upload a ZIP containing many sheets
+    /**
+     * Upload ZIP containing many files
+     */
     public function uploadBatch(Request $request)
     {
         $request->validate([
@@ -34,34 +39,60 @@ class KassMigrationController extends Controller
 
         $zipPath = $request->file('zip_file')->store('kass_zips');
 
-        // Extract ZIP
+        // Extract
         $extractTo = storage_path('app/kass_batch_' . time());
         mkdir($extractTo);
 
         $zip = new \ZipArchive;
-
         if ($zip->open(storage_path('app/' . $zipPath)) === TRUE) {
             $zip->extractTo($extractTo);
             $zip->close();
         }
 
-        return back()->with('success', "Batch extracted. Ready for processing.")
+        return back()->with('success', 'ZIP extracted.')
                      ->with('folder', $extractTo);
     }
 
-    
+    /**
+     * PROCESS FILE — MAIN ENTRY
+     */
+    public function process(Request $request)
+    {
+        $filePath = $request->input('file_path');
 
+        if (!$filePath || !Storage::exists($filePath)) {
+            return back()->with('error', 'File not found or missing path.');
+        }
+
+        try {
+            $this->parseFile($filePath);
+        } catch (\Exception $e) {
+            return back()->with('error', "Error: " . $e->getMessage());
+        }
+
+        return back()->with('success', 'Processing complete.');
+    }
+
+    /**
+     * Parse CSV file and insert into staging tables
+     */
     private function parseFile($filePath)
     {
-        $rows = array_map('str_getcsv', file(storage_path('app/'.$filePath)));
-        $header = array_shift($rows);
+        $fullPath = storage_path('app/' . $filePath);
 
-        // Determine if this is savings or loans
+        $rows = array_map('str_getcsv', file($fullPath));
+        if (!$rows || count($rows) < 2) {
+            throw new \Exception("Invalid or empty CSV file.");
+        }
+
+        $headerRaw = array_shift($rows);
+        $header = $this->normalizeHeaders($headerRaw);
+
         $isSavings = $this->isSavingsSheet($header);
         $isLoans = !$isSavings;
 
         foreach ($rows as $row) {
-            $data = array_combine($header, $row);
+            $data = $this->mapRow($header, $row);
 
             if ($isSavings) {
                 $this->insertSavings($data, $filePath);
@@ -71,75 +102,129 @@ class KassMigrationController extends Controller
         }
     }
 
-    private function isSavingsSheet($header)
+    /**
+     * Normalize Header Keys
+     */
+    private function normalizeHeaders($header)
     {
-        return in_array('SHARES/DEPOST', $header) || in_array('MEMB', $header);
+        return array_map(function ($h) {
+            return strtolower(str_replace([' ', '/', '-', '.', "\t"], '_', trim($h)));
+        }, $header);
     }
 
+    /**
+     * Convert row array into associative array using normalized headers
+     */
+    private function mapRow($header, $row)
+    {
+        $assoc = [];
+        foreach ($header as $i => $col) {
+            $assoc[$col] = $row[$i] ?? null;
+        }
+        return $assoc;
+    }
+
+    /**
+     * SAVINGS DETECTOR
+     */
+    private function isSavingsSheet($header)
+    {
+        $possibleSavingsCols = [
+            'capital', 'memb', 'welfare', 'wel_reg', 'new_wel', 'kasico'
+        ];
+
+        foreach ($possibleSavingsCols as $col) {
+            if (in_array($col, $header)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * INSERT SAVINGS ROW
+     */
     private function insertSavings($row, $source)
     {
         DB::table('kass_staging_contributions')->insert([
-            'raw_name' => $row['NAME'] ?? null,
-            'member_identifier' => $row['PFNO'] ?? null,
-            'adm_no' => $row['ADM NO'] ?? null,
-            'company' => $row['COMP'] ?? null,
-            'year' => $row['YEAR'] ?? null,
-            'month' => $row['MONTH'] ?? null,
-            'raw_type' => $this->detectContributionType($row),
-            'amount' => $this->extractAmount($row),
-            'source_file' => $source,
-            'notes' => null,
-            'created_at' => now(),
+            'raw_name'          => $row['name'] ?? null,
+            'member_identifier' => $row['pfno'] ?? null,
+            'adm_no'            => $row['adm_no'] ?? null,
+            'company'           => $row['comp'] ?? null,
+            'year'              => $row['year'] ?? null,
+            'month'             => $row['month'] ?? null,
+            'raw_type'          => $this->detectContributionType($row),
+            'amount'            => $this->extractAmount($row),
+            'source_file'       => $source,
+            'created_at'        => now(),
+            'updated_at'        => now()
         ]);
     }
 
+    /**
+     * Determine Savings Category
+     */
     private function detectContributionType($row)
     {
-        $types = ['CAPITAL', 'MEMB', 'WELFARE', 'NEW WEL', 'KASICO'];
-        foreach ($types as $t) {
-            if (!empty($row[$t])) {
-                return $t;
+        $fields = ['capital', 'memb', 'welfare', 'new_wel', 'wel_reg', 'kasico'];
+
+        foreach ($fields as $f) {
+            if (isset($row[$f]) && $row[$f] !== "" && $row[$f] != 0) {
+                return strtoupper($f);
             }
         }
+
         return 'UNKNOWN';
     }
 
+    /**
+     * Extract numeric amount from a row
+     */
     private function extractAmount($row)
     {
-        foreach ($row as $k => $v) {
-            if (is_numeric($v)) {
-                return $v;
-            }
+        foreach ($row as $v) {
+            if (is_numeric($v)) return floatval($v);
         }
         return 0;
     }
 
+    /**
+     * INSERT LOAN ROW
+     */
     private function insertLoan($row, $source)
     {
         DB::table('kass_staging_loans')->insert([
-            'raw_name' => $row['NAME'] ?? null,
-            'member_identifier' => $row['PFNO'] ?? null,
-            'adm_no' => $row['ADM NO'] ?? null,
-            'company' => $row['COMP'] ?? null,
-            'loan_type' => $this->detectLoanType($row),
-            'year' => $row['YEAR'] ?? null,
-            'month' => $row['MONTH'] ?? null,
-            'principal_disbursed' => $row['CR'] ?? null,
-            'repayment_amount' => $row['DR'] ?? null,
-            'interest_amount' => $row['INT'] ?? null,
-            'period_index' => $row['PERIOD'] ?? null,
-            'source_file' => $source,
-            'created_at' => now(),
+            'raw_name'          => $row['name'] ?? null,
+            'member_identifier' => $row['pfno'] ?? null,
+            'adm_no'            => $row['adm_no'] ?? null,
+            'company'           => $row['comp'] ?? null,
+            'loan_type'         => $this->detectLoanType($row),
+            'year'              => $row['year'] ?? null,
+            'month'             => $row['month'] ?? null,
+            'principal_disbursed' => $row['cr'] ?? 0,
+            'repayment_amount'    => $row['dr'] ?? 0,
+            'interest_amount'     => $row['int'] ?? 0,
+            'period_index'        => $row['period'] ?? null,
+            'source_file'         => $source,
+            'created_at'          => now(),
+            'updated_at'          => now()
         ]);
     }
 
+    /**
+     * Detect Loan Type
+     */
     private function detectLoanType($row)
     {
-        if (isset($row['LOAN 1'])) return 'LOAN_1';
-        if (isset($row['LOAN 2'])) return 'LOAN_2';
+        if (isset($row['loan_1'])) return 'LOAN_1';
+        if (isset($row['loan_2'])) return 'LOAN_2';
         return 'UNKNOWN';
     }
 
+    /**
+     * View Data in Staging Tables
+     */
     public function staging()
     {
         $contrib = DB::table('kass_staging_contributions')->paginate(50);
@@ -148,6 +233,9 @@ class KassMigrationController extends Controller
         return view('kass.staging', compact('contrib', 'loans'));
     }
 
+    /**
+     * Clear staging tables
+     */
     public function clearStaging()
     {
         DB::table('kass_staging_contributions')->truncate();
@@ -155,79 +243,4 @@ class KassMigrationController extends Controller
 
         return back()->with('success', 'Staging tables cleared.');
     }
-    public function process(Request $request)
-{
-    $filePath = $request->input('file_path');
-
-    if (!$filePath || !Storage::exists($filePath)) {
-        return back()->with('error', 'File not found.');
-    }
-
-    $fullPath = storage_path('app/' . $filePath);
-
-    // Detect Savings or Loans based on column headers
-    $handle = fopen($fullPath, 'r');
-
-    $header = fgetcsv($handle);
-
-    // Normalize headers
-    $normalized = array_map(function ($h) {
-        return strtolower(trim(str_replace([' ', '/', '-'], '_', $h)));
-    }, $header);
-
-    if (in_array('shares/depost', $normalized) || in_array('memb', $normalized)) {
-        $type = 'savings';
-    } elseif (in_array('loan_1', $normalized) || in_array('dr', $normalized)) {
-        $type = 'loans';
-    } else {
-        return back()->with('error', 'Unknown file format.');
-    }
-
-    // PROCESS SAVINGS FILE
-    if ($type == 'savings') {
-        while (($row = fgetcsv($handle)) !== false) {
-
-            DB::table('kass_staging_contributions')->insert([
-                'raw_name'     => $row[1] ?? null,  // NAME col
-                'member_identifier' => $row[2] ?? null, // PFNO
-                'adm_no'       => $row[3] ?? null,
-                'company'      => $row[4] ?? null,
-                'year'         => $row[5] ?? null,
-                'month'        => $row[6] ?? null,
-                'raw_type'     => 'savings',
-                'amount'       => $row[7] ?? 0,
-                'source_file'  => $filePath,
-                'created_at'   => now(),
-                'updated_at'   => now()
-            ]);
-        }
-    }
-
-    // PROCESS LOANS FILE
-    if ($type == 'loans') {
-        while (($row = fgetcsv($handle)) !== false) {
-
-            DB::table('kass_staging_loans')->insert([
-                'raw_name'     => $row[1] ?? null,
-                'member_identifier' => $row[2] ?? null,
-                'adm_no'       => $row[3] ?? null,
-                'company'      => $row[4] ?? null,
-                'loan_type'    => 'NORMAL', // Later auto-detect per section
-                'year'         => $row[5] ?? null,
-                'month'        => $row[6] ?? null,
-                'principal_disbursed' => $row[7] ?? 0,
-                'repayment_amount'    => $row[8] ?? 0,
-                'interest_amount'     => $row[9] ?? 0,
-                'source_file'  => $filePath,
-                'created_at'   => now(),
-                'updated_at'   => now()
-            ]);
-        }
-    }
-
-    fclose($handle);
-
-    return back()->with('success', 'Processing complete.');
-}
-
 }
