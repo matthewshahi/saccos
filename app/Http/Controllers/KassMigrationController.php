@@ -216,6 +216,15 @@ class KassMigrationController extends Controller
         [$headerRaw, $start] = $this->extractHeader($clean);
         $headerNorm          = $this->normalizeHeaders($headerRaw);
 
+        if (!in_array('month', $headerNorm)) {
+    $this->logFileEvent($sourceFile, 'INVALID_HEADER', 'MONTH column missing (possibly blank column after NAME).');
+}
+
+if (!in_array('year', $headerNorm)) {
+    $this->logFileEvent($sourceFile, 'INVALID_HEADER', 'YEAR column misaligned.');
+}
+
+
         // 2) Locate critical columns by normalized name
         $monthIndex = $this->getMonthIndex($headerNorm);
         $runBalInfo = $this->getRunBalIndexAndKey($headerNorm);
@@ -510,26 +519,34 @@ class KassMigrationController extends Controller
 {
     foreach ($rows as $i => $row) {
 
-        // Skip completely empty rows
         if (!$this->rowHasValues($row)) {
             continue;
         }
 
-        // Normalize aggressively
-        $cleaned = array_map(function ($v) {
-            $v = str_replace("\xC2\xA0", ' ', (string)$v); // Fix NBSP
-            $v = strtoupper(trim($v));
-            $v = preg_replace('/\s+/', ' ', $v);
-            return $v;
+        // Force-remove trailing & inner empty columns
+        $trimmed = array_map(function ($v) {
+            return trim(str_replace("\xC2\xA0", ' ', (string)$v));
         }, $row);
 
-        if (in_array('NAME', $cleaned)) {
-            return [$row, $i + 1];
+        // Identify header rows by NAME
+        $upper = array_map(fn($v) => strtoupper($v), $trimmed);
+
+        if (in_array('NAME', $upper)) {
+
+            // 🎯 FIX BLANK COLUMNS HERE
+            $cleanHeader = [];
+            foreach ($trimmed as $colVal) {
+                if ($colVal === '') continue; // <-- REMOVE BLANK COLUMNS
+                $cleanHeader[] = $colVal;
+            }
+
+            return [$cleanHeader, $i + 1];
         }
     }
 
     throw new \Exception("Header row not found.");
 }
+
 
 
     private function rowHasValues($row): bool
@@ -542,13 +559,25 @@ class KassMigrationController extends Controller
         return false;
     }
 
-    private function normalizeHeaders($row): array
-    {
-        return array_map(
-            fn ($h) => strtolower(str_replace([' ', '/', '.', '-', "\t"], '_', trim($h))),
-            $row
-        );
+   private function normalizeHeaders($row): array
+{
+    $norm = [];
+
+    foreach ($row as $h) {
+
+        $clean = trim(str_replace("\xC2\xA0", ' ', (string)$h));
+
+        if ($clean === '') continue; // <-- Skip blanks completely
+
+        $clean = strtolower(str_replace([' ', '/', '.', '-', "\t"], '_', $clean));
+
+        $norm[] = $clean;
     }
+
+    return $norm;
+}
+
+
 
     private function mapRow($header, $row): array
     {
