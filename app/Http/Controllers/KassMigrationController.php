@@ -101,43 +101,47 @@ class KassMigrationController extends Controller
      |   PROCESS ALL FILES IN FOLDER
      |
      ===========================================================*/
-   public function processAll()
+  public function processAll()
 {
     // Only pick Excel files
     $files = array_values(array_filter(Storage::files('kass_uploads'), function ($file) {
         return in_array(strtolower(pathinfo($file, PATHINFO_EXTENSION)), ['xls', 'xlsx']);
     }));
 
-    // No files left → Done
-    if (empty($files)) {
-        return back()->with('success', "🎉 All files processed — no remaining files.");
+    $remaining = count($files);
+
+    if ($remaining === 0) {
+        return view('kass.auto', [
+            'message' => "🎉 All files processed! No remaining files.",
+            'remaining' => 0,
+            'next' => false
+        ]);
     }
 
-    // Process ONLY the first file
+    // Process only first file
     $file = $files[0];
 
     try {
         $this->processExcel($file);
-
-        // Delete after successful processing
         Storage::delete($file);
 
-        return redirect()
-            ->route('kass.process.all')
-            ->with('success', "✅ Processed: {$file} — moving to next...");
+        return view('kass.auto', [
+            'message' => "✅ Processed: {$file}",
+            'remaining' => $remaining - 1,
+            'next' => true
+        ]);
     }
-
     catch (\Exception $e) {
 
-        // Log for review
         $this->logMissingSheet($file, "PROCESS_ERROR", $e->getMessage());
 
-        // Delete problematic file so the loop does not get stuck
         Storage::delete($file);
 
-        return redirect()
-            ->route('kass.process.all')
-            ->with('error', "❌ Failed on {$file}: " . $e->getMessage());
+        return view('kass.auto', [
+            'message' => "❌ Failed on {$file}: " . $e->getMessage(),
+            'remaining' => $remaining - 1,
+            'next' => true
+        ]);
     }
 }
 
