@@ -368,4 +368,68 @@ class KassMigrationController extends Controller
 
         return back()->with('success', 'Staging cleared.');
     }
+
+    public function processNext()
+{
+    $trackerPath = storage_path('app/kass_tracker.json');
+
+    // Load tracker file or initialize
+    if (!file_exists($trackerPath)) {
+        file_put_contents($trackerPath, json_encode([
+            'last_file' => null,
+            'status' => 'IDLE'
+        ], JSON_PRETTY_PRINT));
+    }
+
+    $tracker = json_decode(file_get_contents($trackerPath), true);
+
+    // Get all Excel files
+    $files = array_values(array_filter(Storage::files('kass_uploads'), function($file) {
+        return in_array(strtolower(pathinfo($file, PATHINFO_EXTENSION)), ['xls', 'xlsx']);
+    }));
+
+    if (empty($files)) {
+        return "No XLS/XLSX files found.";
+    }
+
+    // If last_file exists, pick the next
+    $index = 0;
+
+    if ($tracker['last_file']) {
+        $index = array_search($tracker['last_file'], $files);
+        if ($index === false) $index = 0;
+        else $index++;
+    }
+
+    // If we've reached end of list
+    if ($index >= count($files)) {
+        return "All files processed.";
+    }
+
+    $fileToProcess = $files[$index];
+
+    // Update tracker BEFORE processing
+    $tracker['last_file'] = $fileToProcess;
+    $tracker['status'] = "PROCESSING";
+    file_put_contents($trackerPath, json_encode($tracker, JSON_PRETTY_PRINT));
+
+    try {
+        $this->processExcel($fileToProcess);
+
+        // Mark success
+        $tracker['status'] = "SUCCESS";
+        file_put_contents($trackerPath, json_encode($tracker, JSON_PRETTY_PRINT));
+
+        return "Processed: {$fileToProcess}";
+
+    } catch (\Exception $e) {
+
+        // Mark failure
+        $tracker['status'] = "FAILED: " . $e->getMessage();
+        file_put_contents($trackerPath, json_encode($tracker, JSON_PRETTY_PRINT));
+
+        return "FAILED: " . $e->getMessage();
+    }
+}
+
 }
