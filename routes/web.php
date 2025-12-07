@@ -49,6 +49,38 @@ use App\Http\Controllers\InsuranceLoanReportController;
 use App\Http\Controllers\PasswordResetController;
 use App\Http\Controllers\LoanRepaymentImportController;
 use App\Http\Controllers\ManualMpesaRecoveryController;
+
+
+use App\Http\Controllers\KassMigrationController;
+
+Route::middleware(['auth'])->prefix('kass-migration')->group(function () {
+
+    // Upload page
+    Route::get('/', [KassMigrationController::class, 'index'])
+        ->name('kass.index');
+
+    // Upload one sheet
+    Route::post('/upload', [KassMigrationController::class, 'uploadSingle'])
+        ->name('kass.upload.single');
+
+    // Upload a ZIP containing all company sheets
+    Route::post('/upload-batch', [KassMigrationController::class, 'uploadBatch'])
+        ->name('kass.upload.batch');
+
+    // Process migration (parse → normalize → staging)
+    Route::post('/process', [KassMigrationController::class, 'process'])
+        ->name('kass.process');
+
+    // View staging results
+    Route::get('/staging', [KassMigrationController::class, 'staging'])
+        ->name('kass.staging');
+
+    // Clear staging tables
+    Route::delete('/staging/clear', [KassMigrationController::class, 'clearStaging'])
+        ->name('kass.staging.clear');
+});
+
+
 // use App\Http\Controllers\LedgerRebuildController;
 
 // Route::get('/rebuild/ledgers', [LedgerRebuildController::class, 'rebuild'])
