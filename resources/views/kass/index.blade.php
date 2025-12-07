@@ -1,90 +1,139 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="container">
+<div class="container py-4">
 
-    <h2>KASS SACCO Migration Tool</h2>
-    <p>Upload individual CSV files or a ZIP containing multiple sheets.</p>
+    <h2 class="mb-4">📦 KASS SACCO Data Migration Tool</h2>
+    <p class="text-muted">Upload raw Excel/CSV files, choose the file, then run the import into staging.</p>
 
+    {{-- Flash Messages --}}
     @if(session('success'))
         <div class="alert alert-success">{{ session('success') }}</div>
     @endif
+    @if(session('error'))
+        <div class="alert alert-danger">{{ session('error') }}</div>
+    @endif
 
-    {{-- Upload Single --}}
-    <form action="{{ route('kass.upload.single') }}" method="POST" enctype="multipart/form-data">
-        @csrf
-        <label>Upload Savings/Loans CSV</label>
-        <input type="file" name="file" class="form-control" required>
-        <button class="btn btn-primary mt-2">Upload Single File</button>
-    </form>
+    <div class="row">
 
-    <hr>
+        {{-- ===========================
+             UPLOAD SINGLE FILE
+        ============================ --}}
+        <div class="col-md-6 mb-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    Upload Single File (CSV, XLS, XLSX)
+                </div>
+                <div class="card-body">
+                    <form action="{{ route('kass.upload.single') }}" method="POST" enctype="multipart/form-data">
+                        @csrf
+                        <label class="fw-bold">Choose File</label>
+                        <input type="file" name="file" class="form-control mb-3" required>
+                        <button class="btn btn-primary w-100">Upload File</button>
+                    </form>
+                </div>
+            </div>
+        </div>
 
-    {{-- Upload Batch Zip --}}
-    <form action="{{ route('kass.upload.batch') }}" method="POST" enctype="multipart/form-data">
-        @csrf
-        <label>Upload ZIP of all company files</label>
-        <input type="file" name="zip_file" class="form-control" required>
-        <button class="btn btn-warning mt-2">Upload Batch</button>
-    </form>
+        {{-- ===========================
+             UPLOAD ZIP
+        ============================ --}}
+        <div class="col-md-6 mb-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-warning text-dark">
+                    Upload Batch ZIP (Multiple Companies)
+                </div>
+                <div class="card-body">
+                    <form action="{{ route('kass.upload.batch') }}" method="POST" enctype="multipart/form-data">
+                        @csrf
+                        <label class="fw-bold">Choose ZIP File</label>
+                        <input type="file" name="zip_file" class="form-control mb-3" required>
+                        <button class="btn btn-warning w-100">Upload ZIP</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
 
-    <hr>
+    {{-- ===========================
+         IMPORT SECTION
+    ============================ --}}
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-success text-white">
+            Step 3 — Import Selected File
+        </div>
+        <div class="card-body">
 
-    {{-- Process --}}
-    <form action="{{ route('kass.process') }}" method="POST">
-        @csrf
-        <label>File Path (optional)</label>
-        <input type="text" name="file_path" class="form-control" placeholder="storage/kass_uploads/file.csv">
+            <form action="{{ route('kass.process') }}" method="POST">
+                @csrf
 
-        <label class="mt-2">Folder Path (optional)</label>
-        <input type="text" name="folder_path" class="form-control" placeholder="/full/path/to/extracted/batch">
+                <input type="hidden" id="file_path" name="file_path">
 
-        <button class="btn btn-success mt-3">Process File(s)</button>
-    </form>
+                <div class="mb-3">
+                    <label class="fw-bold">Selected File Path</label>
+                    <input type="text" class="form-control" id="file_path_display" placeholder="Click 'Use This File' from the list below" readonly>
+                </div>
 
-    <hr>
+                <button class="btn btn-success w-100 py-2">
+                    🚀 Start Import into Staging
+                </button>
+            </form>
+        </div>
+    </div>
 
-    <a href="{{ route('kass.staging') }}" class="btn btn-dark">View Staging Tables</a>
+    {{-- ===========================
+         RECENTLY UPLOADED FILES
+    ============================ --}}
+    <div class="card shadow-sm">
+        <div class="card-header bg-dark text-white">
+            Recently Uploaded Files (Last 10)
+        </div>
+        <div class="card-body p-0">
+            <table class="table table-striped table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>File Name</th>
+                        <th>Path</th>
+                        <th>Uploaded</th>
+                        <th>Select</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($files as $file)
+                        <tr>
+                            <td>{{ $file['name'] }}</td>
+                            <td><code>{{ $file['path'] }}</code></td>
+                            <td>{{ $file['time'] }}</td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-primary"
+                                    onclick="selectFile('{{ $file['path'] }}')">
+                                    Use This File
+                                </button>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="4" class="text-center text-muted py-3">
+                                No uploaded files found.
+                            </td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    </div>
 
-    <hr>
-
-<h4>Recently Uploaded Files</h4>
-
-<table class="table table-bordered table-sm">
-    <thead>
-        <tr>
-            <th>File Name</th>
-            <th>Full Path</th>
-            <th>Uploaded</th>
-            <th>Select</th>
-        </tr>
-    </thead>
-    <tbody>
-        @forelse($files as $file)
-            <tr>
-                <td>{{ $file['name'] }}</td>
-                <td>
-                    <code>{{ 'storage/' . $file['path'] }}</code>
-                </td>
-                <td>{{ $file['time'] }}</td>
-                <td>
-                    <button class="btn btn-sm btn-primary"
-                        onclick="document.getElementById('file_path').value = '{{ $file['path'] }}'">
-                        Use This File
-                    </button>
-                </td>
-            </tr>
-        @empty
-            <tr>
-                <td colspan="4">No uploaded files.</td>
-            </tr>
-        @endforelse
-    </tbody>
-</table>
-
-
+    <div class="text-end mt-3">
+        <a href="{{ route('kass.staging') }}" class="btn btn-dark">View Staging Data</a>
+    </div>
 
 </div>
 
+<script>
+function selectFile(path) {
+    document.getElementById('file_path').value = path;
+    document.getElementById('file_path_display').value = path;
+}
+</script>
 
 @endsection
