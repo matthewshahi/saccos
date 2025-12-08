@@ -9,33 +9,30 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
 
 class KassMigrationController extends Controller
 {
-    /**
-     * How many data rows to process per request in chunked mode
-     */
-    private $chunkSize = 500;
+  public function __construct()
+{
+    $this->middleware('auth');
 
-    public function __construct()
-    {
-        $this->middleware('auth');
+    // Allow long-running migrations (30 minutes)
+    ini_set('max_execution_time', '1800');     // Script run time
+    ini_set('max_input_time', '1800');         // Upload parsing time
+    ini_set('request_terminate_timeout', '1800'); // FPM/Apache timeout if supported
 
-        // Allow long-running migrations (30 minutes)
-        ini_set('max_execution_time', '1800');     // Script run time
-        ini_set('max_input_time', '1800');         // Upload parsing time
-        ini_set('request_terminate_timeout', '1800'); // FPM/Apache timeout if supported
+    // Increase memory
+    ini_set('memory_limit', '2048M');
 
-        // Increase memory
-        ini_set('memory_limit', '2048M');
+    // Increase upload limits (Excel, ZIP, CSV, etc.)
+    ini_set('upload_max_filesize', '500M');
+    ini_set('post_max_size', '500M');
 
-        // Increase upload limits (Excel, ZIP, CSV, etc.)
-        ini_set('upload_max_filesize', '500M');
-        ini_set('post_max_size', '500M');
+    // Avoid partial uploads
+    ini_set('max_file_uploads', '50');
 
-        // Avoid partial uploads
-        ini_set('max_file_uploads', '50');
+    // Increase socket timeout (CSV/Excel reads)
+    ini_set('default_socket_timeout', '1800');
+}
 
-        // Increase socket timeout (CSV/Excel reads)
-        ini_set('default_socket_timeout', '1800');
-    }
+
 
     /*===========================================================
      |
@@ -93,8 +90,7 @@ class KassMigrationController extends Controller
     }
 
     /*===========================================================
-     |  PROCESS A SINGLE FILE (manual button) – FULL IMPORT
-     |  (Uses non-chunked processExcel)
+     |  PROCESS A SINGLE FILE (manual button)
      ===========================================================*/
     public function process(Request $request)
     {
@@ -108,7 +104,6 @@ class KassMigrationController extends Controller
             $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
 
             if (in_array($ext, ['xls', 'xlsx'])) {
-                // Full import (no chunking)
                 $this->processExcel($file);
             } else {
                 $this->processCsv($file);
@@ -124,7 +119,7 @@ class KassMigrationController extends Controller
 
     /*===========================================================
      |
-     |   PROCESS ALL FILES – ONE CHUNK PER HIT (auto-refresh)
+     |   PROCESS ALL FILES – ONE PER HIT (used by auto-refresh)
      |
      ===========================================================*/
     public function processAll()
@@ -149,28 +144,16 @@ class KassMigrationController extends Controller
         $file = $files[0];
 
         try {
-            $done = $this->processExcelChunked($file);
+            $this->processExcel($file);
+            Storage::delete($file);
 
-            if ($done) {
-                // File fully imported → delete it
-                Storage::delete($file);
-                $this->deleteTracker($file);
-                $this->logFileEvent($file, 'FILE_PROCESSED', 'File imported and deleted from kass_uploads.');
+            $this->logFileEvent($file, 'FILE_PROCESSED', 'File imported and deleted from kass_uploads.');
 
-                return view('kass.auto', [
-                    'message'   => "✅ Finished file: {$file}",
-                    'remaining' => $remaining - 1,
-                    'next'      => true,
-                ]);
-            }
-
-            // Still more rows remaining in this file
             return view('kass.auto', [
-                'message'   => "⏳ Processed a batch of rows for: {$file}",
-                'remaining' => $remaining, // same file still in queue
+                'message'   => "✅ Processed: {$file}",
+                'remaining' => $remaining - 1,
                 'next'      => true,
             ]);
-
         } catch (\Exception $e) {
 
             // Log at file level
@@ -178,7 +161,6 @@ class KassMigrationController extends Controller
 
             // Delete problematic file so we don’t loop forever
             Storage::delete($file);
-            $this->deleteTracker($file);
 
             return view('kass.auto', [
                 'message'   => "❌ Failed on {$file}: " . $e->getMessage(),
@@ -190,63 +172,11 @@ class KassMigrationController extends Controller
 
     /*===========================================================
      |
-     |   EXCEL HANDLING (CHUNKED) – CONTRIBUTIONS ONLY
-     |
-     |   Valid sheets ONLY:
-     |      SHAREMPA => contributions (shares & other types)
-     |
-     |   Loan processing is intentionally ignored.
-     |
-     ===========================================================*/
-    private function processExcelChunked(string $filePath): bool
-    {
-        $fullPath    = storage_path("app/{$filePath}");
-        $spreadsheet = IOFactory::load($fullPath);
-
-        $sheets = [];
-        foreach ($spreadsheet->getAllSheets() as $sheet) {
-            $sheets[strtoupper(trim($sheet->getTitle()))] = $sheet;
-        }
-
-        // SHAREMPA (or closest match)
-        $share = $this->findSharempaSheet($sheets);
-
-        if (!$share) {
-            $this->logFileEvent($filePath, "MISSING_SHAREMPA", "No sheet resembling SHAREMPA was found (chunked mode).");
-            // nothing to do for this file; treat as done
-            return true;
-        }
-
-        // Load tracker for this file (row, carry values, openingDone)
-        $tracker = $this->loadTracker($filePath);
-
-        // Run contribution sheet in "chunk mode"
-        $result = $this->processContributionSheet($share['sheet'], $filePath, $tracker);
-
-        if (!is_array($result) || !isset($result['finished'], $result['tracker'])) {
-            // Defensive: if something odd, treat as finished to avoid infinite loop
-            return true;
-        }
-
-        if ($result['finished']) {
-            // Fully done with this sheet
-            $this->deleteTracker($filePath);
-            return true;
-        }
-
-        // Not finished – persist updated tracker
-        $this->saveTracker($filePath, $result['tracker']);
-        return false;
-    }
-
-    /*===========================================================
-     |
-     |   EXCEL HANDLING (FULL) – USED BY MANUAL process()
+     |   EXCEL HANDLING
      |
      |   Valid sheets ONLY:
      |      SHAREMPA => contributions (shares)
-     |
-     |   Loan processing is ignored here as requested.
+     |      LOANMPA  => loans
      |
      ===========================================================*/
     private function processExcel(string $filePath): void
@@ -262,15 +192,20 @@ class KassMigrationController extends Controller
         // SHAREMPA
         $share = $this->findSharempaSheet($sheets);
 
-        if ($share) {
-            $this->logFileEvent($filePath, "SHAREMPA_MATCH", "Matched using: " . $share['match']);
-            // Full import (no tracker → processes all rows)
-            $this->processContributionSheet($share['sheet'], $filePath, null);
-        } else {
-            $this->logFileEvent($filePath, "MISSING_SHAREMPA", "No sheet resembling SHAREMPA was found.");
-        }
+if ($share) {
+    $this->logFileEvent($filePath, "SHAREMPA_MATCH", "Matched using: " . $share['match']);
+    $this->processContributionSheet($share['sheet'], $filePath);
+} else {
+    $this->logFileEvent($filePath, "MISSING_SHAREMPA", "No sheet resembling SHAREMPA was found.");
+}
 
-        // LOANMPA intentionally ignored as per instruction
+
+        // LOANMPA
+        if (isset($sheets['LOANMPA'])) {
+            $this->processLoanSheet($sheets['LOANMPA'], $filePath);
+        } else {
+            $this->logFileEvent($filePath, "MISSING_LOANMPA", "LOANMPA sheet not found.");
+        }
     }
 
     /* If someone uploads CSV/TXT – log and ignore (no fatal error) */
@@ -295,12 +230,8 @@ class KassMigrationController extends Controller
      |   - RUN BAL never stored as a transaction row
      |   - Empty / zero values skipped
      |
-     |   BEHAVIOUR:
-     |   - If $tracker === null  → FULL RUN (original behaviour; returns void)
-     |   - If $tracker !== null  → CHUNKED RUN (returns ['finished'=>bool,'tracker'=>array])
-     |
      ===========================================================*/
-    private function processContributionSheet($sheet, string $sourceFile, ?array $tracker = null)
+    private function processContributionSheet($sheet, string $sourceFile): void
     {
         $rows  = $sheet->toArray(null, true, true, true);
         $clean = array_map(fn ($r) => array_values($r), $rows);
@@ -310,12 +241,13 @@ class KassMigrationController extends Controller
         $headerNorm          = $this->normalizeHeaders($headerRaw);
 
         if (!in_array('month', $headerNorm)) {
-            $this->logFileEvent($sourceFile, 'INVALID_HEADER', 'MONTH column missing (possibly blank column after NAME).');
-        }
+    $this->logFileEvent($sourceFile, 'INVALID_HEADER', 'MONTH column missing (possibly blank column after NAME).');
+}
 
-        if (!in_array('year', $headerNorm)) {
-            $this->logFileEvent($sourceFile, 'INVALID_HEADER', 'YEAR column misaligned.');
-        }
+if (!in_array('year', $headerNorm)) {
+    $this->logFileEvent($sourceFile, 'INVALID_HEADER', 'YEAR column misaligned.');
+}
+
 
         // 2) Locate critical columns by normalized name
         $monthIndex = $this->getMonthIndex($headerNorm);
@@ -334,45 +266,16 @@ class KassMigrationController extends Controller
         //    Rule: strictly between MONTH and RUN BAL.
         $transactionIndexes = $this->getTransactionColumnIndexes($headerNorm, $monthIndex, $runBalIndex);
 
-        // === State for opening balance & carry-down ===
+        // 4) Track opening balance per member + year so we only insert once
+        //    Key: company|adm_no|year
         $openingDone = [];
-        $carryName   = null;
-        $carryAdm    = null;
-        $carryComp   = null;
 
-        $maxRow = count($clean);
+        // 5) Carry-down buffers
+        $carryName = null;
+        $carryAdm  = null;
+        $carryComp = null;
 
-        // ==== CHUNK MODE SETUP ====
-        $chunkMode = ($tracker !== null);
-
-        if ($chunkMode) {
-            // Starting row for this chunk
-            $startRow = $tracker['row'] ?? $start;
-            if ($startRow < $start) {
-                $startRow = $start;
-            }
-
-            // Restore carry-down
-            $carryName = $tracker['carry_name'] ?? null;
-            $carryAdm  = $tracker['carry_adm'] ?? null;
-            $carryComp = $tracker['carry_comp'] ?? null;
-
-            // Restore openingDone set
-            if (!empty($tracker['opening_done']) && is_array($tracker['opening_done'])) {
-                foreach ($tracker['opening_done'] as $key) {
-                    $openingDone[$key] = true;
-                }
-            }
-
-            $limit = $startRow + $this->chunkSize;
-        } else {
-            // Full run
-            $startRow = $start;
-            $limit    = $maxRow; // process all
-        }
-
-        // 5) Main loop
-        for ($i = $startRow; $i < $maxRow && $i < $limit; $i++) {
+        for ($i = $start; $i < count($clean); $i++) {
             $row = $clean[$i];
 
             if (!$this->rowHasValues($row)) {
@@ -409,15 +312,15 @@ class KassMigrationController extends Controller
 
             // If still missing key identifiers – log and skip row
             if (empty($mapped['name']) || empty($mapped['adm_no'])) {
-                $this->logIssue(
-                    $sourceFile,
-                    'ANOMALY_MISSING_KEY_FIELDS',
-                    array_merge($mapped, [
-                        '_carry_name' => $carryName,
-                        '_carry_adm'  => $carryAdm,
-                        '_carry_comp' => $carryComp
-                    ])
-                );
+               $this->logIssue(
+    $sourceFile,
+    'ANOMALY_MISSING_KEY_FIELDS',
+    array_merge($mapped, [
+        '_carry_name' => $carryName,
+        '_carry_adm'  => $carryAdm,
+        '_carry_comp' => $carryComp
+    ])
+);
 
                 continue;
             }
@@ -547,30 +450,96 @@ class KassMigrationController extends Controller
                 }
             }
         }
+    }
 
-        // ====== END OF LOOP ======
+    /*===========================================================
+     |
+     |   LOANMPA — Loan Sheet
+     |
+     |   (Left mostly unchanged; loans logic is simpler)
+     |
+     ===========================================================*/
+    private function processLoanSheet($sheet, string $sourceFile): void
+    {
+        $rows  = $sheet->toArray(null, true, true, true);
+        $clean = array_map(fn ($r) => array_values($r), $rows);
 
-        if (!$chunkMode) {
-            // Original behaviour: nothing to return
-            return;
+        [$headerRaw, $start] = $this->extractHeader($clean);
+        $header = $this->normalizeHeaders($headerRaw);
+
+        $carryName = null;
+        $carryAdm  = null;
+        $carryComp = null;
+
+        for ($i = $start; $i < count($clean); $i++) {
+            $row = $clean[$i];
+
+            if (!$this->rowHasValues($row)) {
+                continue;
+            }
+
+            $mapped = $this->mapRow($header, $row);
+
+            // Skip header-like rows
+            if ($this->looksLikeHeaderRow($mapped)) {
+                $this->logIssue($sourceFile, 'HEADER_ROW_IN_DATA_LOAN', $mapped);
+                continue;
+            }
+
+            // Carry down
+            if (!empty($mapped['name'])) {
+                $carryName = $mapped['name'];
+            } else {
+                $mapped['name'] = $carryName;
+            }
+
+            if (!empty($mapped['adm_no'])) {
+                $carryAdm = $mapped['adm_no'];
+            } else {
+                $mapped['adm_no'] = $carryAdm;
+            }
+
+            if (!empty($mapped['comp'])) {
+                $carryComp = $mapped['comp'];
+            } else {
+                $mapped['comp'] = $carryComp;
+            }
+
+            if (empty($mapped['name']) || empty($mapped['adm_no'])) {
+                $this->logIssue($sourceFile, 'MISSING_NAME_OR_ADM_AFTER_CARRY_LOAN', $mapped);
+                continue;
+            }
+
+            $year  = $this->cleanYear($mapped['year'] ?? null, $sourceFile, $mapped);
+            $month = $this->cleanMonth($mapped['month'] ?? null, $sourceFile, $mapped);
+
+            $principal = $this->num($mapped['cr'] ?? null);
+            $repay     = $this->num($mapped['dr'] ?? null);
+            $interest  = $this->num($mapped['int'] ?? null);
+
+            try {
+                DB::table('kass_staging_loans')->insert([
+                    'raw_name'            => $mapped['name'],
+                    'member_identifier'   => $mapped['pfno'] ?? null,
+                    'adm_no'              => $mapped['adm_no'],
+                    'company'             => $mapped['comp'],
+                    'loan_type'           => 'LOANMPA',
+                    'year'                => $year,
+                    'month'               => $month,
+                    'principal_disbursed' => $principal,
+                    'repayment_amount'    => $repay,
+                    'interest_amount'     => $interest,
+                    'period_index'        => $mapped['period'] ?? null,
+                    'source_file'         => $sourceFile,
+                    'raw_row_json'        => json_encode($mapped),
+                    'created_at'          => now(),
+                    'updated_at'          => now(),
+                ]);
+            } catch (\Exception $e) {
+                $this->logIssue($sourceFile, 'DB_INSERT_ERROR_LOAN: ' . $e->getMessage(), $mapped);
+                continue;
+            }
         }
-
-        // Chunk mode: decide if finished, and return tracker
-        $nextRow = $limit;
-        $finished = ($nextRow >= $maxRow);
-
-        $newTracker = [
-            'row'          => $nextRow,
-            'carry_name'   => $carryName,
-            'carry_adm'    => $carryAdm,
-            'carry_comp'   => $carryComp,
-            'opening_done' => array_keys($openingDone),
-        ];
-
-        return [
-            'finished' => $finished,
-            'tracker'  => $newTracker,
-        ];
     }
 
     /*===========================================================
@@ -579,31 +548,34 @@ class KassMigrationController extends Controller
      |
      ===========================================================*/
 
-    private function extractHeader(array $rows): array
-    {
-        foreach ($rows as $i => $row) {
+ private function extractHeader(array $rows): array
+{
+    foreach ($rows as $i => $row) {
 
-            if (!$this->rowHasValues($row)) {
-                continue;
-            }
-
-            // Clean header row values
-            $trimmed = array_map(function ($v) {
-                return trim(str_replace("\xC2\xA0", ' ', (string)$v));
-            }, $row);
-
-            // Detect row containing NAME
-            $upper = array_map('strtoupper', $trimmed);
-            if (!in_array('NAME', $upper)) {
-                continue;
-            }
-
-            // 🔥 IMPORTANT: DO NOT REMOVE ANY COLUMNS
-            return [$trimmed, $i + 1];
+        if (!$this->rowHasValues($row)) {
+            continue;
         }
 
-        throw new \Exception("Header row not found.");
+        // Clean header row values
+        $trimmed = array_map(function ($v) {
+            return trim(str_replace("\xC2\xA0", ' ', (string)$v));
+        }, $row);
+
+        // Detect row containing NAME
+        $upper = array_map('strtoupper', $trimmed);
+        if (!in_array('NAME', $upper)) {
+            continue;
+        }
+
+        // 🔥 IMPORTANT: DO NOT REMOVE ANY COLUMNS
+        return [$trimmed, $i + 1];
     }
+
+    throw new \Exception("Header row not found.");
+}
+
+
+
 
     private function rowHasValues($row): bool
     {
@@ -615,116 +587,121 @@ class KassMigrationController extends Controller
         return false;
     }
 
-    private function normalizeHeaders($row): array
-    {
-        $norm = [];
+   private function normalizeHeaders($row): array
+{
+    $norm = [];
 
-        foreach ($row as $i => $h) {
+    foreach ($row as $i => $h) {
 
-            $clean = trim(str_replace("\xC2\xA0", ' ', (string)$h));
+        $clean = trim(str_replace("\xC2\xA0", ' ', (string)$h));
 
-            if ($clean === '') {
-                // keep placeholder key so indexes never shift
-                $norm[] = "_col{$i}";
-                continue;
-            }
-
-            $clean = strtolower(str_replace([' ', '/', '.', '-', "\t"], '_', $clean));
-
-            $norm[] = $clean;
+        if ($clean === '') {
+            // keep placeholder key so indexes never shift
+            $norm[] = "_col{$i}";
+            continue;
         }
 
-        return $norm;
+        $clean = strtolower(str_replace([' ', '/', '.', '-', "\t"], '_', $clean));
+
+        $norm[] = $clean;
     }
 
-    private function findSharempaSheet(array $sheets)
-    {
-        $candidates = [];
+    return $norm;
+}
 
-        foreach ($sheets as $title => $sheetObj) {
 
-            // Clean sheet title
-            $clean = strtoupper(trim(str_replace("\xC2\xA0", ' ', $title)));
 
-            // Remove inner spaces to allow "SHARE MPA"
-            $noSpace = str_replace(' ', '', $clean);
+private function findSharempaSheet(array $sheets)
+{
+    $candidates = [];
 
-            // -----------------------------
-            // 1️⃣ STRICT MATCH
-            // -----------------------------
-            if ($clean === 'SHAREMPA' || $noSpace === 'SHAREMPA') {
-                return [
+    foreach ($sheets as $title => $sheetObj) {
+
+        // Clean sheet title
+        $clean = strtoupper(trim(str_replace("\xC2\xA0", ' ', $title)));
+
+        // Remove inner spaces to allow "SHARE MPA"
+        $noSpace = str_replace(' ', '', $clean);
+
+        // -----------------------------
+        // 1️⃣ STRICT MATCH
+        // -----------------------------
+        if ($clean === 'SHAREMPA' || $noSpace === 'SHAREMPA') {
+            return [
+                'sheet' => $sheetObj,
+                'match' => "STRICT: $title"
+            ];
+        }
+
+        // -----------------------------
+        // 2️⃣ VARIANTS using symbols
+        // -----------------------------
+        $variant = str_replace([' ', '_', '-', '.'], '', $clean);
+        if ($variant === 'SHAREMPA') {
+            $candidates["VARIANT:$title"] = $sheetObj;
+        }
+
+        // -----------------------------
+        // 3️⃣ PREFIX / SUFFIX
+        // (e.g. SHAREMPA 2015, 2012 SHAREMPA)
+        // -----------------------------
+        if (str_starts_with($clean, 'SHAREMPA') || str_ends_with($clean, 'SHAREMPA')) {
+            $candidates["PREFIX_SUFFIX:$title"] = $sheetObj;
+        }
+
+        // -----------------------------
+        // 4️⃣ CONTAINS BOTH WORDS
+        // (e.g. SHARE MPA, SHARE-MPA2020)
+        // -----------------------------
+        if (str_contains($clean, 'SHARE') && str_contains($clean, 'MPA')) {
+
+            // Guard against reversed names like "MPA SHARES"
+            // Must keep "SHARE" before "MPA"
+            $posShare = strpos($clean, 'SHARE');
+            $posMpa   = strpos($clean, 'MPA');
+
+            if ($posShare !== false && $posMpa !== false && $posShare < $posMpa) {
+                $candidates["CONTAINS:$title"] = $sheetObj;
+            }
+        }
+    }
+
+    // -----------------------------
+    // 5️⃣ Resolve multiple candidates
+    // -----------------------------
+    if (!empty($candidates)) {
+
+        $best = null;
+        $bestDist = 999;
+
+        foreach ($candidates as $label => $sheetObj) {
+
+            // Compare cleaned label ONLY to the target word
+            $dist = levenshtein(
+                str_replace(['VARIANT:', 'PREFIX_SUFFIX:', 'CONTAINS:'], '', $label),
+                'SHAREMPA'
+            );
+
+            if ($dist < $bestDist) {
+                $bestDist = $dist;
+                $best = [
                     'sheet' => $sheetObj,
-                    'match' => "STRICT: $title"
+                    'match' => "LEVENSHTEIN:$label"
                 ];
             }
-
-            // -----------------------------
-            // 2️⃣ VARIANTS using symbols
-            // -----------------------------
-            $variant = str_replace([' ', '_', '-', '.'], '', $clean);
-            if ($variant === 'SHAREMPA') {
-                $candidates["VARIANT:$title"] = $sheetObj;
-            }
-
-            // -----------------------------
-            // 3️⃣ PREFIX / SUFFIX
-            // (e.g. SHAREMPA 2015, 2012 SHAREMPA)
-            // -----------------------------
-            if (str_starts_with($clean, 'SHAREMPA') || str_ends_with($clean, 'SHAREMPA')) {
-                $candidates["PREFIX_SUFFIX:$title"] = $sheetObj;
-            }
-
-            // -----------------------------
-            // 4️⃣ CONTAINS BOTH WORDS
-            // (e.g. SHARE MPA, SHARE-MPA2020)
-            // -----------------------------
-            if (str_contains($clean, 'SHARE') && str_contains($clean, 'MPA')) {
-
-                // Guard against reversed names like "MPA SHARES"
-                // Must keep "SHARE" before "MPA"
-                $posShare = strpos($clean, 'SHARE');
-                $posMpa   = strpos($clean, 'MPA');
-
-                if ($posShare !== false && $posMpa !== false && $posShare < $posMpa) {
-                    $candidates["CONTAINS:$title"] = $sheetObj;
-                }
-            }
         }
 
-        // -----------------------------
-        // 5️⃣ Resolve multiple candidates
-        // -----------------------------
-        if (!empty($candidates)) {
-
-            $best = null;
-            $bestDist = 999;
-
-            foreach ($candidates as $label => $sheetObj) {
-
-                // Compare cleaned label ONLY to the target word
-                $dist = levenshtein(
-                    str_replace(['VARIANT:', 'PREFIX_SUFFIX:', 'CONTAINS:'], '', $label),
-                    'SHAREMPA'
-                );
-
-                if ($dist < $bestDist) {
-                    $bestDist = $dist;
-                    $best = [
-                        'sheet' => $sheetObj,
-                        'match' => "LEVENSHTEIN:$label"
-                    ];
-                }
-            }
-
-            return $best;
-        }
-
-        // -----------------------------
-        // 6️⃣ Nothing matched
-        // -----------------------------
-        return null;
+        return $best;
     }
+
+    // -----------------------------
+    // 6️⃣ Nothing matched
+    // -----------------------------
+    return null;
+}
+
+
+
 
     private function mapRow($header, $row): array
     {
@@ -895,13 +872,12 @@ class KassMigrationController extends Controller
 
     /*===========================================================
      | STAGING SCREEN
-     | (contributions table is actively used; loans can remain for now)
      ===========================================================*/
     public function staging()
     {
         return view('kass.staging', [
             'contrib' => DB::table('kass_staging_contributions')->paginate(50),
-            'loans'   => DB::table('kass_staging_loans')->paginate(50), // will be empty if loans ignored
+            'loans'   => DB::table('kass_staging_loans')->paginate(50),
         ]);
     }
 
@@ -914,12 +890,11 @@ class KassMigrationController extends Controller
     }
 
     /*===========================================================
-     |  Legacy tracker-based endpoint – still uses full processExcel
-     |  (You can ignore this if you are using processAll() + chunking)
+     |  Tracker-based one-by-one endpoint (optional)
      ===========================================================*/
     public function processNext()
     {
-        $trackerPath = storage_path('app/kass_tracker_legacy.json');
+        $trackerPath = storage_path('app/kass_tracker.json');
 
         if (!file_exists($trackerPath)) {
             file_put_contents($trackerPath, json_encode([
@@ -955,7 +930,6 @@ class KassMigrationController extends Controller
         file_put_contents($trackerPath, json_encode($tracker, JSON_PRETTY_PRINT));
 
         try {
-            // Full import (no chunking)
             $this->processExcel($fileToProcess);
             $tracker['status'] = "SUCCESS";
             file_put_contents($trackerPath, json_encode($tracker, JSON_PRETTY_PRINT));
@@ -969,50 +943,6 @@ class KassMigrationController extends Controller
             Storage::delete($fileToProcess);
 
             return "FAILED: " . $e->getMessage();
-        }
-    }
-
-    /*===========================================================
-     |  CHUNK TRACKER HELPERS (per-file)
-     ===========================================================*/
-    private function getTrackerStoragePath(string $filePath): string
-    {
-        return 'kass_tracker/' . md5($filePath) . '.json';
-    }
-
-    private function loadTracker(string $filePath): array
-    {
-        $path = $this->getTrackerStoragePath($filePath);
-
-        $default = [
-            'row'          => 0,
-            'carry_name'   => null,
-            'carry_adm'    => null,
-            'carry_comp'   => null,
-            'opening_done' => [],
-        ];
-
-        if (!Storage::exists($path)) {
-            return $default;
-        }
-
-        $data = json_decode(Storage::get($path), true) ?: [];
-
-        return array_merge($default, $data);
-    }
-
-    private function saveTracker(string $filePath, array $tracker): void
-    {
-        Storage::makeDirectory('kass_tracker');
-        $path = $this->getTrackerStoragePath($filePath);
-        Storage::put($path, json_encode($tracker));
-    }
-
-    private function deleteTracker(string $filePath): void
-    {
-        $path = $this->getTrackerStoragePath($filePath);
-        if (Storage::exists($path)) {
-            Storage::delete($path);
         }
     }
 }
