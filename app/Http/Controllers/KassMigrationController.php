@@ -45,9 +45,9 @@ class KassMigrationController extends Controller
     public function index()
     {
         $files = collect(Storage::files('kass_uploads'))
-            ->sortByDesc(fn ($f) => Storage::lastModified($f))
+            ->sortByDesc(fn($f) => Storage::lastModified($f))
             ->take(20)
-            ->map(fn ($f) => [
+            ->map(fn($f) => [
                 'name' => basename($f),
                 'path' => $f,
                 'time' => date('Y-m-d H:i:s', Storage::lastModified($f)),
@@ -113,7 +113,6 @@ class KassMigrationController extends Controller
             } else {
                 $this->processCsv($file);
             }
-
         } catch (\Exception $e) {
             $this->logFileEvent($file, 'PROCESS_ERROR', $e->getMessage());
             return back()->with('error', "Error: " . $e->getMessage());
@@ -139,114 +138,114 @@ class KassMigrationController extends Controller
      |
      ===========================================================*/
     public function processAll()
-{
-    $files = collect(\Storage::files('kass_uploads'))
-        ->filter(fn($f) => preg_match('/\.(xls|xlsx|csv)$/i', $f))
-        ->values();
+    {
+        $files = collect(\Storage::files('kass_uploads'))
+            ->filter(fn($f) => preg_match('/\.(xls|xlsx|csv)$/i', $f))
+            ->values();
 
-    if (count($files) === 0) {
-        return view('kass.process_done', [
-            'message'   => "No files found.",
-            'remaining' => 0,
-            'next'      => false
-        ]);
-    }
+        if (count($files) === 0) {
+            return view('kass.process_done', [
+                'message'   => "No files found.",
+                'remaining' => 0,
+                'next'      => false
+            ]);
+        }
 
-    // Load progress tracker
-    $trackerFile = storage_path('app/kass_uploads/tracker.json');
-    $tracker = file_exists($trackerFile)
-        ? json_decode(file_get_contents($trackerFile), true)
-        : ['index' => 0];
+        // Load progress tracker
+        $trackerFile = storage_path('app/kass_uploads/tracker.json');
+        $tracker = file_exists($trackerFile)
+            ? json_decode(file_get_contents($trackerFile), true)
+            : ['index' => 0];
 
-    $index = $tracker['index'];
+        $index = $tracker['index'];
 
-    if (!isset($files[$index])) {
-        return view('kass.process_done', [
-            'message'   => "All files processed!",
-            'remaining' => 0,
-            'next'      => false
-        ]);
-    }
+        if (!isset($files[$index])) {
+            return view('kass.process_done', [
+                'message'   => "All files processed!",
+                'remaining' => 0,
+                'next'      => false
+            ]);
+        }
 
-    $file = $files[$index];
+        $file = $files[$index];
 
-    // 🔥 Auto convert XLS → XLSX
-    $converted = $this->convertXlsToXlsx($file);
+        // 🔥 Auto convert XLS → XLSX
+        $converted = $this->convertXlsToXlsx($file);
 
-    if (!$converted) {
-        \Log::error("Skipping file due to conversion error: {$file}");
+        if (!$converted) {
+            \Log::error("Skipping file due to conversion error: {$file}");
+            $tracker['index']++;
+            file_put_contents($trackerFile, json_encode($tracker));
+
+            return view('kass.process_step', [
+                'message'   => "❌ Failed converting {$file}, skipping.",
+                'remaining' => count($files) - $tracker['index'],
+                'next'      => true
+            ]);
+        }
+
+        // Process the converted XLSX
+        $this->importShareOrLoanSheet($converted);
+
+        // Move to next file
         $tracker['index']++;
         file_put_contents($trackerFile, json_encode($tracker));
 
         return view('kass.process_step', [
-            'message'   => "❌ Failed converting {$file}, skipping.",
+            'message'   => "Processed: " . basename($converted),
             'remaining' => count($files) - $tracker['index'],
             'next'      => true
         ]);
     }
+    private function importShareOrLoanSheet($filePath)
+    {
+        $file = storage_path("app/{$filePath}");
 
-    // Process the converted XLSX
-    $this->importShareOrLoanSheet($converted);
+        $reader = new \PhpOffice\PhpSpreadsheet\Reader\Xlsx();
+        $reader->setReadDataOnly(true);
 
-    // Move to next file
-    $tracker['index']++;
-    file_put_contents($trackerFile, json_encode($tracker));
+        // Load only SHAREMPA or LOANMPA
+        $reader->setLoadSheetsOnly(['SHAREMPA', 'LOANMPA']);
 
-    return view('kass.process_step', [
-        'message'   => "Processed: " . basename($converted),
-        'remaining' => count($files) - $tracker['index'],
-        'next'      => true
-    ]);
-}
-private function importShareOrLoanSheet($filePath)
-{
-    $file = storage_path("app/{$filePath}");
+        $spreadsheet = $reader->load($file);
+        $sheet = $spreadsheet->getActiveSheet();
 
-    $reader = new \PhpOffice\PhpSpreadsheet\Reader\Xlsx();
-    $reader->setReadDataOnly(true);
+        $rowCount = $sheet->getHighestDataRow();
+        $chunkSize = 200;
 
-    // Load only SHAREMPA or LOANMPA
-    $reader->setLoadSheetsOnly(['SHAREMPA', 'LOANMPA']);
+        for ($start = 2; $start <= $rowCount; $start += $chunkSize) {
 
-    $spreadsheet = $reader->load($file);
-    $sheet = $spreadsheet->getActiveSheet();
+            $end = $start + $chunkSize - 1;
+            if ($end > $rowCount) $end = $rowCount;
 
-    $rowCount = $sheet->getHighestDataRow();
-    $chunkSize = 200;
+            $rows = [];
 
-    for ($start = 2; $start <= $rowCount; $start += $chunkSize) {
+            for ($row = $start; $row <= $end; $row++) {
+                $name = trim($sheet->getCell("A{$row}")->getValue());
 
-        $end = $start + $chunkSize - 1;
-        if ($end > $rowCount) $end = $rowCount;
+                if ($name === null || $name === "") continue;
 
-        $rows = [];
+                $rows[] = [
+                    'name'   => $sheet->getCell("A{$row}")->getValue(),
+                    'adm'    => $sheet->getCell("B{$row}")->getValue(),
+                    'comp'   => $sheet->getCell("C{$row}")->getValue(),
+                    'year'   => $sheet->getCell("D{$row}")->getValue(),
+                    'month'  => $sheet->getCell("E{$row}")->getValue(),
+                    'memb'   => $sheet->getCell("F{$row}")->getValue(),
+                    'dr'     => $sheet->getCell("G{$row}")->getValue(),
+                    'cr'     => $sheet->getCell("H{$row}")->getValue(),
+                    'bal'    => $sheet->getCell("I{$row}")->getValue(),
+                    'file'   => $filePath,
+                    'created_at' => now(),
+                    'updated_at' => now()
+                ];
+            }
 
-        for ($row = $start; $row <= $end; $row++) {
-            $name = trim($sheet->getCell("A{$row}")->getValue());
-
-            if ($name === null || $name === "") continue;
-
-            $rows[] = [
-                'name'   => $sheet->getCell("A{$row}")->getValue(),
-                'adm'    => $sheet->getCell("B{$row}")->getValue(),
-                'comp'   => $sheet->getCell("C{$row}")->getValue(),
-                'year'   => $sheet->getCell("D{$row}")->getValue(),
-                'month'  => $sheet->getCell("E{$row}")->getValue(),
-                'memb'   => $sheet->getCell("F{$row}")->getValue(),
-                'dr'     => $sheet->getCell("G{$row}")->getValue(),
-                'cr'     => $sheet->getCell("H{$row}")->getValue(),
-                'bal'    => $sheet->getCell("I{$row}")->getValue(),
-                'file'   => $filePath,
-                'created_at' => now(),
-                'updated_at' => now()
-            ];
-        }
-
-        if (!empty($rows)) {
-            DB::table('kass_staging_shares')->insert($rows);
+            if (!empty($rows)) {
+                DB::table('kass_staging_shares')->insert($rows);
+            }
         }
     }
-}
 
 
     /*===========================================================
@@ -302,7 +301,7 @@ private function importShareOrLoanSheet($filePath)
     private function processContributionSheet($sheet, string $sourceFile): void
     {
         $rows  = $sheet->toArray(null, true, true, true);
-        $clean = array_map(fn ($r) => array_values($r), $rows);
+        $clean = array_map(fn($r) => array_values($r), $rows);
 
         // 1) Detect header row (the one that contains "NAME")
         [$headerRaw, $start] = $this->extractHeader($clean);
@@ -554,7 +553,7 @@ private function importShareOrLoanSheet($filePath)
         $sheet = $share['sheet'];
 
         $rows  = $sheet->toArray(null, true, true, true);
-        $clean = array_map(fn ($r) => array_values($r), $rows);
+        $clean = array_map(fn($r) => array_values($r), $rows);
 
         // Header detection
         [$headerRaw, $start] = $this->extractHeader($clean);
@@ -895,8 +894,16 @@ private function importShareOrLoanSheet($filePath)
     private function looksLikeHeaderRow(array $mapped): bool
     {
         $candidates = [
-            'name', 'adm_no', 'comp', 'company',
-            'year', 'month', 'memb', 'dr', 'cr', 'run_bal',
+            'name',
+            'adm_no',
+            'comp',
+            'company',
+            'year',
+            'month',
+            'memb',
+            'dr',
+            'cr',
+            'run_bal',
         ];
 
         $score = 0;
@@ -1151,34 +1158,34 @@ private function importShareOrLoanSheet($filePath)
             unlink($path);
         }
     }
-}
 
-private function convertXlsToXlsx($filePath)
-{
-    $fullPath = storage_path("app/{$filePath}");
 
-    // If file is already xlsx, return as-is
-    if (!str_ends_with(strtolower($filePath), '.xls')) {
-        return $filePath;
-    }
+    private function convertXlsToXlsx($filePath)
+    {
+        $fullPath = storage_path("app/{$filePath}");
 
-    try {
-        // Load XLS
-        $reader = \PhpOffice\PhpSpreadsheet\IOFactory::createReader('Xls');
-        $spreadsheet = $reader->load($fullPath);
+        // If file is already xlsx, return as-is
+        if (!str_ends_with(strtolower($filePath), '.xls')) {
+            return $filePath;
+        }
 
-        // Convert path
-        $newFilePath = str_replace('.xls', '.xlsx', $filePath);
-        $newFullPath = storage_path("app/{$newFilePath}");
+        try {
+            // Load XLS
+            $reader = \PhpOffice\PhpSpreadsheet\IOFactory::createReader('Xls');
+            $spreadsheet = $reader->load($fullPath);
 
-        // Save XLSX
-        $writer = \PhpOffice\PhpSpreadsheet\IOFactory::createWriter($spreadsheet, 'Xlsx');
-        $writer->save($newFullPath);
+            // Convert path
+            $newFilePath = str_replace('.xls', '.xlsx', $filePath);
+            $newFullPath = storage_path("app/{$newFilePath}");
 
-        return $newFilePath;
-    } 
-    catch (\Exception $e) {
-        \Log::error("XLS Conversion Failed: {$e->getMessage()}");
-        return null;
+            // Save XLSX
+            $writer = \PhpOffice\PhpSpreadsheet\IOFactory::createWriter($spreadsheet, 'Xlsx');
+            $writer->save($newFullPath);
+
+            return $newFilePath;
+        } catch (\Exception $e) {
+            \Log::error("XLS Conversion Failed: {$e->getMessage()}");
+            return null;
+        }
     }
 }
