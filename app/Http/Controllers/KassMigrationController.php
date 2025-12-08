@@ -10,9 +10,9 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
 class KassMigrationController extends Controller
 {
     /**
-     * How many data rows to process per request in chunked mode
+     * How many data rows to process per request when using processAll()
      */
-    private $chunkSize = 500;
+    protected int $chunkSize = 500;
 
     public function __construct()
     {
@@ -94,7 +94,8 @@ class KassMigrationController extends Controller
 
     /*===========================================================
      |  PROCESS A SINGLE FILE (manual button) – FULL IMPORT
-     |  (Uses non-chunked processExcel)
+     |  (Can still timeout on very huge files – use processAll()
+     |   for safe, chunked processing)
      ===========================================================*/
     public function process(Request $request)
     {
@@ -108,7 +109,6 @@ class KassMigrationController extends Controller
             $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
 
             if (in_array($ext, ['xls', 'xlsx'])) {
-                // Full import (no chunking)
                 $this->processExcel($file);
             } else {
                 $this->processCsv($file);
@@ -124,20 +124,32 @@ class KassMigrationController extends Controller
 
     /*===========================================================
      |
-     |   PROCESS ALL FILES – ONE CHUNK PER HIT (auto-refresh)
+     |   PROCESS ALL FILES – SAFE, CHUNKED (NO TIMEOUTS)
+     |
+     |   Uses a JSON tracker at storage/app/kass_chunk_state.json
+     |   and processes only $chunkSize rows per request.
+     |
+     |   Your Blade button + auto-refresh still works:
+     |
+     |   <form action="{{ route('kass.process.all') }}" method="GET">
+     |       <button class="btn btn-lg btn-success w-100 my-3">
+     |           🚀 Import ALL Uploaded Excel Files into Staging
+     |       </button>
+     |   </form>
      |
      ===========================================================*/
     public function processAll()
     {
-        // Only pick Excel files
-        $files = array_values(array_filter(Storage::files('kass_uploads'), function ($file) {
-            return in_array(strtolower(pathinfo($file, PATHINFO_EXTENSION)), ['xls', 'xlsx']);
-        }));
+        // 1. Get all Excel files currently in kass_uploads
+        $files = array_values(array_filter(
+            Storage::files('kass_uploads'),
+            fn ($file) => in_array(strtolower(pathinfo($file, PATHINFO_EXTENSION)), ['xls', 'xlsx'])
+        ));
 
-        $remaining = count($files);
+        // If nothing at all, clear tracker and show done
+        if (empty($files)) {
+            $this->resetChunkState();
 
-        // Nothing left
-        if ($remaining === 0) {
             return view('kass.auto', [
                 'message'   => "🎉 All files processed! No remaining files.",
                 'remaining' => 0,
@@ -145,108 +157,79 @@ class KassMigrationController extends Controller
             ]);
         }
 
-        // Always process only the FIRST file
-        $file = $files[0];
+        // 2. Load or initialise current chunk state
+        $state = $this->loadChunkState();
+
+        // If no active file or file removed, pick the first one
+        if (empty($state['file']) || !Storage::exists($state['file'])) {
+            $state = [
+                'file'         => $files[0],
+                'row'          => 0,
+                'carry_name'   => null,
+                'carry_adm'    => null,
+                'carry_comp'   => null,
+                'opening_done' => [],
+            ];
+        }
+
+        $currentFile = $state['file'];
 
         try {
-            $done = $this->processExcelChunked($file);
-
-            if ($done) {
-                // File fully imported → delete it
-                Storage::delete($file);
-                $this->deleteTracker($file);
-                $this->logFileEvent($file, 'FILE_PROCESSED', 'File imported and deleted from kass_uploads.');
-
-                return view('kass.auto', [
-                    'message'   => "✅ Finished file: {$file}",
-                    'remaining' => $remaining - 1,
-                    'next'      => true,
-                ]);
-            }
-
-            // Still more rows remaining in this file
-            return view('kass.auto', [
-                'message'   => "⏳ Processed a batch of rows for: {$file}",
-                'remaining' => $remaining, // same file still in queue
-                'next'      => true,
-            ]);
-
+            // 3. Process ONE chunk of this file
+            $result = $this->processExcelChunkedContrib($currentFile, $state);
         } catch (\Exception $e) {
 
             // Log at file level
-            $this->logFileEvent($file, 'PROCESS_ERROR', $e->getMessage());
+            $this->logFileEvent($currentFile, 'CHUNK_PROCESS_ERROR', $e->getMessage());
 
             // Delete problematic file so we don’t loop forever
-            Storage::delete($file);
-            $this->deleteTracker($file);
+            if (Storage::exists($currentFile)) {
+                Storage::delete($currentFile);
+            }
+
+            // Reset chunk state
+            $this->resetChunkState();
 
             return view('kass.auto', [
-                'message'   => "❌ Failed on {$file}: " . $e->getMessage(),
-                'remaining' => $remaining - 1,
+                'message'   => "❌ Failed on {$currentFile}: " . $e->getMessage(),
+                'remaining' => max(count($files) - 1, 0),
                 'next'      => true,
             ]);
         }
-    }
 
-    /*===========================================================
-     |
-     |   EXCEL HANDLING (CHUNKED) – CONTRIBUTIONS ONLY
-     |
-     |   Valid sheets ONLY:
-     |      SHAREMPA => contributions (shares & other types)
-     |
-     |   Loan processing is intentionally ignored.
-     |
-     ===========================================================*/
-    private function processExcelChunked(string $filePath): bool
-    {
-        $fullPath    = storage_path("app/{$filePath}");
-        $spreadsheet = IOFactory::load($fullPath);
-
-        $sheets = [];
-        foreach ($spreadsheet->getAllSheets() as $sheet) {
-            $sheets[strtoupper(trim($sheet->getTitle()))] = $sheet;
-        }
-
-        // SHAREMPA (or closest match)
-        $share = $this->findSharempaSheet($sheets);
-
-        if (!$share) {
-            $this->logFileEvent($filePath, "MISSING_SHAREMPA", "No sheet resembling SHAREMPA was found (chunked mode).");
-            // nothing to do for this file; treat as done
-            return true;
-        }
-
-        // Load tracker for this file (row, carry values, openingDone)
-        $tracker = $this->loadTracker($filePath);
-
-        // Run contribution sheet in "chunk mode"
-        $result = $this->processContributionSheet($share['sheet'], $filePath, $tracker);
-
-        if (!is_array($result) || !isset($result['finished'], $result['tracker'])) {
-            // Defensive: if something odd, treat as finished to avoid infinite loop
-            return true;
-        }
-
+        // 4. If finished this file → delete it & reset state so next call picks the next file
         if ($result['finished']) {
-            // Fully done with this sheet
-            $this->deleteTracker($filePath);
-            return true;
+
+            if (Storage::exists($currentFile)) {
+                Storage::delete($currentFile);
+            }
+
+            $this->resetChunkState();
+
+            $remainingAfter = max(count($files) - 1, 0);
+
+            return view('kass.auto', [
+                'message'   => "✅ Finished & removed {$currentFile}",
+                'remaining' => $remainingAfter,
+                'next'      => ($remainingAfter > 0),
+            ]);
         }
 
-        // Not finished – persist updated tracker
-        $this->saveTracker($filePath, $result['tracker']);
-        return false;
+        // 5. Not finished yet → save updated state (row pointer, carry values, opening_done)
+        $this->saveChunkState($result['state']);
+
+        return view('kass.auto', [
+            'message'   => "⏳ Processing {$currentFile} … rows {$state['row']} → {$result['state']['row']}",
+            'remaining' => "Processing current file + " . max(count($files) - 1, 0) . " more",
+            'next'      => true,
+        ]);
     }
 
     /*===========================================================
      |
-     |   EXCEL HANDLING (FULL) – USED BY MANUAL process()
+     |   EXCEL HANDLING – FULL (used by manual process())
      |
-     |   Valid sheets ONLY:
-     |      SHAREMPA => contributions (shares)
-     |
-     |   Loan processing is ignored here as requested.
+     |   Contributions only. LOANMPA is **ignored** as requested.
      |
      ===========================================================*/
     private function processExcel(string $filePath): void
@@ -264,13 +247,19 @@ class KassMigrationController extends Controller
 
         if ($share) {
             $this->logFileEvent($filePath, "SHAREMPA_MATCH", "Matched using: " . $share['match']);
-            // Full import (no tracker → processes all rows)
-            $this->processContributionSheet($share['sheet'], $filePath, null);
+            $this->processContributionSheet($share['sheet'], $filePath);
         } else {
             $this->logFileEvent($filePath, "MISSING_SHAREMPA", "No sheet resembling SHAREMPA was found.");
         }
 
-        // LOANMPA intentionally ignored as per instruction
+        // LOANMPA – intentionally ignored for now
+        /*
+        if (isset($sheets['LOANMPA'])) {
+            $this->processLoanSheet($sheets['LOANMPA'], $filePath);
+        } else {
+            $this->logFileEvent($filePath, "MISSING_LOANMPA", "LOANMPA sheet not found.");
+        }
+        */
     }
 
     /* If someone uploads CSV/TXT – log and ignore (no fatal error) */
@@ -281,26 +270,12 @@ class KassMigrationController extends Controller
 
     /*===========================================================
      |
-     |   SHAREMPA — Contributions Sheet
+     |   SHAREMPA — Contributions Sheet (FULL RUN)
      |
-     |   New rules:
-     |   - Only transaction columns between MONTH and RUN BAL / RUNBAL
-     |   - Each non-zero numeric transaction => separate row
-     |   - raw_type = original column label (e.g. "CAPITAL", "NEW WEL", "DR", "CR")
-     |   - Amount stored exactly as numeric (no sign manipulation)
-     |   - Opening balance:
-     |        opening = run_bal + dr - cr
-     |        stored once per (company + adm_no + year)
-     |        month = month where RUN BAL first appears
-     |   - RUN BAL never stored as a transaction row
-     |   - Empty / zero values skipped
-     |
-     |   BEHAVIOUR:
-     |   - If $tracker === null  → FULL RUN (original behaviour; returns void)
-     |   - If $tracker !== null  → CHUNKED RUN (returns ['finished'=>bool,'tracker'=>array])
+     |   (Your original logic — unchanged)
      |
      ===========================================================*/
-    private function processContributionSheet($sheet, string $sourceFile, ?array $tracker = null)
+    private function processContributionSheet($sheet, string $sourceFile): void
     {
         $rows  = $sheet->toArray(null, true, true, true);
         $clean = array_map(fn ($r) => array_values($r), $rows);
@@ -334,45 +309,16 @@ class KassMigrationController extends Controller
         //    Rule: strictly between MONTH and RUN BAL.
         $transactionIndexes = $this->getTransactionColumnIndexes($headerNorm, $monthIndex, $runBalIndex);
 
-        // === State for opening balance & carry-down ===
+        // 4) Track opening balance per member + year so we only insert once
+        //    Key: company|adm_no|year
         $openingDone = [];
-        $carryName   = null;
-        $carryAdm    = null;
-        $carryComp   = null;
 
-        $maxRow = count($clean);
+        // 5) Carry-down buffers
+        $carryName = null;
+        $carryAdm  = null;
+        $carryComp = null;
 
-        // ==== CHUNK MODE SETUP ====
-        $chunkMode = ($tracker !== null);
-
-        if ($chunkMode) {
-            // Starting row for this chunk
-            $startRow = $tracker['row'] ?? $start;
-            if ($startRow < $start) {
-                $startRow = $start;
-            }
-
-            // Restore carry-down
-            $carryName = $tracker['carry_name'] ?? null;
-            $carryAdm  = $tracker['carry_adm'] ?? null;
-            $carryComp = $tracker['carry_comp'] ?? null;
-
-            // Restore openingDone set
-            if (!empty($tracker['opening_done']) && is_array($tracker['opening_done'])) {
-                foreach ($tracker['opening_done'] as $key) {
-                    $openingDone[$key] = true;
-                }
-            }
-
-            $limit = $startRow + $this->chunkSize;
-        } else {
-            // Full run
-            $startRow = $start;
-            $limit    = $maxRow; // process all
-        }
-
-        // 5) Main loop
-        for ($i = $startRow; $i < $maxRow && $i < $limit; $i++) {
+        for ($i = $start; $i < count($clean); $i++) {
             $row = $clean[$i];
 
             if (!$this->rowHasValues($row)) {
@@ -547,20 +493,225 @@ class KassMigrationController extends Controller
                 }
             }
         }
+    }
 
-        // ====== END OF LOOP ======
+    /*===========================================================
+     |
+     |   CHUNKED CONTRIBUTIONS PROCESSOR (for processAll)
+     |
+     |   - Uses same logic as processContributionSheet(),
+     |     but only handles a slice of rows per request and
+     |     persists carry + opening_done state in JSON.
+     |
+     ===========================================================*/
+    private function processExcelChunkedContrib(string $filePath, array $state): array
+    {
+        $fullPath    = storage_path("app/{$filePath}");
+        $spreadsheet = IOFactory::load($fullPath);
 
-        if (!$chunkMode) {
-            // Original behaviour: nothing to return
-            return;
+        // Collect sheets
+        $sheets = [];
+        foreach ($spreadsheet->getAllSheets() as $sheet) {
+            $sheets[strtoupper(trim($sheet->getTitle()))] = $sheet;
         }
 
-        // Chunk mode: decide if finished, and return tracker
-        $nextRow = $limit;
-        $finished = ($nextRow >= $maxRow);
+        // SHAREMPA (or best match)
+        $share = $this->findSharempaSheet($sheets);
 
-        $newTracker = [
-            'row'          => $nextRow,
+        if (!$share) {
+            $this->logFileEvent($filePath, "MISSING_SHAREMPA", "No sheet resembling SHAREMPA (chunked).");
+            // Treat as finished
+            return [
+                'finished' => true,
+                'state'    => $state,
+            ];
+        }
+
+        $sheet = $share['sheet'];
+
+        $rows  = $sheet->toArray(null, true, true, true);
+        $clean = array_map(fn ($r) => array_values($r), $rows);
+
+        // Header detection
+        [$headerRaw, $start] = $this->extractHeader($clean);
+        $headerNorm          = $this->normalizeHeaders($headerRaw);
+
+        //  Locate columns
+        $monthIndex = $this->getMonthIndex($headerNorm);
+        $runBalInfo = $this->getRunBalIndexAndKey($headerNorm);
+        $runBalIndex = $runBalInfo['index'];  // can be null
+        $runBalKey   = $runBalInfo['key'];    // normalized key, e.g. "run_bal"
+
+        $transactionIndexes = $this->getTransactionColumnIndexes($headerNorm, $monthIndex, $runBalIndex);
+
+        // Restore state
+        $maxRow      = count($clean);
+        $currentRow  = $state['row'] ?? 0;
+
+        if ($currentRow < $start) {
+            $currentRow = $start;
+        }
+
+        $carryName   = $state['carry_name'] ?? null;
+        $carryAdm    = $state['carry_adm'] ?? null;
+        $carryComp   = $state['carry_comp'] ?? null;
+        $openingDone = [];
+
+        if (!empty($state['opening_done']) && is_array($state['opening_done'])) {
+            foreach ($state['opening_done'] as $k) {
+                $openingDone[$k] = true;
+            }
+        }
+
+        $limitRow = $currentRow + $this->chunkSize;
+
+        // === Main chunk loop ===
+        for ($i = $currentRow; $i < $maxRow && $i < $limitRow; $i++) {
+            $row = $clean[$i];
+
+            if (!$this->rowHasValues($row)) {
+                continue;
+            }
+
+            $mapped = $this->mapRow($headerNorm, $row);
+
+            if ($this->looksLikeHeaderRow($mapped)) {
+                $this->logIssue($filePath, 'HEADER_ROW_IN_DATA_CHUNK', $mapped);
+                continue;
+            }
+
+            // Carry-down
+            if (!empty($mapped['name'])) {
+                $carryName = $mapped['name'];
+            } else {
+                $mapped['name'] = $carryName;
+            }
+
+            if (!empty($mapped['adm_no'])) {
+                $carryAdm = $mapped['adm_no'];
+            } else {
+                $mapped['adm_no'] = $carryAdm;
+            }
+
+            if (!empty($mapped['comp'])) {
+                $carryComp = $mapped['comp'];
+            } else {
+                $mapped['comp'] = $carryComp;
+            }
+
+            if (empty($mapped['name']) || empty($mapped['adm_no'])) {
+                $this->logIssue(
+                    $filePath,
+                    'ANOMALY_MISSING_KEY_FIELDS_CHUNK',
+                    array_merge($mapped, [
+                        '_carry_name' => $carryName,
+                        '_carry_adm'  => $carryAdm,
+                        '_carry_comp' => $carryComp
+                    ])
+                );
+                continue;
+            }
+
+            $year  = $this->cleanYear($mapped['year'] ?? null, $filePath, $mapped);
+            $month = $this->cleanMonth($mapped['month'] ?? null, $filePath, $mapped);
+
+            $openingKey = ($carryComp ?? '') . '|' . ($carryAdm ?? '') . '|' . (string) $year;
+
+            $dr = $this->num($mapped['dr'] ?? null);
+            $cr = $this->num($mapped['cr'] ?? null);
+
+            $runBal = null;
+            if ($runBalKey !== null && array_key_exists($runBalKey, $mapped)) {
+                $runBal = $this->num($mapped[$runBalKey]);
+            }
+
+            // Opening balance
+            if ($runBal !== null && !isset($openingDone[$openingKey])) {
+                $drOpening = $dr ?? 0;
+                $crOpening = $cr ?? 0;
+
+                $openingAmount = $runBal + $drOpening - $crOpening;
+
+                if ($openingAmount != 0 && $year !== null) {
+                    try {
+                        DB::table('kass_staging_contributions')->insert([
+                            'raw_name'          => $mapped['name'],
+                            'member_identifier' => $mapped['pfno'] ?? null,
+                            'adm_no'            => $mapped['adm_no'],
+                            'company'           => $mapped['comp'],
+                            'year'              => $year,
+                            'month'             => $month,
+                            'raw_type'          => 'OPENING_BALANCE',
+                            'amount'            => $openingAmount,
+                            'source_file'       => $filePath,
+                            'raw_row_json'      => json_encode($mapped),
+                            'created_at'        => now(),
+                            'updated_at'        => now(),
+                        ]);
+                    } catch (\Exception $e) {
+                        $this->logIssue(
+                            $filePath,
+                            'DB_INSERT_ERROR_OPENING_BALANCE_CHUNK: ' . $e->getMessage(),
+                            array_merge($mapped, ['_opening_amount' => $openingAmount])
+                        );
+                    }
+                }
+
+                $openingDone[$openingKey] = true;
+            }
+
+            // Transactions
+            foreach ($transactionIndexes as $colIndex) {
+                if (!array_key_exists($colIndex, $row) || !array_key_exists($colIndex, $headerRaw)) {
+                    continue;
+                }
+
+                $rawHeaderLabel = trim((string) $headerRaw[$colIndex]);
+                $rawCellValue   = $row[$colIndex];
+
+                $amount = $this->num($rawCellValue);
+
+                if ($amount === null || $amount == 0) {
+                    continue;
+                }
+
+                $normalizedKey = $headerNorm[$colIndex] ?? 'unknown';
+                $rawType       = $rawHeaderLabel !== '' ? strtoupper($rawHeaderLabel) : strtoupper($normalizedKey);
+
+                try {
+                    DB::table('kass_staging_contributions')->insert([
+                        'raw_name'          => $mapped['name'],
+                        'member_identifier' => $mapped['pfno'] ?? null,
+                        'adm_no'            => $mapped['adm_no'],
+                        'company'           => $mapped['comp'],
+                        'year'              => $year,
+                        'month'             => $month,
+                        'raw_type'          => $rawType,
+                        'amount'            => $amount,
+                        'source_file'       => $filePath,
+                        'raw_row_json'      => json_encode($mapped),
+                        'created_at'        => now(),
+                        'updated_at'        => now(),
+                    ]);
+                } catch (\Exception $e) {
+                    $this->logIssue(
+                        $filePath,
+                        'DB_INSERT_ERROR_TRANSACTION_CHUNK: ' . $e->getMessage(),
+                        array_merge($mapped, [
+                            '_col_index' => $colIndex,
+                            '_raw_type'  => $rawType,
+                            '_amount'    => $amount,
+                        ])
+                    );
+                }
+            }
+        }
+
+        $finished = ($i >= $maxRow);
+
+        $newState = [
+            'file'         => $filePath,
+            'row'          => $finished ? $maxRow : $i,
             'carry_name'   => $carryName,
             'carry_adm'    => $carryAdm,
             'carry_comp'   => $carryComp,
@@ -569,7 +720,7 @@ class KassMigrationController extends Controller
 
         return [
             'finished' => $finished,
-            'tracker'  => $newTracker,
+            'state'    => $newState,
         ];
     }
 
@@ -649,9 +800,7 @@ class KassMigrationController extends Controller
             // Remove inner spaces to allow "SHARE MPA"
             $noSpace = str_replace(' ', '', $clean);
 
-            // -----------------------------
             // 1️⃣ STRICT MATCH
-            // -----------------------------
             if ($clean === 'SHAREMPA' || $noSpace === 'SHAREMPA') {
                 return [
                     'sheet' => $sheetObj,
@@ -659,30 +808,20 @@ class KassMigrationController extends Controller
                 ];
             }
 
-            // -----------------------------
             // 2️⃣ VARIANTS using symbols
-            // -----------------------------
             $variant = str_replace([' ', '_', '-', '.'], '', $clean);
             if ($variant === 'SHAREMPA') {
                 $candidates["VARIANT:$title"] = $sheetObj;
             }
 
-            // -----------------------------
             // 3️⃣ PREFIX / SUFFIX
-            // (e.g. SHAREMPA 2015, 2012 SHAREMPA)
-            // -----------------------------
             if (str_starts_with($clean, 'SHAREMPA') || str_ends_with($clean, 'SHAREMPA')) {
                 $candidates["PREFIX_SUFFIX:$title"] = $sheetObj;
             }
 
-            // -----------------------------
             // 4️⃣ CONTAINS BOTH WORDS
-            // (e.g. SHARE MPA, SHARE-MPA2020)
-            // -----------------------------
             if (str_contains($clean, 'SHARE') && str_contains($clean, 'MPA')) {
 
-                // Guard against reversed names like "MPA SHARES"
-                // Must keep "SHARE" before "MPA"
                 $posShare = strpos($clean, 'SHARE');
                 $posMpa   = strpos($clean, 'MPA');
 
@@ -692,9 +831,7 @@ class KassMigrationController extends Controller
             }
         }
 
-        // -----------------------------
-        // 5️⃣ Resolve multiple candidates
-        // -----------------------------
+        // Resolve multiple candidates
         if (!empty($candidates)) {
 
             $best = null;
@@ -702,7 +839,6 @@ class KassMigrationController extends Controller
 
             foreach ($candidates as $label => $sheetObj) {
 
-                // Compare cleaned label ONLY to the target word
                 $dist = levenshtein(
                     str_replace(['VARIANT:', 'PREFIX_SUFFIX:', 'CONTAINS:'], '', $label),
                     'SHAREMPA'
@@ -720,9 +856,6 @@ class KassMigrationController extends Controller
             return $best;
         }
 
-        // -----------------------------
-        // 6️⃣ Nothing matched
-        // -----------------------------
         return null;
     }
 
@@ -735,7 +868,6 @@ class KassMigrationController extends Controller
         return $out;
     }
 
-    /* Header-like row detection inside data region */
     private function looksLikeHeaderRow(array $mapped): bool
     {
         $candidates = [
@@ -755,11 +887,9 @@ class KassMigrationController extends Controller
             }
         }
 
-        // If several columns look like headers → treat as header row
         return $score >= 2;
     }
 
-    /* Locate MONTH column index */
     private function getMonthIndex(array $headerNorm): ?int
     {
         foreach ($headerNorm as $i => $col) {
@@ -770,11 +900,9 @@ class KassMigrationController extends Controller
         return null;
     }
 
-    /* Locate RUN BAL / RUNBAL column index & key */
     private function getRunBalIndexAndKey(array $headerNorm): array
     {
         foreach ($headerNorm as $i => $col) {
-            // Accept any normalized header that combines "run" and "bal"
             if (str_contains($col, 'run') && str_contains($col, 'bal')) {
                 return ['index' => $i, 'key' => $col];
             }
@@ -783,11 +911,6 @@ class KassMigrationController extends Controller
         return ['index' => null, 'key' => null];
     }
 
-    /**
-     * Transaction columns = those STRICTLY between MONTH and RUN BAL.
-     * - If monthIndex is null → we just consider all columns except obvious non-data ones.
-     * - If runBalIndex is null → we consider columns after MONTH up to end.
-     */
     private function getTransactionColumnIndexes(array $headerNorm, ?int $monthIndex, ?int $runBalIndex): array
     {
         $indexes = [];
@@ -795,19 +918,16 @@ class KassMigrationController extends Controller
 
         for ($i = 0; $i < $max; $i++) {
 
-            // Skip columns that are clearly structural
             $key = $headerNorm[$i];
 
             if (in_array($key, ['name', 'adm_no', 'comp', 'company', 'pfno', 'year', 'month', 'period'])) {
                 continue;
             }
 
-            // If we know where MONTH is, enforce "after month"
             if ($monthIndex !== null && $i <= $monthIndex) {
                 continue;
             }
 
-            // If we know where RUN BAL is, enforce "before run bal"
             if ($runBalIndex !== null && $i >= $runBalIndex) {
                 continue;
             }
@@ -818,7 +938,6 @@ class KassMigrationController extends Controller
         return $indexes;
     }
 
-    /* Year cleaner – converts to int or null, logs bad values */
     private function cleanYear($value, string $file, array $row)
     {
         $value = trim((string) $value);
@@ -835,7 +954,6 @@ class KassMigrationController extends Controller
         return null;
     }
 
-    /* Month cleaner – uppercase string, logs weird ones (but still stores) */
     private function cleanMonth($value, string $file, array $row)
     {
         $value = trim((string) $value);
@@ -854,22 +972,14 @@ class KassMigrationController extends Controller
         return $month;
     }
 
-    /**
-     * Numeric normaliser:
-     * - Removes commas and spaces.
-     * - Keeps minus sign if present.
-     * - Returns float or null if not numeric.
-     */
     private function num($v)
     {
         if ($v === null || $v === '') {
             return null;
         }
 
-        // Convert e.g. " 12,000 " → "12000"
         $v = str_replace([',', ' '], '', (string) $v);
 
-        // After cleaning, must be numeric to be valid
         return is_numeric($v) ? (float) $v : null;
     }
 
@@ -879,14 +989,12 @@ class KassMigrationController extends Controller
      |
      ===========================================================*/
 
-    // File-level events (missing sheets, process errors, etc.)
     private function logFileEvent(string $file, string $type, string $note): void
     {
         $line = "[" . now() . "] FILE: {$file} | TYPE: {$type} | NOTE: {$note}\n";
         Storage::append('logs/kass_missing_sheets.log', $line);
     }
 
-    // Row-level issues (bad data, DB insert failures, misaligned rows, etc.)
     private function logIssue(string $file, string $message, array $row = []): void
     {
         $line = "[" . now() . "] FILE: {$file} | ISSUE: {$message} | ROW: " . json_encode($row) . "\n";
@@ -895,13 +1003,12 @@ class KassMigrationController extends Controller
 
     /*===========================================================
      | STAGING SCREEN
-     | (contributions table is actively used; loans can remain for now)
      ===========================================================*/
     public function staging()
     {
         return view('kass.staging', [
             'contrib' => DB::table('kass_staging_contributions')->paginate(50),
-            'loans'   => DB::table('kass_staging_loans')->paginate(50), // will be empty if loans ignored
+            'loans'   => DB::table('kass_staging_loans')->paginate(50),
         ]);
     }
 
@@ -914,12 +1021,12 @@ class KassMigrationController extends Controller
     }
 
     /*===========================================================
-     |  Legacy tracker-based endpoint – still uses full processExcel
-     |  (You can ignore this if you are using processAll() + chunking)
+     |  Legacy tracker-based endpoint – unchanged
+     |  (still uses full processExcel, so may timeout on big files)
      ===========================================================*/
     public function processNext()
     {
-        $trackerPath = storage_path('app/kass_tracker_legacy.json');
+        $trackerPath = storage_path('app/kass_tracker.json');
 
         if (!file_exists($trackerPath)) {
             file_put_contents($trackerPath, json_encode([
@@ -955,7 +1062,6 @@ class KassMigrationController extends Controller
         file_put_contents($trackerPath, json_encode($tracker, JSON_PRETTY_PRINT));
 
         try {
-            // Full import (no chunking)
             $this->processExcel($fileToProcess);
             $tracker['status'] = "SUCCESS";
             file_put_contents($trackerPath, json_encode($tracker, JSON_PRETTY_PRINT));
@@ -973,46 +1079,52 @@ class KassMigrationController extends Controller
     }
 
     /*===========================================================
-     |  CHUNK TRACKER HELPERS (per-file)
+     |  CHUNK STATE HELPERS (for processAll)
      ===========================================================*/
-    private function getTrackerStoragePath(string $filePath): string
+    private function getChunkStatePath(): string
     {
-        return 'kass_tracker/' . md5($filePath) . '.json';
+        return storage_path('app/kass_chunk_state.json');
     }
 
-    private function loadTracker(string $filePath): array
+    private function loadChunkState(): array
     {
-        $path = $this->getTrackerStoragePath($filePath);
+        $path = $this->getChunkStatePath();
 
-        $default = [
+        if (!file_exists($path)) {
+            return [
+                'file'         => null,
+                'row'          => 0,
+                'carry_name'   => null,
+                'carry_adm'    => null,
+                'carry_comp'   => null,
+                'opening_done' => [],
+            ];
+        }
+
+        $json = file_get_contents($path);
+        $data = json_decode($json, true) ?: [];
+
+        return array_merge([
+            'file'         => null,
             'row'          => 0,
             'carry_name'   => null,
             'carry_adm'    => null,
             'carry_comp'   => null,
             'opening_done' => [],
-        ];
-
-        if (!Storage::exists($path)) {
-            return $default;
-        }
-
-        $data = json_decode(Storage::get($path), true) ?: [];
-
-        return array_merge($default, $data);
+        ], $data);
     }
 
-    private function saveTracker(string $filePath, array $tracker): void
+    private function saveChunkState(array $state): void
     {
-        Storage::makeDirectory('kass_tracker');
-        $path = $this->getTrackerStoragePath($filePath);
-        Storage::put($path, json_encode($tracker));
+        $path = $this->getChunkStatePath();
+        file_put_contents($path, json_encode($state, JSON_PRETTY_PRINT));
     }
 
-    private function deleteTracker(string $filePath): void
+    private function resetChunkState(): void
     {
-        $path = $this->getTrackerStoragePath($filePath);
-        if (Storage::exists($path)) {
-            Storage::delete($path);
+        $path = $this->getChunkStatePath();
+        if (file_exists($path)) {
+            unlink($path);
         }
     }
 }
