@@ -138,65 +138,80 @@ class KassMigrationController extends Controller
      |
      ===========================================================*/
     public function processAll()
-    {
-        $files = collect(\Storage::files('kass_uploads'))
-            ->filter(fn($f) => preg_match('/\.(xls|xlsx|csv)$/i', $f))
-            ->values();
+{
+    $files = collect(Storage::files('kass_uploads'))
+        ->filter(fn($f) => preg_match('/\.(xls|xlsx)$/i', $f))
+        ->values();
 
-        if (count($files) === 0) {
-            return view('kass.process_done', [
-                'message'   => "No files found.",
-                'remaining' => 0,
-                'next'      => false
-            ]);
-        }
+    if ($files->isEmpty()) {
+        $this->resetChunkState();
+        return view('kass.process_done', [
+            'message'   => "🎉 All files processed!",
+            'remaining' => 0,
+            'next'      => false
+        ]);
+    }
 
-        // Load progress tracker
-        $trackerFile = storage_path('app/kass_uploads/tracker.json');
-        $tracker = file_exists($trackerFile)
-            ? json_decode(file_get_contents($trackerFile), true)
-            : ['index' => 0];
+    // Load state (file + row pointer + carry vars)
+    $state = $this->loadChunkState();
 
-        $index = $tracker['index'];
+    // If no file selected or file deleted, pick the first
+    if (!$state['file'] || !Storage::exists($state['file'])) {
+        $state = [
+            'file'         => $files[0],
+            'row'          => 0,
+            'carry_name'   => null,
+            'carry_adm'    => null,
+            'carry_comp'   => null,
+            'opening_done' => [],
+        ];
+    }
 
-        if (!isset($files[$index])) {
-            return view('kass.process_done', [
-                'message'   => "All files processed!",
-                'remaining' => 0,
-                'next'      => false
-            ]);
-        }
+    $file = $state['file'];
 
-        $file = $files[$index];
+    // Convert XLS → XLSX automatically
+    $converted = $this->convertXlsToXlsx($file);
 
-        // 🔥 Auto convert XLS → XLSX
-        $converted = $this->convertXlsToXlsx($file);
-
-        if (!$converted) {
-            \Log::error("Skipping file due to conversion error: {$file}");
-            $tracker['index']++;
-            file_put_contents($trackerFile, json_encode($tracker));
-
-            return view('kass.process_step', [
-                'message'   => "❌ Failed converting {$file}, skipping.",
-                'remaining' => count($files) - $tracker['index'],
-                'next'      => true
-            ]);
-        }
-
-        // Process the converted XLSX
-        $this->importShareOrLoanSheet($converted);
-
-        // Move to next file
-        $tracker['index']++;
-        file_put_contents($trackerFile, json_encode($tracker));
+    if (!$converted) {
+        $this->logFileEvent($file, "XLS_CONVERT_FAIL", "Conversion failed, skipping.");
+        Storage::delete($file);
+        $this->resetChunkState();
 
         return view('kass.process_step', [
-            'message'   => "Processed: " . basename($converted),
-            'remaining' => count($files) - $tracker['index'],
+            'message'   => "❌ Failed converting {$file}. Skipped.",
+            'remaining' => max(count($files) - 1, 0),
             'next'      => true
         ]);
     }
+
+    // Process ONE CHUNK using your full SACCO parser
+    $result = $this->processExcelChunkedContrib($converted, $state);
+
+    if ($result['finished']) {
+
+        Storage::delete($file);
+        $this->resetChunkState();
+
+        $remaining = max(count($files) - 1, 0);
+
+        return view('kass.process_step', [
+            'message'   => "✅ Finished & removed " . basename($file),
+            'remaining' => $remaining,
+            'next'      => $remaining > 0
+        ]);
+    }
+
+    // Save updated chunk state and continue
+    $this->saveChunkState($result['state']);
+
+    return view('kass.process_step', [
+        'message'   => "⏳ Importing " . basename($file) . 
+                       " — rows {$state['row']} → {$result['state']['row']}",
+        'remaining' => "Processing current + " . max(count($files) - 1, 0),
+        'next'      => true
+    ]);
+}
+
     private function importShareOrLoanSheet($filePath)
     {
         $file = storage_path("app/{$filePath}");
