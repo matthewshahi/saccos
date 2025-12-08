@@ -81,6 +81,9 @@ Route::middleware(['auth'])->prefix('kass-migration')->group(function () {
 
         Route::post('/kass/process-all', [KassMigrationController::class, 'processAll'])
     ->name('kass.process.all');
+Route::get('/kass-migration/kass/process-all', 
+    [KassMigrationController::class, 'processAll']
+)->name('kass.process.all');
 
      
 Route::get('/kass/preview', [KassMigrationController::class, 'preview'])
