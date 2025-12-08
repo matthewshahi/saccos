@@ -139,91 +139,115 @@ class KassMigrationController extends Controller
      |
      ===========================================================*/
     public function processAll()
-    {
-        // 1. Get all Excel files currently in kass_uploads
-        $files = array_values(array_filter(
-            Storage::files('kass_uploads'),
-            fn ($file) => in_array(strtolower(pathinfo($file, PATHINFO_EXTENSION)), ['xls', 'xlsx'])
-        ));
+{
+    $files = collect(\Storage::files('kass_uploads'))
+        ->filter(fn($f) => preg_match('/\.(xls|xlsx|csv)$/i', $f))
+        ->values();
 
-        // If nothing at all, clear tracker and show done
-        if (empty($files)) {
-            $this->resetChunkState();
+    if (count($files) === 0) {
+        return view('kass.process_done', [
+            'message'   => "No files found.",
+            'remaining' => 0,
+            'next'      => false
+        ]);
+    }
 
-            return view('kass.auto', [
-                'message'   => "🎉 All files processed! No remaining files.",
-                'remaining' => 0,
-                'next'      => false,
-            ]);
-        }
+    // Load progress tracker
+    $trackerFile = storage_path('app/kass_uploads/tracker.json');
+    $tracker = file_exists($trackerFile)
+        ? json_decode(file_get_contents($trackerFile), true)
+        : ['index' => 0];
 
-        // 2. Load or initialise current chunk state
-        $state = $this->loadChunkState();
+    $index = $tracker['index'];
 
-        // If no active file or file removed, pick the first one
-        if (empty($state['file']) || !Storage::exists($state['file'])) {
-            $state = [
-                'file'         => $files[0],
-                'row'          => 0,
-                'carry_name'   => null,
-                'carry_adm'    => null,
-                'carry_comp'   => null,
-                'opening_done' => [],
+    if (!isset($files[$index])) {
+        return view('kass.process_done', [
+            'message'   => "All files processed!",
+            'remaining' => 0,
+            'next'      => false
+        ]);
+    }
+
+    $file = $files[$index];
+
+    // 🔥 Auto convert XLS → XLSX
+    $converted = $this->convertXlsToXlsx($file);
+
+    if (!$converted) {
+        \Log::error("Skipping file due to conversion error: {$file}");
+        $tracker['index']++;
+        file_put_contents($trackerFile, json_encode($tracker));
+
+        return view('kass.process_step', [
+            'message'   => "❌ Failed converting {$file}, skipping.",
+            'remaining' => count($files) - $tracker['index'],
+            'next'      => true
+        ]);
+    }
+
+    // Process the converted XLSX
+    $this->importShareOrLoanSheet($converted);
+
+    // Move to next file
+    $tracker['index']++;
+    file_put_contents($trackerFile, json_encode($tracker));
+
+    return view('kass.process_step', [
+        'message'   => "Processed: " . basename($converted),
+        'remaining' => count($files) - $tracker['index'],
+        'next'      => true
+    ]);
+}
+private function importShareOrLoanSheet($filePath)
+{
+    $file = storage_path("app/{$filePath}");
+
+    $reader = new \PhpOffice\PhpSpreadsheet\Reader\Xlsx();
+    $reader->setReadDataOnly(true);
+
+    // Load only SHAREMPA or LOANMPA
+    $reader->setLoadSheetsOnly(['SHAREMPA', 'LOANMPA']);
+
+    $spreadsheet = $reader->load($file);
+    $sheet = $spreadsheet->getActiveSheet();
+
+    $rowCount = $sheet->getHighestDataRow();
+    $chunkSize = 200;
+
+    for ($start = 2; $start <= $rowCount; $start += $chunkSize) {
+
+        $end = $start + $chunkSize - 1;
+        if ($end > $rowCount) $end = $rowCount;
+
+        $rows = [];
+
+        for ($row = $start; $row <= $end; $row++) {
+            $name = trim($sheet->getCell("A{$row}")->getValue());
+
+            if ($name === null || $name === "") continue;
+
+            $rows[] = [
+                'name'   => $sheet->getCell("A{$row}")->getValue(),
+                'adm'    => $sheet->getCell("B{$row}")->getValue(),
+                'comp'   => $sheet->getCell("C{$row}")->getValue(),
+                'year'   => $sheet->getCell("D{$row}")->getValue(),
+                'month'  => $sheet->getCell("E{$row}")->getValue(),
+                'memb'   => $sheet->getCell("F{$row}")->getValue(),
+                'dr'     => $sheet->getCell("G{$row}")->getValue(),
+                'cr'     => $sheet->getCell("H{$row}")->getValue(),
+                'bal'    => $sheet->getCell("I{$row}")->getValue(),
+                'file'   => $filePath,
+                'created_at' => now(),
+                'updated_at' => now()
             ];
         }
 
-        $currentFile = $state['file'];
-
-        try {
-            // 3. Process ONE chunk of this file
-            $result = $this->processExcelChunkedContrib($currentFile, $state);
-        } catch (\Exception $e) {
-
-            // Log at file level
-            $this->logFileEvent($currentFile, 'CHUNK_PROCESS_ERROR', $e->getMessage());
-
-            // Delete problematic file so we don’t loop forever
-            if (Storage::exists($currentFile)) {
-                Storage::delete($currentFile);
-            }
-
-            // Reset chunk state
-            $this->resetChunkState();
-
-            return view('kass.auto', [
-                'message'   => "❌ Failed on {$currentFile}: " . $e->getMessage(),
-                'remaining' => max(count($files) - 1, 0),
-                'next'      => true,
-            ]);
+        if (!empty($rows)) {
+            DB::table('kass_staging_shares')->insert($rows);
         }
-
-        // 4. If finished this file → delete it & reset state so next call picks the next file
-        if ($result['finished']) {
-
-            if (Storage::exists($currentFile)) {
-                Storage::delete($currentFile);
-            }
-
-            $this->resetChunkState();
-
-            $remainingAfter = max(count($files) - 1, 0);
-
-            return view('kass.auto', [
-                'message'   => "✅ Finished & removed {$currentFile}",
-                'remaining' => $remainingAfter,
-                'next'      => ($remainingAfter > 0),
-            ]);
-        }
-
-        // 5. Not finished yet → save updated state (row pointer, carry values, opening_done)
-        $this->saveChunkState($result['state']);
-
-        return view('kass.auto', [
-            'message'   => "⏳ Processing {$currentFile} … rows {$state['row']} → {$result['state']['row']}",
-            'remaining' => "Processing current file + " . max(count($files) - 1, 0) . " more",
-            'next'      => true,
-        ]);
     }
+}
+
 
     /*===========================================================
      |
@@ -1126,5 +1150,35 @@ class KassMigrationController extends Controller
         if (file_exists($path)) {
             unlink($path);
         }
+    }
+}
+
+private function convertXlsToXlsx($filePath)
+{
+    $fullPath = storage_path("app/{$filePath}");
+
+    // If file is already xlsx, return as-is
+    if (!str_ends_with(strtolower($filePath), '.xls')) {
+        return $filePath;
+    }
+
+    try {
+        // Load XLS
+        $reader = \PhpOffice\PhpSpreadsheet\IOFactory::createReader('Xls');
+        $spreadsheet = $reader->load($fullPath);
+
+        // Convert path
+        $newFilePath = str_replace('.xls', '.xlsx', $filePath);
+        $newFullPath = storage_path("app/{$newFilePath}");
+
+        // Save XLSX
+        $writer = \PhpOffice\PhpSpreadsheet\IOFactory::createWriter($spreadsheet, 'Xlsx');
+        $writer->save($newFullPath);
+
+        return $newFilePath;
+    } 
+    catch (\Exception $e) {
+        \Log::error("XLS Conversion Failed: {$e->getMessage()}");
+        return null;
     }
 }
