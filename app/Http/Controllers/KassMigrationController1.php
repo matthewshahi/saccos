@@ -11,7 +11,7 @@ class KassMigrationController extends Controller
 {
   public function __construct()
 {
-    $this->middleware('auth');
+   
 
     // Allow long-running migrations (30 minutes)
     ini_set('max_execution_time', '1800');     // Script run time

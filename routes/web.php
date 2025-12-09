@@ -52,8 +52,11 @@ use App\Http\Controllers\ManualMpesaRecoveryController;
 
 
 use App\Http\Controllers\KassMigrationController;
+// routes/web.php
+ 
 
-Route::middleware(['auth'])->prefix('kass-migration')->group(function () {
+
+Route::prefix('kass-migration')->group(function () {
 
     // Upload page
     Route::get('/', [KassMigrationController::class, 'index'])
