@@ -51,51 +51,51 @@ use App\Http\Controllers\LoanRepaymentImportController;
 use App\Http\Controllers\ManualMpesaRecoveryController;
 
 
-use App\Http\Controllers\KassMigrationController;
-// routes/web.php
+// use App\Http\Controllers\KassMigrationController;
+// // routes/web.php
  
 
 
-Route::prefix('kass-migration')->group(function () {
+// Route::prefix('kass-migration')->group(function () {
 
-    // Upload page
-    Route::get('/', [KassMigrationController::class, 'index'])
-        ->name('kass.index');
+//     // Upload page
+//     Route::get('/', [KassMigrationController::class, 'index'])
+//         ->name('kass.index');
 
-    // Upload one sheet
-    Route::post('/upload', [KassMigrationController::class, 'uploadSingle'])
-        ->name('kass.upload.single');
+//     // Upload one sheet
+//     Route::post('/upload', [KassMigrationController::class, 'uploadSingle'])
+//         ->name('kass.upload.single');
 
-    // Upload a ZIP containing all company sheets
-    Route::post('/upload-batch', [KassMigrationController::class, 'uploadBatch'])
-        ->name('kass.upload.batch');
+//     // Upload a ZIP containing all company sheets
+//     Route::post('/upload-batch', [KassMigrationController::class, 'uploadBatch'])
+//         ->name('kass.upload.batch');
 
-    // Process migration (parse → normalize → staging)
-    Route::post('/process', [KassMigrationController::class, 'process'])
-        ->name('kass.process');
+//     // Process migration (parse → normalize → staging)
+//     Route::post('/process', [KassMigrationController::class, 'process'])
+//         ->name('kass.process');
 
-    // View staging results
-    Route::get('/staging', [KassMigrationController::class, 'staging'])
-        ->name('kass.staging');
+//     // View staging results
+//     Route::get('/staging', [KassMigrationController::class, 'staging'])
+//         ->name('kass.staging');
 
-    // Clear staging tables
-    Route::delete('/staging/clear', [KassMigrationController::class, 'clearStaging'])
-        ->name('kass.staging.clear');
+//     // Clear staging tables
+//     Route::delete('/staging/clear', [KassMigrationController::class, 'clearStaging'])
+//         ->name('kass.staging.clear');
 
-        Route::post('/kass/process-all', [KassMigrationController::class, 'processAll'])
-    ->name('kass.process.all');
+//         Route::post('/kass/process-all', [KassMigrationController::class, 'processAll'])
+//     ->name('kass.process.all');
 
 
      
-// 🚀 PROCESS ALL FILES (GET) — THIS ONE WAS MISSING
-    Route::get('/kass/process-all', [KassMigrationController::class, 'processAll'])
-        ->name('kass.process.all');
+// // 🚀 PROCESS ALL FILES (GET) — THIS ONE WAS MISSING
+//     Route::get('/kass/process-all', [KassMigrationController::class, 'processAll'])
+//         ->name('kass.process.all');
 
-Route::get('/kass/preview', [KassMigrationController::class, 'preview'])
-    ->name('kass.preview');
+// Route::get('/kass/preview', [KassMigrationController::class, 'preview'])
+//     ->name('kass.preview');
 
 
-});
+// });
 
 
 // use App\Http\Controllers\LedgerRebuildController;
