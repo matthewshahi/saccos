@@ -535,8 +535,10 @@ if (!preg_match('/^\d{4}$/', $year)) {
 
     if (str_contains($normalized, 'MEMB')) {
         // goes to FOSA
+         $fosaTypeId = $this->resolveFosaType($type);
         DB::table('sacco_fosas')->insert([
             'fosa_member_id'      => $memberId,
+            'fosa_type_id'        => $fosaTypeId,          // <<< REQUIRED
             'fosa_amount_paying'  => abs($amount),
             'fosa_paid_by'        => 'imported',
             'fosa_period'         => $period,
@@ -563,8 +565,11 @@ if (!preg_match('/^\d{4}$/', $year)) {
     /* ============================================================
      *  4) EVERYTHING ELSE → FOSA
      * ============================================================ */
+
+    $fosaTypeId = $this->resolveFosaType($type);
     DB::table('sacco_fosas')->insert([
         'fosa_member_id'      => $memberId,
+        'fosa_type_id'        => $fosaTypeId,  
         'fosa_amount_paying'  => abs($amount),
         'fosa_paid_by'        => 'imported',
         'fosa_period'         => $period,
@@ -580,6 +585,89 @@ if (!preg_match('/^\d{4}$/', $year)) {
     $summary['fosa_inserted']++;
 }
 
+
+/**
+ * Resolve or Create FOSA Type based on raw type tag.
+ *
+ * @param string $typeRaw  (e.g. "MEMB", "SAVINGS", "FINE", "OTHER")
+ * @return int type_id
+ */
+/**
+ * Resolve or create a FOSA Type with strict 2-character prefixes.
+ */
+protected function resolveFosaType(string $typeRaw): int
+{
+    $clean = strtoupper(trim($typeRaw));
+    if ($clean === '') {
+        $clean = 'OTHER';
+    }
+
+    // 1. Check if type_name exists
+    $existing = DB::table('sacco_fosa_types')
+        ->where('type_name', $clean)
+        ->first();
+
+    if ($existing) {
+        return $existing->type_id;
+    }
+
+    // -------------------------------------------------------
+    // 2. Build a 2-character default prefix
+    // -------------------------------------------------------
+    $cleanLetters = preg_replace('/[^A-Z]/', '', $clean);
+
+    if (strlen($cleanLetters) >= 2) {
+        $prefix = substr($cleanLetters, 0, 2); // first two letters
+    } elseif (strlen($cleanLetters) === 1) {
+        $prefix = $cleanLetters . 'X'; // pad to 2 chars, e.g., "M" -> "MX"
+    } else {
+        $prefix = 'OT'; // fallback for weird names
+    }
+
+    // Ensure prefix is ALWAYS 2 chars
+    $prefix = substr($prefix, 0, 2);
+
+    $originalPrefix = $prefix;
+
+    // -------------------------------------------------------
+    // 3. Ensure uniqueness by generating alternate 2-char codes
+    // -------------------------------------------------------
+    $i = 1;
+
+    while (
+        DB::table('sacco_fosa_types')
+            ->where('type_prefix', $prefix)
+            ->exists()
+    ) {
+        // Generate alternatives like M1, M2 … M9, A0–Z9 etc.
+        // Convert $i into a 2-char code safely
+        if ($i < 10) {
+            $prefix = $originalPrefix[0] . $i;   // e.g., M + 1 -> M1
+        } else {
+            // cycle through alphanumerics for 2-char codes
+            $chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            $pos = $i % strlen($chars);
+            $prefix = $originalPrefix[0] . $chars[$pos];
+        }
+
+        $i++;
+    }
+
+    // -------------------------------------------------------
+    // 4. Create new type
+    // -------------------------------------------------------
+    $typeId = DB::table('sacco_fosa_types')->insertGetId([
+        'type_name'     => $clean,
+        'type_prefix'   => $prefix,
+        'type_active'   => 'Y',
+        'type_default'  => 'N',
+        'created_by'    => 1,
+        'created_ip'    => 'MIGRATION',
+        'created_at'    => Carbon::now(),
+    ]);
+
+    return $typeId;
+}
 
 
     /* ============================================================

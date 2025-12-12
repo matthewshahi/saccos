@@ -140,35 +140,71 @@
     </div>
 
     {{-- FOSA --}}
-    <div class="card mb-4">
-        <div class="card-header bg-warning fw-bold">FOSA Statement</div>
-        <div class="card-body p-0">
+<div class="card mb-4">
+    <div class="card-header bg-warning fw-bold">Other Contributions Statement (Grouped by Type)</div>
+
+    <div class="card-body p-0">
+
+        @foreach($data['fosaGrouped'] as $typeName => $rows)
+
+            {{-- TYPE HEADER --}}
+            <div class="bg-secondary text-white p-2 fw-bold">
+                {{ $typeName }}
+            </div>
+
             <table class="table table-striped table-sm mb-0">
                 <thead class="bg-light">
                     <tr>
-                        <th>#</th><th>Period</th><th>Date</th><th>Description</th><th>Doc No</th>
-                        <th class="text-end">Debit</th><th class="text-end">Credit</th><th class="text-end">Balance</th>
+                        <th>#</th>
+                        <th>Period</th>
+                        <th>Date</th>
+                        <th>Description</th>
+                        <th>Doc No</th>
+                        <th class="text-end">Debit</th>
+                        <th class="text-end">Credit</th>
+                        <th class="text-end">Balance</th>
                     </tr>
                 </thead>
+
                 <tbody>
-                    @php $total_fosas = 0; @endphp
-                    @foreach($data['fosaContributions'] as $i => $r)
-                        @php $total_fosas += $r->fosa_amount_paying; @endphp
+                    @php $running = 0; @endphp
+
+                    @foreach($rows as $i => $r)
+                        @php $running += $r->fosa_amount_paying; @endphp
+
                         <tr>
                             <td>{{ $i + 1 }}</td>
                             <td>{{ $r->fosa_period }}</td>
                             <td>{{ \Carbon\Carbon::parse($r->fosa_date_paid)->format('d-m-Y') }}</td>
                             <td>{{ $r->fosa_description }}</td>
                             <td>{{ $r->fosa_doc_no }}</td>
-                            <td class="text-end">{{ $r->fosa_amount_paying < 0 ? number_format(-$r->fosa_amount_paying,2) : '' }}</td>
-                            <td class="text-end">{{ $r->fosa_amount_paying > 0 ? number_format($r->fosa_amount_paying,2) : '' }}</td>
-                            <td class="text-end fw-bold">{{ number_format($total_fosas,2) }}</td>
+
+                            <td class="text-end">
+                                {{ $r->fosa_amount_paying < 0 ? number_format(-$r->fosa_amount_paying,2) : '' }}
+                            </td>
+
+                            <td class="text-end">
+                                {{ $r->fosa_amount_paying > 0 ? number_format($r->fosa_amount_paying,2) : '' }}
+                            </td>
+
+                            <td class="text-end fw-bold">{{ number_format($running, 2) }}</td>
                         </tr>
                     @endforeach
+
+                    {{-- SUBTOTAL --}}
+                    <tr class="table-secondary fw-bold">
+                        <td colspan="7" class="text-end">Subtotal for {{ $typeName }}</td>
+                        <td class="text-end">{{ number_format($running, 2) }}</td>
+                    </tr>
                 </tbody>
             </table>
-        </div>
+
+            <br>
+        @endforeach
+
     </div>
+</div>
+
 
     {{-- LOANS --}}
     <div class="card mb-5">

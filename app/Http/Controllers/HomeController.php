@@ -1200,14 +1200,31 @@ $data = [
 
         // Fetch FOSA contributions
         $fosaContributions = DB::table('sacco_fosas')
-            ->join('sacco_members', 'sacco_fosas.fosa_member_id', '=', 'sacco_members.member_id')
-            ->join('sacco_department', 'sacco_members.member_dept', '=', 'sacco_department.department_id')
-            ->join('sacco_company', 'sacco_department.department_company_id', '=', 'sacco_company.company_id')
-            ->where('sacco_members.member_deleted', '<>', 'Y')
-            ->where('sacco_fosas.fosa_member_id', $id)
-            ->orderBy('sacco_fosas.fosa_period')
-            ->orderBy('sacco_fosas.fosa_date_paid')
-            ->get();
+    ->leftJoin('sacco_fosa_types', 'sacco_fosas.fosa_type_id', '=', 'sacco_fosa_types.type_id')
+    ->join('sacco_members', 'sacco_fosas.fosa_member_id', '=', 'sacco_members.member_id')
+    ->join('sacco_department', 'sacco_members.member_dept', '=', 'sacco_department.department_id')
+    ->join('sacco_company', 'sacco_department.department_company_id', '=', 'sacco_company.company_id')
+    ->where('sacco_members.member_deleted', '<>', 'Y')
+    ->where('sacco_fosas.fosa_member_id', $id)
+    ->orderBy('sacco_fosas.fosa_type_id')
+    ->orderBy('sacco_fosas.fosa_period')
+    ->orderBy('sacco_fosas.fosa_date_paid')
+    ->select(
+        'sacco_fosas.*',
+        'sacco_members.member_name',
+        'sacco_department.department_name',
+        'sacco_company.company_name',
+        'sacco_fosa_types.type_name',
+        'sacco_fosa_types.type_prefix'
+    )
+    ->get();
+
+
+$fosaGrouped = $fosaContributions->groupBy(function ($row) {
+    return $row->type_name ?: 'UNSPECIFIED';
+});
+
+    
 
         // Calculate opening balance for shares
         $openingBalanceShares = DB::table('sacco_shares')
@@ -1253,6 +1270,8 @@ $data = [
     ->orderBy('sacco_loans.loan_loan_type', 'asc')
             ->get();
 
+
+      
         // Fetch all loan payments
         $loanPayments = DB::table('sacco_loan_payments')
             ->join('sacco_loans', 'sacco_loan_payments.loan_payments_loan_id', '=', 'sacco_loans.loan_id')
@@ -1268,6 +1287,7 @@ $data = [
         $data = [
             'member' => $member,
             'fosaContributions' => $fosaContributions,
+            'fosaGrouped' => $fosaGrouped,
             'shareContributions' => $shareContributions,
             'capitalContributions' => $capitalContributions,
             'openingBalanceShares' => $openingBalanceShares,

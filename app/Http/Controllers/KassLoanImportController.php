@@ -87,6 +87,13 @@ class KassLoanImportController extends Controller
         foreach ($groups as $loanGroups) {
             foreach ($loanGroups as $loanRows) {
 
+                $loanType = $loanRows[0]->loan_type;
+
+$loanRows = collect($loanRows)
+    ->filter(fn($r) => $r->loan_type === $loanType)
+    ->values();
+
+
                 $loanRows = $loanRows->values();
                 $loanRows = $loanRows->sortBy(function ($r) {
     return ((int)$r->year * 100) + $this->safeMonth($r->month);
@@ -109,87 +116,118 @@ class KassLoanImportController extends Controller
      * ============================================================ */
  protected function detectLoanCycles($rows)
 {
-    $cycles = [];
+    $cycles  = [];
     $current = [];
     $prevRow = null;
 
     foreach ($rows as $row) {
 
-        // This flag determines whether a new cycle must start
         $startNewLoan = false;
 
         $outstanding = (float)$row->outstanding_balance;
         $periodIndex = trim($row->period_index);
 
+        $curYear  = (int)$row->year;
+        $curMonth = $this->safeMonth($row->month);
+        $curPeriod = ($curYear * 100) + $curMonth;
+
         /*
-         * ---------------------------------------------------------------
-         * RULE 1 — FIRST ROW ALWAYS STARTS A NEW LOAN CYCLE
-         * ---------------------------------------------------------------
-         * Every member + loan_type group must begin with a fresh cycle.
+         * ============================================================
+         * PRIORITY 1 — FIRST ROW ALWAYS STARTS A NEW LOAN
+         * ============================================================
          */
         if ($prevRow === null) {
             $startNewLoan = true;
-        } 
-        else 
+        }
+        else
         {
             $prevOutstanding = (float)$prevRow->outstanding_balance;
+            $prevPeriodIndex = trim($prevRow->period_index);
+            $prevYear   = (int)$prevRow->year;
+            $prevMonth  = $this->safeMonth($prevRow->month);
+            $prevPeriod = ($prevYear * 100) + $prevMonth;
 
             /*
-             * ---------------------------------------------------------------
-             * RULE 2 — PERIOD_INDEX IS THE STRONGEST INDICATOR OF A NEW LOAN
-             * ---------------------------------------------------------------
-             * KASS SACCO uses period_index (e.g., 48, 60) to indicate
-             * the beginning of a structured repayment period.
-             *
-             * Even if the previous loan did NOT finish, a top-up or refinance
-             * resets the loan plan → new cycle REQUIRED.
+             * ==================================================================
+             * PRIORITY 2 — PERIOD INDEX CHANGE → TRUE NEW LOAN
+             * ==================================================================
+             * New loan ONLY when:
+             *   - current period_index is numeric AND > 0
+             *   - AND previous period_index was NULL/blank OR different number
+             * This is the MOST RELIABLE signal in the payroll structure.
+             * ==================================================================
              */
-            if (is_numeric($periodIndex) && (int)$periodIndex > 0) {
+            if (
+                is_numeric($periodIndex) &&
+                (int)$periodIndex > 0 &&
+                (
+                    $prevPeriodIndex === null ||
+                    trim($prevPeriodIndex) === '' ||
+                    $prevPeriodIndex != $periodIndex
+                )
+            ) {
                 $startNewLoan = true;
             }
 
             /*
-             * ---------------------------------------------------------------
-             * RULE 3 — OUTSTANDING BALANCE EXACTLY ZERO → LOAN ENDED
-             * ---------------------------------------------------------------
-             * When a loan fully clears, the next available record MUST
-             * belong to a different loan instance.
+             * ==================================================================
+             * PRIORITY 3 — PREVIOUS OUTSTANDING == 0 → DEFINITELY NEW LOAN
+             * ==================================================================
+             * When a loan hits zero, the next deduction is ALWAYS a new loan.
+             * ==================================================================
              */
-            if ($prevOutstanding == 0) {
+            else if ($prevOutstanding == 0) {
                 $startNewLoan = true;
             }
 
             /*
-             * ---------------------------------------------------------------
-             * RULE 4 — OUTSTANDING INCREASES → POSSIBLE NEW LOAN
-             * ---------------------------------------------------------------
-             * Customers may take a second loan of the SAME loan type.
-             * Payroll postings may also include penalties.
-             *
-             * So this rule is weaker than period_index but still valid.
+             * ==================================================================
+             * PRIORITY 4 — OUTSTANDING INCREASE → POSSIBLE NEW LOAN
+             * ==================================================================
+             * But NOT on every increase — only when:
+             *   - prevOutstanding is small (loan nearly finished)
+             *   AND outstanding jumps upward (e.g. 8,748 → 50,000)
+             * ==================================================================
              */
-            if ($outstanding > $prevOutstanding) {
+            else if (
+                $outstanding > $prevOutstanding &&
+                $prevOutstanding < 15000         // threshold to avoid false triggers
+            ) {
                 $startNewLoan = true;
+            }
+
+            /*
+             * ==================================================================
+             * PRIORITY 5 — MONTH GAP > 3 MONTHS → NEW LOAN
+             * ==================================================================
+             * Used ONLY if none of the above triggered.
+             * ==================================================================
+             */
+            else {
+                $gap = $this->monthDiff($prevYear, $prevMonth, $curYear, $curMonth);
+                if ($gap > 3) {
+                    $startNewLoan = true;
+                }
             }
         }
 
         /*
-         * ---------------------------------------------------------------
-         * If a new loan should start, close the previous one
-         * (but only if it has rows)
-         * ---------------------------------------------------------------
+         * ============================================================
+         * CLOSE PREVIOUS CYCLE IF A NEW ONE STARTS
+         * ============================================================
          */
         if ($startNewLoan && !empty($current)) {
             $cycles[] = $current;
-            $current = [];
+            $current  = [];
         }
 
-        // Add this row to the current cycle
         $current[] = $row;
-        $prevRow = $row;
+        $prevRow   = $row;
     }
 
-    // Push the final cycle into the list
+    /*
+     * Push the final cycle
+     */
     if (!empty($current)) {
         $cycles[] = $current;
     }
@@ -198,6 +236,16 @@ class KassLoanImportController extends Controller
 }
 
 
+
+protected function monthDiff($y1, $m1, $y2, $m2)
+{
+    $m1 = $this->safeMonth($m1);
+    $m2 = $this->safeMonth($m2);
+
+    if (!$m1 || !$m2) return 999; // safety fallback
+
+    return (($y2 * 12) + $m2) - (($y1 * 12) + $m1);
+}
 
     /* ============================================================
      *  IMPORT ONE LOAN CYCLE
@@ -283,7 +331,8 @@ class KassLoanImportController extends Controller
         'loan_loan_paid'                   => 0,
 
         'loan_doc_no'                      => 'IMPORT',
-        'loan_description'                 => "IMPORT — {$loanTypeName} — {$first->company}",
+      //  'loan_description'                 => "IMPORT — {$loanTypeName} — {$first->company}",
+'loan_description' => "IMPORT — {$loanTypeName} — {$first->company} — SRC={$first->source_file}",
 
         'loan_on'                          => now(),
         'loan_by'                          => 1,
@@ -330,7 +379,9 @@ class KassLoanImportController extends Controller
         DB::table('sacco_loan_payments')->insert([
             'loan_payments_amount'       => $principal,
             'loan_payments_interest'     => $interest,
-            'loan_payments_description'  => "IMPORT — {$row->company}{$descNote}",
+            // 'loan_payments_description'  => "IMPORT — {$row->company}{$descNote}",
+            'loan_payments_description'  => "IMPORT — {$row->company} — FILE: {$row->source_file}{$descNote}",
+
             'loan_payments_docno'        => 'IMPORT',
             'loan_payments_paid_in_by'   => $row->company,
             'loan_payments_period'       => $period,

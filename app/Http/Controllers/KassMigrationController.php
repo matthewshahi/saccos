@@ -837,22 +837,23 @@ $previousPeriod = $periodCarry[$memberKey][$label] ?? null;
 // 1) If PERIOD is a valid numeric → update and treat as new cycle if previous null
 // 2) If PERIOD invalid but CR>0 → carry previousPeriod
 // 3) If PERIOD invalid and CR==0 → leave period null
-if ($cleanPeriod !== null) {
+// PERIOD rules:
+// - Use PERIOD only if explicitly provided in Excel.
+// - Do NOT carry period forward into later months.
+// - Later MONTHS must have period_index = null.
 
-    // Update
-    $periodCarry[$memberKey][$label] = $cleanPeriod;
+if ($cleanPeriod !== null) {
+    // Use only the PERIOD found in this exact month
     $periodVal = $cleanPeriod;
 
-} else {
+    // But DO NOT carry to next months
+    $periodCarry[$memberKey][$label] = null;
 
-    if ($hasPrincipal) {
-        // Carry previous period
-        $periodVal = $previousPeriod;
-    } else {
-        // No principal → no processing this month → period stays null
-        $periodVal = null;
-    }
+} else {
+    // No PERIOD in this cell → leave null ALWAYS
+    $periodVal = null;
 }
+
 
  // ============================================================
 // SKIP ALL ZERO / BLANK LOAN ROWS

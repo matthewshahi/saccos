@@ -186,34 +186,44 @@ if (config('sacco.transport_sacco') === 'Y') {
         return view('members.capital_listings', compact('data'));
     }
     public function fosaListings()
-    {
-        $fosaContributions = DB::table('sacco_fosas')
-            ->select(
-                'fosa_id',
-                'fosa_amount_paying',
-                'fosa_paid_by',
-                'fosa_period',
-                'fosa_description',
-                'fosa_doc_no',
-                'fosa_date_paid'
-            )
-            ->where('fosa_member_id', Auth::user()->id)
-            ->orderBy('fosa_period', 'asc')
-            ->get();
+{
+    $memberId = Auth::user()->id;
 
-        // Calculate running balance
-        $runningBalance = 0;
-        foreach ($fosaContributions as $fosa) {
-            $runningBalance += $fosa->fosa_amount_paying;
-            $fosa->running_balance = $runningBalance; // Add running balance to each record
+    // Fetch contributions + join fosa types
+    $fosaContributions = DB::table('sacco_fosas')
+        ->leftJoin('sacco_fosa_types', 'sacco_fosas.fosa_type_id', '=', 'sacco_fosa_types.type_id')
+        ->select(
+            'sacco_fosas.*',
+            'sacco_fosa_types.type_name',
+            'sacco_fosa_types.type_prefix'
+        )
+        ->where('fosa_member_id', $memberId)
+        ->orderBy('fosa_type_id')
+        ->orderBy('fosa_period')
+        ->orderBy('fosa_date_paid')
+        ->get();
+
+    // GROUPING BY TYPE
+    $fosaGrouped = $fosaContributions->groupBy(function ($row) {
+        return $row->type_name ?: 'UNSPECIFIED';
+    });
+
+    // Running balance PER GROUP
+    foreach ($fosaGrouped as $type => $rows) {
+        $running = 0;
+        foreach ($rows as $r) {
+            $running += $r->fosa_amount_paying;
+            $r->running_balance = $running;
         }
-
-        $data = [
-            'fosaContributions' => $fosaContributions,
-        ];
-
-        return view('members.fosa_listings', compact('data'));
     }
+
+    return view('members.fosa_listings', [
+        'data' => [
+            'fosaGrouped' => $fosaGrouped,
+        ],
+    ]);
+}
+
 
     public function loansTaken()
     {

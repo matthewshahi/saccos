@@ -81,7 +81,7 @@
                     <li class="Ul_li--hover">
                         <a href="{{ url('/contributions/fosa') }}">
                             <i class="i-Bank text-20 me-2 text-muted"></i>
-                            <span class="item-name text-15 text-muted">FOSA</span>
+                            <span class="item-name text-15 text-muted">FOSA & Other Contributions</span>
                         </a>
                     </li>
                     <li class="Ul_li--hover">
