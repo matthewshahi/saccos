@@ -9,28 +9,30 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
 
 class KassMigrationController extends Controller
 {
-  public function __construct()
-{
-   
+    private static $didTruncate = false;
 
-    // Allow long-running migrations (30 minutes)
-    ini_set('max_execution_time', '1800');     // Script run time
-    ini_set('max_input_time', '1800');         // Upload parsing time
-    ini_set('request_terminate_timeout', '1800'); // FPM/Apache timeout if supported
+    public function __construct()
+    {
 
-    // Increase memory
-    ini_set('memory_limit', '2048M');
 
-    // Increase upload limits (Excel, ZIP, CSV, etc.)
-    ini_set('upload_max_filesize', '500M');
-    ini_set('post_max_size', '500M');
+        // Allow long-running migrations (30 minutes)
+        ini_set('max_execution_time', '1800');     // Script run time
+        ini_set('max_input_time', '1800');         // Upload parsing time
+        ini_set('request_terminate_timeout', '1800'); // FPM/Apache timeout if supported
 
-    // Avoid partial uploads
-    ini_set('max_file_uploads', '50');
+        // Increase memory
+        ini_set('memory_limit', '2048M');
 
-    // Increase socket timeout (CSV/Excel reads)
-    ini_set('default_socket_timeout', '1800');
-}
+        // Increase upload limits (Excel, ZIP, CSV, etc.)
+        ini_set('upload_max_filesize', '500M');
+        ini_set('post_max_size', '500M');
+
+        // Avoid partial uploads
+        ini_set('max_file_uploads', '50');
+
+        // Increase socket timeout (CSV/Excel reads)
+        ini_set('default_socket_timeout', '1800');
+    }
 
 
 
@@ -42,9 +44,9 @@ class KassMigrationController extends Controller
     public function index()
     {
         $files = collect(Storage::files('kass_uploads'))
-            ->sortByDesc(fn ($f) => Storage::lastModified($f))
+            ->sortByDesc(fn($f) => Storage::lastModified($f))
             ->take(20)
-            ->map(fn ($f) => [
+            ->map(fn($f) => [
                 'name' => basename($f),
                 'path' => $f,
                 'time' => date('Y-m-d H:i:s', Storage::lastModified($f)),
@@ -108,7 +110,6 @@ class KassMigrationController extends Controller
             } else {
                 $this->processCsv($file);
             }
-
         } catch (\Exception $e) {
             $this->logFileEvent($file, 'PROCESS_ERROR', $e->getMessage());
             return back()->with('error', "Error: " . $e->getMessage());
@@ -122,53 +123,221 @@ class KassMigrationController extends Controller
      |   PROCESS ALL FILES – ONE PER HIT (used by auto-refresh)
      |
      ===========================================================*/
-    public function processAll()
-    {
-        // Only pick Excel files
-        $files = array_values(array_filter(Storage::files('kass_uploads'), function ($file) {
-            return in_array(strtolower(pathinfo($file, PATHINFO_EXTENSION)), ['xls', 'xlsx']);
-        }));
+public function processAll()
+{
+    
+    // ============================================================
+    // 2️⃣ FIND FILES IN UPLOADS FOLDER
+    // ============================================================
+    $files = array_values(array_filter(Storage::files('kass_uploads'), function ($file) {
+        return in_array(strtolower(pathinfo($file, PATHINFO_EXTENSION)), ['xls', 'xlsx']);
+    }));
 
-        $remaining = count($files);
+    $remaining = count($files);
 
-        // Nothing left
-        if ($remaining === 0) {
-            return view('kass.auto', [
-                'message'   => "🎉 All files processed! No remaining files.",
-                'remaining' => 0,
-                'next'      => false,
-            ]);
-        }
-
-        // Always process only the FIRST file
-        $file = $files[0];
-
-        try {
-            $this->processExcel($file);
-            Storage::delete($file);
-
-            $this->logFileEvent($file, 'FILE_PROCESSED', 'File imported and deleted from kass_uploads.');
-
-            return view('kass.auto', [
-                'message'   => "✅ Processed: {$file}",
-                'remaining' => $remaining - 1,
-                'next'      => true,
-            ]);
-        } catch (\Exception $e) {
-
-            // Log at file level
-            $this->logFileEvent($file, 'PROCESS_ERROR', $e->getMessage());
-
-            // Delete problematic file so we don’t loop forever
-            Storage::delete($file);
-
-            return view('kass.auto', [
-                'message'   => "❌ Failed on {$file}: " . $e->getMessage(),
-                'remaining' => $remaining - 1,
-                'next'      => true,
-            ]);
-        }
+    // ============================================================
+    // 3️⃣ NO FILES LEFT
+    // ============================================================
+    if ($remaining === 0) {
+        return view('kass.auto', [
+            'message'   => "🎉 All files processed! No remaining files.",
+            'remaining' => 0,
+            'next'      => false,
+        ]);
     }
+
+    // ============================================================
+    // 4️⃣ ALWAYS PROCESS JUST ONE FILE
+    // ============================================================
+    $file = $files[0];
+
+    if (!Storage::exists($file)) {
+        return view('kass.auto', [
+            'message'   => "⚠️ Skipped missing file: {$file}",
+            'remaining' => $remaining - 1,
+            'next'      => true,
+        ]);
+    }
+
+    // ============================================================
+    // 5️⃣ PROCESS FILE
+    // ============================================================
+    try {
+        $this->processExcel($file);
+
+        // Delete after success
+        Storage::delete($file);
+
+        $this->logFileEvent(
+            $file,
+            'FILE_PROCESSED',
+            'File imported and deleted from kass_uploads.'
+        );
+
+        return view('kass.auto', [
+            'message'   => "✅ Processed: {$file}",
+            'remaining' => $remaining - 1,
+            'next'      => true,
+        ]);
+
+    } catch (\Throwable $e) {
+
+        // Log failure and remove bad file
+        $this->logFileEvent($file, 'PROCESS_ERROR', $e->getMessage());
+        Storage::delete($file);
+
+        return view('kass.auto', [
+            'message'   => "❌ Failed on {$file}: " . $e->getMessage(),
+            'remaining' => $remaining - 1,
+            'next'      => true,
+        ]);
+    }
+}
+
+
+
+//    public function processAll()
+// {
+//     try {
+
+//         // ===============================
+//         // STEP 1: LIST FILES
+//         // ===============================
+//         $files = array_values(array_filter(
+//             Storage::files('kass_uploads'),
+//             fn($f) => in_array(strtolower(pathinfo($f, PATHINFO_EXTENSION)), ['xls', 'xlsx'])
+//         ));
+
+//         if (empty($files)) {
+//             dd('✅ NO FILES FOUND IN kass_uploads');
+//         }
+
+//         $file     = $files[0];
+//         $fullPath = storage_path("app/{$file}");
+
+//         // ===============================
+//         // STEP 2: FILE EXISTS?
+//         // ===============================
+//         if (!file_exists($fullPath)) {
+//             dd('❌ FILE NOT FOUND AT PHP LEVEL', $fullPath);
+//         }
+
+//         // ===============================
+//         // STEP 3: LOAD EXCEL
+//         // ===============================
+//         try {
+//             $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($fullPath);
+//         } catch (\Throwable $e) {
+//             dd(
+//                 '🔥 PHPSPREADSHEET LOAD FAILED',
+//                 $e->getMessage(),
+//                 $e->getFile(),
+//                 $e->getLine()
+//             );
+//         }
+
+//         // ===============================
+//         // STEP 4: MAP SHEETS
+//         // ===============================
+//         $sheets = [];
+//         foreach ($spreadsheet->getAllSheets() as $sheet) {
+//             $sheets[strtoupper(trim($sheet->getTitle()))] = $sheet;
+//         }
+
+//         // Just for context (does NOT stop execution)
+//         // If you want to see them once, uncomment:
+//         // dd('✅ SHEETS FOUND', array_keys($sheets));
+
+//         // ===============================
+//         // STEP 5: FIND SHARE / SAVINGS SHEET
+//         // ===============================
+//         try {
+//             $share = $this->findSharempaSheet($sheets);
+//         } catch (\Throwable $e) {
+//             dd(
+//                 '🔥 CRASH INSIDE findSharempaSheet()',
+//                 $e->getMessage(),
+//                 $e->getFile(),
+//                 $e->getLine()
+//             );
+//         }
+
+//         if (!$share) {
+//             dd('❌ NO SHARE / SAVINGS SHEET FOUND', array_keys($sheets));
+//         }
+
+//         // ===============================
+//         // STEP 6: FIND LOAN SHEET
+//         // ===============================
+//         $loanSheet = null;
+//         $loanMatch = null;
+
+//         // STRICT: LOANMPA
+//         if (isset($sheets['LOANMPA'])) {
+//             $loanSheet = $sheets['LOANMPA'];
+//             $loanMatch = 'STRICT: LOANMPA';
+//         }
+
+//         // FALLBACK: any title containing LOAN
+//         if (!$loanSheet) {
+//             foreach ($sheets as $title => $sheetObj) {
+//                 if (str_contains(strtoupper($title), 'LOAN')) {
+//                     $loanSheet = $sheetObj;
+//                     $loanMatch = "CONTAINS: {$title}";
+//                     break;
+//                 }
+//             }
+//         }
+
+//         if (!$loanSheet) {
+//             // Not fatal for debugging, but let’s see it clearly
+//             dd('❌ NO LOAN SHEET FOUND', array_keys($sheets));
+//         }
+
+//         // ===============================
+//         // STEP 7: TEST CONTRIBUTIONS PROCESS
+//         // ===============================
+//         try {
+//             $this->processContributionSheet($share['sheet'], $file);
+//         } catch (\Throwable $e) {
+//             dd(
+//                 '🔥 CRASH INSIDE processContributionSheet()',
+//                 $e->getMessage(),
+//                 $e->getFile(),
+//                 $e->getLine()
+//             );
+//         }
+
+//         // ===============================
+//         // STEP 8: TEST LOANS PROCESS
+//         // ===============================
+//         try {
+//             $this->processLoanSheet($loanSheet, $file);
+//         } catch (\Throwable $e) {
+//             dd(
+//                 '🔥 CRASH INSIDE processLoanSheet()',
+//                 $e->getMessage(),
+//                 $e->getFile(),
+//                 $e->getLine()
+//             );
+//         }
+
+//         // ===============================
+//         // STEP 9: IF WE REACH HERE, ALL GOOD
+//         // ===============================
+//         dd('✅ FULL FILE PROCESSED SUCCESSFULLY', $file);
+
+//     } catch (\Throwable $e) {
+//         dd(
+//             '🔥 OUTER FATAL ERROR',
+//             $e->getMessage(),
+//             $e->getFile(),
+//             $e->getLine()
+//         );
+//     }
+// }
+
+
 
     /*===========================================================
      |
@@ -192,20 +361,44 @@ class KassMigrationController extends Controller
         // SHAREMPA
         $share = $this->findSharempaSheet($sheets);
 
-if ($share) {
-    $this->logFileEvent($filePath, "SHAREMPA_MATCH", "Matched using: " . $share['match']);
-    $this->processContributionSheet($share['sheet'], $filePath);
+        if ($share) {
+            $this->logFileEvent($filePath, "SHAREMPA_MATCH", "Matched using: " . $share['match']);
+            $this->processContributionSheet($share['sheet'], $filePath);
+        } else {
+            $this->logFileEvent($filePath, "MISSING_SHAREMPA", "No sheet resembling SHAREMPA was found.");
+        }
+
+
+        // ✅ SMART LOAN SHEET DETECTION (LOANMPA → fallback to any tab containing LOAN)
+$loanSheet = null;
+$loanMatch = null;
+
+// 1️⃣ Strict priority: LOANMPA
+if (isset($sheets['LOANMPA'])) {
+    $loanSheet = $sheets['LOANMPA'];
+    $loanMatch = 'STRICT: LOANMPA';
+}
+
+// 2️⃣ Fallback: any tab that CONTAINS the word "LOAN"
+if (!$loanSheet) {
+    foreach ($sheets as $title => $sheetObj) {
+        if (str_contains(strtoupper($title), 'LOAN')) {
+            $loanSheet = $sheetObj;
+            $loanMatch = "CONTAINS: $title";
+            break; // ✅ take first safe match only
+        }
+    }
+}
+
+// 3️⃣ Final routing
+if ($loanSheet) {
+    $this->logFileEvent($filePath, "LOAN_MATCH", "Matched using: {$loanMatch}");
+    $this->processLoanSheet($loanSheet, $filePath);
 } else {
-    $this->logFileEvent($filePath, "MISSING_SHAREMPA", "No sheet resembling SHAREMPA was found.");
+    $this->logFileEvent($filePath, "MISSING_LOAN_SHEET", "No sheet containing LOAN was found.");
 }
 
 
-        // LOANMPA
-        if (isset($sheets['LOANMPA'])) {
-            $this->processLoanSheet($sheets['LOANMPA'], $filePath);
-        } else {
-            $this->logFileEvent($filePath, "MISSING_LOANMPA", "LOANMPA sheet not found.");
-        }
     }
 
     /* If someone uploads CSV/TXT – log and ignore (no fatal error) */
@@ -231,226 +424,194 @@ if ($share) {
      |   - Empty / zero values skipped
      |
      ===========================================================*/
-    private function processContributionSheet($sheet, string $sourceFile): void
-    {
-        $rows  = $sheet->toArray(null, true, true, true);
-        $clean = array_map(fn ($r) => array_values($r), $rows);
+   private function processContributionSheet($sheet, string $sourceFile): void
+{
+    $highestRow = $sheet->getHighestDataRow();
+    $highestCol = $sheet->getHighestDataColumn();
 
-        // 1) Detect header row (the one that contains "NAME")
-        [$headerRaw, $start] = $this->extractHeader($clean);
-        $headerNorm          = $this->normalizeHeaders($headerRaw);
+    $rows = $sheet->rangeToArray("A1:{$highestCol}{$highestRow}", null, true, true, true);
 
-        if (!in_array('month', $headerNorm)) {
-    $this->logFileEvent($sourceFile, 'INVALID_HEADER', 'MONTH column missing (possibly blank column after NAME).');
-}
+    // Convert rows to 0-based index arrays
+    $clean = array_map(fn($r) => array_values($r), $rows);
 
-if (!in_array('year', $headerNorm)) {
-    $this->logFileEvent($sourceFile, 'INVALID_HEADER', 'YEAR column misaligned.');
-}
+    // ---------------------------------------------------------
+    // 1) Detect header row (row containing NAME)
+    // ---------------------------------------------------------
+    [$headerRaw, $start] = $this->extractHeader($clean);
+    $headerNorm          = $this->normalizeHeaders($headerRaw);
 
+    if (!in_array('month', $headerNorm)) {
+        $this->logFileEvent($sourceFile, 'INVALID_HEADER', 'MONTH column missing.');
+    }
 
-        // 2) Locate critical columns by normalized name
-        $monthIndex = $this->getMonthIndex($headerNorm);
-        $runBalInfo = $this->getRunBalIndexAndKey($headerNorm);
-        $runBalIndex = $runBalInfo['index'];  // can be null
-        $runBalKey   = $runBalInfo['key'];    // normalized key, e.g. "run_bal"
+    if (!in_array('year', $headerNorm)) {
+        $this->logFileEvent($sourceFile, 'INVALID_HEADER', 'YEAR column missing.');
+    }
 
-        if ($monthIndex === null) {
-            $this->logFileEvent($sourceFile, 'MISSING_MONTH_COLUMN', 'No MONTH column detected in SHAREMPA.');
+    // ---------------------------------------------------------
+    // 2) Locate MONTH and RUN BAL columns
+    // ---------------------------------------------------------
+    $monthIndex  = $this->getMonthIndex($headerNorm);
+    $runBalInfo  = $this->getRunBalIndexAndKey($headerNorm);
+    $runBalIndex = $runBalInfo['index'];
+
+    // ---------------------------------------------------------
+    // 3) Transaction columns = strictly between MONTH and RUN BAL
+    // ---------------------------------------------------------
+    $transactionIndexes = $this->getTransactionColumnIndexes($headerNorm, $monthIndex, $runBalIndex);
+
+    // ---------------------------------------------------------
+    // 4) Carry-down fields
+    // ---------------------------------------------------------
+    $carryName = null;
+    $carryAdm  = null;
+    $carryComp = null;
+
+    // Track first-January rows per MEMBER + COMPANY + YEAR
+    $this->seenFirstJanuary = $this->seenFirstJanuary ?? [];
+
+    // ---------------------------------------------------------
+    // 5) Process each data row
+    // ---------------------------------------------------------
+    for ($i = $start; $i < count($clean); $i++) {
+
+        $row = $clean[$i];
+
+        if (!$this->rowHasValues($row)) {
+            continue;
         }
-        if ($runBalIndex === null) {
-            $this->logFileEvent($sourceFile, 'MISSING_RUN_BAL_COLUMN', 'No RUN BAL / RUNBAL column detected in SHAREMPA.');
+
+        // Map row by normalized header keys
+        $mapped = $this->mapRow($headerNorm, $row);
+
+        // Skip accidental duplicated header rows inside data
+        if ($this->looksLikeHeaderRow($mapped)) {
+            $this->logIssue($sourceFile, 'HEADER_ROW_IN_DATA', $mapped);
+            continue;
         }
 
-        // 3) Determine which header indexes are "transaction" columns.
-        //    Rule: strictly between MONTH and RUN BAL.
-        $transactionIndexes = $this->getTransactionColumnIndexes($headerNorm, $monthIndex, $runBalIndex);
+        // -----------------------------------------
+        // Carry NAME, ADM NO, COMPANY downward
+        // -----------------------------------------
+        if (!empty($mapped['name'])) {
+            $carryName = $mapped['name'];
+        } else {
+            $mapped['name'] = $carryName;
+        }
 
-        // 4) Track opening balance per member + year so we only insert once
-        //    Key: company|adm_no|year
-        $openingDone = [];
+        if (!empty($mapped['adm_no'])) {
+            $carryAdm = $mapped['adm_no'];
+        } else {
+            $mapped['adm_no'] = $carryAdm;
+        }
 
-        // 5) Carry-down buffers
-        $carryName = null;
-        $carryAdm  = null;
-        $carryComp = null;
+        if (!empty($mapped['comp'])) {
+            $carryComp = $mapped['comp'];
+        } else {
+            $mapped['comp'] = $carryComp;
+        }
 
-        for ($i = $start; $i < count($clean); $i++) {
-            $row = $clean[$i];
+        // Skip row if identification is still missing
+        if (empty($mapped['name']) || empty($mapped['adm_no'])) {
+            $this->logIssue($sourceFile, 'ANOMALY_MISSING_KEY_FIELDS', [
+                'row'          => $mapped,
+                '_carry_name'  => $carryName,
+                '_carry_adm'   => $carryAdm,
+                '_carry_comp'  => $carryComp
+            ]);
+            continue;
+        }
 
-            if (!$this->rowHasValues($row)) {
+        // -----------------------------------------
+        // Clean year / month
+        // -----------------------------------------
+        $year  = $this->cleanYear($mapped['year']  ?? null, $sourceFile, $mapped);
+        $month = $this->cleanMonth($mapped['month'] ?? null, $sourceFile, $mapped);
+
+        // -----------------------------------------
+        // Skip any row missing a valid YEAR or MONTH
+        // -----------------------------------------
+        if ($year === null || $month === null) {
+            $this->logIssue($sourceFile, 'SKIPPED_INVALID_PERIOD', $mapped);
+            continue;
+        }
+
+        // -----------------------------------------
+        // FIRST-JANUARY SKIP RULE  
+        // Skip the FIRST January for each MEMBER+COMPANY+YEAR
+        // -----------------------------------------
+        if ($month === 'JAN') {
+
+            $memberYearKey = $mapped['adm_no'] . "|" . $mapped['comp'] . "|" . $year;
+
+            if (!isset($this->seenFirstJanuary[$memberYearKey])) {
+
+                // mark as seen
+                $this->seenFirstJanuary[$memberYearKey] = true;
+
+                // skip this first JAN row
+                continue;
+            }
+        }
+
+        // ---------------------------------------------------------
+        // 6) Extract real transaction columns
+        // ---------------------------------------------------------
+        foreach ($transactionIndexes as $colIndex) {
+
+            if (!array_key_exists($colIndex, $row) || !array_key_exists($colIndex, $headerRaw)) {
                 continue;
             }
 
-            // Map row by normalized header keys (name, adm_no, comp, year, month, dr, cr, run_bal, etc.)
-            $mapped = $this->mapRow($headerNorm, $row);
+            $rawHeaderLabel = trim((string) $headerRaw[$colIndex]);
+            $rawCellValue   = $row[$colIndex];
 
-            // --- Skip duplicated header rows inside data ---
-            if ($this->looksLikeHeaderRow($mapped)) {
-                $this->logIssue($sourceFile, 'HEADER_ROW_IN_DATA', $mapped);
+            $amount = $this->num($rawCellValue);
+
+            // Skip empty or zero or invalid numeric
+            if ($amount === null || $amount == 0) {
                 continue;
             }
 
-            // ---- Carry down NAME / ADM / COMPANY (per Excel pattern) ----
-            if (!empty($mapped['name'])) {
-                $carryName = $mapped['name'];
-            } else {
-                $mapped['name'] = $carryName;
-            }
+            // Choose transaction label
+            $normalizedKey = $headerNorm[$colIndex] ?? 'unknown';
+            $rawType       = $rawHeaderLabel !== '' 
+                                ? strtoupper($rawHeaderLabel)
+                                : strtoupper($normalizedKey);
 
-            if (!empty($mapped['adm_no'])) {
-                $carryAdm = $mapped['adm_no'];
-            } else {
-                $mapped['adm_no'] = $carryAdm;
-            }
-
-            if (!empty($mapped['comp'])) {
-                $carryComp = $mapped['comp'];
-            } else {
-                $mapped['comp'] = $carryComp;
-            }
-
-            // If still missing key identifiers – log and skip row
-            if (empty($mapped['name']) || empty($mapped['adm_no'])) {
-               $this->logIssue(
-    $sourceFile,
-    'ANOMALY_MISSING_KEY_FIELDS',
-    array_merge($mapped, [
-        '_carry_name' => $carryName,
-        '_carry_adm'  => $carryAdm,
-        '_carry_comp' => $carryComp
-    ])
-);
-
+            // ---------------------------------------------------------
+            // INSERT REAL TRANSACTION ROW
+            // ---------------------------------------------------------
+            try {
+                DB::table('kass_staging_contributions')->insert([
+                    'raw_name'          => $mapped['name'],
+                    'member_identifier' => $mapped['pfno'] ?? null,
+                    'adm_no'            => $mapped['adm_no'],
+                    'company'           => $mapped['comp'],
+                    'year'              => $year,
+                    'month'             => $month,
+                    'raw_type'          => $rawType,
+                    'amount'            => $amount,
+                    'source_file'       => $sourceFile,
+                    'raw_row_json'      => json_encode($mapped),
+                    'created_at'        => now(),
+                    'updated_at'        => now(),
+                ]);
+            } catch (\Exception $e) {
+                $this->logIssue($sourceFile, 'DB_INSERT_ERROR_TRANSACTION', [
+                    'error'     => $e->getMessage(),
+                    'row_index' => $i,
+                    '_col'      => $colIndex,
+                    '_raw_type' => $rawType,
+                    '_amount'   => $amount
+                ]);
                 continue;
-            }
-
-            // Clean year / month (month stored as uppercase JAN, FEB, ...)
-            $year  = $this->cleanYear($mapped['year'] ?? null, $sourceFile, $mapped);
-            $month = $this->cleanMonth($mapped['month'] ?? null, $sourceFile, $mapped);
-
-            // Key for opening-balance control: company + adm + year
-            $openingKey = ($carryComp ?? '') . '|' . ($carryAdm ?? '') . '|' . (string) $year;
-
-            // Numeric DR/CR for this row (used for both transactions & opening calc)
-            $dr = $this->num($mapped['dr'] ?? null);
-            $cr = $this->num($mapped['cr'] ?? null);
-
-            // Numeric RUN BAL for this row (if column exists)
-            $runBal = null;
-            if ($runBalKey !== null && array_key_exists($runBalKey, $mapped)) {
-                $runBal = $this->num($mapped[$runBalKey]);
-            }
-
-            // ================== OPENING BALANCE ==================
-            //
-            // Rule:
-            //   opening = run_bal + dr - cr
-            //
-            // - Only computed the FIRST time we see a numeric RUN BAL
-            //   for a (company, adm_no, year) combination.
-            // - Stored under the same YEAR + MONTH as that row.
-            // - Amount stored exactly as computed (can be + / -).
-            // - If result is 0 or year is null → skip.
-            // =====================================================
-            if ($runBal !== null && !isset($openingDone[$openingKey])) {
-
-                // Use 0 when dr/cr are null
-                $drOpening = $dr ?? 0;
-                $crOpening = $cr ?? 0;
-
-                $openingAmount = $runBal + $drOpening - $crOpening;
-
-                if ($openingAmount != 0 && $year !== null) {
-                    try {
-                        DB::table('kass_staging_contributions')->insert([
-                            'raw_name'          => $mapped['name'],
-                            'member_identifier' => $mapped['pfno'] ?? null,
-                            'adm_no'            => $mapped['adm_no'],
-                            'company'           => $mapped['comp'],
-                            'year'              => $year,
-                            'month'             => $month,                  // month where RUN BAL first appears
-                            'raw_type'          => 'OPENING_BALANCE',
-                            'amount'            => $openingAmount,
-                            'source_file'       => $sourceFile,
-                            'raw_row_json'      => json_encode($mapped),
-                            'created_at'        => now(),
-                            'updated_at'        => now(),
-                        ]);
-                    } catch (\Exception $e) {
-                        $this->logIssue(
-                            $sourceFile,
-                            'DB_INSERT_ERROR_OPENING_BALANCE: ' . $e->getMessage(),
-                            array_merge($mapped, ['_opening_amount' => $openingAmount])
-                        );
-                    }
-                }
-
-                // Mark opening as done for this member+year
-                $openingDone[$openingKey] = true;
-            }
-
-            // ================== TRANSACTION ROWS ==================
-            //
-            // Now we loop over all transaction columns between MONTH and RUN BAL.
-            // For each numeric, non-zero value we insert a row with:
-            //   raw_type = original column label (as it appears in Excel)
-            //   amount   = numeric value (positive or negative, we don't flip sign)
-            //
-            // Empty values or zero => skipped entirely.
-            // ======================================================
-            foreach ($transactionIndexes as $colIndex) {
-
-                // Safety: ensure we have header & row cell for this index
-                if (!array_key_exists($colIndex, $row) || !array_key_exists($colIndex, $headerRaw)) {
-                    continue;
-                }
-
-                $rawHeaderLabel = trim((string) $headerRaw[$colIndex]);  // e.g. "CAPITAL", "NEW WEL", "DR", "CR"
-                $rawCellValue   = $row[$colIndex];
-
-                // Clean to numeric (remove commas, spaces, but keep minus sign if any)
-                $amount = $this->num($rawCellValue);
-
-                // Skip if not numeric or zero (avoid bloating DB with junk rows)
-                if ($amount === null || $amount == 0) {
-                    continue;
-                }
-
-                // If the header label is blank, fall back to normalized key name
-                $normalizedKey = $headerNorm[$colIndex] ?? 'unknown';
-                $rawType       = $rawHeaderLabel !== '' ? strtoupper($rawHeaderLabel) : strtoupper($normalizedKey);
-
-                try {
-                    DB::table('kass_staging_contributions')->insert([
-                        'raw_name'          => $mapped['name'],
-                        'member_identifier' => $mapped['pfno'] ?? null,
-                        'adm_no'            => $mapped['adm_no'],
-                        'company'           => $mapped['comp'],
-                        'year'              => $year,
-                        'month'             => $month,
-                        'raw_type'          => $rawType,          // EXACTLY the transaction type as per column
-                        'amount'            => $amount,           // store numeric as-is (can be + or -)
-                        'source_file'       => $sourceFile,
-                        'raw_row_json'      => json_encode($mapped),
-                        'created_at'        => now(),
-                        'updated_at'        => now(),
-                    ]);
-                } catch (\Exception $e) {
-                    $this->logIssue(
-                        $sourceFile,
-                        'DB_INSERT_ERROR_TRANSACTION: ' . $e->getMessage(),
-                        array_merge($mapped, [
-                            '_col_index' => $colIndex,
-                            '_raw_type'  => $rawType,
-                            '_amount'    => $amount,
-                        ])
-                    );
-                    continue;
-                }
             }
         }
     }
+}
+
+
 
     /*===========================================================
      |
@@ -461,83 +622,254 @@ if (!in_array('year', $headerNorm)) {
      ===========================================================*/
     private function processLoanSheet($sheet, string $sourceFile): void
     {
-        $rows  = $sheet->toArray(null, true, true, true);
-        $clean = array_map(fn ($r) => array_values($r), $rows);
+        $highestRow = $sheet->getHighestDataRow();
+$highestCol = $sheet->getHighestDataColumn();
 
-        [$headerRaw, $start] = $this->extractHeader($clean);
-        $header = $this->normalizeHeaders($headerRaw);
+$rows = $sheet
+    ->rangeToArray("A1:{$highestCol}{$highestRow}", null, true, true, true);
 
-        $carryName = null;
-        $carryAdm  = null;
-        $carryComp = null;
+$clean = array_map(fn($r) => array_values($r), $rows);
 
-        for ($i = $start; $i < count($clean); $i++) {
-            $row = $clean[$i];
+        
+
+        // 1) Find header row with NAME and the label row above it
+        $headerRow   = null;
+        $labelRow    = null;
+        $start       = 0;
+
+        foreach ($clean as $i => $row) {
 
             if (!$this->rowHasValues($row)) {
                 continue;
             }
 
-            $mapped = $this->mapRow($header, $row);
+            $trimmed = array_map(function ($v) {
+                return trim(str_replace("\xC2\xA0", ' ', (string) $v));
+            }, $row);
 
-            // Skip header-like rows
-            if ($this->looksLikeHeaderRow($mapped)) {
-                $this->logIssue($sourceFile, 'HEADER_ROW_IN_DATA_LOAN', $mapped);
+            $upper = array_map('strtoupper', $trimmed);
+
+            if (in_array('NAME', $upper)) {
+                $headerRow = $trimmed;
+                $start     = $i + 1;
+                $labelRow  = $i > 0 ? $clean[$i - 1] : null;
+                break;
+            }
+        }
+
+        if ($headerRow === null) {
+            $this->logFileEvent($sourceFile, 'LOAN_HEADER_NOT_FOUND', 'Could not find header row with NAME.');
+            return;
+        }
+
+        // 2) Base columns: NAME / ADM NO / COMP
+        $upper = array_map('strtoupper', $headerRow);
+
+        $idxName = array_search('NAME', $upper);
+        $idxAdm  = array_search('ADM NO', $upper);
+        if ($idxAdm === false) {
+            $idxAdm = array_search('ADMNO', $upper);
+        }
+        $idxComp = array_search('COMP', $upper);
+        if ($idxComp === false) {
+            $idxComp = array_search('COMPANY', $upper);
+        }
+
+        if ($idxName === false || $idxAdm === false || $idxComp === false) {
+            $this->logFileEvent($sourceFile, 'LOAN_HEADER_MISSING_KEYS', 'Missing NAME / ADM NO / COMP.');
+            return;
+        }
+
+        // 3) Detect loan blocks and their labels (NORMAL, NORMAL A, EMERGENCY, ...)
+        $loanBlocks = $this->findLoanBlocks($headerRow, $labelRow);
+
+        if (empty($loanBlocks)) {
+            $this->logFileEvent($sourceFile, 'NO_LOAN_BLOCKS_FOUND', 'No YEAR/MONTH/DR/INT/PERIOD blocks found.');
+            return;
+        }
+
+        // 4) Carry-down state
+        $carryName = null;
+        $carryAdm  = null;
+        $carryComp = null;
+
+        // Per-member + loan-type metadata (PERIOD carried down)
+        // Key = adm_no|company, then [loan_label] => period
+        $currentMemberKey = null;
+        $periodCarry      = [];
+
+        for ($i = $start; $i < count($clean); $i++) {
+
+            $row = $clean[$i];
+            if (!$this->rowHasValues($row)) {
                 continue;
             }
 
-            // Carry down
-            if (!empty($mapped['name'])) {
-                $carryName = $mapped['name'];
+            // ----- Carry NAME / ADM / COMP -----
+            $name = $row[$idxName] ?? null;
+            if (trim((string) $name) !== '') {
+                $carryName = $name;
             } else {
-                $mapped['name'] = $carryName;
+                $name = $carryName;
             }
 
-            if (!empty($mapped['adm_no'])) {
-                $carryAdm = $mapped['adm_no'];
+            $adm = $row[$idxAdm] ?? null;
+            if (trim((string) $adm) !== '') {
+                $carryAdm = $adm;
             } else {
-                $mapped['adm_no'] = $carryAdm;
+                $adm = $carryAdm;
             }
 
-            if (!empty($mapped['comp'])) {
-                $carryComp = $mapped['comp'];
+            $comp = $row[$idxComp] ?? null;
+            if (trim((string) $comp) !== '') {
+                $carryComp = $comp;
             } else {
-                $mapped['comp'] = $carryComp;
+                $comp = $carryComp;
             }
 
-            if (empty($mapped['name']) || empty($mapped['adm_no'])) {
-                $this->logIssue($sourceFile, 'MISSING_NAME_OR_ADM_AFTER_CARRY_LOAN', $mapped);
-                continue;
-            }
-
-            $year  = $this->cleanYear($mapped['year'] ?? null, $sourceFile, $mapped);
-            $month = $this->cleanMonth($mapped['month'] ?? null, $sourceFile, $mapped);
-
-            $principal = $this->num($mapped['cr'] ?? null);
-            $repay     = $this->num($mapped['dr'] ?? null);
-            $interest  = $this->num($mapped['int'] ?? null);
-
-            try {
-                DB::table('kass_staging_loans')->insert([
-                    'raw_name'            => $mapped['name'],
-                    'member_identifier'   => $mapped['pfno'] ?? null,
-                    'adm_no'              => $mapped['adm_no'],
-                    'company'             => $mapped['comp'],
-                    'loan_type'           => 'LOANMPA',
-                    'year'                => $year,
-                    'month'               => $month,
-                    'principal_disbursed' => $principal,
-                    'repayment_amount'    => $repay,
-                    'interest_amount'     => $interest,
-                    'period_index'        => $mapped['period'] ?? null,
-                    'source_file'         => $sourceFile,
-                    'raw_row_json'        => json_encode($mapped),
-                    'created_at'          => now(),
-                    'updated_at'          => now(),
+            if (empty($name) || empty($adm)) {
+                $this->logIssue($sourceFile, 'MISSING_NAME_OR_ADM_AFTER_CARRY_LOAN', [
+                    'row_index' => $i,
+                    'row'       => $row,
                 ]);
-            } catch (\Exception $e) {
-                $this->logIssue($sourceFile, 'DB_INSERT_ERROR_LOAN: ' . $e->getMessage(), $mapped);
                 continue;
+            }
+
+            $memberKey = trim((string) $adm) . '|' . trim((string) $comp);
+            if ($memberKey === '|') {
+    $this->logIssue($sourceFile, 'INVALID_MEMBER_KEY_LOAN', [
+        'row_index' => $i,
+        'adm'       => $adm,
+        'company'   => $comp,
+    ]);
+    continue;
+}
+
+
+            if ($memberKey !== $currentMemberKey) {
+                $currentMemberKey      = $memberKey;
+                $periodCarry[$memberKey] = [];
+            }
+
+            // ---------- For each LOAN BLOCK (NORMAL, NORMAL A, EMERGENCY, ...) ----------
+            foreach ($loanBlocks as $block) {
+
+                
+                $label = $block['label']; // e.g. NORMAL / NORMAL A / EMERGENCY
+                $cols  = $block['cols'];
+
+                // ✅ HARD SAFETY CHECK — prevent undefined index crashes
+if (!isset($cols['year'], $cols['month'])) {
+    $this->logIssue($sourceFile, 'LOAN_BLOCK_MISSING_YEAR_OR_MONTH', [
+        'loan_label' => $label,
+        'cols'       => $cols,
+    ]);
+    continue;
+}
+
+
+
+                // YEAR & MONTH for this block / this row
+                $rawYear  = $row[$cols['year']]  ?? null;
+                $rawMonth = $row[$cols['month']] ?? null;
+
+                $yearStr  = trim((string) $rawYear);
+                $monthStr = trim((string) $rawMonth);
+
+                // No year+month → no record for this loan on this row (summary rows, blank months)
+                if ($yearStr === '' && $monthStr === '') {
+                    continue;
+                }
+
+                // Clean year/month
+                $year  = $this->cleanYear($rawYear, $sourceFile, []);
+                $month = $this->cleanMonth($rawMonth, $sourceFile, []);
+
+                // Skip rows where MONTH has value but YEAR is missing
+                if ($year === null && $month !== null) {
+                    continue;
+                }
+
+                // Skip invalid rows entirely
+                if ($year === null || $month === null) {
+                    continue;
+                }
+
+
+                 
+
+                // DR / CR / INT / PERIOD may or may not exist in this block
+                $rawDr = null;
+                if ($cols['dr'] !== null && array_key_exists($cols['dr'], $row)) {
+                    $rawDr = $row[$cols['dr']];
+                }
+
+                $rawCr = null;
+                if ($cols['cr'] !== null && array_key_exists($cols['cr'], $row)) {
+                    $rawCr = $row[$cols['cr']];
+                }
+
+                $rawInt = null;
+                if ($cols['int'] !== null && array_key_exists($cols['int'], $row)) {
+                    $rawInt = $row[$cols['int']];
+                }
+
+                $rawPeriod = null;
+                if ($cols['period'] !== null && array_key_exists($cols['period'], $row)) {
+                    $rawPeriod = $row[$cols['period']];
+                }
+
+                $dr  = $this->num($rawDr);   // can be null
+                $cr  = $this->num($rawCr);   // can be null
+                $int = $this->num($rawInt);  // can be null
+
+                // Carry PERIOD down per member+loan-type
+                if ($rawPeriod !== null && trim((string) $rawPeriod) !== '') {
+                    $periodCarry[$memberKey][$label] = (int) ($this->num($rawPeriod) ?? 0);
+                }
+
+                $periodVal = $periodCarry[$memberKey][$label] ?? null;
+
+                // --------- INSERT ROW (even if DR/CR/INT are null) ---------
+                try {
+                    DB::table('kass_staging_loans')->insert([
+                        'raw_name'            => $name,
+                        'member_identifier'   => null, // no PFNO in this LOANS sheet
+                        'adm_no'              => $adm,
+                        'company'             => $comp,
+                        'loan_type'           => $label,        // EXACT loan name: NORMAL, NORMAL A, EMERGENCY, ...
+                        'year'                => $year,
+                        'month'               => $month,
+                        'outstanding_balance' => $dr,   // DR = loan balance
+                        'principal_paid'      => $cr,   // CR = monthly principal
+                        'interest_paid'       => $int,  // INT = interest for that month
+
+                        'period_index'        => $periodVal,
+                        'source_file'         => $sourceFile,
+                        'raw_row_json'        => json_encode([
+                            'loan_label' => $label,
+                            'raw_year'   => $rawYear,
+                            'raw_month'  => $rawMonth,
+                            'raw_dr'     => $rawDr,
+                            'raw_cr'     => $rawCr,
+                            'raw_int'    => $rawInt,
+                            'raw_period' => $rawPeriod,
+                        ]),
+                        'created_at'          => now(),
+                        'updated_at'          => now(),
+                    ]);
+                } catch (\Exception $e) {
+                    $this->logIssue(
+                        $sourceFile,
+                        'DB_INSERT_ERROR_LOAN_BLOCK: ' . $e->getMessage(),
+                        [
+                            'row_index' => $i,
+                            'loan_type' => $label,
+                            'adm_no'    => $adm,
+                            'company'   => $comp,
+                        ]
+                    );
+                }
             }
         }
     }
@@ -548,31 +880,31 @@ if (!in_array('year', $headerNorm)) {
      |
      ===========================================================*/
 
- private function extractHeader(array $rows): array
-{
-    foreach ($rows as $i => $row) {
+    private function extractHeader(array $rows): array
+    {
+        foreach ($rows as $i => $row) {
 
-        if (!$this->rowHasValues($row)) {
-            continue;
+            if (!$this->rowHasValues($row)) {
+                continue;
+            }
+
+            // Clean header row values
+            $trimmed = array_map(function ($v) {
+                return trim(str_replace("\xC2\xA0", ' ', (string)$v));
+            }, $row);
+
+            // Detect row containing NAME
+            $upper = array_map('strtoupper', $trimmed);
+            if (!in_array('NAME', $upper)) {
+                continue;
+            }
+
+            // 🔥 IMPORTANT: DO NOT REMOVE ANY COLUMNS
+            return [$trimmed, $i + 1];
         }
 
-        // Clean header row values
-        $trimmed = array_map(function ($v) {
-            return trim(str_replace("\xC2\xA0", ' ', (string)$v));
-        }, $row);
-
-        // Detect row containing NAME
-        $upper = array_map('strtoupper', $trimmed);
-        if (!in_array('NAME', $upper)) {
-            continue;
-        }
-
-        // 🔥 IMPORTANT: DO NOT REMOVE ANY COLUMNS
-        return [$trimmed, $i + 1];
+        throw new \Exception("Header row not found.");
     }
-
-    throw new \Exception("Header row not found.");
-}
 
 
 
@@ -587,45 +919,43 @@ if (!in_array('year', $headerNorm)) {
         return false;
     }
 
-   private function normalizeHeaders($row): array
-{
-    $norm = [];
+    private function normalizeHeaders($row): array
+    {
+        $norm = [];
 
-    foreach ($row as $i => $h) {
+        foreach ($row as $i => $h) {
 
-        $clean = trim(str_replace("\xC2\xA0", ' ', (string)$h));
+            $clean = trim(str_replace("\xC2\xA0", ' ', (string)$h));
 
-        if ($clean === '') {
-            // keep placeholder key so indexes never shift
-            $norm[] = "_col{$i}";
-            continue;
+            if ($clean === '') {
+                // keep placeholder key so indexes never shift
+                $norm[] = "_col{$i}";
+                continue;
+            }
+
+            $clean = strtolower(str_replace([' ', '/', '.', '-', "\t"], '_', $clean));
+
+            $norm[] = $clean;
         }
 
-        $clean = strtolower(str_replace([' ', '/', '.', '-', "\t"], '_', $clean));
-
-        $norm[] = $clean;
+        return $norm;
     }
 
-    return $norm;
-}
 
 
-
-private function findSharempaSheet(array $sheets)
+    private function findSharempaSheet(array $sheets)
 {
+    // =========================================================
+    // 1️⃣ PHASE ONE — YOUR ORIGINAL ROBUST SHAREMPA LOGIC
+    // =========================================================
     $candidates = [];
 
     foreach ($sheets as $title => $sheetObj) {
 
-        // Clean sheet title
-        $clean = strtoupper(trim(str_replace("\xC2\xA0", ' ', $title)));
-
-        // Remove inner spaces to allow "SHARE MPA"
+        $clean   = strtoupper(trim(str_replace("\xC2\xA0", ' ', $title)));
         $noSpace = str_replace(' ', '', $clean);
 
-        // -----------------------------
-        // 1️⃣ STRICT MATCH
-        // -----------------------------
+        // STRICT MATCH
         if ($clean === 'SHAREMPA' || $noSpace === 'SHAREMPA') {
             return [
                 'sheet' => $sheetObj,
@@ -633,30 +963,20 @@ private function findSharempaSheet(array $sheets)
             ];
         }
 
-        // -----------------------------
-        // 2️⃣ VARIANTS using symbols
-        // -----------------------------
+        // VARIANTS
         $variant = str_replace([' ', '_', '-', '.'], '', $clean);
         if ($variant === 'SHAREMPA') {
             $candidates["VARIANT:$title"] = $sheetObj;
         }
 
-        // -----------------------------
-        // 3️⃣ PREFIX / SUFFIX
-        // (e.g. SHAREMPA 2015, 2012 SHAREMPA)
-        // -----------------------------
+        // PREFIX / SUFFIX
         if (str_starts_with($clean, 'SHAREMPA') || str_ends_with($clean, 'SHAREMPA')) {
             $candidates["PREFIX_SUFFIX:$title"] = $sheetObj;
         }
 
-        // -----------------------------
-        // 4️⃣ CONTAINS BOTH WORDS
-        // (e.g. SHARE MPA, SHARE-MPA2020)
-        // -----------------------------
+        // CONTAINS BOTH WORDS IN CORRECT ORDER
         if (str_contains($clean, 'SHARE') && str_contains($clean, 'MPA')) {
 
-            // Guard against reversed names like "MPA SHARES"
-            // Must keep "SHARE" before "MPA"
             $posShare = strpos($clean, 'SHARE');
             $posMpa   = strpos($clean, 'MPA');
 
@@ -666,9 +986,6 @@ private function findSharempaSheet(array $sheets)
         }
     }
 
-    // -----------------------------
-    // 5️⃣ Resolve multiple candidates
-    // -----------------------------
     if (!empty($candidates)) {
 
         $best = null;
@@ -676,7 +993,6 @@ private function findSharempaSheet(array $sheets)
 
         foreach ($candidates as $label => $sheetObj) {
 
-            // Compare cleaned label ONLY to the target word
             $dist = levenshtein(
                 str_replace(['VARIANT:', 'PREFIX_SUFFIX:', 'CONTAINS:'], '', $label),
                 'SHAREMPA'
@@ -694,9 +1010,47 @@ private function findSharempaSheet(array $sheets)
         return $best;
     }
 
-    // -----------------------------
-    // 6️⃣ Nothing matched
-    // -----------------------------
+    // =========================================================
+    // 2️⃣ PHASE TWO — FALLBACK TO SHARES
+    // =========================================================
+    foreach ($sheets as $title => $sheetObj) {
+
+        $clean = strtoupper(trim(str_replace("\xC2\xA0", ' ', $title)));
+
+        if (
+            $clean === 'SHARES' ||
+            str_starts_with($clean, 'SHARES') ||
+            str_contains($clean, 'SHARES')
+        ) {
+            return [
+                'sheet' => $sheetObj,
+                'match' => "FALLBACK_SHARES: $title"
+            ];
+        }
+    }
+
+    // =========================================================
+    // 3️⃣ PHASE THREE — LAST RESORT SAVINGS
+    // =========================================================
+    foreach ($sheets as $title => $sheetObj) {
+
+        $clean = strtoupper(trim(str_replace("\xC2\xA0", ' ', $title)));
+
+        if (
+            $clean === 'SAVINGS' ||
+            str_starts_with($clean, 'SAVINGS') ||
+            str_contains($clean, 'SAVINGS')
+        ) {
+            return [
+                'sheet' => $sheetObj,
+                'match' => "FALLBACK_SAVINGS: $title"
+            ];
+        }
+    }
+
+    // =========================================================
+    // ❌ NOTHING MATCHED
+    // =========================================================
     return null;
 }
 
@@ -716,8 +1070,16 @@ private function findSharempaSheet(array $sheets)
     private function looksLikeHeaderRow(array $mapped): bool
     {
         $candidates = [
-            'name', 'adm_no', 'comp', 'company',
-            'year', 'month', 'memb', 'dr', 'cr', 'run_bal',
+            'name',
+            'adm_no',
+            'comp',
+            'company',
+            'year',
+            'month',
+            'memb',
+            'dr',
+            'cr',
+            'run_bal',
         ];
 
         $score = 0;
@@ -797,32 +1159,42 @@ private function findSharempaSheet(array $sheets)
 
     /* Year cleaner – converts to int or null, logs bad values */
     private function cleanYear($value, string $file, array $row)
-    {
-        $value = trim((string) $value);
+{
+    $value = trim((string) $value);
 
-        if ($value === '') {
-            return null;
-        }
-
-        if (is_numeric($value)) {
-            return (int) $value;
-        }
-
-        $this->logIssue($file, 'INVALID_YEAR_VALUE', array_merge($row, ['_year_raw' => $value]));
+    if ($value === '') {
         return null;
     }
+
+    // ✅ REMOVE commas before numeric check
+    $clean = str_replace(',', '', $value);
+
+    if (is_numeric($clean)) {
+        return (int) $clean;
+    }
+
+    $this->logIssue($file, 'INVALID_YEAR_VALUE', array_merge($row, [
+        '_year_raw' => $value
+    ]));
+
+    return null;
+}
+
 
     /* Month cleaner – uppercase string, logs weird ones (but still stores) */
     private function cleanMonth($value, string $file, array $row)
     {
         $value = trim((string) $value);
-
-        if ($value === '') {
-            return null;
-        }
+        if ($value === '') return null;
 
         $month = strtoupper($value);
-        $valid = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUNE', 'JULY', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+
+        // Correct Kass MPA month format
+        $valid = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+
+        // Accept JUNE → JUN, JULY → JUL
+        if ($month === 'JUNE') $month = 'JUN';
+        if ($month === 'JULY') $month = 'JUL';
 
         if (!in_array($month, $valid)) {
             $this->logIssue($file, 'UNEXPECTED_MONTH_VALUE', array_merge($row, ['_month_raw' => $value]));
@@ -830,6 +1202,7 @@ private function findSharempaSheet(array $sheets)
 
         return $month;
     }
+
 
     /**
      * Numeric normaliser:
@@ -944,5 +1317,99 @@ private function findSharempaSheet(array $sheets)
 
             return "FAILED: " . $e->getMessage();
         }
+    }
+
+    /**
+     * Detect repeating loan blocks inside LOANMPA header row.
+     * Each block must match:
+     *   YEAR | MONTH | DR | CR | INT | PERIOD | MONTHLY
+     */
+    /**
+     * Detect loan blocks inside LOANMPA.
+     * Handles REAL structure of your files:
+     *
+     *   NORMAL
+     *   YEAR | MONTH | DR | CR | INT | PERIOD
+     *
+     * Loan label ALWAYS comes from row above header row.
+     */
+    private function findLoanBlocks(array $headerRow, ?array $labelRow = null): array
+    {
+        // Clean header row
+        $clean = [];
+        foreach ($headerRow as $v) {
+            $clean[] = strtoupper(trim(str_replace("\xC2\xA0", ' ', (string) $v)));
+        }
+
+        $blocks = [];
+        $max = count($clean);
+        $loanNo = 0;
+
+        for ($i = 0; $i < $max; $i++) {
+
+            // Look for YEAR
+            if ($clean[$i] !== 'YEAR') {
+                continue;
+            }
+
+            // COLUMN 1 → MONTH
+            if (!isset($clean[$i + 1]) || $clean[$i + 1] !== 'MONTH') {
+                continue;
+            }
+
+            // DR, CR, INT, PERIOD must follow (MONTHLY NOT REQUIRED)
+            $cols = [
+                'year'   => $i,
+                'month'  => $i + 1,
+                'dr'     => null,
+                'cr'     => null,
+                'int'    => null,
+                'period' => null,
+            ];
+
+            // Scan next 6 columns for DR/CR/INT/PERIOD
+            for ($j = $i + 2; $j <= $i + 7 && $j < $max; $j++) {
+
+                $h = $clean[$j];
+
+                if ($h === 'YEAR') {
+                    break;
+                }
+
+                if ($h === 'DR')     $cols['dr']     = $j;
+                if ($h === 'CR')     $cols['cr']     = $j;
+                if ($h === 'INT')    $cols['int']    = $j;
+                if ($h === 'PERIOD') $cols['period'] = $j;
+            }
+
+            // If DR/CR/INT/PERIOD missing, skip (this was a payroll block)
+            if ($cols['dr'] === null && $cols['cr'] === null && $cols['int'] === null) {
+                continue;
+            }
+
+            // Detect loan label from row ABOVE header
+            $label = 'LOAN_' . ($loanNo + 1);
+
+            if ($labelRow !== null) {
+                $raw = $labelRow[$i] ?? '';
+                if (trim($raw) === '') {
+                    $raw = $labelRow[$i + 1] ?? '';
+                }
+
+                if (trim($raw) !== '') {
+                    $label = strtoupper(trim($raw));
+                }
+            }
+
+            $loanNo++;
+
+            $blocks[] = [
+                'loan_no' => $loanNo,
+                'label'   => $label,
+                'cols'    => $cols,
+            ];
+        }
+
+        return $blocks;
     }
 }

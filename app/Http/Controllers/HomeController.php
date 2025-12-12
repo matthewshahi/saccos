@@ -1248,7 +1248,9 @@ $data = [
             ->where('sacco_loans.loan_member', $id)
             ->select('sacco_loans.*', 'sacco_loan_types.loan_type_name', 'sacco_loan_category.loan_category_name')
             ->orderBy('sacco_loans.loan_taken_period')
-            ->orderBy('sacco_loans.loan_on')
+           ->orderBy('sacco_loans.loan_taken_period', 'asc')
+    ->orderBy('sacco_loans.loan_on', 'asc')
+    ->orderBy('sacco_loans.loan_loan_type', 'asc')
             ->get();
 
         // Fetch all loan payments
