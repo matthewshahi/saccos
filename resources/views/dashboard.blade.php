@@ -119,10 +119,10 @@ if (!function_exists('formatAmount')) {
         <a href="{{ url('/reports/loans/issued') }}" class="card-link">
             <div class="card">
                 <div class="card-body text-center">
-                    <h6 class="card-title">Oustanding Loans</h6>
+                    <h6 class="card-title">Oustandings Loans</h6>
                     <div class="d-flex justify-content-center align-items-center">
                         <i class="i-Checked-User text-primary" style="font-size: 2rem; margin-right: 0.5rem;"></i>
-                        <p class="card-text mb-0" id="activeLoansCount" style="font-size: 1.5rem;">{{ number_format($activeLoansCount) }}</p>
+                        <p class="card-text mb-0" id="activeLoansCount" style="font-size: 1.5rem;">{{ $activeLoansCount}}</p>
                     </div>
                 </div>
             </div>
@@ -135,7 +135,7 @@ if (!function_exists('formatAmount')) {
                     <h6 class="card-title">Delinquent Loans</h6>
                     <div class="d-flex justify-content-center align-items-center">
                         <i class="i-Danger text-danger" style="font-size: 2rem; margin-right: 0.5rem;"></i>
-                        <p class="card-text mb-0" id="delinquentLoansCount" style="font-size: 1.5rem;">{{ number_format($delinquentLoansCount) }}</p>
+                        <p class="card-text mb-0" id="delinquentLoansCount" style="font-size: 1.5rem;">{{ $delinquentLoansCount }}</p>
                     </div>
                 </div>
             </div>
