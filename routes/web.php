@@ -166,7 +166,7 @@ Route::get('/kass/preview', [KassMigrationController::class, 'preview'])
 
 // use App\Http\Controllers\ReportsShareController;
 
-// Route::get('/members/update-totals', [\App\Http\Controllers\MemberTotalsController::class, 'recalculateAll'])->name('members.recalculate.totals');
+ Route::get('/members/update-totals', [\App\Http\Controllers\MemberTotalsController::class, 'recalculateAll'])->name('members.recalculate.totals');
 
 // // Route::get('/members/import-transactions', [MemberImportController::class, 'showImportTransactionsForm'])->name('members.import.transactions.form');
 // // Route::post('/members/import-transactions', [MemberImportController::class, 'importSavingsAndShares'])->name('members.import.transactions');
