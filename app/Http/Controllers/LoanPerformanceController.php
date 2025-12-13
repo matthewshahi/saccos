@@ -27,18 +27,16 @@ class LoanPerformanceController extends Controller
             $query = $this->applySearchFilter($query, $request->input('search'));
         }
 
-        /**
-         * For very large datasets, consider pagination:
-         * $loans = $query->paginate(200);
-         * (and update the view accordingly)
-         */
+        // NOTE: For very large datasets, pagination is recommended
+        // $loans = $query->paginate(200);
         $loans = $query->get();
 
         foreach ($loans as $loan) {
 
-            // If loan_taken_start_period is null, use loan_taken_period
+            // Loan start period fallback
             $loanStartPeriod = $loan->loan_taken_start_period ?: $loan->loan_taken_period;
 
+            // Classification
             $loan->loan_category = $this->getLoanCategory(
                 $loan->last_payment_period,
                 $loanStartPeriod,
@@ -60,25 +58,29 @@ class LoanPerformanceController extends Controller
     }
 
     /**
-     * Build base query for outstanding loans (NO DUPLICATES)
-     *
-     * Strategy:
-     * - Join to a grouped subquery that returns ONE ROW PER LOAN:
-     *      loan_id, last_payment_on = MAX(loan_payments_on)
-     * - This guarantees no duplicates even if multiple payments exist on same date.
+     * Build base query for outstanding loans
+     * - One row per loan (NO DUPLICATES)
+     * - Uses loan_payments_period (authoritative accounting period)
      */
     protected function getOutstandingLoansQuery($ignoreLoanBalanceBelow, $version = null)
     {
-        // Subquery: one row per loan (loan_id -> last payment date)
+        /**
+         * Subquery:
+         * One row per loan
+         * Gets the LAST repayment PERIOD (YYYYMM)
+         */
         $latestPaymentSub = DB::table('sacco_loan_payments as p')
-            ->selectRaw('p.loan_payments_loan_id as loan_id, MAX(p.loan_payments_on) as last_payment_on')
+            ->selectRaw('
+                p.loan_payments_loan_id as loan_id,
+                MAX(p.loan_payments_period) as last_payment_period
+            ')
             ->groupBy('p.loan_payments_loan_id');
 
         $query = DB::table('sacco_loans as l')
             ->join('sacco_members as m', 'l.loan_member', '=', 'm.member_id')
             ->join('sacco_loan_types as lt', 'l.loan_loan_type', '=', 'lt.loan_type_id')
 
-            // Join the derived table (1 row per loan)
+            // Join one repayment summary row per loan
             ->leftJoinSub($latestPaymentSub, 'lp', function ($join) {
                 $join->on('l.loan_id', '=', 'lp.loan_id');
             })
@@ -92,13 +94,13 @@ class LoanPerformanceController extends Controller
                 'm.member_position',
                 'lt.loan_type_name',
 
-                // Canonical last payment period (YYYYMM) derived from last_payment_on
-                DB::raw("DATE_FORMAT(lp.last_payment_on, '%Y%m') as last_payment_period")
+                // Authoritative last repayment period (YYYYMM)
+                'lp.last_payment_period'
             )
 
             ->where('l.loan_stoped', 'N')
 
-            // NULL-safe outstanding balance check
+            // Outstanding balance (NULL-safe)
             ->whereRaw(
                 '(l.loan_amount - IFNULL(l.loan_loan_paid, 0)) > ?',
                 [$ignoreLoanBalanceBelow]
@@ -124,13 +126,14 @@ class LoanPerformanceController extends Controller
     }
 
     /**
-     * Loan aging classifier
+     * Loan aging classifier (period-based, not date-based)
      */
     protected function getLoanCategory($lastPaymentPeriod, $loanStartPeriod, $currentPeriod)
     {
+        // Priority: last repayment → loan start
         $period = $lastPaymentPeriod ?: $loanStartPeriod;
 
-        // Guard against invalid or legacy values
+        // Guard against invalid data
         if (!$period || !preg_match('/^\d{6}$/', (string) $period)) {
             return ['category' => 'Loss', 'class' => 'bg-dark'];
         }
