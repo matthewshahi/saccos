@@ -826,7 +826,9 @@ if (!isset($cols['year'], $cols['month'])) {
                 // ---------------------- PERIOD HANDLING (NEW RULES) ----------------------
 
 // Clean PERIOD value
-$cleanPeriod = $this->cleanLoanPeriod($rawPeriod);
+// $cleanPeriod = $this->cleanLoanPeriod($rawPeriod);
+$cleanPeriod = $this->validPeriodIndex($rawPeriod);
+
 
 // Was there principal payment?
 $hasPrincipal = ($cr !== null && $cr > 0);
@@ -1474,6 +1476,27 @@ private function cleanLoanPeriod($value)
     }
 
     return (int)$str;
+}
+protected function validPeriodIndex($value)
+{
+    if ($value === null) return null;
+
+    // Trim outside spaces
+    $value = trim($value);
+
+    // If contains letters or symbols (except spaces), reject
+    if (preg_match('/[^0-9 ]/', $value)) {
+        return null;
+    }
+
+    // Remove spaces only
+    $clean = str_replace(' ', '', $value);
+
+    if ($clean === '') return null;
+
+    $num = intval($clean);
+
+    return ($num >= 1 && $num <= 72) ? $num : null;
 }
 
 }
