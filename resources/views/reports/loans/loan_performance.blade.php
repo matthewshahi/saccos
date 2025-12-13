@@ -61,7 +61,7 @@
                                     <td class="text-right">{{ number_format($loan->loan_loan_paid, 2) }}</td>
                                     <td class="text-right">{{ number_format($loan->loan_amount - $loan->loan_loan_paid, 2) }}</td>
                                     <td>{{ $loan->loan_taken_period }}</td>
-                                    <td>{{ $loan->loan_payments_period }}</td>
+                                    <td>{{ $loan->last_payment_period }}</td>
                                     <td><span class="badge {{ $loan->loan_category['class'] }}">{{ $loan->loan_category['category'] }}</span></td>
                                 </tr>
                                 @endforeach
