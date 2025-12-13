@@ -268,60 +268,81 @@ DB::table('sacco_loans')
 
 
     private function dashboard_getDelinquentLoansCount()
-    {
+{
+    // Correct current period format (YYYYMM)
+    $PeriodNow = date('Ym');
+    $IgnoreLoanBalanceBelow = 5;
 
+    $periodNowYear  = (int) substr($PeriodNow, 0, 4);
+    $periodNowMonth = (int) substr($PeriodNow, 4, 2);
 
+    // Months difference calculator (period-based, not date-based)
+    $monthsDifference = function ($relevantPeriod) use ($periodNowYear, $periodNowMonth) {
 
-        $currentPeriod = date('YYYYmm');
+        // Normalize & validate
+        $relevantPeriod = preg_replace('/\D/', '', (string) $relevantPeriod);
 
-
-        $PeriodNow = $currentPeriod;
-        $IgnoreLoanBalanceBelow = 5;
-
-        // Calculate the current period year and month
-        $periodNowYear = intval(substr($PeriodNow, 0, 4));
-        $periodNowMonth = intval(substr($PeriodNow, 4, 2));
-
-        // Function to calculate the months difference between two periods
-        $monthsDifference = function ($relevantPeriod) use ($periodNowYear, $periodNowMonth) {
-            $relevantYear = intval(substr($relevantPeriod, 0, 4));
-            $relevantMonth = intval(substr($relevantPeriod, 4, 2));
-
-            return ($periodNowYear - $relevantYear) * 12 + ($periodNowMonth - $relevantMonth);
-        };
-
-        $loans = DB::table('sacco_loans')
-            ->join('sacco_loan_types', 'sacco_loans.loan_loan_type', '=', 'sacco_loan_types.loan_type_id')
-            ->leftJoin(DB::raw('(SELECT loan_payments_loan_id, MAX(loan_payments_period) as last_paid FROM sacco_loan_payments GROUP BY loan_payments_loan_id) as sacco_loan_payments'), 'sacco_loans.loan_id', '=', 'sacco_loan_payments.loan_payments_loan_id')
-            ->select('loan_taken_period', 'sacco_loan_payments.last_paid', 'loan_taken_start_period', DB::raw('(sacco_loans.loan_amount - sacco_loans.loan_loan_paid) as OutstandingAmount'))
-            ->whereRaw('(sacco_loans.loan_amount - sacco_loans.loan_loan_paid) > ?', [$IgnoreLoanBalanceBelow])
-            ->orderBy('sacco_loans.loan_id', 'desc')
-            ->get();
-
-        $count = 0;
-
-        foreach ($loans as $loan) {
-            // Check if $loan->last_paid exists and is not empty, else use $loan->loan_taken_period
-            $relevantPeriod = (isset($loan->last_paid) && !empty($loan->last_paid)) ? $loan->last_paid : $loan->loan_taken_period;
-
-            // New condition
-            if ($relevantPeriod < $loan->loan_taken_start_period) {
-                if ($loan->loan_taken_start_period > $PeriodNow) {
-                    $relevantPeriod = $PeriodNow;
-                } else {
-                    $relevantPeriod = $loan->loan_taken_start_period;
-                }
-            }
-
-            $monthsDiff = $monthsDifference($relevantPeriod);
-
-            if ($monthsDiff > 2) {
-                $count++;
-            }
+        if (!preg_match('/^\d{6}$/', $relevantPeriod)) {
+            return 999; // treat invalid as very old (delinquent)
         }
 
-        return $count;
+        $relevantYear  = (int) substr($relevantPeriod, 0, 4);
+        $relevantMonth = (int) substr($relevantPeriod, 4, 2);
+
+        return ($periodNowYear - $relevantYear) * 12
+             + ($periodNowMonth - $relevantMonth);
+    };
+
+    // Subquery: ONE row per loan → last repayment PERIOD
+    $latestPaymentSub = DB::table('sacco_loan_payments')
+        ->selectRaw('loan_payments_loan_id, MAX(loan_payments_period) as last_paid_period')
+        ->groupBy('loan_payments_loan_id');
+
+    $loans = DB::table('sacco_loans as l')
+        ->leftJoinSub($latestPaymentSub, 'lp', function ($join) {
+            $join->on('l.loan_id', '=', 'lp.loan_payments_loan_id');
+        })
+        ->select(
+            'l.loan_taken_period',
+            'l.loan_taken_start_period',
+            'lp.last_paid_period',
+            DB::raw('(l.loan_amount - IFNULL(l.loan_loan_paid, 0)) as OutstandingAmount')
+        )
+        ->whereRaw('(l.loan_amount - IFNULL(l.loan_loan_paid, 0)) > ?', [$IgnoreLoanBalanceBelow])
+        ->get();
+
+    $count = 0;
+
+    foreach ($loans as $loan) {
+
+        // Correct start-period fallback
+        $startPeriod = $loan->loan_taken_start_period ?: $loan->loan_taken_period;
+
+        // Relevant period = last payment OR start period
+        $relevantPeriod = $loan->last_paid_period ?: $startPeriod;
+
+        // Normalize for comparison
+        $relevantPeriodInt = (int) preg_replace('/\D/', '', (string) $relevantPeriod);
+        $startPeriodInt    = (int) preg_replace('/\D/', '', (string) $startPeriod);
+        $PeriodNowInt      = (int) $PeriodNow;
+
+        // Clamp bad data: repayment before loan start
+        if ($startPeriodInt > 0 && $relevantPeriodInt > 0 && $relevantPeriodInt < $startPeriodInt) {
+            $relevantPeriodInt = ($startPeriodInt > $PeriodNowInt)
+                ? $PeriodNowInt
+                : $startPeriodInt;
+        }
+
+        $monthsDiff = $monthsDifference($relevantPeriodInt);
+
+        // Delinquent = NOT CURRENT
+        if ($monthsDiff > 2) {
+            $count++;
+        }
     }
+
+    return $count;
+}
 
     private function dashboard_getLoansAndRepayments()
     {
