@@ -27,6 +27,24 @@
             <div class="card text-start">
                 <div class="card-body">
                     <h4 class="card-title mb-3">Loans Issued</h4>
+                    <div class="mb-3">
+    <strong>Loan Classification Legend:</strong>
+    <span class="badge bg-success ms-2">Current</span>
+    <small class="me-3">≤ 2 months</small>
+
+    <span class="badge bg-info">Watch</span>
+    <small class="me-3">3–4 months</small>
+
+    <span class="badge bg-warning">Substandard</span>
+    <small class="me-3">5–6 months</small>
+
+    <span class="badge bg-danger">Doubtful</span>
+    <small class="me-3">7–9 months</small>
+
+    <span class="badge bg-dark">Loss</span>
+    <small>> 9 months / No valid payment</small>
+</div>
+
                     <p>Below is a table of loans issued, categorized by their status.</p>
                     <div class="table-responsive">
                         <table class="table table-striped table-bordered nowrap" id="loanPerformanceTable" style="width:100%">
