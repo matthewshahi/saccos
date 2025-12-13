@@ -23,16 +23,29 @@ class LoanPerformanceController extends Controller
 
         $query = $this->getOutstandingLoansQuery($ignoreLoanBalanceBelow, $version);
 
-        if ($request->has('search')) {
-            $search = $request->input('search');
-            $query = $this->applySearchFilter($query, $search);
+        if ($request->filled('search')) {
+            $query = $this->applySearchFilter($query, $request->input('search'));
         }
 
+        /**
+         * For very large datasets, consider pagination:
+         * $loans = $query->paginate(200);
+         * (and update the view accordingly)
+         */
         $loans = $query->get();
 
         foreach ($loans as $loan) {
-            $loan->loan_category = $this->getLoanCategory($loan->loan_payments_period, $loan->loan_taken_period, $currentPeriod);
-            $loan->position = $loan->member_position == 2 ? 'Official' : 'Member';
+
+            // If loan_taken_start_period is null, use loan_taken_period
+            $loanStartPeriod = $loan->loan_taken_start_period ?: $loan->loan_taken_period;
+
+            $loan->loan_category = $this->getLoanCategory(
+                $loan->last_payment_period,
+                $loanStartPeriod,
+                $currentPeriod
+            );
+
+            $loan->position = ($loan->member_position == 2) ? 'Official' : 'Member';
         }
 
         if ($request->ajax()) {
@@ -40,79 +53,104 @@ class LoanPerformanceController extends Controller
         }
 
         return view('reports.loans.loan_performance', [
-            'loans' => $loans,
+            'loans'         => $loans,
             'currentPeriod' => $currentPeriod,
-            'version' => $version
+            'version'       => $version,
         ]);
     }
 
+    /**
+     * Build base query for outstanding loans (NO DUPLICATES)
+     *
+     * Strategy:
+     * - Join to a grouped subquery that returns ONE ROW PER LOAN:
+     *      loan_id, last_payment_on = MAX(loan_payments_on)
+     * - This guarantees no duplicates even if multiple payments exist on same date.
+     */
     protected function getOutstandingLoansQuery($ignoreLoanBalanceBelow, $version = null)
     {
-        $query = DB::table('sacco_loans')
-            ->join('sacco_members', 'sacco_loans.loan_member', '=', 'sacco_members.member_id')
-            ->join('sacco_loan_types', 'sacco_loans.loan_loan_type', '=', 'sacco_loan_types.loan_type_id')
-            ->leftJoin('sacco_loan_payments', function ($join) {
-                $join->on('sacco_loans.loan_id', '=', 'sacco_loan_payments.loan_payments_loan_id')
-                     ->whereRaw('sacco_loan_payments.loan_payments_period = (
-                         SELECT MAX(lp.loan_payments_period)
-                         FROM sacco_loan_payments lp
-                         WHERE lp.loan_payments_loan_id = sacco_loans.loan_id
-                     )');
+        // Subquery: one row per loan (loan_id -> last payment date)
+        $latestPaymentSub = DB::table('sacco_loan_payments as p')
+            ->selectRaw('p.loan_payments_loan_id as loan_id, MAX(p.loan_payments_on) as last_payment_on')
+            ->groupBy('p.loan_payments_loan_id');
+
+        $query = DB::table('sacco_loans as l')
+            ->join('sacco_members as m', 'l.loan_member', '=', 'm.member_id')
+            ->join('sacco_loan_types as lt', 'l.loan_loan_type', '=', 'lt.loan_type_id')
+
+            // Join the derived table (1 row per loan)
+            ->leftJoinSub($latestPaymentSub, 'lp', function ($join) {
+                $join->on('l.loan_id', '=', 'lp.loan_id');
             })
+
             ->select(
-                'sacco_loans.*',
-                'sacco_members.member_name',
-                'sacco_members.member_sacco_id',
-                'sacco_members.member_national_id',
-                'sacco_members.member_phone_no',
-                'sacco_members.member_position',
-                'sacco_loan_types.loan_type_name',
-                'sacco_loan_payments.loan_payments_period'
+                'l.*',
+                'm.member_name',
+                'm.member_sacco_id',
+                'm.member_national_id',
+                'm.member_phone_no',
+                'm.member_position',
+                'lt.loan_type_name',
+
+                // Canonical last payment period (YYYYMM) derived from last_payment_on
+                DB::raw("DATE_FORMAT(lp.last_payment_on, '%Y%m') as last_payment_period")
             )
-            ->where('sacco_loans.loan_stoped', 'N')
-            ->where(DB::raw('sacco_loans.loan_amount - sacco_loans.loan_loan_paid'), '>', $ignoreLoanBalanceBelow);
+
+            ->where('l.loan_stoped', 'N')
+
+            // NULL-safe outstanding balance check
+            ->whereRaw(
+                '(l.loan_amount - IFNULL(l.loan_loan_paid, 0)) > ?',
+                [$ignoreLoanBalanceBelow]
+            );
 
         if ($version == 2) {
-            $query->where('sacco_members.member_position', 2);
+            $query->where('m.member_position', 2);
         }
 
-        return $query->orderBy('sacco_members.member_name');
+        return $query->orderBy('m.member_name');
     }
 
+    /**
+     * Apply free-text search
+     */
     protected function applySearchFilter($query, $search)
     {
-        return $query->where(function($q) use ($search) {
-            $q->where('sacco_members.member_name', 'like', "%{$search}%")
-                ->orWhere('sacco_members.member_phone_no', 'like', "%{$search}%")
-                ->orWhere('sacco_members.member_national_id', 'like', "%{$search}%");
+        return $query->where(function ($q) use ($search) {
+            $q->where('m.member_name', 'like', "%{$search}%")
+              ->orWhere('m.member_phone_no', 'like', "%{$search}%")
+              ->orWhere('m.member_national_id', 'like', "%{$search}%");
         });
     }
 
-    protected function getLoanCategory($loanPaymentsPeriod, $loanTakenPeriod, $currentPeriod)
+    /**
+     * Loan aging classifier
+     */
+    protected function getLoanCategory($lastPaymentPeriod, $loanStartPeriod, $currentPeriod)
     {
-        $period = $loanPaymentsPeriod ?? $loanTakenPeriod;
+        $period = $lastPaymentPeriod ?: $loanStartPeriod;
 
-        if (!$period) {
+        // Guard against invalid or legacy values
+        if (!$period || !preg_match('/^\d{6}$/', (string) $period)) {
             return ['category' => 'Loss', 'class' => 'bg-dark'];
         }
 
-        $lastPeriodDate = \DateTime::createFromFormat('Ym', $period);
+        $lastDate    = \DateTime::createFromFormat('Ym', $period);
         $currentDate = \DateTime::createFromFormat('Ym', $currentPeriod);
 
-        $interval = $lastPeriodDate->diff($currentDate);
-        $months = $interval->y * 12 + $interval->m;
-
-        if ($months <= 2) {
-            return ['category' => 'Current', 'class' => 'bg-success'];
-        } elseif ($months <= 4) {
-            return ['category' => 'Watch', 'class' => 'bg-info'];
-        } elseif ($months <= 6) {
-            return ['category' => 'Substandard', 'class' => 'bg-warning'];
-        } elseif ($months <= 9) {
-            return ['category' => 'Doubtful', 'class' => 'bg-danger'];
-        } else {
+        if (!$lastDate || !$currentDate) {
             return ['category' => 'Loss', 'class' => 'bg-dark'];
         }
+
+        $interval = $lastDate->diff($currentDate);
+        $months   = ($interval->y * 12) + $interval->m;
+
+        return match (true) {
+            $months <= 2 => ['category' => 'Current',     'class' => 'bg-success'],
+            $months <= 4 => ['category' => 'Watch',       'class' => 'bg-info'],
+            $months <= 6 => ['category' => 'Substandard', 'class' => 'bg-warning'],
+            $months <= 9 => ['category' => 'Doubtful',    'class' => 'bg-danger'],
+            default      => ['category' => 'Loss',        'class' => 'bg-dark'],
+        };
     }
 }
- 
