@@ -541,35 +541,7 @@ class KassMigrationController extends Controller
                 $mapped['comp'] = $carryComp;
             }
 
-            // =====================================================
-            // 🔁 BACKFILL ADM WHEN IT APPEARS (CRITICAL FIX)
-            // =====================================================
-            $this->safeBackfillAdmFromName($mapped);
-
-
-
             $memberKey = $this->memberKey($mapped);
-
-            // =====================================================
-            // 🔁 REAL-TIME ADM BACKFILL (NAME → ADM)
-            // =====================================================
-
-
-
-            if (empty($mapped['adm_no']) && !empty($mapped['name'])) {
-
-                $resolvedAdm = $this->resolveAdmFromStaging($mapped);
-
-                if (!empty($resolvedAdm)) {
-
-                    // Update current row in memory
-                    $mapped['adm_no'] = $resolvedAdm;
-
-                   $this->safeBackfillAdmFromName($mapped);
-                }
-            }
-
-
 
             if ($memberKey === null) {
                 $this->logIssue($sourceFile, 'ANOMALY_MISSING_MEMBER_KEY', [
@@ -1931,33 +1903,34 @@ class KassMigrationController extends Controller
             $name = trim((string)($mapped['name'] ?? ''));
 
             $memberScope = DB::table('kass_staging_contributions')
-                ->when($adm !== '', function ($q) use ($adm) {
+    ->when($adm !== '', function ($q) use ($adm) {
 
-                    // 1️⃣ ADM MATCH — FINAL, NO NAMES
-                    $q->where('adm_no', $adm);
-                }, function ($q) use ($name, $comp) {
+        // 1️⃣ ADM MATCH — FINAL, NO NAMES
+        $q->where('adm_no', $adm);
 
-                    // 2️⃣ NAME MATCH — ONLY IF ADM IS EMPTY
-                    $q->where('company', $comp);
+    }, function ($q) use ($name, $comp) {
 
-                    $candidates = $this->buildNameCandidates($name);
+        // 2️⃣ NAME MATCH — ONLY IF ADM IS EMPTY
+        $q->where('company', $comp);
 
-                    if (empty($candidates)) {
-                        // force no matches if name is unusable
-                        $q->whereRaw('1 = 0');
-                        return;
-                    }
+        $candidates = $this->buildNameCandidates($name);
 
-                    // IMPORTANT: ordered ORs, NOT token loops
-                    $q->where(function ($qq) use ($candidates) {
-                        foreach ($candidates as $cand) {
-                            $qq->orWhereRaw(
-                                "UPPER(TRIM(REGEXP_REPLACE(raw_name, '[[:space:]]+', ' '))) = ?",
-                                [$cand]
-                            );
-                        }
-                    });
-                });
+        if (empty($candidates)) {
+            // force no matches if name is unusable
+            $q->whereRaw('1 = 0');
+            return;
+        }
+
+        // IMPORTANT: ordered ORs, NOT token loops
+        $q->where(function ($qq) use ($candidates) {
+            foreach ($candidates as $cand) {
+                $qq->orWhereRaw(
+                    "UPPER(TRIM(REGEXP_REPLACE(raw_name, '[[:space:]]+', ' '))) = ?",
+                    [$cand]
+                );
+            }
+        });
+    });
 
 
 
@@ -2000,28 +1973,11 @@ class KassMigrationController extends Controller
                         'updated_at'   => now(),
                     ]);
                 } elseif ($delta < -1) {
-
-                    // History is HIGHER than opening RUN BAL
-                    // Therefore we must DEBIT to reduce it
-
-                    DB::table('kass_staging_contributions')->insert([
-                        'raw_name'     => $name,
-                        'adm_no'       => $adm,
-                        'company'      => $comp,
-                        'year'         => $year,
-                        'month'        => 'JAN',
-                        'raw_type'     => 'DR',
-                        'amount'       => abs($delta),
-                        'source_file'  => $sourceFile,
-                        'raw_row_json' => json_encode([
-                            'system'   => 'OPENING_SHARE_RECON',
-                            'opening'  => $snap['share_run_bal'],
-                            'history'  => $historicalNet,
-                            'delta'    => $delta,
-                            'direction' => 'DOWNWARD_ADJUSTMENT'
-                        ]),
-                        'created_at'   => now(),
-                        'updated_at'   => now(),
+                    $this->logIssue($sourceFile, 'OPENING_SHARE_LOWER_THAN_HISTORY', [
+                        'member'  => $mapped,
+                        'opening' => $snap['share_run_bal'],
+                        'history' => $historicalNet,
+                        'delta'   => $delta,
                     ]);
                 }
             }
@@ -2165,126 +2121,5 @@ class KassMigrationController extends Controller
             : strtoupper($normalizedKey ?? 'unknown');
 
         return $this->normalizeContributionType($rawType);
-    }
-
-
-    private function getTwoNameCombinations(string $name): array
-    {
-        $tokens = explode(' ', $this->normalizeName($name));
-
-        if (count($tokens) < 2) {
-            return [];
-        }
-
-        $pairs = [];
-
-        for ($i = 0; $i < count($tokens); $i++) {
-            for ($j = $i + 1; $j < count($tokens); $j++) {
-                $pairs[] = $tokens[$i] . ' ' . $tokens[$j];
-            }
-        }
-
-        return array_unique($pairs);
-    }
-
-    private function normalizeName(string $name): string
-    {
-        $name = strtoupper($name);
-        $name = preg_replace('/[^A-Z\s]/', '', $name);
-        $name = preg_replace('/\s+/', ' ', trim($name));
-
-        return $name;
-    }
-
-    private function resolveAdmFromStaging(array $mapped): ?string
-    {
-        $admNo   = trim((string)($mapped['adm_no'] ?? ''));
-        $nameRaw = trim((string)($mapped['name'] ?? ''));
-        $comp    = trim((string)($mapped['comp'] ?? ''));
-
-        if ($admNo !== '') {
-            return $admNo; // ADM already known
-        }
-
-        if ($nameRaw === '' || $comp === '') {
-            return null;
-        }
-
-        $full = $this->canonicalPersonName($nameRaw);
-
-        // 1) FULL NAME FIRST (exact canonical match)
-        $found = DB::table('kass_staging_contributions')
-            ->where('company', $comp)
-            ->whereNotNull('adm_no')
-            ->whereRaw(
-                "UPPER(TRIM(REGEXP_REPLACE(raw_name, '[[:space:]]+', ' '))) = ?",
-                [$full]
-            )
-            ->value('adm_no');
-
-        if (!empty($found)) {
-            return (string)$found;
-        }
-
-        // 2) TWO-NAME FALLBACK (still scoped to company)
-        foreach ($this->buildNameCandidates($nameRaw) as $cand) {
-
-            $parts = explode(' ', $cand);
-            if (count($parts) < 2) {
-                continue;
-            }
-
-            $a = $parts[0];
-            $b = $parts[1];
-
-            $found = DB::table('kass_staging_contributions')
-                ->where('company', $comp)
-                ->whereNotNull('adm_no')
-                ->whereRaw("UPPER(raw_name) LIKE ? AND UPPER(raw_name) LIKE ?", ["%$a%", "%$b%"])
-                ->value('adm_no');
-
-            if (!empty($found)) {
-                return (string)$found;
-            }
-        }
-
-        return null;
-    }
-    /**
-     * Safely backfill ADM number for rows missing adm_no,
-     * using FIRST + SECOND name tokens only.
-     *
-     * Returns true if an update was attempted, false if skipped.
-     */
-    private function safeBackfillAdmFromName(array $mapped): bool
-    {
-        if (empty($mapped['adm_no']) || empty($mapped['name']) || empty($mapped['comp'])) {
-            return false;
-        }
-
-        $parts = explode(' ', $this->canonicalPersonName($mapped['name']));
-        $parts = array_values(array_filter($parts));
-
-        // ❗ Never backfill on single-token names
-        if (count($parts) < 2) {
-            return false;
-        }
-
-        $first  = $parts[0];
-        $second = $parts[1];
-
-        DB::table('kass_staging_contributions')
-            ->where('company', $mapped['comp'])
-            ->whereNull('adm_no')
-            ->whereRaw(
-                "UPPER(raw_name) LIKE ? AND UPPER(raw_name) LIKE ?",
-                ["%{$first}%", "%{$second}%"]
-            )
-            ->update([
-                'adm_no'     => $mapped['adm_no'],
-                'updated_at' => now(),
-            ]);
-
-        return true;
     }
 }

@@ -84,11 +84,11 @@ class KassLoanImportController extends Controller
             'unresolved_members'   => []
         ];
 
-        $groups = DB::table('kass_staging_loans')
-            ->orderBy('raw_name')
-            ->orderBy('loan_type')   // loan stream identity
-            ->orderBy('year')
-            ->orderByRaw("
+       $groups = DB::table('kass_staging_loans')
+    ->orderBy('raw_name')
+    ->orderBy('loan_type')   // loan stream identity
+    ->orderBy('year')
+    ->orderByRaw("
         CASE UPPER(month)
             WHEN 'JAN' THEN 1
             WHEN 'FEB' THEN 2
@@ -105,8 +105,8 @@ class KassLoanImportController extends Controller
             ELSE 99
         END
     ")
-            ->get()
-            ->groupBy(['raw_name', 'loan_type']);
+    ->get()
+    ->groupBy(['raw_name', 'loan_type']);
 
 
 
@@ -149,6 +149,43 @@ class KassLoanImportController extends Controller
         $prevRow = null;
 
         foreach ($rows as $row) {
+
+                    // ----------------------------------------------------
+        // CLEARANCE / DERIVED ROW DETECTION
+        // ----------------------------------------------------
+        $isClearance = false;
+
+        if ($prevRow !== null) {
+            $isClearance = (
+                (float)$row->principal_paid < 0
+                && abs((float)$row->principal_paid)
+                   >= abs((float)$prevRow->outstanding_balance) - 1
+
+            );
+        }
+
+        $isDerived = isset($row->raw_row_json)
+            && str_contains($row->raw_row_json, 'DERIVED_ZERO');
+
+            // ----------------------------------------------------
+// SAFETY: first row can NEVER be clearance or derived
+// ----------------------------------------------------
+if ($prevRow === null) {
+    $isClearance = false;
+    $isDerived   = false;
+}
+
+            // ----------------------------------------------------
+// NEVER split loan on clearance or derived rows
+// ----------------------------------------------------
+if ($isClearance || $isDerived) {
+    $current[] = $row;
+    $prevRow   = $row;
+    continue;
+}
+
+
+
 
             $startNewLoan = false;
 
@@ -199,13 +236,14 @@ class KassLoanImportController extends Controller
                 $prevIdx = $prevRow->period_index ?? null;
 
                 // NEW loan ONLY when period_index APPEARS
-                if (
-                    is_numeric($curIdx)
-                    && (int)$curIdx > 0
-                    && !empty($current) // important
-                ) {
-                    $startNewLoan = true;
-                }
+if (
+   is_numeric($curIdx)
+&& (int)$curIdx > 0
+&& ($prevIdx === null || trim($prevIdx) === '')
+&& $prevOutstanding > 0
+) {
+    $startNewLoan = true;
+}
 
 
 
@@ -215,9 +253,9 @@ class KassLoanImportController extends Controller
              * ==================================================================
              * When a loan hits zero, the next deduction is ALWAYS a new loan.
              * ==================================================================
-             */ else if ($prevOutstanding == 0) {
-                    $startNewLoan = true;
-                }
+            //  */ else if ($prevOutstanding == 0) {
+            //         $startNewLoan = true;
+            //     }
 
                 /*
              * ==================================================================
@@ -484,103 +522,106 @@ class KassLoanImportController extends Controller
         /* Track last loan for top-up detection */
         $this->lastLoan[$memberId][$loanTypeId] = $loanId;
 
-
         /* ------------------------------------------
+ * 5.5) INSERT SYSTEM ADJUSTMENT PAYMENTS (IF ANY)
+ * ------------------------------------------ */
+/* ------------------------------------------
  * 5.5) INSERT SYSTEM ADJUSTMENT PAYMENTS
  * ------------------------------------------ */
-        if (count($cycle) > 1) {
+if (count($cycle) > 1) {
 
-            for ($i = 1; $i < count($cycle); $i++) {
+    for ($i = 1; $i < count($cycle); $i++) {
 
-    $prev = $cycle[$i - 1];
-    $cur  = $cycle[$i];
+        $prev = $cycle[$i - 1];
+        $cur  = $cycle[$i];
 
-    /* ============================================================
-     * NORMALISE VALUES (ONCE — DO NOT REPEAT)
-     * ============================================================ */
-    $prevOutstanding = $this->moneyToCents($prev->outstanding_balance);
-    $curOutstanding  = $this->moneyToCents($cur->outstanding_balance);
-    $prevPrincipal   = $this->moneyToCents($prev->principal_paid);
+        /*
+         * HARD RULE:
+         * If current row has period_index (numeric > 0),
+         * this jump is EXPLAINED (new loan / top-up).
+         * DO NOT compute delta.
+         */
+        if (is_numeric($cur->period_index) && (int)$cur->period_index > 0) {
+            continue;
+        }
 
-    /* ============================================================
-     * HARD STOPS — ABSOLUTE (NO SYS-ADJ BEYOND THIS POINT)
-     * ============================================================ */
+        $prevOutstanding = $this->moneyToCents($prev->outstanding_balance);
+$prevPrincipal   = $this->moneyToCents($prev->principal_paid);
+$curOutstanding  = $this->moneyToCents($cur->outstanding_balance);
 
-    // 1. Loan closes on current row
-    if ($curOutstanding === 0) {
-        continue;
-    }
+/*
+ * Expected outstanding based on arithmetic
+ */
+$expectedNext = $prevOutstanding - $prevPrincipal;
 
-    // 2. Principal clears or over-clears balance
-    if ($prevOutstanding > 0 && abs($prevPrincipal) >= $prevOutstanding) {
-        continue;
-    }
+/*
+ * Delta = actual − expected
+ */
+$deltaCents = $curOutstanding - $expectedNext;
 
-    // 3. Explained jump (new loan / top-up)
-    if (is_numeric($cur->period_index) && (int)$cur->period_index > 0) {
-        continue;
-    }
-
-    // 4. Missing principal — nothing to reconcile
-    if ($prev->principal_paid === null) {
-        continue;
-    }
-
-    // 5. Previous loan already closed
-    if ($prevOutstanding === 0) {
-        continue;
-    }
-
-    /* ============================================================
-     * RECONCILIATION (ONLY REACHED IF ALL HARD STOPS PASSED)
-     * ============================================================ */
-
-    $expectedNext = $prevOutstanding - $prevPrincipal;
-    $deltaCents   = $curOutstanding - $expectedNext;
-
-    // Ignore rounding noise (≤ KES 2)
-    if (abs($deltaCents) <= 200) {
-        continue;
-    }
-
-    // Adjustment is negative of delta
-    $amount = (-$deltaCents) / 100;
-
-    $year  = (int) $cur->year;
-    $month = $this->safeMonth($cur->month);
-    if (!$year || !$month) {
-        continue;
-    }
-
-    $period   = sprintf('%04d%02d', $year, $month);
-    $datePaid = Carbon::create($year, $month, 1)->endOfMonth()->toDateString();
-
-    DB::table('sacco_loan_payments')->insert([
-        'loan_payments_amount'      => $amount,
-        'loan_payments_interest'    => 0,
-        'loan_payments_description' =>
-            "SYSTEM ADJUSTMENT — BALANCE RECONCILE — {$this->sourceFileTag($cur)}",
-        'loan_payments_docno'       => 'SYS-ADJ',
-        'loan_payments_paid_in_by'  => 'SYSTEM',
-        'loan_payments_period'      => $period,
-        'loan_payments_paid_on'     => $datePaid,
-        'loan_payments_loan_id'     => $loanId,
-        'loan_payments_on'          => now(),
-        'loan_payments_by'          => 1,
-        'loan_payments_ip'          => 'SYSTEM',
-    ]);
-
-    DB::table('sacco_loans')
-        ->where('loan_id', $loanId)
-        ->update([
-            'loan_loan_paid' => DB::raw("COALESCE(loan_loan_paid,0) + ({$amount})")
-        ]);
-
-    $summary['payments_inserted']++;
+/*
+ * Ignore rounding noise (≤ KES 2)
+ */
+if (abs($deltaCents) <= 200) {
+    continue;
 }
 
+/*
+ * Adjustment payment MUST be the NEGATIVE of delta
+ * This is the rule you correctly stated
+ */
+$adjustmentCents = -$deltaCents;
 
-        }
+/*
+ * Signed amount (CAN be negative)
+ */
+$amount = $adjustmentCents / 100;
+
+/*
+ * Period + date
+ */
+$year  = (int) $cur->year;
+$month = $this->safeMonth($cur->month);
+
+if (!$year || !$month) {
+    continue;
+}
+
+$period   = sprintf('%04d%02d', $year, $month);
+$datePaid = Carbon::create($year, $month, 1)->endOfMonth()->toDateString();
+
+/*
+ * Insert SYSTEM adjustment (signed)
+ */
+DB::table('sacco_loan_payments')->insert([
+    'loan_payments_amount'      => $amount, // SIGNED (can be negative)
+    'loan_payments_interest'    => 0,
+    'loan_payments_description' =>
+        "SYSTEM ADJUSTMENT — BALANCE RECONCILE — {$this->sourceFileTag($cur)}",
+    'loan_payments_docno'       => 'SYS-ADJ',
+    'loan_payments_paid_in_by'  => 'SYSTEM',
+    'loan_payments_period'      => $period,
+    'loan_payments_paid_on'     => $datePaid,
+    'loan_payments_loan_id'     => $loanId,
+    'loan_payments_on'          => now(),
+    'loan_payments_by'          => 1,
+    'loan_payments_ip'          => 'SYSTEM',
+]);
+
+/*
+ * Apply signed effect to loan_loan_paid
+ */
+DB::table('sacco_loans')
+    ->where('loan_id', $loanId)
+    ->update([
+        'loan_loan_paid' => DB::raw("COALESCE(loan_loan_paid,0) + ({$amount})")
+    ]);
+
+$summary['payments_inserted']++;
+
+
+    }
+}
 
 
 
@@ -892,25 +933,26 @@ class KassLoanImportController extends Controller
         return strtoupper(trim($file));
     }
 
-
+   
 
     protected function logAdjustment(array $data): void
-    {
-        file_put_contents(
-            storage_path('logs/kass_loan_adjustments.log'),
-            date('Y-m-d H:i:s') . ' | ' . json_encode($data, JSON_UNESCAPED_SLASHES) . PHP_EOL,
-            FILE_APPEND
-        );
+{
+    file_put_contents(
+        storage_path('logs/kass_loan_adjustments.log'),
+        date('Y-m-d H:i:s') . ' | ' . json_encode($data, JSON_UNESCAPED_SLASHES) . PHP_EOL,
+        FILE_APPEND
+    );
+}
+protected function moneyToCents($value): int
+{
+    if ($value === null || $value === '') {
+        return 0;
     }
-    protected function moneyToCents($value): int
-    {
-        if ($value === null || $value === '') {
-            return 0;
-        }
 
-        // Normalize strings like "50,000.00"
-        $normalized = str_replace([',', ' '], '', (string) $value);
+    // Normalize strings like "50,000.00"
+    $normalized = str_replace([',', ' '], '', (string) $value);
 
-        return (int) round(((float) $normalized) * 100);
-    }
+    return (int) round(((float) $normalized) * 100);
+}
+
 }

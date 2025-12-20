@@ -1239,11 +1239,10 @@ private function logSTKPushRequest(
     }
 }
     private function logTransaction($message, $context = [], $level = 'info')
-    {
-        Log::channel('single')->{$level}($message, $context);
-        $logFile = storage_path('logs/mpesa_trans.txt');
-        file_put_contents($logFile, "[" . now() . "] " . strtoupper($level) . ": " . $message . ' ' . json_encode($context) . PHP_EOL, FILE_APPEND);
-    }
+{
+    Log::{$level}($message, $context);
+}
+
 
     public function paymentSuccess(Request $request)
 {

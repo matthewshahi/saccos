@@ -20,13 +20,6 @@ class KassMigrationController extends Controller
 
     private array $seenFirstJanuary = [];
 
-    // Opening balance snapshots (per member|company|year)
-    private array $openingSnapshots = [];
-
-    // Holds a “maybe-opening” JAN row until we see what follows.
-    private array $pendingJanuary = []; // key: memberYearKey => ['mapped'=>..., 'headerNorm'=>..., 'headerRaw'=>..., 'row'=>..., 'transactionIndexes'=>..., 'sourceFile'=>...]
-
-
 
     public function __construct()
     {
@@ -440,12 +433,6 @@ class KassMigrationController extends Controller
      ===========================================================*/
     private function processContributionSheet($sheet, string $sourceFile): void
     {
-
-        $this->pendingJanuary   = [];
-        $this->openingSnapshots = [];
-        $this->seenFirstJanuary = [];
-
-
         $highestRow = $sheet->getHighestDataRow();
         $highestCol = $sheet->getHighestDataColumn();
 
@@ -541,35 +528,7 @@ class KassMigrationController extends Controller
                 $mapped['comp'] = $carryComp;
             }
 
-            // =====================================================
-            // 🔁 BACKFILL ADM WHEN IT APPEARS (CRITICAL FIX)
-            // =====================================================
-            $this->safeBackfillAdmFromName($mapped);
-
-
-
             $memberKey = $this->memberKey($mapped);
-
-            // =====================================================
-            // 🔁 REAL-TIME ADM BACKFILL (NAME → ADM)
-            // =====================================================
-
-
-
-            if (empty($mapped['adm_no']) && !empty($mapped['name'])) {
-
-                $resolvedAdm = $this->resolveAdmFromStaging($mapped);
-
-                if (!empty($resolvedAdm)) {
-
-                    // Update current row in memory
-                    $mapped['adm_no'] = $resolvedAdm;
-
-                   $this->safeBackfillAdmFromName($mapped);
-                }
-            }
-
-
 
             if ($memberKey === null) {
                 $this->logIssue($sourceFile, 'ANOMALY_MISSING_MEMBER_KEY', [
@@ -624,83 +583,6 @@ class KassMigrationController extends Controller
             //     }
             // }
 
-            // -----------------------------------------
-            // OPENING JANUARY DETECTION
-            // -----------------------------------------
-            $memberYearKey = $this->memberYearKey($mapped, $year);
-
-            // -------------------------
-            // CONSECUTIVE-JAN LOGIC
-            // -------------------------
-            if ($month === 'JAN') {
-
-                // If we already have a pending JAN for this member+year,
-                // then we have TWO consecutive JANs -> the FIRST is opening.
-                if (isset($this->pendingJanuary[$memberYearKey])) {
-
-                    $pending = $this->pendingJanuary[$memberYearKey];
-
-                    // 1) First JAN is opening snapshot (do NOT insert its transactions)
-                    $this->captureOpeningSnapshot(
-                        $memberYearKey,
-                        $pending['mapped'],
-                        $pending['headerNorm'],
-                        $pending['row'],
-                        $year   // ✅ PASS THE YEAR YOU JUST CLEANED
-                    );
-
-
-                    // 2) Clear pending, and continue with current JAN as a normal transactional row
-                    unset($this->pendingJanuary[$memberYearKey]);
-
-                    // fall through to normal transaction insert for current row
-                } else {
-
-                    // Put this JAN on hold until we see what the next row month is
-                    $this->pendingJanuary[$memberYearKey] = [
-                        'mapped'             => $mapped,
-                        'headerRaw'          => $headerRaw,
-                        'headerNorm'         => $headerNorm,
-                        'row'                => $row,
-                        'transactionIndexes' => $transactionIndexes,
-                        'rowIndex'           => $i,
-                        'sourceFile'         => $sourceFile,
-                        'year'               => $year, // ✅ store resolved year
-                    ];
-
-
-                    // Do not process this row yet
-                    continue;
-                }
-            } else {
-
-                // If a pending JAN exists but the next month is NOT JAN,
-                // then that first JAN was NOT opening; it was transactional.
-                if (isset($this->pendingJanuary[$memberYearKey])) {
-
-                    $pending = $this->pendingJanuary[$memberYearKey];
-                    unset($this->pendingJanuary[$memberYearKey]);
-
-                    // replay the pending JAN as a normal transactional row
-                    $pendingYear = (int)($pending['year'] ?? 0);
-                    if ($pendingYear > 0) {
-                        $this->insertContributionTransactionsForRow(
-                            $pending['mapped'],
-                            $pendingYear,   // ✅ correct year
-                            'JAN',
-                            $pending['row'],
-                            $pending['headerRaw'],
-                            $pending['headerNorm'],
-                            $pending['transactionIndexes'],
-                            $headerCarry,
-                            $sourceFile,
-                            $pending['rowIndex']
-                        );
-                    }
-                }
-            }
-
-
             // ---------------------------------------------------------
             // 6) Extract real transaction columns
             // ---------------------------------------------------------
@@ -730,11 +612,10 @@ class KassMigrationController extends Controller
                 }
 
                 // Choose transaction label
-                $rawType = $this->resolveRawType(
-                    $rawHeaderLabel,
-                    $headerNorm[$colIndex] ?? null
-                );
-
+                $normalizedKey = $headerNorm[$colIndex] ?? 'unknown';
+                $rawType       = $rawHeaderLabel !== ''
+                    ? strtoupper($rawHeaderLabel)
+                    : strtoupper($normalizedKey);
 
                 // ---------------------------------------------------------
                 // INSERT REAL TRANSACTION ROW
@@ -765,39 +646,6 @@ class KassMigrationController extends Controller
                     continue;
                 }
             }
-        }
-
-        // Flush any pending JANs (they were transactional, not opening)
-        foreach ($this->pendingJanuary as $memberYearKey => $pending) {
-
-            $mapped = $pending['mapped'];
-
-            $year = (int)($pending['year'] ?? 0);
-            if ($year <= 0) {
-                continue;
-            }
-
-
-            $this->insertContributionTransactionsForRow(
-                $mapped,
-                $year,
-                'JAN',
-                $pending['row'],
-                $pending['headerRaw'],
-                $pending['headerNorm'],
-                $pending['transactionIndexes'],
-                $headerCarry,
-                $sourceFile,
-                $pending['rowIndex']
-            );
-
-            unset($this->pendingJanuary[$memberYearKey]);
-        }
-
-
-
-        if (!empty($this->openingSnapshots)) {
-            $this->reconcileOpeningBalances($sourceFile);
         }
     }
 
@@ -1649,107 +1497,23 @@ class KassMigrationController extends Controller
     }
     private function memberKey(array $mapped): ?string
     {
-        $adm  = $this->normalizeWhitespace((string)($mapped['adm_no'] ?? ''));
-        $name = $this->normalizeWhitespace((string)($mapped['name'] ?? ''));
-        $comp = $this->normalizeWhitespace((string)($mapped['comp'] ?? ''));
+        $adm  = trim((string)($mapped['adm_no'] ?? ''));
+        $name = trim((string)($mapped['name'] ?? ''));
+        $comp = trim((string)($mapped['comp'] ?? ''));
 
-        $adm  = strtoupper($adm);
-        $comp = strtoupper($comp);
-
-        // 1) ALWAYS prefer ADM (members can move companies)
-        if ($adm !== '') {
-            return "ADM={$adm}";
+        // 1️⃣ Preferred: ADM NO + COMPANY
+        if ($adm !== '' && $comp !== '') {
+            return strtoupper($adm . '|' . $comp);
         }
 
-        // 2) fallback: name-based key, but DO NOT sort tokens
+        // 2️⃣ Fallback: NAME + COMPANY
         if ($name !== '' && $comp !== '') {
-            $canon = $this->canonicalPersonName($name);
-            $parts = $this->nameParts($canon);
-
-            // enforce "always use two names"
-            if (count($parts) >= 2) {
-                $firstTwo = $parts[0] . ' ' . $parts[1];
-                return "NAME={$firstTwo}::COMP={$comp}";
-            }
+            return strtoupper($name . '|' . $comp);
         }
 
+        // 3️⃣ Invalid identity
         return null;
     }
-
-
-    /**
-     * Canonical person-name for identity matching in staging:
-     * - remove punctuation
-     * - lower/upper normalize
-     * - split tokens
-     * - sort tokens
-     * This makes "MOSES NJENGA" and "MOSES NJENGA MUNYIRI" share a stable base,
-     * and reduces splits from ordering/spacing.
-     */
-    private function canonicalPersonName(string $name): string
-    {
-        $name = strtoupper((string)$name);
-
-        // remove punctuation but keep spaces
-        $name = preg_replace('/[^A-Z0-9 ]+/', ' ', $name);
-
-        // collapse multiple spaces + trim
-        $name = trim(preg_replace('/\s+/', ' ', $name));
-
-        return $name;
-    }
-
-    private function normalizeWhitespace(string $s): string
-    {
-        $s = str_replace("\xC2\xA0", ' ', $s);
-        return trim(preg_replace('/\s+/', ' ', $s));
-    }
-
-    private function nameParts(string $name): array
-    {
-        $canon = $this->canonicalPersonName($this->normalizeWhitespace($name));
-        if ($canon === '') return [];
-        return array_values(array_filter(explode(' ', $canon)));
-    }
-
-    /**
-     * Build fallback name candidates in correct priority:
-     * 1) FULL name exactly (all tokens)
-     * 2) FIRST + SECOND
-     * 3) FIRST + THIRD (if exists)
-     */
-    private function buildNameCandidates(string $rawName): array
-    {
-        $parts = $this->nameParts($rawName);
-        if (count($parts) < 2) return [];
-
-        $candidates = [];
-
-        // 1) full name first (DO NOT split before trying it)
-        $candidates[] = implode(' ', $parts);
-
-        // 2) always enforce at least two names
-        $first = $parts[0];
-        $second = $parts[1];
-        $candidates[] = $first . ' ' . $second;
-
-        // 3) first + third (first name fixed)
-        if (isset($parts[2])) {
-            $third = $parts[2];
-            $candidates[] = $first . ' ' . $third;
-        }
-
-        // unique, preserve order
-        $out = [];
-        foreach ($candidates as $c) {
-            $c = $this->normalizeWhitespace($c);
-            if ($c !== '' && !in_array($c, $out, true)) $out[] = $c;
-        }
-
-        return $out;
-    }
-
-
 
     /**
      * Detects an abrupt zero-balance row at the end of an active loan repayment.
@@ -1825,466 +1589,23 @@ class KassMigrationController extends Controller
     }
 
     private function formulaIsSimpleArithmetic(Cell $cell): bool
-    {
-        if (!$cell->isFormula()) {
-            return false;
-        }
-
-        $formula = strtoupper($cell->getValue());
-
-        // Count cell references
-        preg_match_all('/\b[A-Z]{1,3}[0-9]{1,7}\b/', $formula, $refs);
-        $refCount = count(array_unique($refs[0]));
-
-        // Count operators
-        preg_match_all('/[+\-*\/]/', $formula, $ops);
-        $opCount = count($ops[0]);
-
-        // ACCEPT simple arithmetic like =E12-F12
-        return ($refCount >= 2 && $opCount >= 1);
-    }
-
-    private function isOpeningJanuaryRow(string $memberKey, int $year, string $month): bool
-    {
-        if ($month !== 'JAN') {
-            return false;
-        }
-
-        $key = $memberKey . '|' . $year;
-
-        if (!isset($this->seenFirstJanuary[$key])) {
-            // first JAN seen → tentatively opening
-            $this->seenFirstJanuary[$key] = 1;
-            return true;
-        }
-
-        // second JAN → first was opening, this one is transactional
+{
+    if (!$cell->isFormula()) {
         return false;
     }
 
-    private function captureOpeningSnapshot(
-        string $memberYearKey,
-        array $mapped,
-        array $headerNorm,
-        array $row,
-        int $year
-    ): void {
+    $formula = strtoupper($cell->getValue());
 
-        $runBalIndex = $this->getRunBalIndexAndKey($headerNorm)['index'];
-        $runBal = ($runBalIndex !== null) ? $this->num($row[$runBalIndex] ?? null) : null;
+    // Count cell references
+    preg_match_all('/\b[A-Z]{1,3}[0-9]{1,7}\b/', $formula, $refs);
+    $refCount = count(array_unique($refs[0]));
 
-        $capital = 0.0;
+    // Count operators
+    preg_match_all('/[+\-*\/]/', $formula, $ops);
+    $opCount = count($ops[0]);
 
-        foreach ($headerNorm as $i => $col) {
-            $colNorm = strtoupper(trim($col));
+    // ACCEPT simple arithmetic like =E12-F12
+    return ($refCount >= 2 && $opCount >= 1);
+}
 
-            // cover: capital, n_capital (and any header normalized with capital)
-            if (str_contains($colNorm, 'CAPITAL')) {
-                $capital += (float)($this->num($row[$i] ?? null) ?? 0);
-            }
-        }
-
-        $this->openingSnapshots[$memberYearKey] = [
-            'year'          => $year,
-            'share_run_bal' => $runBal,
-            'capital'       => $capital,
-            'mapped'        => $mapped,
-        ];
-    }
-
-
-    private function reconcileOpeningBalances(string $sourceFile): void
-    {
-        foreach ($this->openingSnapshots as $memberYearKey => $snap) {
-
-            $mapped = $snap['mapped'];
-
-            // ✅ ALWAYS trust snapshot year
-            $year = (int)($snap['year'] ?? 0);
-
-            // Defensive fallback (rare)
-            if ($year <= 0 && preg_match('/::YEAR=(\d{4})$/', $memberYearKey, $m)) {
-                $year = (int)$m[1];
-            }
-
-            if ($year <= 0) {
-                $this->logIssue($sourceFile, 'OPENING_SNAPSHOT_MISSING_YEAR', [
-                    'key'  => $memberYearKey,
-                    'snap' => $snap,
-                ]);
-                continue;
-            }
-
-
-
-            // // If year wasn’t in mapped for opening row, parse from key as fallback
-            // if ($year <= 0 && preg_match('/::YEAR=(\d{4})$/', $memberYearKey, $m)) {
-            //     $year = (int)$m[1];
-            // }
-
-            // Member scoping
-
-            $comp = trim((string)($mapped['comp'] ?? ''));
-
-
-            $adm  = trim((string)($mapped['adm_no'] ?? ''));
-            $name = trim((string)($mapped['name'] ?? ''));
-
-            $memberScope = DB::table('kass_staging_contributions')
-                ->when($adm !== '', function ($q) use ($adm) {
-
-                    // 1️⃣ ADM MATCH — FINAL, NO NAMES
-                    $q->where('adm_no', $adm);
-                }, function ($q) use ($name, $comp) {
-
-                    // 2️⃣ NAME MATCH — ONLY IF ADM IS EMPTY
-                    $q->where('company', $comp);
-
-                    $candidates = $this->buildNameCandidates($name);
-
-                    if (empty($candidates)) {
-                        // force no matches if name is unusable
-                        $q->whereRaw('1 = 0');
-                        return;
-                    }
-
-                    // IMPORTANT: ordered ORs, NOT token loops
-                    $q->where(function ($qq) use ($candidates) {
-                        foreach ($candidates as $cand) {
-                            $qq->orWhereRaw(
-                                "UPPER(TRIM(REGEXP_REPLACE(raw_name, '[[:space:]]+', ' '))) = ?",
-                                [$cand]
-                            );
-                        }
-                    });
-                });
-
-
-
-            // -------------------------
-            // SHARES opening RUN BAL recon (CR/DR)
-            // -------------------------
-            if ($snap['share_run_bal'] !== null) {
-
-                $historicalNet = (clone $memberScope)
-                    ->where('year', '<', $year)
-                    ->whereIn('raw_type', ['CR', 'DR'])
-                    ->sum(DB::raw("
-                    CASE 
-                        WHEN raw_type = 'CR' THEN amount
-                        WHEN raw_type = 'DR' THEN -amount
-                        ELSE 0
-                    END
-                "));
-
-                $delta = (float)$snap['share_run_bal'] - (float)$historicalNet;
-
-                // If opening is higher, we add CR to equalise.
-                if ($delta > 1) {
-                    DB::table('kass_staging_contributions')->insert([
-                        'raw_name'     => $name,
-                        'adm_no'       => $adm,
-                        'company'      => $comp,
-                        'year'         => $year,
-                        'month'        => 'JAN',
-                        'raw_type'     => 'CR',
-                        'amount'       => $delta,
-                        'source_file'  => $sourceFile,
-                        'raw_row_json' => json_encode([
-                            'system'   => 'OPENING_SHARE_RECON',
-                            'opening'  => $snap['share_run_bal'],
-                            'history'  => $historicalNet,
-                            'delta'    => $delta,
-                        ]),
-                        'created_at'   => now(),
-                        'updated_at'   => now(),
-                    ]);
-                } elseif ($delta < -1) {
-
-                    // History is HIGHER than opening RUN BAL
-                    // Therefore we must DEBIT to reduce it
-
-                    DB::table('kass_staging_contributions')->insert([
-                        'raw_name'     => $name,
-                        'adm_no'       => $adm,
-                        'company'      => $comp,
-                        'year'         => $year,
-                        'month'        => 'JAN',
-                        'raw_type'     => 'DR',
-                        'amount'       => abs($delta),
-                        'source_file'  => $sourceFile,
-                        'raw_row_json' => json_encode([
-                            'system'   => 'OPENING_SHARE_RECON',
-                            'opening'  => $snap['share_run_bal'],
-                            'history'  => $historicalNet,
-                            'delta'    => $delta,
-                            'direction' => 'DOWNWARD_ADJUSTMENT'
-                        ]),
-                        'created_at'   => now(),
-                        'updated_at'   => now(),
-                    ]);
-                }
-            }
-
-            // -------------------------
-            // CAPITAL opening recon (CAPITAL + N/CAPITAL treated as CAPITAL)
-            // -------------------------
-            if ($snap['capital'] > 0) {
-
-                $historicalCapital = (clone $memberScope)
-                    ->where('year', '<', $year)
-                    ->where('raw_type', 'CAPITAL')
-                    ->sum('amount');
-
-                $deltaCap = (float)$snap['capital'] - (float)$historicalCapital;
-
-                if ($deltaCap > 1) {
-                    DB::table('kass_staging_contributions')->insert([
-                        'raw_name'     => $name,
-                        'adm_no'       => $adm,
-                        'company'      => $comp,
-                        'year'         => $year,
-                        'month'        => 'JAN',
-                        'raw_type'     => 'CAPITAL',
-                        'amount'       => $deltaCap,
-                        'source_file'  => $sourceFile,
-                        'raw_row_json' => json_encode([
-                            'system'  => 'OPENING_CAPITAL_RECON',
-                            'opening' => $snap['capital'],
-                            'history' => $historicalCapital,
-                            'delta'   => $deltaCap,
-                        ]),
-                        'created_at'   => now(),
-                        'updated_at'   => now(),
-                    ]);
-                } elseif ($deltaCap < -1) {
-                    $this->logIssue($sourceFile, 'OPENING_CAPITAL_LOWER_THAN_HISTORY', [
-                        'member'  => $mapped,
-                        'opening' => $snap['capital'],
-                        'history' => $historicalCapital,
-                        'delta'   => $deltaCap,
-                    ]);
-                }
-            }
-        }
-    }
-
-    private function memberYearKey(array $mapped, int $year): string
-    {
-        $adm  = strtoupper(trim((string)($mapped['adm_no'] ?? '')));
-        $name = strtoupper(trim((string)($mapped['name'] ?? '')));
-        $comp = strtoupper(trim((string)($mapped['comp'] ?? '')));
-
-        if ($adm !== '') {
-            return "ADM={$adm}::COMP={$comp}::YEAR={$year}";
-        }
-
-
-        $canon = $this->canonicalPersonName($name);
-        return "NAME={$canon}::COMP={$comp}::YEAR={$year}";
-    }
-
-
-    private function normalizeContributionType(string $rawType): string
-    {
-        $t = strtoupper(trim($rawType));
-
-        // Merge all capital variants
-        if (str_contains($t, 'CAPITAL')) {
-            return 'CAPITAL';
-        }
-
-        // Keep DR/CR as-is
-        if ($t === 'DR' || $t === 'CR') {
-            return $t;
-        }
-
-        return $t;
-    }
-    private function insertContributionTransactionsForRow(
-        array $mapped,
-        int $year,
-        string $month,
-        array $row,
-        array $headerRaw,
-        array $headerNorm,
-        array $transactionIndexes,
-        array &$headerCarry,
-        string $sourceFile,
-        int $rowIndex
-    ): void {
-
-        foreach ($transactionIndexes as $colIndex) {
-
-            if (!array_key_exists($colIndex, $row) || !array_key_exists($colIndex, $headerRaw)) {
-                continue;
-            }
-
-            $rawHeaderLabel = trim((string)($headerRaw[$colIndex] ?? ''));
-
-            if ($rawHeaderLabel !== '') {
-                $headerCarry[$colIndex] = $rawHeaderLabel;
-            } else {
-                $rawHeaderLabel = $headerCarry[$colIndex] ?? '';
-            }
-
-            $amount = $this->num($row[$colIndex] ?? null);
-
-            if ($amount === null || $amount == 0) {
-                continue;
-            }
-            //$normalizedKey = $headerNorm[$colIndex] ?? 'unknown';
-            $rawType = $this->resolveRawType(
-                $rawHeaderLabel,
-                $headerNorm[$colIndex] ?? null
-            );
-
-
-
-
-            DB::table('kass_staging_contributions')->insert([
-                'raw_name'          => $mapped['name'],
-                'member_identifier' => $mapped['pfno'] ?? null,
-                'adm_no'            => $mapped['adm_no'],
-                'company'           => $mapped['comp'],
-                'year'              => $year,
-                'month'             => $month,
-                'raw_type'          => $rawType,
-                'amount'            => $amount,
-                'source_file'       => $sourceFile,
-                'raw_row_json'      => json_encode($mapped),
-                'created_at'        => now(),
-                'updated_at'        => now(),
-            ]);
-        }
-    }
-    private function resolveRawType(string $rawHeaderLabel, ?string $normalizedKey): string
-    {
-        $rawType = trim($rawHeaderLabel) !== ''
-            ? strtoupper($rawHeaderLabel)
-            : strtoupper($normalizedKey ?? 'unknown');
-
-        return $this->normalizeContributionType($rawType);
-    }
-
-
-    private function getTwoNameCombinations(string $name): array
-    {
-        $tokens = explode(' ', $this->normalizeName($name));
-
-        if (count($tokens) < 2) {
-            return [];
-        }
-
-        $pairs = [];
-
-        for ($i = 0; $i < count($tokens); $i++) {
-            for ($j = $i + 1; $j < count($tokens); $j++) {
-                $pairs[] = $tokens[$i] . ' ' . $tokens[$j];
-            }
-        }
-
-        return array_unique($pairs);
-    }
-
-    private function normalizeName(string $name): string
-    {
-        $name = strtoupper($name);
-        $name = preg_replace('/[^A-Z\s]/', '', $name);
-        $name = preg_replace('/\s+/', ' ', trim($name));
-
-        return $name;
-    }
-
-    private function resolveAdmFromStaging(array $mapped): ?string
-    {
-        $admNo   = trim((string)($mapped['adm_no'] ?? ''));
-        $nameRaw = trim((string)($mapped['name'] ?? ''));
-        $comp    = trim((string)($mapped['comp'] ?? ''));
-
-        if ($admNo !== '') {
-            return $admNo; // ADM already known
-        }
-
-        if ($nameRaw === '' || $comp === '') {
-            return null;
-        }
-
-        $full = $this->canonicalPersonName($nameRaw);
-
-        // 1) FULL NAME FIRST (exact canonical match)
-        $found = DB::table('kass_staging_contributions')
-            ->where('company', $comp)
-            ->whereNotNull('adm_no')
-            ->whereRaw(
-                "UPPER(TRIM(REGEXP_REPLACE(raw_name, '[[:space:]]+', ' '))) = ?",
-                [$full]
-            )
-            ->value('adm_no');
-
-        if (!empty($found)) {
-            return (string)$found;
-        }
-
-        // 2) TWO-NAME FALLBACK (still scoped to company)
-        foreach ($this->buildNameCandidates($nameRaw) as $cand) {
-
-            $parts = explode(' ', $cand);
-            if (count($parts) < 2) {
-                continue;
-            }
-
-            $a = $parts[0];
-            $b = $parts[1];
-
-            $found = DB::table('kass_staging_contributions')
-                ->where('company', $comp)
-                ->whereNotNull('adm_no')
-                ->whereRaw("UPPER(raw_name) LIKE ? AND UPPER(raw_name) LIKE ?", ["%$a%", "%$b%"])
-                ->value('adm_no');
-
-            if (!empty($found)) {
-                return (string)$found;
-            }
-        }
-
-        return null;
-    }
-    /**
-     * Safely backfill ADM number for rows missing adm_no,
-     * using FIRST + SECOND name tokens only.
-     *
-     * Returns true if an update was attempted, false if skipped.
-     */
-    private function safeBackfillAdmFromName(array $mapped): bool
-    {
-        if (empty($mapped['adm_no']) || empty($mapped['name']) || empty($mapped['comp'])) {
-            return false;
-        }
-
-        $parts = explode(' ', $this->canonicalPersonName($mapped['name']));
-        $parts = array_values(array_filter($parts));
-
-        // ❗ Never backfill on single-token names
-        if (count($parts) < 2) {
-            return false;
-        }
-
-        $first  = $parts[0];
-        $second = $parts[1];
-
-        DB::table('kass_staging_contributions')
-            ->where('company', $mapped['comp'])
-            ->whereNull('adm_no')
-            ->whereRaw(
-                "UPPER(raw_name) LIKE ? AND UPPER(raw_name) LIKE ?",
-                ["%{$first}%", "%{$second}%"]
-            )
-            ->update([
-                'adm_no'     => $mapped['adm_no'],
-                'updated_at' => now(),
-            ]);
-
-        return true;
-    }
 }

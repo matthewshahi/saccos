@@ -50,11 +50,34 @@ use App\Http\Controllers\PasswordResetController;
 use App\Http\Controllers\LoanRepaymentImportController;
 use App\Http\Controllers\ManualMpesaRecoveryController;
 
-
+/*
 use App\Http\Controllers\KassMigrationController;
 use App\Http\Controllers\KasMemberImportController;
 
-/*
+use App\Http\Controllers\KassContributionsImportController;
+
+use App\Http\Controllers\KassMemberMasterImportController;
+
+Route::prefix('kass')->group(function () {
+    Route::get('/member-master-import', [KassMemberMasterImportController::class, 'index'])->name('kass.member_master_import.index');
+    Route::post('/member-master-import/preview', [KassMemberMasterImportController::class, 'preview'])->name('kass.member_master_import.preview');
+    Route::post('/member-master-import/confirm', [KassMemberMasterImportController::class, 'confirm'])->name('kass.member_master_import.confirm');
+});
+
+
+Route::get('/kass/import/contributions', 
+    [KassContributionsImportController::class, 'index']
+)->name('kass.import.contributions.form');
+
+Route::post('/kass/import/contributions', 
+    [KassContributionsImportController::class, 'import']
+)->name('kass.import.contributions.run');
+Route::get(
+    '/kass/import/contributions/run',
+    [KassContributionsImportController::class, 'run']
+);
+
+
 Route::prefix('kass_loan_imports')->name('kassloan.')->group(function () {
 
     // Dashboard
@@ -145,8 +168,8 @@ Route::get('/kass/preview', [KassMigrationController::class, 'preview'])
 
 
 });
+ 
 */
-
 // use App\Http\Controllers\LedgerRebuildController;
 
 // Route::get('/rebuild/ledgers', [LedgerRebuildController::class, 'rebuild'])

@@ -10,6 +10,14 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
 class KassMigrationController extends Controller
 {
     private static $didTruncate = false;
+        // Tracks whether we have ever seen this member before (across all processed files)
+    // Key format: ADM|COMP or NAME|COMP fallback
+    private array $seenMembersGlobal = [];
+
+    // Tracks whether we have skipped the first JAN for a member (only when member is already known)
+    private array $skippedFirstJanForKnownMember = [];
+
+
 
     public function __construct()
     {
@@ -511,16 +519,26 @@ if ($loanSheet) {
             $mapped['comp'] = $carryComp;
         }
 
-        // Skip row if identification is still missing
-        if (empty($mapped['name']) || empty($mapped['adm_no'])) {
-            $this->logIssue($sourceFile, 'ANOMALY_MISSING_KEY_FIELDS', [
-                'row'          => $mapped,
-                '_carry_name'  => $carryName,
-                '_carry_adm'   => $carryAdm,
-                '_carry_comp'  => $carryComp
-            ]);
-            continue;
-        }
+        $memberKey = $this->memberKey($mapped);
+
+if ($memberKey === null) {
+    $this->logIssue($sourceFile, 'ANOMALY_MISSING_MEMBER_KEY', [
+        'row' => $mapped,
+    ]);
+    continue;
+}
+
+
+        // // Skip row if identification is still missing
+        // if (empty($mapped['name']) || empty($mapped['adm_no'])) {
+        //     $this->logIssue($sourceFile, 'ANOMALY_MISSING_KEY_FIELDS', [
+        //         'row'          => $mapped,
+        //         '_carry_name'  => $carryName,
+        //         '_carry_adm'   => $carryAdm,
+        //         '_carry_comp'  => $carryComp
+        //     ]);
+        //     continue;
+        // }
 
         // -----------------------------------------
         // Clean year / month
@@ -1497,6 +1515,24 @@ protected function validPeriodIndex($value)
     $num = intval($clean);
 
     return ($num >= 1 && $num <= 72) ? $num : null;
+}
+private function memberKey(array $mapped): ?string
+{
+    $adm  = trim((string)($mapped['adm_no'] ?? ''));
+    $comp = trim((string)($mapped['comp'] ?? ''));
+    $name = trim((string)($mapped['name'] ?? ''));
+
+    // Prefer ADM+COMP
+    if ($adm !== '' && $comp !== '') {
+        return strtoupper($adm . '|' . $comp);
+    }
+
+    // Fallback: NAME+COMP (only if ADM missing)
+    if ($name !== '' && $comp !== '') {
+        return strtoupper($name . '|' . $comp);
+    }
+
+    return null;
 }
 
 }

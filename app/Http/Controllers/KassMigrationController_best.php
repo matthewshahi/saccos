@@ -544,8 +544,27 @@ class KassMigrationController extends Controller
             // =====================================================
             // 🔁 BACKFILL ADM WHEN IT APPEARS (CRITICAL FIX)
             // =====================================================
-            $this->safeBackfillAdmFromName($mapped);
+            if (!empty($mapped['adm_no']) && !empty($mapped['name'])) {
 
+                [$first, $second] = array_slice(
+    explode(' ', $this->canonicalPersonName($mapped['name'])),
+    0,
+    2
+);
+
+DB::table('kass_staging_contributions')
+    ->where('company', $mapped['comp'])
+    ->whereNull('adm_no')
+    ->whereRaw(
+        "UPPER(raw_name) LIKE ? AND UPPER(raw_name) LIKE ?",
+        ["%$first%", "%$second%"]
+    )
+    ->update([
+        'adm_no'     => $mapped['adm_no'],
+        'updated_at'=> now(),
+    ]);
+
+            }
 
 
             $memberKey = $this->memberKey($mapped);
@@ -565,7 +584,25 @@ class KassMigrationController extends Controller
                     // Update current row in memory
                     $mapped['adm_no'] = $resolvedAdm;
 
-                   $this->safeBackfillAdmFromName($mapped);
+                    // Persist back to staging (real-time normalization)
+                   [$first, $second] = array_slice(
+    explode(' ', $this->canonicalPersonName($mapped['name'])),
+    0,
+    2
+);
+
+DB::table('kass_staging_contributions')
+    ->where('company', $mapped['comp'])
+    ->whereNull('adm_no')
+    ->whereRaw(
+        "UPPER(raw_name) LIKE ? AND UPPER(raw_name) LIKE ?",
+        ["%$first%", "%$second%"]
+    )
+    ->update([
+        'adm_no'     => $mapped['adm_no'],
+        'updated_at'=> now(),
+    ]);
+
                 }
             }
 
@@ -2249,42 +2286,5 @@ class KassMigrationController extends Controller
         }
 
         return null;
-    }
-    /**
-     * Safely backfill ADM number for rows missing adm_no,
-     * using FIRST + SECOND name tokens only.
-     *
-     * Returns true if an update was attempted, false if skipped.
-     */
-    private function safeBackfillAdmFromName(array $mapped): bool
-    {
-        if (empty($mapped['adm_no']) || empty($mapped['name']) || empty($mapped['comp'])) {
-            return false;
-        }
-
-        $parts = explode(' ', $this->canonicalPersonName($mapped['name']));
-        $parts = array_values(array_filter($parts));
-
-        // ❗ Never backfill on single-token names
-        if (count($parts) < 2) {
-            return false;
-        }
-
-        $first  = $parts[0];
-        $second = $parts[1];
-
-        DB::table('kass_staging_contributions')
-            ->where('company', $mapped['comp'])
-            ->whereNull('adm_no')
-            ->whereRaw(
-                "UPPER(raw_name) LIKE ? AND UPPER(raw_name) LIKE ?",
-                ["%{$first}%", "%{$second}%"]
-            )
-            ->update([
-                'adm_no'     => $mapped['adm_no'],
-                'updated_at' => now(),
-            ]);
-
-        return true;
     }
 }

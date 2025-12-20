@@ -213,7 +213,7 @@
             @foreach($data['loans'] as $loan)
                 <div class="loan-box mb-4 p-3 border rounded">
                     <h6 class="fw-bold text-danger">
-                        {{ $loan->loan_type_name }} ({{ $loan->loan_id }}) — {{ $loan->loan_category_name }}
+                        {{ $loan->loan_type_name }} ({{ $loan->loan_id }}) — {{ $loan->loan_doc_no }}
                     </h6>
                     <p class="small mb-2">
                         <strong>Amount:</strong> Ksh {{ number_format($loan->loan_amount,2) }} |
