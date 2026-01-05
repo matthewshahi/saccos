@@ -7,7 +7,7 @@
 
       {{-- HEADER --}}
       <div class="card-header d-flex align-items-center">
-        <h3 class="w-75 card-title m-0">FOSA Members Report</h3>
+        <h3 class="w-75 card-title m-0">OTher Savings - Members Report</h3>
         <div class="dropdown dropleft text-end w-25">
           <button class="btn bg-gray-100" data-bs-toggle="dropdown">
             <i class="nav-icon i-Gear-2"></i>
