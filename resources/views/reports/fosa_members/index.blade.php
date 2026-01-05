@@ -92,33 +92,77 @@
         <div class="table-responsive">
           <table class="table table-striped text-center">
             <thead>
-              <tr>
-                <th>#</th>
-                <th>Member</th>
-                <th>Department</th>
-                <th>Company</th>
-                <th>Txns</th>
-                <th>Total FOSA</th>
-                <th>Last Txn</th>
-              </tr>
-            </thead>
-            <tbody>
-              @forelse ($records as $i => $row)
-                <tr>
-                  <th>{{ $records->firstItem() + $i }}</th>
-                  <td>{{ $row->member_name }}</td>
-                  <td>{{ $row->department_name }}</td>
-                  <td>{{ $row->company_name }}</td>
-                  <td>{{ number_format($row->txn_count) }}</td>
-                  <td>{{ number_format($row->total_fosa_amount, 2) }}</td>
-                  <td>{{ $row->last_txn_date }}</td>
-                </tr>
-              @empty
-                <tr>
-                  <td colspan="7" class="text-muted">No matching records.</td>
-                </tr>
-              @endforelse
-            </tbody>
+<tr>
+    <th class="text-start">#</th>
+    <th class="text-start">Member</th>
+    <th class="text-start">SACCO No</th>
+    <th class="text-start">National ID</th>
+    <th class="text-start">KRA PIN</th>
+    <th class="text-start">Phone</th>
+    <th class="text-start">Department</th>
+    <th class="text-start">Company</th>
+    <th class="text-end">Txns</th>
+    <th class="text-end">Total FOSA</th>
+    <th class="text-end">Last Txn</th>
+</tr>
+</thead>
+
+            <<tbody>
+@forelse ($records as $i => $row)
+<tr>
+    <td class="text-start">
+        {{ $records->firstItem() + $i }}
+    </td>
+
+    <td class="text-start fw-semibold">
+        {{ $row->member_name }}
+    </td>
+
+    <td class="text-start text-muted">
+        {{ $row->member_sacco_id ?? '—' }}
+    </td>
+
+    <td class="text-start text-muted">
+        {{ $row->member_national_id ?? '—' }}
+    </td>
+
+    <td class="text-start text-muted">
+        {{ $row->member_kra_pin ?? '—' }}
+    </td>
+
+    <td class="text-start">
+        {{ $row->member_phone_no ?? '—' }}
+    </td>
+
+    <td class="text-start">
+        {{ $row->department_name }}
+    </td>
+
+    <td class="text-start">
+        {{ $row->company_name }}
+    </td>
+
+    <td class="text-end">
+        {{ number_format($row->txn_count) }}
+    </td>
+
+    <td class="text-end fw-bold">
+        {{ number_format($row->total_fosa_amount, 2) }}
+    </td>
+
+    <td class="text-end">
+        {{ \Carbon\Carbon::parse($row->last_txn_date)->format('d/m/Y H:i') }}
+    </td>
+</tr>
+@empty
+<tr>
+    <td colspan="11" class="text-center text-muted">
+        No matching records found
+    </td>
+</tr>
+@endforelse
+</tbody>
+
           </table>
         </div>
 
