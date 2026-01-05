@@ -94,6 +94,26 @@
           </div>
         </form>
       </div>
+      @if(request()->filled('description_search'))
+<div class="card-body pt-3 pb-0">
+    <div class="alert alert-warning d-flex align-items-start" role="alert">
+        <i class="nav-icon i-Warning-Window me-2 mt-1"></i>
+        <div>
+            <strong>Important:</strong> You are searching using transaction descriptions.
+            <br>
+            Descriptions are <em>free-text</em> and may not reflect the official FOSA category.
+            This means:
+            <ul class="mb-1">
+                <li>A member may appear when searching <strong>REFLECTOR</strong> even if the payment was actually a different category (e.g. Registration).</li>
+                <li>The same member may appear under multiple description searches.</li>
+            </ul>
+            <strong>Best practice:</strong> Use official FOSA categorisation for accurate reporting.
+            Description search is intended for <em>data review and cleanup</em> only.
+        </div>
+    </div>
+</div>
+@endif
+
 
       {{-- TABLE --}}
       <div class="card-body">

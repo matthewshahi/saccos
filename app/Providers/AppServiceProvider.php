@@ -6,6 +6,9 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\View;
 use App\Http\ViewComposers\CurrentPeriodComposer;
 use App\Http\ViewComposers\CompanyNameComposer;
+use Illuminate\Pagination\Paginator;
+
+
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -33,5 +36,9 @@ class AppServiceProvider extends ServiceProvider
 
         // Share Sacco support contact globally with all views
         View::share('saccoSupport', config('app.sacco_support'));
+
+         Paginator::useBootstrap();
     }
+
+    
 }
