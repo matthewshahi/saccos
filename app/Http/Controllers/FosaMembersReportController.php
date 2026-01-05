@@ -114,7 +114,7 @@ class FosaMembersReportController extends Controller
 
         $query->orderBy("{$m}.member_name", 'asc');
 
-        $records = $query->paginate(25)->withQueryString();
+        $records = $query->paginate(400)->withQueryString();
 
         $fosaTypes = DB::table('sacco_fosa_types')
             ->where('type_active', 'Y')
