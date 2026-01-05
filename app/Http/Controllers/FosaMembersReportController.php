@@ -17,11 +17,8 @@ class FosaMembersReportController extends Controller
             ->leftJoin('sacco_fosa_types', 'sacco_fosas.fosa_type_id', '=', 'sacco_fosa_types.type_id')
             ->where('sacco_members.member_deleted', '<>', 'Y');
 
-        /*
-        |--------------------------------------------------------------------------
-        | Filters
-        |--------------------------------------------------------------------------
-        */
+        /* ---------------- Filters ---------------- */
+
         if ($request->filled('fosa_type_id')) {
             $query->where('sacco_fosas.fosa_type_id', $request->fosa_type_id);
         }
@@ -44,33 +41,22 @@ class FosaMembersReportController extends Controller
 
         if ($request->filled('search')) {
             $search = trim($request->search);
-            $query->where(function ($q) use ($search) {
-                $q->where('sacco_members.member_name', 'like', "%{$search}%")
-                  ->orWhere('sacco_members.member_no', 'like', "%{$search}%");
-            });
+            $query->where('sacco_members.member_name', 'like', "%{$search}%");
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | ONE ROW PER MEMBER (critical rule)
-        |--------------------------------------------------------------------------
-        */
+        /* -------- Enforce ONE ROW PER MEMBER -------- */
+
         $query->groupBy(
             'sacco_members.member_id',
-            'sacco_members.member_no',
             'sacco_members.member_name',
             'sacco_department.department_name',
             'sacco_company.company_name'
         );
 
-        /*
-        |--------------------------------------------------------------------------
-        | Aggregates
-        |--------------------------------------------------------------------------
-        */
+        /* ---------------- Select ---------------- */
+
         $query->select(
             'sacco_members.member_id',
-            'sacco_members.member_no',
             'sacco_members.member_name',
             'sacco_department.department_name',
             'sacco_company.company_name',
@@ -79,44 +65,12 @@ class FosaMembersReportController extends Controller
             DB::raw('MAX(sacco_fosas.fosa_date_paid) AS last_txn_date')
         );
 
-        /*
-        |--------------------------------------------------------------------------
-        | Sorting
-        |--------------------------------------------------------------------------
-        */
-        $orderBy  = $request->get('order_by', 'member_name');
-        $orderDir = $request->get('order_dir', 'asc');
-
-        $allowedOrder = [
-            'member_name',
-            'member_no',
-            'total_fosa_amount',
-            'txn_count',
-            'last_txn_date'
-        ];
-
-        if (! in_array($orderBy, $allowedOrder)) {
-            $orderBy = 'member_name';
-        }
-
-        $query->orderBy($orderBy, $orderDir);
+        $query->orderBy('sacco_members.member_name');
 
         $records = $query->paginate(25)->withQueryString();
 
-        /*
-        |--------------------------------------------------------------------------
-        | Filter dropdown data
-        |--------------------------------------------------------------------------
-        */
         $fosaTypes = DB::table('sacco_fosa_types')->orderBy('type_name')->get();
-        $companies = DB::table('sacco_company')->orderBy('company_name')->get();
-        $departments = DB::table('sacco_department')->orderBy('department_name')->get();
 
-        return view('reports.fosa_members.index', compact(
-            'records',
-            'fosaTypes',
-            'companies',
-            'departments'
-        ));
+        return view('reports.fosa_members.index', compact('records', 'fosaTypes'));
     }
 }
