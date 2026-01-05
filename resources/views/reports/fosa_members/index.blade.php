@@ -1,98 +1,115 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="container-fluid">
+<div class="row">
 
-    <h4 class="mb-3">FOSA Contributions – Member Summary</h4>
+  <div class="col-md-12">
+    <div class="card o-hidden mb-4">
 
-    {{-- Filters --}}
-    <form method="get" class="card mb-3">
-        <div class="card-body">
-            <div class="row g-2">
+      {{-- CARD HEADER --}}
+      <div class="card-header d-flex align-items-center">
+        <h3 class="w-75 float-start card-title m-0">
+          FOSA Contributions – Member Summary
+        </h3>
 
-                <div class="col-md-3">
-                    <input type="text" name="search" class="form-control"
-                        placeholder="Search member name / number"
-                        value="{{ request('search') }}">
-                </div>
+        <div class="dropdown dropleft text-end w-25 float-end">
+          <button class="btn bg-gray-100" type="button" data-bs-toggle="dropdown">
+            <i class="nav-icon i-Gear-2"></i>
+          </button>
+          <div class="dropdown-menu">
+            <a class="dropdown-item" href="{{ route('reports.fosa.members') }}">Reset Filters</a>
+          </div>
+        </div>
+      </div>
 
-                <div class="col-md-2">
-                    <select name="fosa_type_id" class="form-control">
-                        <option value="">All FOSA Types</option>
-                        @foreach ($fosaTypes as $type)
-                            <option value="{{ $type->type_id }}"
-                                @selected(request('fosa_type_id') == $type->type_id)>
-                                {{ $type->type_name }}
-                            </option>
-                        @endforeach
-                    </select>
-                </div>
+      {{-- FILTER BAR --}}
+      <div class="card-body border-bottom">
+        <form method="get">
+          <div class="row g-2">
 
-                <div class="col-md-2">
-                    <input type="text" name="period_from" class="form-control"
-                        placeholder="Period From (YYYYMM)"
-                        value="{{ request('period_from') }}">
-                </div>
-
-                <div class="col-md-2">
-                    <input type="text" name="period_to" class="form-control"
-                        placeholder="Period To (YYYYMM)"
-                        value="{{ request('period_to') }}">
-                </div>
-
-                <div class="col-md-3">
-                    <button class="btn btn-primary">Apply Filters</button>
-                    <a href="{{ route('reports.fosa.members') }}"
-                       class="btn btn-outline-secondary">
-                        Reset
-                    </a>
-                </div>
-
+            <div class="col-md-4">
+              <input type="text" name="search" class="form-control"
+                     placeholder="Search member name"
+                     value="{{ request('search') }}">
             </div>
+
+            <div class="col-md-3">
+              <select name="fosa_type_id" class="form-control">
+                <option value="">All FOSA Types</option>
+                @foreach ($fosaTypes as $type)
+                  <option value="{{ $type->type_id }}"
+                    @selected(request('fosa_type_id') == $type->type_id)>
+                    {{ $type->type_name }}
+                  </option>
+                @endforeach
+              </select>
+            </div>
+
+            <div class="col-md-2">
+              <input type="text" name="period_from" class="form-control"
+                     placeholder="From (YYYYMM)"
+                     value="{{ request('period_from') }}">
+            </div>
+
+            <div class="col-md-2">
+              <input type="text" name="period_to" class="form-control"
+                     placeholder="To (YYYYMM)"
+                     value="{{ request('period_to') }}">
+            </div>
+
+            <div class="col-md-1">
+              <button class="btn btn-primary w-100">Go</button>
+            </div>
+
+          </div>
+        </form>
+      </div>
+
+      {{-- TABLE --}}
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table text-center table-striped">
+
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Member</th>
+                <th>Department</th>
+                <th>Company</th>
+                <th>Transactions</th>
+                <th>Total FOSA</th>
+                <th>Last Txn</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              @forelse ($records as $i => $row)
+                <tr>
+                  <th scope="row">{{ $records->firstItem() + $i }}</th>
+                  <td>{{ $row->member_name }}</td>
+                  <td>{{ $row->department_name }}</td>
+                  <td>{{ $row->company_name }}</td>
+                  <td>{{ number_format($row->txn_count) }}</td>
+                  <td>{{ number_format($row->total_fosa_amount, 2) }}</td>
+                  <td>{{ $row->last_txn_date }}</td>
+                </tr>
+              @empty
+                <tr>
+                  <td colspan="7" class="text-muted">
+                    No data found
+                  </td>
+                </tr>
+              @endforelse
+            </tbody>
+
+          </table>
         </div>
-    </form>
 
-    {{-- Results --}}
-    <div class="card">
-        <div class="card-body table-responsive">
+        {{ $records->links() }}
+      </div>
 
-            <table class="table table-bordered table-striped">
-                <thead>
-                    <tr>
-                        <th>Member No</th>
-                        <th>Member Name</th>
-                        <th>Department</th>
-                        <th>Company</th>
-                        <th class="text-end">Transactions</th>
-                        <th class="text-end">Total FOSA</th>
-                        <th>Last Transaction</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @forelse ($records as $row)
-                        <tr>
-                            <td>{{ $row->member_no }}</td>
-                            <td>{{ $row->member_name }}</td>
-                            <td>{{ $row->department_name }}</td>
-                            <td>{{ $row->company_name }}</td>
-                            <td class="text-end">{{ number_format($row->txn_count) }}</td>
-                            <td class="text-end">{{ number_format($row->total_fosa_amount, 2) }}</td>
-                            <td>{{ $row->last_txn_date }}</td>
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="7" class="text-center text-muted">
-                                No records found
-                            </td>
-                        </tr>
-                    @endforelse
-                </tbody>
-            </table>
-
-            {{ $records->links() }}
-
-        </div>
     </div>
+  </div>
 
 </div>
 @endsection
