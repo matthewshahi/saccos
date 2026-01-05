@@ -364,12 +364,12 @@ $defaultLogoPath = '/image/logo.jpg'; // Default logo
                             <li class="Ul_li--hover">
                                 <a class="has-arrow" href="#">
                                     <i class="i-Bar-Chart text-20 me-2" style="color: #663399;"></i>
-                                    <span class="item-name text-15 text-muted">Other Savings /FOSA</span>
+                                    <span class="item-name text-15 text-muted">Other Savings</span>
                                 </a>
                                 <ul class="mm-collapse">
                                     <li class="item-name">
-                                        <a href="{{ url('reports/sasra/member_contributions/data') }}">
-                                            <span class="text-muted">Other Savings / Deposits</span>
+                                        <a href="{{ url('reports/fosa-members') }}">
+                                            <span class="text-muted">Other Savings </span>
                                         </a>
                                     </li>
                                     
