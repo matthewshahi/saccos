@@ -49,6 +49,7 @@ use App\Http\Controllers\InsuranceLoanReportController;
 use App\Http\Controllers\PasswordResetController;
 use App\Http\Controllers\LoanRepaymentImportController;
 use App\Http\Controllers\ManualMpesaRecoveryController;
+use App\Http\Controllers\FosaMembersReportController;
 
 /*
 use App\Http\Controllers\KassMigrationController;
@@ -983,6 +984,9 @@ Route::get('/loans/repayments/sample',
 
     Route::get('/reports/transport/mpesa',[TransportReportsController::class, 'mpesa'])->name('reports.transport.mpesa')->middleware('check_user_rights:rpt_transport_mpesa');
 
+    Route::get('/reports/fosa-members',[FosaMembersReportController::class, 'index'])->name('reports.fosa.members')->middleware('check_user_rights:list_fosa_report');
+
+ 
 
     if (config('sacco.transport_sacco') === 'Y') {
         Route::prefix('transport')->group(function () {
