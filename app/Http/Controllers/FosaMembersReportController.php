@@ -35,8 +35,9 @@ class FosaMembersReportController extends Controller
         $periodFrom = $request->filled('period_from') ? $request->period_from : '000000';
         $periodTo   = $request->filled('period_to')   ? $request->period_to   : '999999';
 
-        $defaultDateFrom = Carbon::now()->startOfMonth()->toDateString();
-        $defaultDateTo   = Carbon::now()->toDateString();
+        $defaultDateFrom = '2006-01-01';
+$defaultDateTo   = Carbon::now()->toDateString();
+
 
         $dateFrom = $request->filled('date_from') ? $request->date_from : $defaultDateFrom;
         $dateTo   = $request->filled('date_to')   ? $request->date_to   : $defaultDateTo;
@@ -106,14 +107,21 @@ class FosaMembersReportController extends Controller
         );
 
         $query->select(
-            "{$m}.member_id",
-            "{$m}.member_name",
-            "{$d}.department_name",
-            "{$c}.company_name",
-            DB::raw("COUNT({$f}.{$this->COL_ID}) AS txn_count"),
-            DB::raw("SUM({$f}.{$this->COL_AMOUNT}) AS total_fosa_amount"),
-            DB::raw("MAX({$f}.{$this->COL_DATE}) AS last_txn_date")
-        );
+    "{$m}.member_id",
+    "{$m}.member_name",
+    "{$m}.member_sacco_id",
+    "{$m}.member_national_id",
+    "{$m}.member_kra_pin",
+    "{$m}.member_phone_no",
+    "{$d}.department_name",
+    "{$c}.company_name",
+    DB::raw("COUNT({$f}.{$this->COL_ID}) AS txn_count"),
+    DB::raw("SUM({$f}.{$this->COL_AMOUNT}) AS total_fosa_amount"),
+    DB::raw("MAX({$f}.{$this->COL_DATE}) AS last_txn_date")
+);
+
+
+         
 
         /*
         |--------------------------------------------------------------------------
