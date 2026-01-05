@@ -1,7 +1,3 @@
-<div style="position:fixed; top:10px; right:10px; background:red; color:white; z-index:99999;">
-    PERIOD ALERT PARTIAL LOADED
-</div>
-
 @if (
     Auth::check()
     && Auth::user()->member_position == 2
@@ -11,12 +7,13 @@
     <div
         id="period-alert"
         class="alert alert-warning alert-dismissible fade show"
+        role="alert"
         style="
             position: fixed;
             bottom: 20px;
             right: 20px;
             max-width: 420px;
-            z-index: 1050;
+            z-index: 99999;
             box-shadow: 0 6px 18px rgba(0,0,0,0.15);
         "
     >
@@ -35,22 +32,26 @@
         <button
             type="button"
             class="btn-close"
+            data-bs-dismiss="alert"
             aria-label="Close"
-            onclick="dismissPeriodAlert()"
         ></button>
     </div>
 
     <script>
         (function () {
+            const alertEl = document.getElementById('period-alert');
+
+            if (!alertEl) return;
+
+            // Do not re-show if dismissed in this session
             if (sessionStorage.getItem('periodAlertDismissed') === '1') {
-                document.getElementById('period-alert')?.remove();
+                alertEl.remove();
                 return;
             }
 
-            window.dismissPeriodAlert = function () {
-                document.getElementById('period-alert')?.remove();
+            alertEl.addEventListener('closed.bs.alert', function () {
                 sessionStorage.setItem('periodAlertDismissed', '1');
-            };
+            });
         })();
     </script>
 @endif
