@@ -45,7 +45,7 @@ class CategorizeUnsortedFosaJob implements ShouldQueue
         $fosas = DB::table('sacco_fosas')
             ->whereNull('fosa_type_id')
             ->orderBy('fosa_id')   // stable batching
-            ->limit(200)
+            ->limit(500)
             ->get([
                 'fosa_id',
                 'fosa_description',
