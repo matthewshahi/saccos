@@ -36,7 +36,7 @@
 </head>
 
 <body class="text-start">
-
+@include('partials.period_alert')
 @include('partials.password_change')
 
 

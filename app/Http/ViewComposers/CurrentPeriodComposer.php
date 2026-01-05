@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\ViewComposers;
 
 use Illuminate\View\View;
@@ -13,6 +14,19 @@ class CurrentPeriodComposer
             ->where('period_deleted', '<>', 'Y')
             ->first();
 
-        $view->with('currentPeriod', $currentPeriod);
+        // Compute system "current" YYYYMM
+        $systemPeriod = (int) date('Ym');
+
+        $isOldPeriod = false;
+
+        if ($currentPeriod && isset($currentPeriod->period_no)) {
+            $isOldPeriod = ((int) $currentPeriod->period_no < $systemPeriod);
+        }
+
+        $view->with([
+            'currentPeriod' => $currentPeriod,
+            'systemPeriod'  => $systemPeriod,
+            'isOldPeriod'   => $isOldPeriod,
+        ]);
     }
 }
