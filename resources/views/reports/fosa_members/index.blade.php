@@ -6,24 +6,17 @@
     <div class="card o-hidden mb-4">
 
       <div class="card-header d-flex align-items-center">
-        <h3 class="w-50 float-start card-title m-0">FOSA Members Report</h3>
-
-        <div class="dropdown dropleft text-end w-50 float-end">
-          <button class="btn bg-gray-100" type="button" data-bs-toggle="dropdown">
-            <i class="nav-icon i-Gear-2"></i>
-          </button>
-          <div class="dropdown-menu">
-            <a class="dropdown-item" href="{{ route('reports.fosa.members') }}">Reset Filters</a>
-          </div>
-        </div>
+        <h3 class="w-50 card-title m-0">FOSA Members Report</h3>
       </div>
 
       <div class="card-body border-bottom">
         <form method="get">
           <div class="row g-2">
 
-            <div class="col-md-5">
-              <input type="text" name="search" class="form-control"
+            <div class="col-md-4">
+              <input type="text"
+                     name="search"
+                     class="form-control"
                      placeholder="Search member name"
                      value="{{ request('search') }}">
             </div>
@@ -31,38 +24,52 @@
             <div class="col-md-4">
               <select name="fosa_type_id" class="form-control">
                 <option value="">All FOSA Types</option>
+
                 @foreach ($fosaTypes as $type)
-                  <option value="{{ $type->type_id }}" @selected(request('fosa_type_id') == $type->type_id)>
+                  <option value="{{ $type->type_id }}"
+                    @selected(request('fosa_type_id') == $type->type_id)>
                     {{ $type->type_name }}
                   </option>
                 @endforeach
+
+                <option value="__NULL__"
+                  @selected(request('fosa_type_id') === '__NULL__')>
+                  Unsorted / Uncategorized
+                </option>
               </select>
             </div>
 
-            <div class="col-md-3">
-              <button class="btn btn-primary w-100">Apply</button>
-            </div>
-
-          </div>
-
-          <div class="row g-2 mt-2">
-            <div class="col-md-3">
-              <input type="text" name="period_from" class="form-control"
-                     placeholder="Period From (YYYYMM)"
+            <div class="col-md-2">
+              <input type="text"
+                     name="period_from"
+                     class="form-control"
+                     placeholder="From (YYYYMM)"
                      value="{{ request('period_from') }}">
             </div>
-            <div class="col-md-3">
-              <input type="text" name="period_to" class="form-control"
-                     placeholder="Period To (YYYYMM)"
+
+            <div class="col-md-2">
+              <input type="text"
+                     name="period_to"
+                     class="form-control"
+                     placeholder="To (YYYYMM)"
                      value="{{ request('period_to') }}">
             </div>
+
+            <div class="col-md-12 mt-2">
+              <button class="btn btn-primary">Apply Filters</button>
+              <a href="{{ route('reports.fosa.members') }}"
+                 class="btn btn-outline-secondary">
+                Reset
+              </a>
+            </div>
+
           </div>
         </form>
       </div>
 
       <div class="card-body">
         <div class="table-responsive">
-          <table class="table text-center">
+          <table class="table table-striped text-center">
             <thead>
               <tr>
                 <th>#</th>
@@ -75,9 +82,9 @@
               </tr>
             </thead>
             <tbody>
-              @forelse($records as $i => $row)
+              @forelse ($records as $i => $row)
                 <tr>
-                  <th scope="row">{{ $records->firstItem() + $i }}</th>
+                  <th>{{ $records->firstItem() + $i }}</th>
                   <td>{{ $row->member_name }}</td>
                   <td>{{ $row->department_name }}</td>
                   <td>{{ $row->company_name }}</td>
@@ -87,7 +94,9 @@
                 </tr>
               @empty
                 <tr>
-                  <td colspan="7" class="text-muted">No records found.</td>
+                  <td colspan="7" class="text-muted">
+                    No matching FOSA records found.
+                  </td>
                 </tr>
               @endforelse
             </tbody>
