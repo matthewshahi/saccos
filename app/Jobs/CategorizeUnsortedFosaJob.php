@@ -17,12 +17,14 @@ class CategorizeUnsortedFosaJob implements ShouldQueue
     {
         /**
          * STEP 1: Load authoritative FOSA types
-         * Exclude the default catch-all bucket
+         * - Active only
+         * - Exclude generic FOSA bucket
+         * - Deterministic ordering
          */
         $types = DB::table('sacco_fosa_types')
             ->where('type_active', 'Y')
             ->where('type_name', '!=', 'FOSA')
-            ->orderBy('type_id') // deterministic order
+            ->orderBy('type_id')
             ->get(['type_id', 'type_name']);
 
         if ($types->isEmpty()) {
@@ -30,21 +32,21 @@ class CategorizeUnsortedFosaJob implements ShouldQueue
         }
 
         /**
-         * Pre-normalize tokens ONCE
+         * STEP 2: Normalize type tokens once
          */
         $tokens = $types->map(function ($t) {
             return [
                 'id'    => $t->type_id,
                 'token' => strtoupper(trim($t->type_name)),
             ];
-        });
+        })->values();
 
         /**
-         * STEP 2: Fetch uncategorised FOSA rows (hard cap = 500)
+         * STEP 3: Fetch uncategorised FOSA rows (bounded batch)
          */
         $fosas = DB::table('sacco_fosas')
             ->whereNull('fosa_type_id')
-            ->orderBy('fosa_id')   // stable batching
+            ->orderBy('fosa_id')
             ->limit(500)
             ->get([
                 'fosa_id',
@@ -57,62 +59,85 @@ class CategorizeUnsortedFosaJob implements ShouldQueue
         }
 
         /**
-         * STEP 3: Deterministic categorisation
+         * STEP 4: Deterministic categorisation
          */
         foreach ($fosas as $fosa) {
 
-            $haystack = strtoupper(
+            // Build normalized haystack
+            $haystack = trim(strtoupper(
                 ($fosa->fosa_description ?? '') . ' ' . ($fosa->fosa_doc_no ?? '')
-            );
+            ));
 
             if ($haystack === '') {
                 continue;
             }
 
+            // Tokenize haystack once per row
+            $hayWords = preg_split(
+                '/[^A-Z0-9\-]+/',
+                $haystack,
+                -1,
+                PREG_SPLIT_NO_EMPTY
+            );
+
+            if (empty($hayWords)) {
+                continue;
+            }
+
+            $haySet = array_fill_keys($hayWords, true);
+
             foreach ($tokens as $type) {
 
-    // Break type name into words
-    $typeWords = preg_split(
-        '/[^A-Z0-9\-]+/',
-        $type['token'],
-        -1,
-        PREG_SPLIT_NO_EMPTY
-    );
+                /**
+                 * Break type name into words
+                 */
+                $typeWords = preg_split(
+                    '/[^A-Z0-9\-]+/',
+                    $type['token'],
+                    -1,
+                    PREG_SPLIT_NO_EMPTY
+                );
 
-    if (empty($typeWords)) {
-        continue;
-    }
+                if (empty($typeWords)) {
+                    continue;
+                }
 
-    // If last word is FEE, drop it (generic descriptor)
-    if (end($typeWords) === 'FEE') {
-        array_pop($typeWords);
-    }
+                /**
+                 * Drop generic trailing descriptor:
+                 *   REGISTRATION FEE → REGISTRATION
+                 *   NTSA FEE         → NTSA
+                 */
+                if (end($typeWords) === 'FEE') {
+                    array_pop($typeWords);
+                }
 
-    if (empty($typeWords)) {
-        continue;
-    }
+                if (empty($typeWords)) {
+                    continue;
+                }
 
-    // Require remaining words to exist
-    $allMatch = true;
-    foreach ($typeWords as $word) {
-        if (!isset($haySet[$word])) {
-            $allMatch = false;
-            break;
-        }
-    }
+                /**
+                 * Require ALL remaining words to exist
+                 */
+                $allMatch = true;
+                foreach ($typeWords as $word) {
+                    if (!isset($haySet[$word])) {
+                        $allMatch = false;
+                        break;
+                    }
+                }
 
-    if ($allMatch) {
-        DB::table('sacco_fosas')
-            ->where('fosa_id', $fosa->fosa_id)
-            ->whereNull('fosa_type_id')
-            ->update([
-                'fosa_type_id' => $type['id'],
-            ]);
+                if ($allMatch) {
+                    DB::table('sacco_fosas')
+                        ->where('fosa_id', $fosa->fosa_id)
+                        ->whereNull('fosa_type_id') // safety against race conditions
+                        ->update([
+                            'fosa_type_id' => $type['id'],
+                        ]);
 
-        break;
-    }
-}
-
+                    // Deterministic first match only
+                    break;
+                }
+            }
         }
     }
 }
