@@ -62,6 +62,13 @@ class Kernel extends ConsoleKernel
             ->timezone('Africa/Nairobi')
         ; //->runInBackground();
 
+        $schedule->job(new \App\Jobs\CategorizeUnsortedFosaJob())
+    ->everyFiveMinutes()
+    ->withoutOverlapping()
+    ->onOneServer()
+    ->timezone('Africa/Nairobi');
+
+
 
     }
 
