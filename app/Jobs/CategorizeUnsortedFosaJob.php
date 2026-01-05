@@ -40,7 +40,7 @@ class CategorizeUnsortedFosaJob implements ShouldQueue
         });
 
         /**
-         * STEP 2: Fetch uncategorised FOSA rows (hard cap = 30)
+         * STEP 2: Fetch uncategorised FOSA rows (hard cap = 500)
          */
         $fosas = DB::table('sacco_fosas')
             ->whereNull('fosa_type_id')
@@ -71,22 +71,48 @@ class CategorizeUnsortedFosaJob implements ShouldQueue
 
             foreach ($tokens as $type) {
 
-                /**
-                 * Explicit token match only
-                 * No fuzzy guessing
-                 */
-                if (str_contains($haystack, $type['token'])) {
+    // Break type name into words
+    $typeWords = preg_split(
+        '/[^A-Z0-9\-]+/',
+        $type['token'],
+        -1,
+        PREG_SPLIT_NO_EMPTY
+    );
 
-                    DB::table('sacco_fosas')
-                        ->where('fosa_id', $fosa->fosa_id)
-                        ->update([
-                            'fosa_type_id' => $type['id'],
-                        ]);
+    if (empty($typeWords)) {
+        continue;
+    }
 
-                    // Stop after first deterministic match
-                    break;
-                }
-            }
+    // If last word is FEE, drop it (generic descriptor)
+    if (end($typeWords) === 'FEE') {
+        array_pop($typeWords);
+    }
+
+    if (empty($typeWords)) {
+        continue;
+    }
+
+    // Require remaining words to exist
+    $allMatch = true;
+    foreach ($typeWords as $word) {
+        if (!isset($haySet[$word])) {
+            $allMatch = false;
+            break;
+        }
+    }
+
+    if ($allMatch) {
+        DB::table('sacco_fosas')
+            ->where('fosa_id', $fosa->fosa_id)
+            ->whereNull('fosa_type_id')
+            ->update([
+                'fosa_type_id' => $type['id'],
+            ]);
+
+        break;
+    }
+}
+
         }
     }
 }
