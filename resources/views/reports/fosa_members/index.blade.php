@@ -47,6 +47,14 @@
               </select>
             </div>
 
+            <div class="col-md-4">
+              <input type="text"
+                     name="description_search"
+                     class="form-control"
+                     placeholder="Search FOSA description (e.g. REFLECTOR)"
+                     value="{{ request('description_search') }}">
+            </div>
+
             <div class="col-md-2">
               <input type="text"
                      name="period_from"
@@ -67,14 +75,14 @@
               <input type="date"
                      name="date_from"
                      class="form-control"
-                     value="{{ request('date_from', $dateFrom) }}">
+                     value="{{ request('date_from') }}">
             </div>
 
             <div class="col-md-2">
               <input type="date"
                      name="date_to"
                      class="form-control"
-                     value="{{ request('date_to', $dateTo) }}">
+                     value="{{ request('date_to') }}">
             </div>
 
             <div class="col-md-12 mt-2">
@@ -90,7 +98,7 @@
       {{-- TABLE --}}
       <div class="card-body">
         <div class="table-responsive">
-          <table class="table table-striped text-center">
+          <table class="table table-striped">
             <thead>
 <tr>
     <th class="text-start">#</th>
@@ -107,48 +115,28 @@
 </tr>
 </thead>
 
-            <<tbody>
+<tbody>
 @forelse ($records as $i => $row)
 <tr>
-    <td class="text-start">
-        {{ $records->firstItem() + $i }}
-    </td>
+    <td class="text-start">{{ $records->firstItem() + $i }}</td>
 
-    <td class="text-start fw-semibold">
-        {{ $row->member_name }}
-    </td>
+    <td class="text-start fw-semibold">{{ $row->member_name }}</td>
 
-    <td class="text-start text-muted">
-        {{ $row->member_sacco_id ?? '—' }}
-    </td>
+    <td class="text-start text-muted">{{ $row->member_sacco_id ?? '—' }}</td>
 
-    <td class="text-start text-muted">
-        {{ $row->member_national_id ?? '—' }}
-    </td>
+    <td class="text-start text-muted">{{ $row->member_national_id ?? '—' }}</td>
 
-    <td class="text-start text-muted">
-        {{ $row->member_kra_pin ?? '—' }}
-    </td>
+    <td class="text-start text-muted">{{ $row->member_kra_pin ?? '—' }}</td>
 
-    <td class="text-start">
-        {{ $row->member_phone_no ?? '—' }}
-    </td>
+    <td class="text-start">{{ $row->member_phone_no ?? '—' }}</td>
 
-    <td class="text-start">
-        {{ $row->department_name }}
-    </td>
+    <td class="text-start">{{ $row->department_name }}</td>
 
-    <td class="text-start">
-        {{ $row->company_name }}
-    </td>
+    <td class="text-start">{{ $row->company_name }}</td>
 
-    <td class="text-end">
-        {{ number_format($row->txn_count) }}
-    </td>
+    <td class="text-end">{{ number_format($row->txn_count) }}</td>
 
-    <td class="text-end fw-bold">
-        {{ number_format($row->total_fosa_amount, 2) }}
-    </td>
+    <td class="text-end fw-bold">{{ number_format($row->total_fosa_amount, 2) }}</td>
 
     <td class="text-end">
         {{ \Carbon\Carbon::parse($row->last_txn_date)->format('d/m/Y H:i') }}
