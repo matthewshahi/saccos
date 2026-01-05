@@ -190,7 +190,7 @@ Route::get('/kass/preview', [KassMigrationController::class, 'preview'])
 
 // use App\Http\Controllers\ReportsShareController;
 
- Route::get('/members/update-totals', [\App\Http\Controllers\MemberTotalsController::class, 'recalculateAll'])->name('members.recalculate.totals');
+Route::get('/members/update-totals', [\App\Http\Controllers\MemberTotalsController::class, 'recalculateAll'])->name('members.recalculate.totals');
 
 // // Route::get('/members/import-transactions', [MemberImportController::class, 'showImportTransactionsForm'])->name('members.import.transactions.form');
 // // Route::post('/members/import-transactions', [MemberImportController::class, 'importSavingsAndShares'])->name('members.import.transactions');
@@ -317,11 +317,10 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/check-payment', [PaymentInquiryController::class, 'index'])->name('payment.check');
     Route::post('/check-payment', [PaymentInquiryController::class, 'check'])->name('payment.check.submit');
 
-   Route::post('/transport/operators/add-from-dashboard', 
-    [\App\Http\Controllers\Transport\OperatorDashBoardSlefAddController::class, 'addFromDashboard']
-)->name('operators.addFromDashboard');
-
-
+    Route::post(
+        '/transport/operators/add-from-dashboard',
+        [\App\Http\Controllers\Transport\OperatorDashBoardSlefAddController::class, 'addFromDashboard']
+    )->name('operators.addFromDashboard');
 });
 
 
@@ -362,25 +361,27 @@ Route::prefix('mobile')->group(function () {
 
 
 
- 
+
 
 Route::middleware(['auth', 'check_member_position'])->group(function () {
 
     // Show manual recovery form
-    Route::get('/mpesa/manual-recovery', 
+    Route::get(
+        '/mpesa/manual-recovery',
         [ManualMpesaRecoveryController::class, 'showForm']
     )->name('mpesa.manual.form')->middleware('check_user_rights:add_mpesa_manual_recovery');
 
     // Validate SMS message and show preview
-    Route::post('/mpesa/manual-recovery/validate', 
+    Route::post(
+        '/mpesa/manual-recovery/validate',
         [ManualMpesaRecoveryController::class, 'validateSms']
     )->name('mpesa.manual.validate')->middleware('check_user_rights:add_mpesa_manual_recovery');
 
     // Final approve & post transaction
-    Route::post('/mpesa/manual-recovery/process', 
+    Route::post(
+        '/mpesa/manual-recovery/process',
         [ManualMpesaRecoveryController::class, 'processSms']
     )->name('mpesa.manual.process')->middleware('check_user_rights:add_mpesa_manual_recovery');
-
 });
 
 
@@ -413,28 +414,28 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
 
 Route::middleware(['auth', 'check_member_position'])->group(function () {
 
-     
 
 
- 
 
-// 📊 Main Insurance Loan Report (view + filter)
-Route::get('/reports/loans/insurance', [InsuranceLoanReportController::class, 'index'])
-    ->name('reports.loans.insurance')
-    ->middleware('check_user_rights:rpt_loans_insurance');
 
-// 📤 Export to CSV
-Route::get('/reports/loans/insurance/export', [InsuranceLoanReportController::class, 'export'])
-    ->name('reports.loans.insurance.export')
-    ->middleware('check_user_rights:rpt_loans_insurance');
 
-Route::get('/members/mass-password-reset', [PasswordResetController::class, 'confirm'])
-    ->name('members.mass_password_reset.confirm')
-    ->middleware('check_user_rights:mass_password_reset');
+    // 📊 Main Insurance Loan Report (view + filter)
+    Route::get('/reports/loans/insurance', [InsuranceLoanReportController::class, 'index'])
+        ->name('reports.loans.insurance')
+        ->middleware('check_user_rights:rpt_loans_insurance');
 
-Route::post('/members/mass-password-reset', [PasswordResetController::class, 'execute'])
-    ->name('members.mass_password_reset.execute')
-    ->middleware('check_user_rights:mass_password_reset');
+    // 📤 Export to CSV
+    Route::get('/reports/loans/insurance/export', [InsuranceLoanReportController::class, 'export'])
+        ->name('reports.loans.insurance.export')
+        ->middleware('check_user_rights:rpt_loans_insurance');
+
+    Route::get('/members/mass-password-reset', [PasswordResetController::class, 'confirm'])
+        ->name('members.mass_password_reset.confirm')
+        ->middleware('check_user_rights:mass_password_reset');
+
+    Route::post('/members/mass-password-reset', [PasswordResetController::class, 'execute'])
+        ->name('members.mass_password_reset.execute')
+        ->middleware('check_user_rights:mass_password_reset');
 
 
 
@@ -608,25 +609,25 @@ Route::post('/members/mass-password-reset', [PasswordResetController::class, 'ex
             Route::get('/transactions/{id}/receipt', [CapitalShareTransactionController::class, 'receipt'])
                 ->name('capitalshares.transactions.receipt');
         });
-   
-        Route::get('/new_members/list', [PublicRegistrationActionsController::class, 'listMembers'])
-    ->name('members.list')
-    ->middleware('check_user_rights:new_member_applications_list');
 
-Route::post('/new_members/update/{id}', [PublicRegistrationActionsController::class, 'updateField'])
-    ->middleware('check_user_rights:new_member_applications_update');
+    Route::get('/new_members/list', [PublicRegistrationActionsController::class, 'listMembers'])
+        ->name('members.list')
+        ->middleware('check_user_rights:new_member_applications_list');
 
-Route::get('/new_members/details/{id}', [PublicRegistrationActionsController::class, 'getMemberDetails'])
-    ->name('members.details')
-    ->middleware('check_user_rights:new_member_applications_update');
+    Route::post('/new_members/update/{id}', [PublicRegistrationActionsController::class, 'updateField'])
+        ->middleware('check_user_rights:new_member_applications_update');
 
-Route::post('/new_members/export/live', [PublicRegistrationActionsController::class, 'exportLive'])
-    ->name('members.exportLive')
-    ->middleware('check_user_rights:new_member_applications_update');
+    Route::get('/new_members/details/{id}', [PublicRegistrationActionsController::class, 'getMemberDetails'])
+        ->name('members.details')
+        ->middleware('check_user_rights:new_member_applications_update');
+
+    Route::post('/new_members/export/live', [PublicRegistrationActionsController::class, 'exportLive'])
+        ->name('members.exportLive')
+        ->middleware('check_user_rights:new_member_applications_update');
 
     Route::post('/new_members/delete', [PublicRegistrationActionsController::class, 'deleteMember'])
-    ->name('new_members.delete')
-    ->middleware('check_user_rights:new_member_applications_update');
+        ->name('new_members.delete')
+        ->middleware('check_user_rights:new_member_applications_update');
 
 
 
@@ -648,9 +649,9 @@ Route::post('/new_members/export/live', [PublicRegistrationActionsController::cl
 
     //Route::get('/members/list', [HomeController::class, 'membersList'])->name('members.list')->middleware('check_user_rights:list_sacco_member');
     Route::get('/members/list', [HomeController::class, 'membersList'])->name('members.listing')->middleware('check_user_rights:list_sacco_member');
-Route::get('/members/list/csv', [HomeController::class, 'membersListCsv'])
-    ->name('members.list.csv')
-    ->middleware('check_user_rights:list_sacco_member');
+    Route::get('/members/list/csv', [HomeController::class, 'membersListCsv'])
+        ->name('members.list.csv')
+        ->middleware('check_user_rights:list_sacco_member');
 
 
     Route::get('/members/add', [HomeController::class, 'addNewMember'])->name('members.add')->middleware('check_user_rights:add_new_sacco_member');
@@ -716,12 +717,13 @@ Route::get('/members/list/csv', [HomeController::class, 'membersListCsv'])
     });
 
     // List manually recovered M-Pesa transactions
-Route::get('/mpesa/manual-recoveries', 
-    [ManualMpesaRecoveryController::class, 'manualRecoveries']
-)->name('mpesa.manual.list')
- ->middleware(['auth', 'check_member_position', 'check_user_rights:add_mpesa_manual_recovery']);
+    Route::get(
+        '/mpesa/manual-recoveries',
+        [ManualMpesaRecoveryController::class, 'manualRecoveries']
+    )->name('mpesa.manual.list')
+        ->middleware(['auth', 'check_member_position', 'check_user_rights:add_mpesa_manual_recovery']);
 
- 
+
 
     Route::get('/reports/sasra/outstandingloans/{status}/{active?}', [HomeController::class, 'reportSasraLoans'])->name('reports.sasra.loans')->middleware('check_user_rights:rpt_loans_issued');
     Route::post('/reports/sasra/outstandingloans/{status}/{active?}', [HomeController::class, 'reportSasraLoans'])->name('reports.sasra.loans.post')->middleware('check_user_rights:rpt_loans_issued');
@@ -830,25 +832,33 @@ Route::get('/mpesa/manual-recoveries',
 
 
     // Loan Repayments CSV Upload
-Route::get('/loans/repayments/import', 
-    [LoanRepaymentImportController::class, 'index'])
-    ->name('loans.repayments.import')
-    ->middleware('check_user_rights:add_loan_payment');
+    Route::get(
+        '/loans/repayments/import',
+        [LoanRepaymentImportController::class, 'index']
+    )
+        ->name('loans.repayments.import')
+        ->middleware('check_user_rights:add_loan_payment');
 
-Route::post('/loans/repayments/import/upload', 
-    [LoanRepaymentImportController::class, 'upload'])
-    ->name('loans.repayments.csv.upload')
-    ->middleware('check_user_rights:add_loan_payment');
+    Route::post(
+        '/loans/repayments/import/upload',
+        [LoanRepaymentImportController::class, 'upload']
+    )
+        ->name('loans.repayments.csv.upload')
+        ->middleware('check_user_rights:add_loan_payment');
 
-Route::post('/loans/repayments/import/process', 
-    [LoanRepaymentImportController::class, 'process'])
-    ->name('loans.repayments.csv.process')
-    ->middleware('check_user_rights:add_loan_payment');
+    Route::post(
+        '/loans/repayments/import/process',
+        [LoanRepaymentImportController::class, 'process']
+    )
+        ->name('loans.repayments.csv.process')
+        ->middleware('check_user_rights:add_loan_payment');
 
-// Download Sample CSV
-Route::get('/loans/repayments/sample', 
-    [LoanRepaymentImportController::class, 'sample'])
-    ->name('loans.repayments.csv.sample');
+    // Download Sample CSV
+    Route::get(
+        '/loans/repayments/sample',
+        [LoanRepaymentImportController::class, 'sample']
+    )
+        ->name('loans.repayments.csv.sample');
 
 
 
@@ -924,14 +934,14 @@ Route::get('/loans/repayments/sample',
 
 
     Route::get('/reports/accounts/profit-loss', [TrialBalanceController::class, 'profitLoss'])
-    ->name('reports.accounts.profit-loss')
-    ->middleware('check_user_rights:rpt_profit_loss');
+        ->name('reports.accounts.profit-loss')
+        ->middleware('check_user_rights:rpt_profit_loss');
 
     Route::get('/reports/accounts/profit-loss/budget', [HomeController::class, 'reportsAccountsTrialBalanceBudget'])->name('reports.accounts.profit-loss.budget')->middleware('check_user_rights:rpt_profit_loss');
     // Route::get('/reports/accounts/balance-sheet', [HomeController::class, 'reportsAccountsTrialBalance'])->name('reports.accounts.balance-sheet')->middleware('check_user_rights:rpt_balance_sheet');
     Route::get('/reports/accounts/balance-sheet', [TrialBalanceController::class, 'balanceSheet'])
-    ->name('reports.accounts.balance-sheet')
-    ->middleware('check_user_rights:rpt_balance_sheet');
+        ->name('reports.accounts.balance-sheet')
+        ->middleware('check_user_rights:rpt_balance_sheet');
     Route::get('/reports/accounts/budget-vs-actuals', [HomeController::class, 'reportsAccountsBudgetVsActuals'])->name('reports.accounts.budget-vs-actuals')->middleware('check_user_rights:rpt_balance_sheet');
     Route::get('/reports/accounts/trial-balance-horizontal', [HomeController::class, 'reportsAccountsTrialBalance'])->name('reports.accounts.trial-balance-horizontal')->middleware('check_user_rights:rpt_balance_sheet');
     Route::get('/reports/accounts/profit-loss-horizontal', [HomeController::class, 'reportsAccountsTrialBalance'])->name('reports.accounts.profit-loss-horizontal')->middleware('check_user_rights:rpt_balance_sheet');
@@ -982,11 +992,16 @@ Route::get('/loans/repayments/sample',
     Route::get('/files/download/{file}', [FileUploadController::class, 'download'])->name('file.download')->middleware('check_user_rights:file_upload');
     Route::delete('/files/delete/{file}', [FileUploadController::class, 'delete'])->name('file.delete')->middleware('check_user_rights:file_delete');
 
-    Route::get('/reports/transport/mpesa',[TransportReportsController::class, 'mpesa'])->name('reports.transport.mpesa')->middleware('check_user_rights:rpt_transport_mpesa');
+    Route::get('/reports/transport/mpesa', [TransportReportsController::class, 'mpesa'])->name('reports.transport.mpesa')->middleware('check_user_rights:rpt_transport_mpesa');
 
-    Route::get('/reports/fosa-members',[FosaMembersReportController::class, 'index'])->name('reports.fosa.members')->middleware('check_user_rights:list_fosa_report');
+    Route::get('/reports/fosa-members', [FosaMembersReportController::class, 'index'])->name('reports.fosa.members')->middleware('check_user_rights:list_fosa_report');
 
- 
+
+    Route::get(
+        '/reports/fosa-members/export/csv',
+        [FosaMembersReportController::class, 'exportCsv']
+    )->name('reports.fosa.members.export.csv');
+
 
     if (config('sacco.transport_sacco') === 'Y') {
         Route::prefix('transport')->group(function () {
@@ -994,4 +1009,3 @@ Route::get('/loans/repayments/sample',
         });
     }
 });
-

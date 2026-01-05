@@ -17,6 +17,10 @@
           </div>
         </div>
       </div>
+<a href="{{ route('reports.fosa.members.export.csv', request()->query()) }}"
+   class="btn btn-outline-success ms-2">
+   Download CSV
+</a>
 
       {{-- FILTERS --}}
       <div class="card-body border-bottom">
