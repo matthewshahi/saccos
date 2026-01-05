@@ -1,3 +1,7 @@
+<div style="position:fixed; top:10px; right:10px; background:red; color:white; z-index:99999;">
+    PERIOD ALERT PARTIAL LOADED
+</div>
+
 @if (
     Auth::check()
     && Auth::user()->member_position == 2
