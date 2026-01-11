@@ -50,3 +50,5 @@ composer.phar
 # JetBrains, Laravel Telescope, etc.
 .idea/
 telescope/*
+.DS_Store
+**/.DS_Store
