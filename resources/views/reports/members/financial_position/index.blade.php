@@ -76,43 +76,55 @@
                 <div class="card-body">
 
                     {{-- FILTER BAR --}}
-                    <form id="filterForm" class="row g-3 align-items-end" onsubmit="return false;">
+                   <form id="filterForm" class="row gx-3 gy-2 align-items-center" onsubmit="return false;">
 
-                        <div class="col-md-2">
-                            <label class="form-label mb-1 fw-semibold">Period (YYYYMM)</label>
-                            <input
-                                type="text"
-                                id="period"
-                                name="period"
-                                class="form-control"
-                                value="{{ $periodValue }}"
-                                placeholder="YYYYMM"
-                                maxlength="6"
-                                autocomplete="off">
-                            <small class="text-muted">Example: 202601</small>
-                        </div>
+    <!-- PERIOD -->
+    <div class="col-md-2">
+        <label class="form-label mb-1 fw-semibold">
+            Period (YYYYMM)
+        </label>
 
-                        <div class="col-md-5">
-                            <label class="form-label mb-1 fw-semibold">Search</label>
-                            <input
-                                type="text"
-                                id="pms_srch"
-                                name="pms_srch"
-                                class="form-control"
-                                placeholder="Name, Sacco ID, National ID, Email, Company, Department..."
-                                autocomplete="off">
-                        </div>
+        <input
+            type="text"
+            id="period"
+            name="period"
+            class="form-control"
+            value="{{ $periodValue }}"
+            placeholder="YYYYMM"
+            maxlength="6"
+            autocomplete="off">
 
-                        <div class="col-md-5 d-flex justify-content-end align-items-end">
-                            <button type="button" id="loadReport" class="btn btn-primary">
-                                Load Report
-                            </button>
-                            <button type="button" id="clearBtn" class="btn btn-outline-secondary ms-2">
-                                Clear
-                            </button>
-                        </div>
+        <small class="text-muted">Example: 202601</small>
+    </div>
 
-                    </form>
+    <!-- SEARCH -->
+    <div class="col-md-5">
+        <label class="form-label mb-1 fw-semibold">
+            Search
+        </label>
+
+        <input
+            type="text"
+            id="pms_srch"
+            name="pms_srch"
+            class="form-control"
+            placeholder="Name, Sacco ID, National ID, Email, Company, Department..."
+            autocomplete="off">
+    </div>
+
+    <!-- ACTIONS -->
+    <div class="col-md-5 d-flex justify-content-end align-items-center">
+        <button type="button" id="loadReport" class="btn btn-primary">
+            Load Report
+        </button>
+
+        <button type="button" id="clearBtn" class="btn btn-outline-secondary ms-2">
+            Clear
+        </button>
+    </div>
+
+</form>
+
 
                     <hr class="my-4">
 
