@@ -11,15 +11,15 @@ class MemberFinancialPositionController extends Controller
      * Report UI
      */
     public function index()
-    {
-        // Legacy behaviour: default to current YYYYMM
-        $currentPeriod = date('Ym');
+{
+    $currentPeriod = date('Ym'); // ALWAYS STRING
 
-        return view(
-            'reports.members.financial_position.index',
-            compact('currentPeriod')
-        );
-    }
+    return view(
+        'reports.members.financial_position.index',
+        ['currentPeriod' => (string) $currentPeriod]
+    );
+}
+
 
     /**
      * Report data (AJAX)
