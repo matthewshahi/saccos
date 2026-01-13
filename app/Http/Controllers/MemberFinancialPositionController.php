@@ -2,70 +2,54 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class MemberFinancialPositionController extends Controller
 {
     /**
-     * Report UI
+     * Show report UI
+     * No period table, no lookup.
      */
     public function index()
-{
-    $currentPeriod = date('Ym'); // ALWAYS STRING
+    {
+        // Default period = current YYYYMM
+        $currentPeriod = date('Ym');
 
-    return view(
-        'reports.members.financial_position.index',
-        ['currentPeriod' => (string) $currentPeriod]
-    );
-}
-
+        return view('reports.members.financial_position.index', compact('currentPeriod'));
+    }
 
     /**
-     * Report data (AJAX)
+     * Fetch report data (AS AT period)
      */
     public function data(Request $request)
     {
-        $period = $request->get('period', date('Ym'));
+        // Default to current YYYYMM if not provided
+        $period = $request->input('period', date('Ym'));
 
+        // Safety: numeric YYYYMM only
         if (!preg_match('/^\d{6}$/', $period)) {
-            return response()->json(['error' => 'Invalid period'], 422);
+            return response()->json([
+                'error' => 'Invalid period format. Expected YYYYMM.'
+            ], 422);
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | LOAN TYPES
-        |--------------------------------------------------------------------------
-        */
+        // ======================
+        // Loan types
+        // ======================
         $loanTypes = DB::table('sacco_loan_types')
             ->where('loan_type_deleted', '<>', 'Y')
             ->orderBy('loan_type_name')
             ->get();
 
-        /*
-        |--------------------------------------------------------------------------
-        | MEMBERS + DEPARTMENT + COMPANY + POSITION
-        |--------------------------------------------------------------------------
-        */
+        // ======================
+        // Active members
+        // ======================
         $members = DB::table('sacco_members')
-            ->join(
-                'sacco_department',
-                'sacco_members.member_dept',
-                '=',
-                'sacco_department.department_id'
-            )
-            ->join(
-                'sacco_company',
-                'sacco_department.department_company_id',
-                '=',
-                'sacco_company.company_id'
-            )
-            ->join(
-                'sacco_position',
-                'sacco_members.member_position',
-                '=',
-                'sacco_position.position_id'
-            )
+            ->join('sacco_department', 'sacco_members.member_dept', '=', 'sacco_department.department_id')
+            ->join('sacco_company', 'sacco_department.department_company_id', '=', 'sacco_company.company_id')
+            ->join('sacco_position', 'sacco_members.member_position', '=', 'sacco_position.position_id')
             ->where('member_deleted', '<>', 'Y')
             ->where('member_active', '=', 'Y')
             ->orderBy('member_name')
@@ -81,106 +65,93 @@ class MemberFinancialPositionController extends Controller
             ])
             ->get();
 
-        $rows = [];
+        $results = [];
 
-        foreach ($members as $m) {
+        foreach ($members as $member) {
 
-            /*
-            |--------------------------------------------------------------------------
-            | SAVINGS (SHARES)
-            |--------------------------------------------------------------------------
-            */
+            // ======================
+            // SAVINGS
+            // ======================
             $savings = DB::table('sacco_shares')
-                ->where('share_member_id', $m->member_id)
+                ->where('share_member_id', $member->member_id)
                 ->where('share_period', '<=', $period)
                 ->sum('share_amount_paying');
 
-            /*
-            |--------------------------------------------------------------------------
-            | FOSA
-            |--------------------------------------------------------------------------
-            */
+            // ======================
+            // FOSA
+            // ======================
             $fosa = DB::table('sacco_fosas')
-                ->where('fosa_member_id', $m->member_id)
+                ->where('fosa_member_id', $member->member_id)
                 ->where('fosa_period', '<=', $period)
-                ->sum('fosa_amount_paying');
+                ->sum('fosa_amount');
 
-            /*
-            |--------------------------------------------------------------------------
-            | CAPITAL SHARES
-            |--------------------------------------------------------------------------
-            */
+            // ======================
+            // CAPITAL
+            // ======================
             $capital = DB::table('sacco_capital_shares')
-                ->where('share_capitalmember_id', $m->member_id)
+                ->where('share_capitalmember_id', $member->member_id)
                 ->where('share_capitalperiod', '<=', $period)
                 ->sum('share_capitalamount_paying');
 
-            /*
-            |--------------------------------------------------------------------------
-            | LOANS (LEGACY LOGIC PRESERVED)
-            |--------------------------------------------------------------------------
-            */
-            $loanData = [];
+            // ======================
+            // LOANS
+            // ======================
+            $loans = [];
 
-            foreach ($loanTypes as $lt) {
+            foreach ($loanTypes as $type) {
 
-                // Total loan taken
-                $totalLoan = DB::table('sacco_loans')
-                    ->where('loan_member', $m->member_id)
-                    ->where('loan_loan_type', $lt->loan_type_id)
-                    ->where('loan_taken_period', '<=', $period)
+                // Loan principal issued
+                $taken = DB::table('sacco_loans')
+                    ->where('loan_member_id', $member->member_id)
+                    ->where('loan_type_id', $type->loan_type_id)
+                    ->where('loan_period', '<=', $period)
+                    ->where('loan_deleted', '<>', 'Y')
                     ->sum('loan_amount');
 
-                // Total payments
-                $totalPaid = DB::table('sacco_loan_payments')
-                    ->join(
-                        'sacco_loans',
-                        'sacco_loan_payments.loan_payments_loan_id',
-                        '=',
-                        'sacco_loans.loan_id'
-                    )
-                    ->where('loan_member', $m->member_id)
-                    ->where('loan_loan_type', $lt->loan_type_id)
+                // Principal repaid
+                $repaid = DB::table('sacco_loan_payments')
+                    ->where('loan_payments_member_id', $member->member_id)
+                    ->where('loan_payments_loan_type_id', $type->loan_type_id)
                     ->where('loan_payments_period', '<=', $period)
-                    ->sum('loan_payments_amount');
+                    ->sum('loan_payments_principal');
 
-                $loanData[] = [
-                    'loan_type_name' => $lt->loan_type_name,
-                    'taken'          => round($totalLoan, 2),
-                    'balance'        => round($totalLoan - $totalPaid, 2),
+                $loans[] = [
+                    'loan_type_name' => $type->loan_type_name,
+                    'taken'          => round($taken, 2),
+                    'balance'        => round($taken - $repaid, 2),
                 ];
             }
 
-            $rows[] = [
-                'member_name'        => $m->member_name,
-                'member_sacco_id'    => $m->member_sacco_id,
-                'member_national_id' => $m->member_national_id,
-                'member_gender'      => $m->member_gender,
-                'company'            => $m->company_name,
-                'department'         => $m->department_name,
-                'position'           => $m->position_name,
+            $results[] = [
+                'member_name'        => $member->member_name,
+                'member_sacco_id'    => $member->member_sacco_id,
+                'member_national_id' => $member->member_national_id,
+                'member_gender'      => $member->member_gender,
+                'company'            => $member->company_name,
+                'department'         => $member->department_name,
+                'position'           => $member->position_name,
                 'savings'            => round($savings, 2),
                 'fosa'               => round($fosa, 2),
                 'capital'            => round($capital, 2),
-                'loans'              => $loanData,
+                'loans'              => $loans,
             ];
         }
 
         return response()->json([
             'period' => $period,
-            'data'   => $rows
+            'data'   => $results,
         ]);
     }
 
     /**
-     * CSV EXPORT
+     * Export CSV
      */
     public function export(Request $request)
     {
-        $period = $request->get('period', date('Ym'));
+        $period = $request->input('period', date('Ym'));
 
         if (!preg_match('/^\d{6}$/', $period)) {
-            abort(400, 'Invalid period');
+            return redirect()->back()->with('error', 'Invalid period format');
         }
 
         $request->merge(['period' => $period]);
@@ -192,8 +163,9 @@ class MemberFinancialPositionController extends Controller
 
             $out = fopen('php://output', 'w');
 
+            // Header
             $header = [
-                'Name',
+                'Member Name',
                 'Sacco ID',
                 'National ID',
                 'Gender',
@@ -205,31 +177,30 @@ class MemberFinancialPositionController extends Controller
             ];
 
             if (!empty($data)) {
-                foreach ($data[0]['loans'] as $l) {
-                    $header[] = $l['loan_type_name'] . ' Taken';
-                    $header[] = $l['loan_type_name'] . ' Balance';
+                foreach ($data[0]['loans'] as $loan) {
+                    $header[] = $loan['loan_type_name'] . ' Taken';
+                    $header[] = $loan['loan_type_name'] . ' Balance';
                 }
             }
 
             fputcsv($out, $header);
 
-            foreach ($data as $r) {
-
+            foreach ($data as $row) {
                 $line = [
-                    $r['member_name'],
-                    $r['member_sacco_id'],
-                    $r['member_national_id'],
-                    $r['member_gender'],
-                    $r['company'],
-                    $r['department'],
-                    $r['savings'],
-                    $r['fosa'],
-                    $r['capital'],
+                    $row['member_name'],
+                    $row['member_sacco_id'],
+                    $row['member_national_id'],
+                    $row['member_gender'],
+                    $row['company'],
+                    $row['department'],
+                    $row['savings'],
+                    $row['fosa'],
+                    $row['capital'],
                 ];
 
-                foreach ($r['loans'] as $l) {
-                    $line[] = $l['taken'];
-                    $line[] = $l['balance'];
+                foreach ($row['loans'] as $loan) {
+                    $line[] = $loan['taken'];
+                    $line[] = $loan['balance'];
                 }
 
                 fputcsv($out, $line);
@@ -237,8 +208,8 @@ class MemberFinancialPositionController extends Controller
 
             fclose($out);
         }, 200, [
-            'Content-Type' => 'text/csv',
-            'Content-Disposition' => "attachment; filename={$filename}"
+            'Content-Type'        => 'text/csv',
+            'Content-Disposition' => "attachment; filename={$filename}",
         ]);
     }
 }
