@@ -1012,6 +1012,7 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
     Route::prefix('reports/members')
     ->group(function () {
 
+    
         Route::get(
             '/financial-position',
             [MemberFinancialPositionController::class, 'index']
