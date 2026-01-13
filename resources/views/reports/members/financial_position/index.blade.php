@@ -21,15 +21,25 @@
                 {{-- PERIOD INPUT (YYYYMM – LEGACY) --}}
                 <div class="form-group mr-3">
                     <label for="period" class="mr-2"><strong>Period</strong></label>
-                    <input
-                        type="text"
-                        id="period"
-                        class="form-control"
-                        value="{{ $currentPeriod }}"
-                        placeholder="YYYYMM"
-                        maxlength="6"
-                        style="width:120px"
-                    />
+                    @php
+    // Defensive: enforce legacy scalar behaviour
+    $periodValue = is_scalar($currentPeriod ?? null)
+        ? $currentPeriod
+        : (property_exists($currentPeriod, 'period')
+            ? $currentPeriod->period
+            : date('Ym'));
+@endphp
+
+<input
+    type="text"
+    id="period"
+    class="form-control"
+    value="{{ $periodValue }}"
+    placeholder="YYYYMM"
+    maxlength="6"
+    style="width:120px"
+/>
+
                 </div>
 
                 <button type="button" id="loadReport" class="btn btn-primary mr-2">
