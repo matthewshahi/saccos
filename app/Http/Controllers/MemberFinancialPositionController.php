@@ -12,7 +12,7 @@ class MemberFinancialPositionController extends Controller
      */
     public function index()
     {
-        // Legacy behaviour: default to current YYYYMM
+        // Default to current YYYYMM
         $currentPeriod = date('Ym');
 
         return view(
@@ -26,7 +26,8 @@ class MemberFinancialPositionController extends Controller
      */
     public function data(Request $request)
     {
-        $period = $request->get('period', date('Ym'));
+        $period    = $request->get('period', date('Ym'));
+        $pms_srch  = trim($request->get('pms_srch'));
 
         if (!preg_match('/^\d{6}$/', $period)) {
             return response()->json(['error' => 'Invalid period'], 422);
@@ -47,7 +48,7 @@ class MemberFinancialPositionController extends Controller
         | MEMBERS + DEPARTMENT + COMPANY + POSITION
         |--------------------------------------------------------------------------
         */
-        $members = DB::table('sacco_members')
+        $membersQuery = DB::table('sacco_members')
             ->join(
                 'sacco_department',
                 'sacco_members.member_dept',
@@ -67,7 +68,24 @@ class MemberFinancialPositionController extends Controller
                 'sacco_position.position_id'
             )
             ->where('member_deleted', '<>', 'Y')
-            ->where('member_active', '=', 'Y')
+            ->where('member_active', '=', 'Y');
+
+        /*
+        |--------------------------------------------------------------------------
+        | SEARCH FILTER (NOW ACTUALLY WORKING)
+        |--------------------------------------------------------------------------
+        */
+        if ($pms_srch !== '') {
+            $membersQuery->where(function ($q) use ($pms_srch) {
+                $q->where('member_name', 'like', "%{$pms_srch}%")
+                  ->orWhere('member_sacco_id', 'like', "%{$pms_srch}%")
+                  ->orWhere('member_national_id', 'like', "%{$pms_srch}%")
+                  ->orWhere('company_name', 'like', "%{$pms_srch}%")
+                  ->orWhere('department_name', 'like', "%{$pms_srch}%");
+            });
+        }
+
+        $members = $membersQuery
             ->orderBy('member_name')
             ->select([
                 'member_id',
@@ -81,57 +99,44 @@ class MemberFinancialPositionController extends Controller
             ])
             ->get();
 
+        /*
+        |--------------------------------------------------------------------------
+        | BUILD REPORT ROWS
+        |--------------------------------------------------------------------------
+        */
         $rows = [];
 
         foreach ($members as $m) {
 
-            /*
-            |--------------------------------------------------------------------------
-            | SAVINGS (SHARES)
-            |--------------------------------------------------------------------------
-            */
+            // SAVINGS
             $savings = DB::table('sacco_shares')
                 ->where('share_member_id', $m->member_id)
                 ->where('share_period', '<=', $period)
                 ->sum('share_amount_paying');
 
-            /*
-            |--------------------------------------------------------------------------
-            | FOSA
-            |--------------------------------------------------------------------------
-            */
+            // FOSA
             $fosa = DB::table('sacco_fosas')
                 ->where('fosa_member_id', $m->member_id)
                 ->where('fosa_period', '<=', $period)
                 ->sum('fosa_amount_paying');
 
-            /*
-            |--------------------------------------------------------------------------
-            | CAPITAL SHARES
-            |--------------------------------------------------------------------------
-            */
+            // CAPITAL SHARES
             $capital = DB::table('sacco_capital_shares')
                 ->where('share_capitalmember_id', $m->member_id)
                 ->where('share_capitalperiod', '<=', $period)
                 ->sum('share_capitalamount_paying');
 
-            /*
-            |--------------------------------------------------------------------------
-            | LOANS (LEGACY LOGIC PRESERVED)
-            |--------------------------------------------------------------------------
-            */
+            // LOANS
             $loanData = [];
 
             foreach ($loanTypes as $lt) {
 
-                // Total loan taken
                 $totalLoan = DB::table('sacco_loans')
                     ->where('loan_member', $m->member_id)
                     ->where('loan_loan_type', $lt->loan_type_id)
                     ->where('loan_taken_period', '<=', $period)
                     ->sum('loan_amount');
 
-                // Total payments
                 $totalPaid = DB::table('sacco_loan_payments')
                     ->join(
                         'sacco_loans',
@@ -177,13 +182,18 @@ class MemberFinancialPositionController extends Controller
      */
     public function export(Request $request)
     {
-        $period = $request->get('period', date('Ym'));
+        $period    = $request->get('period', date('Ym'));
+        $pms_srch  = trim($request->get('pms_srch'));
 
         if (!preg_match('/^\d{6}$/', $period)) {
             abort(400, 'Invalid period');
         }
 
-        $request->merge(['period' => $period]);
+        $request->merge([
+            'period'   => $period,
+            'pms_srch' => $pms_srch
+        ]);
+
         $data = $this->data($request)->getData(true)['data'];
 
         $filename = "member_financial_position_{$period}.csv";
@@ -237,7 +247,7 @@ class MemberFinancialPositionController extends Controller
 
             fclose($out);
         }, 200, [
-            'Content-Type' => 'text/csv',
+            'Content-Type'        => 'text/csv',
             'Content-Disposition' => "attachment; filename={$filename}"
         ]);
     }
