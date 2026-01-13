@@ -4,28 +4,33 @@
 
 @section('styles')
 <style>
-    /* Prevent wrapping + make wide tables usable */
+    /* Wide financial table handling */
     .mfp-table-wrap {
         overflow-x: auto;
         overflow-y: auto;
         max-height: 70vh;
         -webkit-overflow-scrolling: touch;
     }
-    .mfp-table th, .mfp-table td {
+
+    .mfp-table th,
+    .mfp-table td {
         white-space: nowrap;
         vertical-align: middle;
     }
+
     .mfp-table thead th {
         position: sticky;
         top: 0;
         z-index: 2;
-        background: #fff;
+        background: #ffffff;
     }
-    .mfp-table tfoot th, .mfp-table tfoot td {
+
+    .mfp-table tfoot th,
+    .mfp-table tfoot td {
         position: sticky;
         bottom: 0;
         z-index: 2;
-        background: #fff;
+        background: #ffffff;
         border-top: 2px solid #dee2e6;
         font-weight: 700;
     }
@@ -34,69 +39,84 @@
 
 @section('content')
 @php
-    // Ensure the value printed in the input is ALWAYS a string (prevents stdClass -> htmlspecialchars crash)
-    $periodValue = $currentPeriod ?? date('Ym');
-
-    if (is_object($periodValue)) {
-        // try common keys if something accidentally passed as object
-        $periodValue = $periodValue->period
-            ?? $periodValue->value
-            ?? $periodValue->currentPeriod
-            ?? date('Ym');
-    }
-
-    $periodValue = (string) $periodValue;
+    $periodValue = (string) ($currentPeriod ?? date('Ym'));
 @endphp
 
 <div class="container-fluid">
 
     <div class="row">
         <div class="col-md-12">
-            <div class="card o-hidden mb-4">
-                <div class="card-header d-flex align-items-center">
-                    <h3 class="w-50 float-start card-title m-0">Member Financial Position (As At)</h3>
 
-                    <div class="w-50 float-end text-end">
-                        <a href="#" id="exportBtn" class="btn btn-sm btn-outline-success disabled" aria-disabled="true">
-                            Export CSV
-                        </a>
+            <div class="card o-hidden mb-4">
+
+                {{-- ================= HEADER ================= --}}
+                <div class="card-header d-flex align-items-center">
+                    <h3 class="card-title m-0 w-50">
+                        Member Financial Position (As At)
+                    </h3>
+
+                    <div class="dropdown dropleft text-end w-50">
+                        <button
+                            class="btn bg-gray-100"
+                            type="button"
+                            id="mfpActions"
+                            data-bs-toggle="dropdown"
+                            aria-haspopup="true"
+                            aria-expanded="false">
+                            <i class="nav-icon i-Gear-2"></i>
+                        </button>
+
+                        <div class="dropdown-menu" aria-labelledby="mfpActions">
+                            <a
+                                href="#"
+                                id="exportBtn"
+                                class="dropdown-item disabled"
+                                aria-disabled="true">
+                                Export CSV
+                            </a>
+                        </div>
                     </div>
                 </div>
 
+                {{-- ================= BODY ================= --}}
                 <div class="card-body">
-                    <form id="filterForm" class="row g-2 align-items-end" onsubmit="return false;">
+
+                    {{-- FILTER FORM --}}
+                    <form id="filterForm" class="row g-3 align-items-end" onsubmit="return false;">
+
                         <div class="col-md-2">
-                            <label class="form-label mb-1"><strong>Period (YYYYMM)</strong></label>
+                            <label class="form-label"><strong>Period (YYYYMM)</strong></label>
                             <input
                                 type="text"
-                                id="period"
-                                name="period"
                                 class="form-control"
+                                id="period"
                                 value="{{ $periodValue }}"
-                                placeholder="YYYYMM"
                                 maxlength="6"
-                                autocomplete="off"
-                            />
+                                placeholder="YYYYMM">
                             <small class="text-muted">Example: 202601</small>
                         </div>
 
                         <div class="col-md-4">
-                            <label class="form-label mb-1"><strong>Search</strong></label>
+                            <label class="form-label"><strong>Search</strong></label>
                             <input
                                 type="text"
-                                id="pms_srch"
-                                name="pms_srch"
                                 class="form-control"
-                                placeholder="Name, Sacco ID, National ID, Email, Company, Department..."
-                                autocomplete="off"
-                            />
+                                id="pms_srch"
+                                placeholder="Name, Sacco ID, National ID, Email, Company, Department">
                         </div>
 
                         <div class="col-md-6 text-end">
-                            <button type="button" id="loadReport" class="btn btn-primary">
+                            <button
+                                type="button"
+                                id="loadReport"
+                                class="btn btn-primary">
                                 Load Report
                             </button>
-                            <button type="button" id="clearBtn" class="btn btn-outline-secondary ms-2">
+
+                            <button
+                                type="button"
+                                id="clearBtn"
+                                class="btn btn-outline-secondary ms-2">
                                 Clear
                             </button>
                         </div>
@@ -104,24 +124,27 @@
 
                     <hr class="my-3">
 
+                    {{-- STATES --}}
                     <div id="loading" class="text-center text-muted d-none">
                         Loading report, please wait…
-                    </div>
-
-                    <div id="tableWrapper" class="mfp-table-wrap d-none">
-                        <table class="table table-hover table-bordered text-center mfp-table mb-0">
-                            <thead id="reportHead"></thead>
-                            <tbody id="reportBody"></tbody>
-                            <tfoot id="reportFoot"></tfoot>
-                        </table>
                     </div>
 
                     <div id="emptyState" class="text-center text-muted d-none">
                         No data found for the selected period.
                     </div>
 
+                    {{-- TABLE --}}
+                    <div id="tableWrapper" class="mfp-table-wrap d-none">
+                        <table class="table table-bordered table-hover text-center mfp-table mb-0">
+                            <thead id="reportHead"></thead>
+                            <tbody id="reportBody"></tbody>
+                            <tfoot id="reportFoot"></tfoot>
+                        </table>
+                    </div>
+
                 </div>
             </div>
+
         </div>
     </div>
 
@@ -131,6 +154,7 @@
 @section('scripts')
 <script>
 (function () {
+
     const loadBtn   = document.getElementById('loadReport');
     const clearBtn  = document.getElementById('clearBtn');
     const periodInp = document.getElementById('period');
@@ -138,64 +162,45 @@
 
     const loading   = document.getElementById('loading');
     const tableWrap = document.getElementById('tableWrapper');
-    const emptyState= document.getElementById('emptyState');
+    const empty     = document.getElementById('emptyState');
 
-    const thead     = document.getElementById('reportHead');
-    const tbody     = document.getElementById('reportBody');
-    const tfoot     = document.getElementById('reportFoot');
+    const thead = document.getElementById('reportHead');
+    const tbody = document.getElementById('reportBody');
+    const tfoot = document.getElementById('reportFoot');
 
     const exportBtn = document.getElementById('exportBtn');
-
-    function escHtml(s) {
-        return String(s ?? '')
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#039;');
-    }
-
-    function money(n) {
-        const x = Number(n || 0);
-        return x.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    }
 
     function resetUI() {
         loading.classList.add('d-none');
         tableWrap.classList.add('d-none');
-        emptyState.classList.add('d-none');
-
+        empty.classList.add('d-none');
         thead.innerHTML = '';
         tbody.innerHTML = '';
         tfoot.innerHTML = '';
-
         exportBtn.classList.add('disabled');
-        exportBtn.setAttribute('aria-disabled', 'true');
         exportBtn.href = '#';
     }
 
-    clearBtn.addEventListener('click', function () {
+    function money(n) {
+        return Number(n || 0).toLocaleString(undefined, {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
+    }
+
+    clearBtn.onclick = () => {
         periodInp.value = '{{ $periodValue }}';
         searchInp.value = '';
         resetUI();
-    });
+    };
 
-    // Optional: Enter key triggers load
-    [periodInp, searchInp].forEach(el => {
-        el.addEventListener('keydown', function (e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                loadBtn.click();
-            }
-        });
-    });
+    loadBtn.onclick = () => {
 
-    loadBtn.addEventListener('click', function () {
         const period = periodInp.value.trim();
-        const pms_srch = searchInp.value.trim();
+        const search = searchInp.value.trim();
 
         if (!/^\d{6}$/.test(period)) {
-            alert('Invalid period. Use YYYYMM format (e.g., 202601).');
+            alert('Invalid period. Use YYYYMM.');
             return;
         }
 
@@ -204,127 +209,104 @@
 
         const url = new URL(`{{ route('reports.members.financial_position.data') }}`, window.location.origin);
         url.searchParams.set('period', period);
-        if (pms_srch.length) url.searchParams.set('pms_srch', pms_srch);
+        if (search) url.searchParams.set('pms_srch', search);
 
-        fetch(url.toString(), { headers: { 'Accept': 'application/json' } })
-            .then(res => res.json())
+        fetch(url)
+            .then(r => r.json())
             .then(resp => {
+
                 loading.classList.add('d-none');
 
-                if (!resp || !Array.isArray(resp.data) || resp.data.length === 0) {
-                    emptyState.classList.remove('d-none');
+                if (!resp.data || !resp.data.length) {
+                    empty.classList.remove('d-none');
                     return;
                 }
 
                 const data = resp.data;
-                const loanCols = (data[0].loans || []).map(l => ({
-                    name: l.loan_type_name
-                }));
+                const loans = data[0].loans || [];
 
-                // =========================
-                // TABLE HEADER
-                // =========================
-                let head = `<tr>
-                    <th>#</th>
-                    <th class="text-start">Names</th>
-                    <th>Sacco ID</th>
-                    <th>National ID</th>
-                    <th>Gender</th>
-                    <th class="text-end">Savings</th>
-                    <th class="text-end">FOSA</th>
-                    <th class="text-end">CAPITAL</th>
+                /* HEADER */
+                let h = `
+                    <tr>
+                        <th>#</th>
+                        <th class="text-start">Names</th>
+                        <th>Sacco ID</th>
+                        <th>National ID</th>
+                        <th>Gender</th>
+                        <th class="text-end">Savings</th>
+                        <th class="text-end">FOSA</th>
+                        <th class="text-end">Capital</th>
                 `;
-
-                loanCols.forEach(c => {
-                    head += `<th class="text-end">${escHtml(c.name)} Taken</th>`;
-                    head += `<th class="text-end">${escHtml(c.name)} Bal</th>`;
+                loans.forEach(l => {
+                    h += `<th class="text-end">${l.loan_type_name} Taken</th>`;
+                    h += `<th class="text-end">${l.loan_type_name} Bal</th>`;
                 });
+                h += `</tr>`;
+                thead.innerHTML = h;
 
-                head += `</tr>`;
-                thead.innerHTML = head;
-
-                // =========================
-                // TABLE BODY + TOTALS
-                // =========================
-                let rows = '';
-
+                /* BODY + TOTALS */
                 let totalSavings = 0, totalFosa = 0, totalCapital = 0;
-                const totalLoanTaken = new Array(loanCols.length).fill(0);
-                const totalLoanBal   = new Array(loanCols.length).fill(0);
+                const loanTaken = new Array(loans.length).fill(0);
+                const loanBal   = new Array(loans.length).fill(0);
 
-                data.forEach((row, i) => {
-                    const savings = Number(row.savings || 0);
-                    const fosa    = Number(row.fosa || 0);
-                    const capital = Number(row.capital || 0);
+                tbody.innerHTML = data.map((r, i) => {
 
-                    totalSavings += savings;
-                    totalFosa    += fosa;
-                    totalCapital += capital;
+                    totalSavings += r.savings;
+                    totalFosa    += r.fosa;
+                    totalCapital += r.capital;
 
-                    rows += `<tr>
-                        <td>${i + 1}</td>
-                        <td class="text-start">${escHtml(row.member_name)}</td>
-                        <td>${escHtml(row.member_sacco_id)}</td>
-                        <td>${escHtml(row.member_national_id)}</td>
-                        <td>${escHtml(row.member_gender)}</td>
-                        <td class="text-end">${money(savings)}</td>
-                        <td class="text-end">${money(fosa)}</td>
-                        <td class="text-end">${money(capital)}</td>
+                    let row = `
+                        <tr>
+                            <td>${i + 1}</td>
+                            <td class="text-start">${r.member_name}</td>
+                            <td>${r.member_sacco_id}</td>
+                            <td>${r.member_national_id}</td>
+                            <td>${r.member_gender}</td>
+                            <td class="text-end">${money(r.savings)}</td>
+                            <td class="text-end">${money(r.fosa)}</td>
+                            <td class="text-end">${money(r.capital)}</td>
                     `;
 
-                    (row.loans || []).forEach((l, idx) => {
-                        const taken = Number(l.taken || 0);
-                        const bal   = Number(l.balance || 0);
-
-                        if (typeof totalLoanTaken[idx] !== 'undefined') totalLoanTaken[idx] += taken;
-                        if (typeof totalLoanBal[idx] !== 'undefined')   totalLoanBal[idx]   += bal;
-
-                        rows += `<td class="text-end">${money(taken)}</td>`;
-                        rows += `<td class="text-end">${money(bal)}</td>`;
+                    r.loans.forEach((l, x) => {
+                        loanTaken[x] += l.taken;
+                        loanBal[x]   += l.balance;
+                        row += `<td class="text-end">${money(l.taken)}</td>`;
+                        row += `<td class="text-end">${money(l.balance)}</td>`;
                     });
 
-                    rows += `</tr>`;
-                });
+                    return row + `</tr>`;
+                }).join('');
 
-                tbody.innerHTML = rows;
-
-                // =========================
-                // TOTALS FOOTER
-                // =========================
-                let foot = `<tr>
-                    <th colspan="5" class="text-end">TOTALS</th>
-                    <th class="text-end">${money(totalSavings)}</th>
-                    <th class="text-end">${money(totalFosa)}</th>
-                    <th class="text-end">${money(totalCapital)}</th>
+                /* FOOTER */
+                let f = `
+                    <tr>
+                        <th colspan="5" class="text-end">TOTALS</th>
+                        <th class="text-end">${money(totalSavings)}</th>
+                        <th class="text-end">${money(totalFosa)}</th>
+                        <th class="text-end">${money(totalCapital)}</th>
                 `;
-
-                loanCols.forEach((c, idx) => {
-                    foot += `<th class="text-end">${money(totalLoanTaken[idx] || 0)}</th>`;
-                    foot += `<th class="text-end">${money(totalLoanBal[idx] || 0)}</th>`;
+                loanTaken.forEach((_, i) => {
+                    f += `<th class="text-end">${money(loanTaken[i])}</th>`;
+                    f += `<th class="text-end">${money(loanBal[i])}</th>`;
                 });
-
-                foot += `</tr>`;
-                tfoot.innerHTML = foot;
+                f += `</tr>`;
+                tfoot.innerHTML = f;
 
                 tableWrap.classList.remove('d-none');
 
-                // =========================
-                // EXPORT LINK
-                // =========================
                 const exportUrl = new URL(`{{ route('reports.members.financial_position.export') }}`, window.location.origin);
                 exportUrl.searchParams.set('period', period);
-                if (pms_srch.length) exportUrl.searchParams.set('pms_srch', pms_srch);
+                if (search) exportUrl.searchParams.set('pms_srch', search);
 
-                exportBtn.href = exportUrl.toString();
+                exportBtn.href = exportUrl;
                 exportBtn.classList.remove('disabled');
-                exportBtn.setAttribute('aria-disabled', 'false');
             })
-            .catch(err => {
+            .catch(() => {
                 loading.classList.add('d-none');
-                console.error(err);
                 alert('Failed to load report');
             });
-    });
+    };
+
 })();
 </script>
 @endsection
