@@ -11,17 +11,22 @@
         max-height: 70vh;
         -webkit-overflow-scrolling: touch;
     }
-    .mfp-table th, .mfp-table td {
+
+    .mfp-table th,
+    .mfp-table td {
         white-space: nowrap;
         vertical-align: middle;
     }
+
     .mfp-table thead th {
         position: sticky;
         top: 0;
         z-index: 2;
         background: #fff;
     }
-    .mfp-table tfoot th, .mfp-table tfoot td {
+
+    .mfp-table tfoot th,
+    .mfp-table tfoot td {
         position: sticky;
         bottom: 0;
         z-index: 2;
@@ -34,11 +39,9 @@
 
 @section('content')
 @php
-    // Ensure the value printed in the input is ALWAYS a string (prevents stdClass -> htmlspecialchars crash)
     $periodValue = $currentPeriod ?? date('Ym');
 
     if (is_object($periodValue)) {
-        // try common keys if something accidentally passed as object
         $periodValue = $periodValue->period
             ?? $periodValue->value
             ?? $periodValue->currentPeriod
@@ -51,22 +54,32 @@
 <div class="container-fluid">
 
     <div class="row">
-        <div class="col-md-12">
-            <div class="card o-hidden mb-4">
-                <div class="card-header d-flex align-items-center">
-                    <h3 class="w-50 float-start card-title m-0">Member Financial Position (As At)</h3>
+        <div class="col-12">
 
-                    <div class="w-50 float-end text-end">
-                        <a href="#" id="exportBtn" class="btn btn-sm btn-outline-success disabled" aria-disabled="true">
-                            Export CSV
-                        </a>
-                    </div>
+            <div class="card o-hidden mb-4">
+
+                {{-- HEADER --}}
+                <div class="card-header d-flex align-items-center justify-content-between">
+                    <h3 class="card-title mb-0">
+                        Member Financial Position (As At)
+                    </h3>
+
+                    <a
+                        href="#"
+                        id="exportBtn"
+                        class="btn btn-sm btn-outline-success disabled"
+                        aria-disabled="true">
+                        Export CSV
+                    </a>
                 </div>
 
                 <div class="card-body">
-                    <form id="filterForm" class="row g-2 align-items-end" onsubmit="return false;">
+
+                    {{-- FILTER BAR --}}
+                    <form id="filterForm" class="row g-3 align-items-end" onsubmit="return false;">
+
                         <div class="col-md-2">
-                            <label class="form-label mb-1"><strong>Period (YYYYMM)</strong></label>
+                            <label class="form-label mb-1 fw-semibold">Period (YYYYMM)</label>
                             <input
                                 type="text"
                                 id="period"
@@ -75,24 +88,22 @@
                                 value="{{ $periodValue }}"
                                 placeholder="YYYYMM"
                                 maxlength="6"
-                                autocomplete="off"
-                            />
+                                autocomplete="off">
                             <small class="text-muted">Example: 202601</small>
                         </div>
 
-                        <div class="col-md-4">
-                            <label class="form-label mb-1"><strong>Search</strong></label>
+                        <div class="col-md-5">
+                            <label class="form-label mb-1 fw-semibold">Search</label>
                             <input
                                 type="text"
                                 id="pms_srch"
                                 name="pms_srch"
                                 class="form-control"
                                 placeholder="Name, Sacco ID, National ID, Email, Company, Department..."
-                                autocomplete="off"
-                            />
+                                autocomplete="off">
                         </div>
 
-                        <div class="col-md-6 text-end">
+                        <div class="col-md-5 d-flex justify-content-end align-items-end">
                             <button type="button" id="loadReport" class="btn btn-primary">
                                 Load Report
                             </button>
@@ -100,14 +111,21 @@
                                 Clear
                             </button>
                         </div>
+
                     </form>
 
-                    <hr class="my-3">
+                    <hr class="my-4">
 
+                    {{-- STATES --}}
                     <div id="loading" class="text-center text-muted d-none">
                         Loading report, please wait…
                     </div>
 
+                    <div id="emptyState" class="text-center text-muted d-none">
+                        No data found for the selected period.
+                    </div>
+
+                    {{-- TABLE --}}
                     <div id="tableWrapper" class="mfp-table-wrap d-none">
                         <table class="table table-hover table-bordered text-center mfp-table mb-0">
                             <thead id="reportHead"></thead>
@@ -116,17 +134,15 @@
                         </table>
                     </div>
 
-                    <div id="emptyState" class="text-center text-muted d-none">
-                        No data found for the selected period.
-                    </div>
-
                 </div>
             </div>
+
         </div>
     </div>
 
 </div>
 @endsection
+
 
 @section('scripts')
 <script>
