@@ -26,7 +26,7 @@
                         name="period"
                         id="period"
                         class="form-control"
-                        value="{{ $currentPeriod }}"
+                        value="{{ (string) $currentPeriod }}"
                         placeholder="YYYYMM"
                         maxlength="6"
                         style="width:120px"
