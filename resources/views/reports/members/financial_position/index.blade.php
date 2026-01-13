@@ -4,7 +4,6 @@
 
 @section('styles')
 <style>
-    /* Wide financial table handling */
     .mfp-table-wrap {
         overflow-x: auto;
         overflow-y: auto;
@@ -38,9 +37,6 @@
 @endsection
 
 @section('content')
-@php
-    $periodValue = (string) ($currentPeriod ?? date('Ym'));
-@endphp
 
 <div class="container-fluid">
 
@@ -49,7 +45,7 @@
 
             <div class="card o-hidden mb-4">
 
-                {{-- ================= HEADER ================= --}}
+                {{-- HEADER --}}
                 <div class="card-header d-flex align-items-center">
                     <h3 class="card-title m-0 w-50">
                         Member Financial Position (As At)
@@ -59,14 +55,11 @@
                         <button
                             class="btn bg-gray-100"
                             type="button"
-                            id="mfpActions"
-                            data-bs-toggle="dropdown"
-                            aria-haspopup="true"
-                            aria-expanded="false">
+                            data-bs-toggle="dropdown">
                             <i class="nav-icon i-Gear-2"></i>
                         </button>
 
-                        <div class="dropdown-menu" aria-labelledby="mfpActions">
+                        <div class="dropdown-menu">
                             <a
                                 href="#"
                                 id="exportBtn"
@@ -78,11 +71,11 @@
                     </div>
                 </div>
 
-                {{-- ================= BODY ================= --}}
+                {{-- BODY --}}
                 <div class="card-body">
 
                     {{-- FILTER FORM --}}
-                    <form id="filterForm" class="row g-3 align-items-end" onsubmit="return false;">
+                    <form class="row g-3 align-items-end" onsubmit="return false;">
 
                         <div class="col-md-2">
                             <label class="form-label"><strong>Period (YYYYMM)</strong></label>
@@ -90,7 +83,7 @@
                                 type="text"
                                 class="form-control"
                                 id="period"
-                                value="{{ $periodValue }}"
+                                value="{{ isset($currentPeriod) ? $currentPeriod : date('Ym') }}"
                                 maxlength="6"
                                 placeholder="YYYYMM">
                             <small class="text-muted">Example: 202601</small>
@@ -189,7 +182,7 @@
     }
 
     clearBtn.onclick = () => {
-        periodInp.value = '{{ $periodValue }}';
+        periodInp.value = '{{ isset($currentPeriod) ? $currentPeriod : date('Ym') }}';
         searchInp.value = '';
         resetUI();
     };
@@ -225,8 +218,7 @@
                 const data = resp.data;
                 const loans = data[0].loans || [];
 
-                /* HEADER */
-                let h = `
+                let head = `
                     <tr>
                         <th>#</th>
                         <th class="text-start">Names</th>
@@ -238,13 +230,12 @@
                         <th class="text-end">Capital</th>
                 `;
                 loans.forEach(l => {
-                    h += `<th class="text-end">${l.loan_type_name} Taken</th>`;
-                    h += `<th class="text-end">${l.loan_type_name} Bal</th>`;
+                    head += `<th class="text-end">${l.loan_type_name} Taken</th>`;
+                    head += `<th class="text-end">${l.loan_type_name} Bal</th>`;
                 });
-                h += `</tr>`;
-                thead.innerHTML = h;
+                head += `</tr>`;
+                thead.innerHTML = head;
 
-                /* BODY + TOTALS */
                 let totalSavings = 0, totalFosa = 0, totalCapital = 0;
                 const loanTaken = new Array(loans.length).fill(0);
                 const loanBal   = new Array(loans.length).fill(0);
@@ -277,8 +268,7 @@
                     return row + `</tr>`;
                 }).join('');
 
-                /* FOOTER */
-                let f = `
+                let foot = `
                     <tr>
                         <th colspan="5" class="text-end">TOTALS</th>
                         <th class="text-end">${money(totalSavings)}</th>
@@ -286,11 +276,11 @@
                         <th class="text-end">${money(totalCapital)}</th>
                 `;
                 loanTaken.forEach((_, i) => {
-                    f += `<th class="text-end">${money(loanTaken[i])}</th>`;
-                    f += `<th class="text-end">${money(loanBal[i])}</th>`;
+                    foot += `<th class="text-end">${money(loanTaken[i])}</th>`;
+                    foot += `<th class="text-end">${money(loanBal[i])}</th>`;
                 });
-                f += `</tr>`;
-                tfoot.innerHTML = f;
+                foot += `</tr>`;
+                tfoot.innerHTML = foot;
 
                 tableWrap.classList.remove('d-none');
 
