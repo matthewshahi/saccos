@@ -1,128 +1,98 @@
-@extends('layouts.app')
+<div class="col-12">
+    <div class="card o-hidden mb-4">
 
-@section('title', 'Member Financial Position')
+        {{-- HEADER --}}
+        <div class="card-header d-flex align-items-center">
+            <h3 class="card-title m-0 flex-grow-1">
+                Member Financial Position — As at {{ $period }}
+            </h3>
 
-@section('content')
-<div class="container-fluid">
-
-<div class="card mb-3">
-    <div class="card-header">
-        <strong>Loan / Savings / FOSA / Capital Balances</strong>
-    </div>
-
-    <div class="card-body">
-        <div class="form-inline">
-            <label class="mr-2"><strong>Period</strong></label>
-            <input type="text"
-                   id="period"
-                   class="form-control mr-2"
-                   value="{{ $currentPeriod }}"
-                   maxlength="6"
-                   style="width:120px">
-
-            <button id="loadReport" class="btn btn-primary mr-2">
-                Load
-            </button>
-
-            <a id="exportBtn" class="btn btn-success disabled" href="#">
+            <a href="{{ route('reports.members.financial_position.export', ['period' => $period]) }}"
+               class="btn btn-sm btn-outline-success">
                 Export CSV
             </a>
         </div>
+
+        {{-- BODY --}}
+        <div class="card-body">
+
+            {{-- SCROLL WRAPPER --}}
+            <div class="table-responsive"
+                 style="max-height:70vh; overflow:auto; white-space:nowrap;">
+
+                <table class="table table-bordered table-striped table-sm text-center">
+
+                    {{-- TABLE HEAD --}}
+                    <thead class="table-light sticky-top">
+                        <tr>
+                            <th>#</th>
+                            <th>Name</th>
+                            <th>Sacco ID</th>
+                            <th>National ID</th>
+                            <th>Gender</th>
+                            <th>Company</th>
+                            <th>Department</th>
+                            <th class="text-end">Savings</th>
+                            <th class="text-end">FOSA</th>
+                            <th class="text-end">Capital</th>
+
+                            @foreach($loanTypes as $lt)
+                                <th class="text-end">{{ $lt->loan_type_name }} Taken</th>
+                                <th class="text-end">{{ $lt->loan_type_name }} Paid</th>
+                            @endforeach
+                        </tr>
+                    </thead>
+
+                    {{-- TABLE BODY --}}
+                    <tbody>
+                        @foreach($rows as $i => $r)
+                            <tr>
+                                <td>{{ $i + 1 }}</td>
+                                <td class="text-start">{{ $r['member_name'] }}</td>
+                                <td>{{ $r['member_sacco_id'] }}</td>
+                                <td>{{ $r['member_national_id'] }}</td>
+                                <td>{{ $r['member_gender'] }}</td>
+                                <td>{{ $r['company'] }}</td>
+                                <td>{{ $r['department'] }}</td>
+
+                                <td class="text-end">{{ number_format($r['savings'], 2) }}</td>
+                                <td class="text-end">{{ number_format($r['fosa'], 2) }}</td>
+                                <td class="text-end">{{ number_format($r['capital'], 2) }}</td>
+
+                                @foreach($r['loans'] as $loan)
+                                    <td class="text-end">
+                                        {{ number_format($loan['taken'], 2) }}
+                                    </td>
+                                    <td class="text-end">
+                                        {{ number_format($loan['paid'], 2) }}
+                                    </td>
+                                @endforeach
+                            </tr>
+                        @endforeach
+                    </tbody>
+
+                    {{-- TOTALS FOOTER --}}
+                    <tfoot class="table-dark sticky-bottom">
+                        <tr>
+                            <th colspan="7" class="text-end">TOTALS</th>
+
+                            <th class="text-end">{{ number_format($totals['savings'], 2) }}</th>
+                            <th class="text-end">{{ number_format($totals['fosa'], 2) }}</th>
+                            <th class="text-end">{{ number_format($totals['capital'], 2) }}</th>
+
+                            @foreach($loanTypes as $lt)
+                                <th class="text-end">
+                                    {{ number_format($totals['loans'][$lt->loan_type_id]['taken'], 2) }}
+                                </th>
+                                <th class="text-end">
+                                    {{ number_format($totals['loans'][$lt->loan_type_id]['paid'], 2) }}
+                                </th>
+                            @endforeach
+                        </tr>
+                    </tfoot>
+
+                </table>
+            </div>
+        </div>
     </div>
 </div>
-
-<div class="card">
-    <div class="card-body">
-
-        <div id="loading" class="text-muted d-none">
-            Loading…
-        </div>
-
-        <div id="tableWrap" class="table-responsive d-none">
-            <table class="table table-bordered table-sm">
-                <thead id="thead"></thead>
-                <tbody id="tbody"></tbody>
-            </table>
-        </div>
-
-    </div>
-</div>
-
-</div>
-@endsection
-
-@section('scripts')
-<script>
-document.getElementById('loadReport').onclick = function () {
-
-    const period = document.getElementById('period').value.trim();
-
-    if (!/^\d{6}$/.test(period)) {
-        alert('Use YYYYMM');
-        return;
-    }
-
-    document.getElementById('loading').classList.remove('d-none');
-    document.getElementById('tableWrap').classList.add('d-none');
-
-    fetch(`{{ route('reports.members.financial_position.data') }}?period=${period}`)
-        .then(r => r.json())
-        .then(resp => {
-
-            document.getElementById('loading').classList.add('d-none');
-
-            const data = resp.data;
-            if (!data || data.length === 0) {
-                alert('No data');
-                return;
-            }
-
-            let head = `<tr>
-                <th>#</th>
-                <th>Name</th>
-                <th>Sacco ID</th>
-                <th>National ID</th>
-                <th>Gender</th>
-                <th>Savings</th>
-                <th>FOSA</th>
-                <th>Capital</th>`;
-
-            data[0].loans.forEach(l => {
-                head += `<th>${l.loan_type_name} Taken</th>
-                         <th>${l.loan_type_name} Bal</th>`;
-            });
-
-            head += `</tr>`;
-            document.getElementById('thead').innerHTML = head;
-
-            let rows = '';
-            data.forEach((r,i) => {
-
-                rows += `<tr>
-                    <td>${i+1}</td>
-                    <td>${r.member_name}</td>
-                    <td>${r.member_sacco_id}</td>
-                    <td>${r.member_national_id}</td>
-                    <td>${r.member_gender}</td>
-                    <td align="right">${r.savings.toLocaleString()}</td>
-                    <td align="right">${r.fosa.toLocaleString()}</td>
-                    <td align="right">${r.capital.toLocaleString()}</td>`;
-
-                r.loans.forEach(l => {
-                    rows += `<td align="right">${l.taken.toLocaleString()}</td>
-                             <td align="right">${l.balance.toLocaleString()}</td>`;
-                });
-
-                rows += `</tr>`;
-            });
-
-            document.getElementById('tbody').innerHTML = rows;
-            document.getElementById('tableWrap').classList.remove('d-none');
-
-            const exp = document.getElementById('exportBtn');
-            exp.href = `{{ route('reports.members.financial_position.export') }}?period=${period}`;
-            exp.classList.remove('disabled');
-        });
-};
-</script>
-@endsection
