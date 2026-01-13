@@ -52,3 +52,5 @@ composer.phar
 telescope/*
 .DS_Store
 **/.DS_Store
+storage/.DS_Store
+/storage

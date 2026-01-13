@@ -50,8 +50,9 @@ use App\Http\Controllers\PasswordResetController;
 use App\Http\Controllers\LoanRepaymentImportController;
 use App\Http\Controllers\ManualMpesaRecoveryController;
 use App\Http\Controllers\FosaMembersReportController;
+use App\Http\Controllers\MemberFinancialPositionController;
 
-/*
+
 use App\Http\Controllers\KassMigrationController;
 use App\Http\Controllers\KasMemberImportController;
 
@@ -66,11 +67,13 @@ Route::prefix('kass')->group(function () {
 });
 
 
-Route::get('/kass/import/contributions', 
+Route::get(
+    '/kass/import/contributions',
     [KassContributionsImportController::class, 'index']
 )->name('kass.import.contributions.form');
 
-Route::post('/kass/import/contributions', 
+Route::post(
+    '/kass/import/contributions',
     [KassContributionsImportController::class, 'import']
 )->name('kass.import.contributions.run');
 Route::get(
@@ -95,7 +98,7 @@ Route::prefix('kass_loan_imports')->name('kassloan.')->group(function () {
 });
 
 
- 
+
 Route::prefix('kas-member-import')->name('kasmember.')->group(function () {
 
     Route::get('/', [KasMemberImportController::class, 'index'])
@@ -124,7 +127,6 @@ Route::prefix('kas-member-import')->name('kasmember.')->group(function () {
 
     Route::get('/process/cleanup', [KasMemberImportController::class, 'cleanup'])
         ->name('process.cleanup');
-
 });
 
 
@@ -155,22 +157,20 @@ Route::prefix('kass-migration')->group(function () {
     Route::delete('/staging/clear', [KassMigrationController::class, 'clearStaging'])
         ->name('kass.staging.clear');
 
-        Route::post('/kass/process-all', [KassMigrationController::class, 'processAll'])
-    ->name('kass.process.all');
+    Route::post('/kass/process-all', [KassMigrationController::class, 'processAll'])
+        ->name('kass.process.all');
 
 
-     
-// 🚀 PROCESS ALL FILES (GET) — THIS ONE WAS MISSING
+
+    // 🚀 PROCESS ALL FILES (GET) — THIS ONE WAS MISSING
     Route::get('/kass/process-all', [KassMigrationController::class, 'processAll'])
         ->name('kass.process.all');
 
-Route::get('/kass/preview', [KassMigrationController::class, 'preview'])
-    ->name('kass.preview');
-
-
+    Route::get('/kass/preview', [KassMigrationController::class, 'preview'])
+        ->name('kass.preview');
 });
- 
-*/
+
+
 // use App\Http\Controllers\LedgerRebuildController;
 
 // Route::get('/rebuild/ledgers', [LedgerRebuildController::class, 'rebuild'])
@@ -1008,4 +1008,32 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
             require __DIR__ . '/transport/routes.php';
         });
     }
+
+    Route::prefix('reports/members')
+    ->group(function () {
+
+        Route::get(
+            '/financial-position',
+            [MemberFinancialPositionController::class, 'index']
+        )
+        ->name('reports.members.financial_position')
+        ->middleware('check_user_rights:rpt_reports');
+
+        Route::get(
+            '/financial-position/data',
+            [MemberFinancialPositionController::class, 'data']
+        )
+        ->name('reports.members.financial_position.data')
+        ->middleware('check_user_rights:rpt_reports');
+
+        Route::get(
+            '/financial-position/export',
+            [MemberFinancialPositionController::class, 'export']
+        )
+        ->name('reports.members.financial_position.export')
+        ->middleware('check_user_rights:rpt_reports');
+    });
+
+
+
 });
