@@ -59,18 +59,19 @@
 
                 {{-- HEADER --}}
                 <div class="card-header d-flex align-items-center justify-content-between">
-                    <h3 class="card-title m-0">
-                        Member Financial Position (As At)
-                    </h3>
+    <h3 class="card-title mb-0">
+        Member Financial Position (As At)
+    </h3>
 
-                    <a
-                        href="#"
-                        id="exportBtn"
-                        class="btn btn-sm btn-outline-success disabled"
-                        aria-disabled="true">
-                        Export CSV
-                    </a>
-                </div>
+    <a
+        href="#"
+        id="exportBtn"
+        class="btn btn-sm btn-outline-success disabled"
+        aria-disabled="true">
+        Export CSV
+    </a>
+</div>
+
 
                 <div class="card-body">
 
