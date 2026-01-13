@@ -346,6 +346,15 @@ $defaultLogoPath = '/image/logo.jpg'; // Default logo
                                             <span class="text-muted">Consolidated (All in One)</span>
                                         </a>
                                     </li>
+
+                                    <li class="item-name">
+                                        <a href="{{ url('/reports/members/financial-position') }}">
+                                            <span class="text-muted">All COntrinutions + Loans "As At"</span>
+                                        </a>
+                                    </li>
+
+                                
+
                                     <li class="item-name">
                                         <a href="{{ url('/registration-fees') }}">
                                             <span class="text-muted">Registration Fees</span>
