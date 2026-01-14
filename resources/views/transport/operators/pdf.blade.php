@@ -61,6 +61,7 @@
             <th>Chair</th>
             <th>Vehicle</th>
             <th>Owner</th>
+            <th>Date Added</th>
         </tr>
     </thead>
     <tbody>
@@ -113,6 +114,14 @@
                     <div class="muted">
                         {{ $o->vehicle_owner_phone }}
                     </div>
+                @endif
+            </td>
+
+            <td>
+                @if(!empty($o->operator_created_at))
+                    {{ \Carbon\Carbon::parse($o->operator_created_at)->format('d M Y') }}
+                @else
+                    -
                 @endif
             </td>
         </tr>
