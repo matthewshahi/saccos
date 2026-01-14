@@ -2,6 +2,17 @@
 
 @section('content')
 @include('transport._nav_links')
+<div class="d-flex gap-2">
+    <a href="{{ route('operators.export.excel') }}"
+       class="btn btn-sm btn-success">
+        <i class="i-File-Excel"></i> Excel
+    </a>
+
+    <a href="{{ route('operators.export.pdf', request()->query()) }}"
+       class="btn btn-sm btn-danger">
+        <i class="i-File-PDF"></i> PDF
+    </a>
+</div>
 
 <div class="row">
   <div class="col-md-12">
