@@ -55,6 +55,7 @@
                             <th>Chair</th>
                             <th>Vehicle</th>
                             <th>Owner</th>
+                            <th>Date Added</th>
                             <th>Action</th>
                         </tr>
                     </thead>
@@ -122,6 +123,17 @@
                             </td>
 
                             <td>
+                                @if(!empty($operator->operator_created_at))
+                                    {{ \Carbon\Carbon::parse($operator->operator_created_at)->format('d M Y') }}
+                                    <div class="small text-muted">
+                                        {{ \Carbon\Carbon::parse($operator->operator_created_at)->diffForHumans() }}
+                                    </div>
+                                @else
+                                    -
+                                @endif
+                            </td>
+
+                            <td>
                                 <a class="text-success"
                                    href="{{ route('operators.edit', $operator->operator_id) }}">
                                     <i class="nav-icon i-Pen-2 fw-bold"></i>
@@ -130,7 +142,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="12" class="text-center text-muted">
+                            <td colspan="13" class="text-center text-muted">
                                 No operators found.
                             </td>
                         </tr>

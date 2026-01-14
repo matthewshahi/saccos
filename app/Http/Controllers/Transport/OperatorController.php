@@ -163,6 +163,12 @@ class OperatorController extends Controller
             'o.operator_type',
             'o.status as operator_status',
 
+            // Operator (dates)
+'o.created_at as operator_created_at',
+'o.updated_at as operator_updated_at',
+
+
+
             // Introducing member
             'm.member_id as introduced_by_member_id',
             'm.member_name as introduced_by_member_name',
@@ -206,7 +212,10 @@ class OperatorController extends Controller
         });
     }
 
-    return $query->orderBy('o.full_name');
+    return $query
+    ->orderByDesc('o.created_at')
+    ->orderByDesc('o.updated_at');
+
 }
 
     public function exportExcel()
