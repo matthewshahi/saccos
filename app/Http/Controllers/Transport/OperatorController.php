@@ -9,20 +9,62 @@ class OperatorController extends Controller
 {
   public function index(Request $request)
 {
-    $query = DB::table('sacco_matatus_operators');
+    $query = DB::table('sacco_matatus_operators as o')
+        ->leftJoin('sacco_members as m', 'm.member_id', '=', 'o.introduced_by_member_id')
+        ->leftJoin('sacco_matatus_stages as s', function ($join) {
+            $join->on('s.id', '=', 'o.operator_stage_id')
+                 ->where('s.deleted', '=', 'N');
+        })
+        ->leftJoin('sacco_matatus_stage_chairs as sc', function ($join) {
+            $join->on('sc.id', '=', 'o.operator_chair_id')
+                 ->where('sc.deleted', '=', 'N');
+        })
+        ->leftJoin('sacco_matatus_operator_vehicle_assignments as ova', function ($join) {
+            $join->on('ova.v_assignment_operator_id', '=', 'o.id')
+                 ->where('ova.v_assignment_status', '=', 'assigned')
+                 ->whereNull('ova.v_assignment_end_date');
+        })
+        ->leftJoin('sacco_matatus_vehicles as v', 'v.id', '=', 'ova.v_assignment_vehicle_id')
+        ->leftJoin('sacco_members as vm', 'vm.member_id', '=', 'v.vehicles_member_id')
+        ->select([
+            'o.*',
+
+            // Introducing member
+            'm.member_name as introduced_by_member_name',
+            'm.member_phone_no as introduced_by_member_phone',
+
+            // Stage
+            's.stage_name',
+
+            // Chair
+            'sc.chair_name as stage_chair_name',
+            'sc.chair_phone as stage_chair_phone',
+
+            // Vehicle
+            'v.vehicles_registration_number',
+            'v.vehicles_status as vehicle_status',
+
+            // Vehicle owner
+            'vm.member_name as vehicle_owner_name',
+        ]);
 
     if ($search = $request->input('q')) {
         $query->where(function ($q) use ($search) {
-            $q->where('full_name', 'like', "%{$search}%")
-              ->orWhere('national_id', 'like', "%{$search}%")
-              ->orWhere('phone', 'like', "%{$search}%");
+            $q->where('o.full_name', 'like', "%{$search}%")
+              ->orWhere('o.national_id', 'like', "%{$search}%")
+              ->orWhere('o.phone', 'like', "%{$search}%")
+              ->orWhere('m.member_name', 'like', "%{$search}%")
+              ->orWhere('v.vehicles_registration_number', 'like', "%{$search}%");
         });
     }
 
-    $operators = $query->orderBy('full_name')->get();
+    $operators = $query
+        ->orderBy('o.full_name')
+        ->get();
 
     return view('transport.operators.index', compact('operators'));
 }
+
 
 public function edit($id)
 {

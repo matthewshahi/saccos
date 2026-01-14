@@ -21,49 +21,94 @@
       <div class="card-body table-responsive">
         <table class="table table-hover table-bordered table-sm text-center">
           <thead class="bg-light">
-            <tr>
-              <th>#</th>
-              <th>Name</th>
-              <th>Phone</th>
-              <th>ID</th>
-              <th>Gender</th>
-              <th>Type</th>
-              <th>Status</th>
-              <th>Reason</th>
-              <th>Action</th>
-            </tr>
-          </thead>
+<tr>
+    <th>#</th>
+    <th>Operator</th>
+    <th>Phone</th>
+    <th>ID</th>
+    <th>Type</th>
+    <th>Status</th>
+    <th>Introduced By</th>
+    <th>Stage</th>
+    <th>Chair</th>
+    <th>Vehicle</th>
+    <th>Owner</th>
+    <th>Action</th>
+</tr>
+</thead>
+
           <tbody>
-            @forelse($operators as $index => $operator)
-              <tr>
-                <td>{{ $index + 1 }}</td>
-                <td>{{ $operator->full_name }}</td>
-                <td>{{ $operator->phone }}</td>
-                <td>{{ $operator->national_id }}</td>
-                <td>{{ ucfirst($operator->gender) }}</td>
-                <td><span class="badge bg-info">{{ ucfirst($operator->operator_type) }}</span></td>
-                <td>
-                  <span class="badge bg-{{ $operator->status === 'active' ? 'success' : 'secondary' }}">
-                    {{ ucfirst($operator->status) }}
-                  </span>
-                </td>
-                <td>
-                  @if($operator->status_reason)
-                    <small class="text-muted">{{ ucfirst($operator->status_reason) }}</small>
-                  @endif
-                </td>
-                <td>
-                  <a class="text-success me-2" href="{{ route('operators.edit', $operator->id) }}">
-                    <i class="nav-icon i-Pen-2 fw-bold"></i>
-                  </a>
-                </td>
-              </tr>
-            @empty
-              <tr>
-                <td colspan="9" class="text-center">No operators found.</td>
-              </tr>
-            @endforelse
-          </tbody>
+@forelse($operators as $index => $operator)
+<tr>
+    <td>{{ $index + 1 }}</td>
+
+    <td class="text-start">
+        <strong>{{ $operator->full_name }}</strong>
+        @if($operator->operator_type)
+            <div class="small text-muted">{{ ucfirst($operator->operator_type) }}</div>
+        @endif
+    </td>
+
+    <td>{{ $operator->phone }}</td>
+    <td>{{ $operator->national_id }}</td>
+
+    <td>
+        <span class="badge bg-info">
+            {{ ucfirst($operator->operator_type) }}
+        </span>
+    </td>
+
+    <td>
+        <span class="badge bg-{{ $operator->status === 'active' ? 'success' : 'secondary' }}">
+            {{ ucfirst($operator->status) }}
+        </span>
+    </td>
+
+    <td class="text-start">
+        {{ $operator->introduced_by_member_name ?? '-' }}
+        @if($operator->introduced_by_member_phone)
+            <div class="small text-muted">{{ $operator->introduced_by_member_phone }}</div>
+        @endif
+    </td>
+
+    <td>
+        {{ $operator->stage_name ?? '-' }}
+    </td>
+
+    <td class="text-start">
+        {{ $operator->stage_chair_name ?? '-' }}
+        @if($operator->stage_chair_phone)
+            <div class="small text-muted">{{ $operator->stage_chair_phone }}</div>
+        @endif
+    </td>
+
+    <td>
+        {{ $operator->vehicles_registration_number ?? '-' }}
+        @if($operator->vehicle_status)
+            <div class="small text-muted">{{ $operator->vehicle_status }}</div>
+        @endif
+    </td>
+
+    <td>
+        {{ $operator->vehicle_owner_name ?? '-' }}
+    </td>
+
+    <td>
+        <a class="text-success me-2"
+           href="{{ route('operators.edit', $operator->id) }}">
+            <i class="nav-icon i-Pen-2 fw-bold"></i>
+        </a>
+    </td>
+</tr>
+@empty
+<tr>
+    <td colspan="12" class="text-center text-muted">
+        No operators found.
+    </td>
+</tr>
+@endforelse
+</tbody>
+
         </table>
       </div>
     </div>
