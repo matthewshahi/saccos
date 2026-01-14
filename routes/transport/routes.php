@@ -269,3 +269,10 @@ Route::get('/stage-chairs/delete/{id}', [MatatuRouteController::class, 'chairsDe
     ->name('chairs.delete')
     ->middleware('check_user_rights:add_new_sacco_member');
 
+Route::get('/operators/export/excel', [OperatorController::class, 'exportExcel'])
+    ->name('operators.export.excel')
+    ->middleware('check_user_rights:add_new_sacco_member');
+
+Route::get('/operators/export/pdf', [OperatorController::class, 'exportPdf'])
+    ->name('operators.export.pdf')
+    ->middleware('check_user_rights:add_new_sacco_member');

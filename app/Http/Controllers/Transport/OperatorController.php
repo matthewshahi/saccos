@@ -8,6 +8,9 @@ use Illuminate\Http\Request;
 use App\Exports\OperatorsExport;
 use Maatwebsite\Excel\Facades\Excel;
 
+use Barryvdh\DomPDF\Facade\Pdf;
+
+
 class OperatorController extends Controller
 {
     public function index(Request $request)
@@ -170,6 +173,21 @@ class OperatorController extends Controller
     return Excel::download(
         new OperatorsExport,
         'operators_' . now()->format('Ymd_His') . '.xlsx'
+    );
+}
+
+
+public function exportPdf(Request $request)
+{
+    $operators = $this->operatorBaseQuery($request)->get();
+
+    $pdf = Pdf::loadView(
+        'transport.operators.pdf',
+        compact('operators')
+    )->setPaper('A4', 'landscape');
+
+    return $pdf->download(
+        'operators_' . now()->format('Ymd_His') . '.pdf'
     );
 }
 
