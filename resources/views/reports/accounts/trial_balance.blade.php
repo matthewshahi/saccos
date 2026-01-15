@@ -134,11 +134,24 @@
                 @endforeach
 
                 {{-- Subtotal --}}
-                <tr class="fw-bold table-light">
-                  <td colspan="3" class="text-end">Subtotal {{ strtoupper(trim($type)) }}</td>
-                  <td class="text-end">{{ number_format($typeDebit,2) }}</td>
-                  <td class="text-end">{{ number_format($typeCredit,2) }}</td>
-                </tr>
+               @php
+  $netTypeBalance = $typeDebit - $typeCredit;
+  $subDebit  = $netTypeBalance > 0 ? $netTypeBalance : 0;
+  $subCredit = $netTypeBalance < 0 ? abs($netTypeBalance) : 0;
+@endphp
+
+<tr class="fw-bold table-light">
+  <td colspan="3" class="text-end">
+    Subtotal {{ strtoupper(trim($type)) }}
+  </td>
+  <td class="text-end">
+    {{ $subDebit > 0 ? number_format($subDebit, 2) : '' }}
+  </td>
+  <td class="text-end">
+    {{ $subCredit > 0 ? number_format($subCredit, 2) : '' }}
+  </td>
+</tr>
+
 
               @empty
                 <tr>
