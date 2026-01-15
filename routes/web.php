@@ -51,6 +51,7 @@ use App\Http\Controllers\LoanRepaymentImportController;
 use App\Http\Controllers\ManualMpesaRecoveryController;
 use App\Http\Controllers\FosaMembersReportController;
 use App\Http\Controllers\MemberFinancialPositionController;
+use App\Http\Controllers\FosaTransferController;
 
 
 use App\Http\Controllers\KassMigrationController;
@@ -1034,4 +1035,27 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
                 ->name('reports.members.financial_position.export')
                 ->middleware('check_user_rights:rpt_reports');
         });
+
+    Route::prefix('fosa/transfers')->group(function () {
+
+        Route::get(
+            '/',
+            [FosaTransferController::class, 'index']
+        )->name('fosa.transfers.index')->middleware('check_user_rights:trasfer_fosa');
+
+        Route::get(
+            '/search',
+            [FosaTransferController::class, 'search']
+        )->name('fosa.transfers.search')->middleware('check_user_rights:trasfer_fosa');
+
+        Route::post(
+            '/post',
+            [FosaTransferController::class, 'postTransfer']
+        )->name('fosa.transfers.post')->middleware('check_user_rights:trasfer_fosa');
+
+        Route::get(
+            '/ledger-search',
+            [FosaTransferController::class, 'ledgerSearch']
+        )->name('fosa.transfers.ledger_search')->middleware('check_user_rights:trasfer_fosa');
+    });
 });
