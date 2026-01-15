@@ -234,20 +234,29 @@
             <div class="card mb-5">
                 <div class="card-header bg-danger text-white fw-bold">Loan Statement</div>
                 <div class="card-body">
+
                     @foreach ($data['loans'] as $loan)
                         <div class="loan-box mb-4 p-3 border rounded">
+
                             <h6 class="fw-bold text-danger">
                                 {{ $loan->loan_type_name }} ({{ $loan->loan_id }}) — {{ $loan->loan_doc_no }}
                             </h6>
+
                             <p class="small mb-2">
                                 <strong>Period Taken:</strong> {{ $loan->loan_taken_period }} |
                                 <strong>Amount:</strong> Ksh {{ number_format($loan->loan_amount, 2) }} |
-                                
                                 <strong>Paid:</strong> Ksh {{ number_format($loan->loan_loan_paid, 2) }} |
                                 <strong>Commission:</strong> {{ number_format($loan->loan_commision, 2) }} |
                                 <strong>Insurance:</strong> {{ number_format($loan->loan_insurance, 2) }}
                             </p>
 
+                            @php
+                                // Opening balance = original loan + movements before period_from
+                                $openingMovement = $data['loanOpeningBalances'][$loan->loan_id] ?? 0;
+                                $balance = $loan->loan_amount + $openingMovement;
+
+                                $loanPayments = $data['paymentsByLoan'][$loan->loan_id] ?? collect();
+                            @endphp
 
                             <div class="table-responsive">
                                 <table class="table table-bordered table-sm mb-0">
@@ -265,12 +274,25 @@
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        @php
-                                            $balance = $loan->loan_amount;
-                                            $loanPayments = $data['paymentsByLoan'][$loan->loan_id] ?? collect();
-                                        @endphp
+
+                                        {{-- Opening balance row --}}
+                                        <tr class="table-secondary fw-bold">
+                                            <td colspan="8" class="text-end">
+                                                Opening Balance as at {{ $data['period_from'] }}
+                                            </td>
+                                            <td class="text-end">
+                                                {{ number_format($balance, 2) }}
+                                            </td>
+                                        </tr>
+
                                         @foreach ($loanPayments as $i => $p)
-                                            @php $balance -= $p->loan_payments_amount; @endphp
+                                            @php
+                                                // loan_payments_amount is signed:
+                                                // +ve = repayment (reduces balance)
+                                                // -ve = loan increase / contra (increases balance)
+                                                $balance -= $p->loan_payments_amount;
+                                            @endphp
+
                                             <tr>
                                                 <td>{{ $i + 1 }}</td>
                                                 <td>{{ $p->loan_payments_period }}</td>
@@ -278,22 +300,35 @@
                                                 </td>
                                                 <td>{{ $p->loan_payments_docno }}</td>
                                                 <td>{{ $p->loan_payments_description }}</td>
-                                                <td class="text-end">{{ number_format($p->loan_payments_amount, 2) }}</td>
-                                                <td class="text-end">{{ number_format($p->loan_payments_interest, 2) }}
+
+                                                <td class="text-end">
+                                                    {{ number_format($p->loan_payments_amount, 2) }}
                                                 </td>
+
+                                                <td class="text-end">
+                                                    {{ number_format($p->loan_payments_interest, 2) }}
+                                                </td>
+
                                                 <td class="text-end">
                                                     {{ number_format($p->loan_payments_amount + $p->loan_payments_interest, 2) }}
                                                 </td>
-                                                <td class="text-end">{{ number_format($balance, 2) }}</td>
+
+                                                <td class="text-end fw-bold">
+                                                    {{ number_format($balance, 2) }}
+                                                </td>
                                             </tr>
                                         @endforeach
+
                                     </tbody>
                                 </table>
                             </div>
+
                         </div>
                     @endforeach
+
                 </div>
             </div>
+
         </div>
 
         {{-- ================= STYLES ================= --}}
