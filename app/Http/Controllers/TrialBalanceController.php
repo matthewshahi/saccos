@@ -252,24 +252,24 @@ class TrialBalanceController extends Controller
      * Profit & Loss Excel export (derived from Trial Balance, but export class may already filter)
      * If your ProfitLossExport expects raw records, we pass TB rows so export matches the view.
      */
-    public function exportProfitLossExcel(Request $request)
-    {
-        $filters = $this->prepareFilters($request);
-        if (isset($filters['error'])) return $filters['error'];
+    // public function exportProfitLossExcel(Request $request)
+    // {
+    //     $filters = $this->prepareFilters($request);
+    //     if (isset($filters['error'])) return $filters['error'];
 
-        $tb = $this->getTrialBalanceRows(
-            $filters['period'],
-            $filters['dateFrom'],
-            $filters['dateTo']
-        );
+    //     $tb = $this->getTrialBalanceRows(
+    //         $filters['period'],
+    //         $filters['dateFrom'],
+    //         $filters['dateTo']
+    //     );
 
-        $suffix = $filters['period'] ?: ($filters['dateFrom']->format('Ymd') . '_to_' . $filters['dateTo']->format('Ymd'));
+    //     $suffix = $filters['period'] ?: ($filters['dateFrom']->format('Ymd') . '_to_' . $filters['dateTo']->format('Ymd'));
 
-        return Excel::download(
-            new ProfitLossExport($tb),
-            'profit_and_loss_' . $suffix . '.xlsx'
-        );
-    }
+    //     return Excel::download(
+    //         new ProfitLossExport($tb),
+    //         'profit_and_loss_' . $suffix . '.xlsx'
+    //     );
+    // }
 
     // ------------------------------------------------------------
     // PRIVATE SHARED FUNCTIONS (SINGLE SOURCE OF TRUTH: accounts_trans)
