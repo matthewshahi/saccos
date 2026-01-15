@@ -476,4 +476,64 @@ class TrialBalanceController extends Controller
             'main_account_type' => $type,
         ]]);
     }
+
+    public function exportProfitLossExcel(Request $request)
+{
+    $filters = $this->prepareFilters($request);
+    if (isset($filters['error'])) return $filters['error'];
+
+    // Canonical source: Trial Balance rows
+    $tb = $this->getTrialBalanceRows(
+        $filters['period'],
+        $filters['dateFrom'],
+        $filters['dateTo']
+    );
+
+    // Filename logic (period or date range)
+    $suffix = $filters['period']
+        ?: ($filters['dateFrom']->format('Ymd') . '_to_' . $filters['dateTo']->format('Ymd'));
+
+    return Excel::download(
+        new ProfitLossExport($tb),
+        'profit_and_loss_' . $suffix . '.xlsx'
+    );
+}
+public function exportProfitLossPdf(Request $request)
+{
+    $filters = $this->prepareFilters($request);
+    if (isset($filters['error'])) return $filters['error'];
+
+    $tb = $this->getTrialBalanceRows(
+        $filters['period'],
+        $filters['dateFrom'],
+        $filters['dateTo']
+    );
+
+    // Split into income & expenses
+    $income = $tb->filter(fn($r) =>
+        str_contains(strtoupper($r->main_account_type), 'INCOME')
+    )->values();
+
+    $expenses = $tb->filter(fn($r) =>
+        str_contains(strtoupper($r->main_account_type), 'EXPENSE')
+    )->values();
+
+    $totalIncome   = $income->sum(fn($r) => ($r->credit ?? 0));
+    $totalExpenses = $expenses->sum(fn($r) => ($r->debit ?? 0));
+    $netProfit     = $totalIncome - $totalExpenses;
+
+    $suffix = $filters['period']
+        ?: ($filters['dateFrom']->format('Ymd') . '_to_' . $filters['dateTo']->format('Ymd'));
+
+    return Pdf::loadView('reports.accounts.profit_loss_pdf', [
+        'income'        => $income,
+        'expenses'      => $expenses,
+        'totalIncome'   => $totalIncome,
+        'totalExpenses' => $totalExpenses,
+        'netProfit'     => $netProfit,
+        'periodLabel'   => $filters['period']
+            ?: ($filters['dateFrom']->format('d M Y') . ' to ' . $filters['dateTo']->format('d M Y')),
+    ])->download('profit_and_loss_' . $suffix . '.pdf');
+}
+
 }
