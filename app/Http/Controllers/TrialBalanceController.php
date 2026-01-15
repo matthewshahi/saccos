@@ -83,43 +83,44 @@ public function balanceSheet(Request $request)
     // -------------------------------
     // TOTALS (LEDGER-DRIVEN ONLY)
     // -------------------------------
-    $totalAssets = $assets->sum(fn ($r) =>
-        ($r->debit ?? 0) - ($r->credit ?? 0)
+    $totalAssets = $assets->sum(
+        fn ($r) => ($r->debit ?? 0) - ($r->credit ?? 0)
     );
 
-    $totalLiabilities = $liabilities->sum(fn ($r) =>
-        ($r->credit ?? 0) - ($r->debit ?? 0)
+    $totalLiabilities = $liabilities->sum(
+        fn ($r) => ($r->credit ?? 0) - ($r->debit ?? 0)
     );
 
     // IMPORTANT:
     // Capital already includes accumulated profit/loss from the ledger.
     // DO NOT derive retained earnings again.
-    $totalCapital = $capital->sum(fn ($r) =>
-        ($r->credit ?? 0) - ($r->debit ?? 0)
+    $totalCapital = $capital->sum(
+        fn ($r) => ($r->credit ?? 0) - ($r->debit ?? 0)
     );
 
     $totalRight = $totalLiabilities + $totalCapital;
 
     // -------------------------------
-    // VIEW SAFETY (PLACEHOLDERS)
+    // VIEW SAFETY
     // -------------------------------
-    $assets = $this->ensureNotEmptyRows($assets, 'No Asset Records', 'ASSET');
+    $assets      = $this->ensureNotEmptyRows($assets, 'No Asset Records', 'ASSET');
     $liabilities = $this->ensureNotEmptyRows($liabilities, 'No Liability Records', 'LIABILITY');
-    $capital = $this->ensureNotEmptyRows($capital, 'No Capital Records', 'CAPITAL');
+    $capital     = $this->ensureNotEmptyRows($capital, 'No Capital Records', 'CAPITAL');
 
     return view('reports.accounts.balance_sheet', [
         'period'           => $filters['period'],
         'dateFrom'         => $filters['dateFrom']->format('Y-m-d'),
         'dateTo'           => $filters['dateTo']->format('Y-m-d'),
-        'assets'           => $assets->values(),
-        'liabilities'      => $liabilities->values(),
-        'capital'          => $capital->values(),
+        'assets'           => $assets,
+        'liabilities'      => $liabilities,
+        'capital'          => $capital,
         'totalAssets'      => $totalAssets,
         'totalLiabilities' => $totalLiabilities,
         'totalCapital'     => $totalCapital,
         'totalRight'       => $totalRight,
     ]);
 }
+
 
     /**
      * Profit & Loss view (derived from Trial Balance)
@@ -590,125 +591,79 @@ public function balanceSheet(Request $request)
             'balance_sheet_' . $suffix . '.xlsx'
         );
     }
+public function exportBalanceSheetPdf(Request $request)
+{
+    $filters = $this->prepareFilters($request);
+    if (isset($filters['error'])) return $filters['error'];
 
-    public function exportBalanceSheetPdf(Request $request)
-    {
-        $filters = $this->prepareFilters($request);
-        if (isset($filters['error'])) {
-            return $filters['error'];
-        }
+    // Canonical Trial Balance rows (ALREADY NETTED)
+    $tb = $this->getTrialBalanceRows(
+        $filters['period'],
+        $filters['dateFrom'],
+        $filters['dateTo']
+    );
 
-        // Canonical Trial Balance rows (ALREADY NETTED)
-        $tb = $this->getTrialBalanceRows(
-            $filters['period'],
-            $filters['dateFrom'],
-            $filters['dateTo']
-        );
+    // Normalize account type ONCE
+    $tb = $tb->map(function ($r) {
+        $r->main_account_type = strtoupper(trim((string) $r->main_account_type));
+        return $r;
+    });
 
-        // Normalize account type ONCE
-        $tb = $tb->map(function ($r) {
-            $r->main_account_type = strtoupper(trim((string) $r->main_account_type));
-            return $r;
-        });
+    // -------------------------------
+    // BALANCE SHEET SECTIONS
+    // -------------------------------
+    $assets = $tb->filter(fn ($r) =>
+        str_starts_with($r->main_account_type, 'ASSET')
+        || str_starts_with($r->main_account_type, 'ASSETS')
+    )->values();
 
-        // -------------------------------
-        // BALANCE SHEET SECTIONS
-        // -------------------------------
-        $assets = $tb->filter(
-            fn($r) =>
-            str_starts_with($r->main_account_type, 'ASSET')
-                || str_starts_with($r->main_account_type, 'ASSETS')
-        )->values();
+    $liabilities = $tb->filter(fn ($r) =>
+        str_starts_with($r->main_account_type, 'LIABILITY')
+        || str_starts_with($r->main_account_type, 'LIABILITIES')
+    )->values();
 
-        $liabilities = $tb->filter(
-            fn($r) =>
-            str_starts_with($r->main_account_type, 'LIABILITY')
-                || str_starts_with($r->main_account_type, 'LIABILITIES')
-        )->values();
+    $capital = $tb->filter(fn ($r) =>
+        str_starts_with($r->main_account_type, 'CAPITAL')
+    )->values();
 
-        $capital = $tb->filter(
-            fn($r) =>
-            str_starts_with($r->main_account_type, 'CAPITAL')
-        )->values();
+    // -------------------------------
+    // TOTALS (MUST MATCH balanceSheet())
+    // -------------------------------
+    $totalAssets = $assets->sum(
+        fn ($r) => ($r->debit ?? 0) - ($r->credit ?? 0)
+    );
 
-        // -------------------------------
-        // TOTALS (MUST MATCH balanceSheet())
-        // -------------------------------
-        $totalAssets = $assets->sum(
-            fn($r) => ($r->debit ?? 0) - ($r->credit ?? 0)
-        );
+    $totalLiabilities = $liabilities->sum(
+        fn ($r) => ($r->credit ?? 0) - ($r->debit ?? 0)
+    );
 
-        $totalLiabilities = $liabilities->sum(
-            fn($r) => ($r->credit ?? 0) - ($r->debit ?? 0)
-        );
+    $totalCapital = $capital->sum(
+        fn ($r) => ($r->credit ?? 0) - ($r->debit ?? 0)
+    );
 
-        $baseCapital = $capital->sum(
-            fn($r) => ($r->credit ?? 0) - ($r->debit ?? 0)
-        );
+    $totalRight = $totalLiabilities + $totalCapital;
 
-        // -------------------------------
-        // RETAINED EARNINGS (FROM TB → P&L)
-        // -------------------------------
-        $income = $tb->filter(
-            fn($r) =>
-            str_contains($r->main_account_type, 'INCOME')
-        );
+    // -------------------------------
+    // LABELS
+    // -------------------------------
+    $periodLabel = $filters['period']
+        ? 'Period ' . $filters['period']
+        : $filters['dateFrom']->format('d M Y') . ' to ' . $filters['dateTo']->format('d M Y');
 
-        $expenses = $tb->filter(
-            fn($r) =>
-            str_contains($r->main_account_type, 'EXPENSE')
-        );
+    $suffix = $filters['period']
+        ?: ($filters['dateFrom']->format('Ymd') . '_to_' . $filters['dateTo']->format('Ymd'));
 
-        $totalIncome = $income->sum(
-            fn($r) => ($r->credit ?? 0) - ($r->debit ?? 0)
-        );
+    return Pdf::loadView('reports.accounts.balance_sheet_pdf', [
+        'assets'           => $assets,
+        'liabilities'      => $liabilities,
+        'capital'          => $capital,
+        'totalAssets'      => $totalAssets,
+        'totalLiabilities' => $totalLiabilities,
+        'totalCapital'     => $totalCapital,
+        'totalRight'       => $totalRight,
+        'periodLabel'      => $periodLabel,
+    ])->download('balance_sheet_' . $suffix . '.pdf');
+}
 
-        $totalExpenses = $expenses->sum(
-            fn($r) => ($r->debit ?? 0) - ($r->credit ?? 0)
-        );
-
-        $netProfit = $totalIncome - $totalExpenses;
-
-        // Retained Earnings PRESENTATION ROW
-        $retainedEarnings = (object) [
-            'main_account_code' => '',
-            'sub_account_code'  => '',
-            'sub_account_name'  => $netProfit >= 0
-                ? 'Retained Earnings (Profit)'
-                : 'Accumulated Loss',
-            'debit'             => $netProfit < 0 ? abs($netProfit) : 0,
-            'credit'            => $netProfit >= 0 ? abs($netProfit) : 0,
-            'main_account_type' => 'CAPITAL',
-        ];
-
-        // Capital INCLUDING retained earnings
-        $capitalDisplay = $capital->values()->push($retainedEarnings);
-
-        $totalCapital = $baseCapital + $netProfit;
-        $totalRight   = $totalLiabilities + $totalCapital;
-
-        // -------------------------------
-        // DISPLAY LABELS
-        // -------------------------------
-        $periodLabel = $filters['period']
-            ? 'Period ' . $filters['period']
-            : $filters['dateFrom']->format('d M Y') . ' to ' . $filters['dateTo']->format('d M Y');
-
-        $suffix = $filters['period']
-            ?: ($filters['dateFrom']->format('Ymd') . '_to_' . $filters['dateTo']->format('Ymd'));
-
-        return Pdf::loadView('reports.accounts.balance_sheet_pdf', [
-            'assets'           => $assets,
-            'liabilities'      => $liabilities,
-            'capital'          => $capitalDisplay,
-            'totalAssets'      => $totalAssets,
-            'totalLiabilities' => $totalLiabilities,
-            'totalCapital'     => $totalCapital,
-            'totalRight'       => $totalRight,
-            'netProfit'        => $netProfit,
-            'periodLabel'      => $periodLabel,
-        ])->download(
-            'balance_sheet_' . $suffix . '.pdf'
-        );
-    }
+    
 }
