@@ -27,7 +27,7 @@
                 </div>
                 <div class="col-md-3 mb-2">
                     <label class="form-label fw-bold">Period To (YYYYMM)</label>
-                    <input type="text" name="period_to" class="form-control form-control-sm" value="999999" readonly>
+                    <input type="text" name="period_to" class="form-control form-control-sm" value="999999">
                 </div>
                 <div class="col-md-3 mb-2">
                     <label class="form-label fw-bold">Loan Status</label>
