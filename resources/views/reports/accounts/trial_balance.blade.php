@@ -11,7 +11,7 @@
 
       <div class="card-body">
 
-        {{-- ✅ Session messages --}}
+        {{-- Session messages --}}
         @if(session('error'))
           <div class="alert alert-danger alert-dismissible fade show">
             {{ session('error') }}
@@ -29,23 +29,24 @@
         {{-- Navigation --}}
         @include('includes.accounts_nav')
 
-<div class="d-flex gap-2 mb-3">
-  <a href="{{ route('reports.accounts.trial-balance.excel', request()->query()) }}"
-     class="btn btn-success btn-sm">
-     Export Excel
-  </a>
+        {{-- Export buttons --}}
+        <div class="d-flex gap-2 mb-3">
+          <a href="{{ route('reports.accounts.trial-balance.excel', request()->query()) }}"
+             class="btn btn-success btn-sm">
+            Export Excel
+          </a>
 
-  <a href="{{ route('reports.accounts.trial-balance.pdf', request()->query()) }}"
-     class="btn btn-danger btn-sm">
-     Export PDF
-  </a>
-</div>
+          <a href="{{ route('reports.accounts.trial-balance.pdf', request()->query()) }}"
+             class="btn btn-danger btn-sm">
+            Export PDF
+          </a>
+        </div>
 
-        {{-- 🔍 Filter Form --}}
+        {{-- Filter Form --}}
         <form method="GET" action="{{ route('reports.accounts.trial-balance') }}" class="row g-3 mb-4">
 
           <div class="col-md-3">
-            <label class="form-label">Period (YYYYmm)</label>
+            <label class="form-label">Period (YYYYMM)</label>
             <input type="text"
                    name="period"
                    value="{{ old('period', $period ?? '') }}"
@@ -77,7 +78,7 @@
 
         </form>
 
-        {{-- 📊 Trial Balance Table --}}
+        {{-- Trial Balance Table --}}
         <div class="table-responsive">
           <table class="table table-bordered">
 
@@ -96,6 +97,8 @@
                 $grandDebit  = 0;
                 $grandCredit = 0;
                 $i = 1;
+
+                // Group by account type for sectioning
                 $grouped = $records->groupBy('main_account_type');
               @endphp
 
@@ -113,57 +116,43 @@
 
                 @foreach($accounts as $rec)
                   @php
-                    $grossDebit  = $rec->debit ?? 0;
-                    $grossCredit = $rec->credit ?? 0;
+                    // Values are already NET from controller
+                    $netDebit  = (float) ($rec->debit ?? 0);
+                    $netCredit = (float) ($rec->credit ?? 0);
 
-                    // NETTING LOGIC (core fix)
-                    $netDebit  = 0;
-                    $netCredit = 0;
-
-                    if ($grossDebit > $grossCredit) {
-                      $netDebit = $grossDebit - $grossCredit;
-                    } elseif ($grossCredit > $grossDebit) {
-                      $netCredit = $grossCredit - $grossDebit;
-                    } else {
-                      continue; // skip zero balance
+                    if ($netDebit == 0 && $netCredit == 0) {
+                      continue;
                     }
 
-                    $fullCode = trim($rec->main_account_code).'/'.trim($rec->sub_account_code);
+                    $fullCode = trim($rec->main_account_code) . '/' . trim($rec->sub_account_code);
 
-                    $typeDebit  += $netDebit;
-                    $typeCredit += $netCredit;
-                    $grandDebit += $netDebit;
-                    $grandCredit+= $netCredit;
+                    $typeDebit   += $netDebit;
+                    $typeCredit  += $netCredit;
+                    $grandDebit  += $netDebit;
+                    $grandCredit += $netCredit;
                   @endphp
 
                   <tr>
                     <td class="text-center">{{ $i++ }}</td>
                     <td class="text-start">{{ trim($rec->sub_account_name) }}</td>
                     <td class="text-center">{{ $fullCode }}</td>
-                    <td class="text-end">{{ $netDebit > 0 ? number_format($netDebit,2) : '' }}</td>
-                    <td class="text-end">{{ $netCredit > 0 ? number_format($netCredit,2) : '' }}</td>
+                    <td class="text-end">{{ $netDebit > 0 ? number_format($netDebit, 2) : '' }}</td>
+                    <td class="text-end">{{ $netCredit > 0 ? number_format($netCredit, 2) : '' }}</td>
                   </tr>
                 @endforeach
 
-                {{-- Subtotal --}}
-               @php
-  $netTypeBalance = $typeDebit - $typeCredit;
-  $subDebit  = $netTypeBalance > 0 ? $netTypeBalance : 0;
-  $subCredit = $netTypeBalance < 0 ? abs($netTypeBalance) : 0;
-@endphp
-
-<tr class="fw-bold table-light">
-  <td colspan="3" class="text-end">
-    Subtotal {{ strtoupper(trim($type)) }}
-  </td>
-  <td class="text-end">
-    {{ $subDebit > 0 ? number_format($subDebit, 2) : '' }}
-  </td>
-  <td class="text-end">
-    {{ $subCredit > 0 ? number_format($subCredit, 2) : '' }}
-  </td>
-</tr>
-
+                {{-- Subtotal (true Trial Balance subtotal) --}}
+                <tr class="fw-bold table-light">
+                  <td colspan="3" class="text-end">
+                    Subtotal {{ strtoupper(trim($type)) }}
+                  </td>
+                  <td class="text-end">
+                    {{ $typeDebit > 0 ? number_format($typeDebit, 2) : '' }}
+                  </td>
+                  <td class="text-end">
+                    {{ $typeCredit > 0 ? number_format($typeCredit, 2) : '' }}
+                  </td>
+                </tr>
 
               @empty
                 <tr>
@@ -175,15 +164,15 @@
             <tfoot class="table-dark fw-bold">
               <tr>
                 <td colspan="3" class="text-end">Grand Totals</td>
-                <td class="text-end">{{ number_format($grandDebit,2) }}</td>
-                <td class="text-end">{{ number_format($grandCredit,2) }}</td>
+                <td class="text-end">{{ number_format($grandDebit, 2) }}</td>
+                <td class="text-end">{{ number_format($grandCredit, 2) }}</td>
               </tr>
               <tr>
                 <td colspan="5" class="text-center">
-                  @if($grandDebit == $grandCredit)
+                  @if(abs($grandDebit - $grandCredit) < 0.01)
                     ✅ Trial Balance Balances
                   @else
-                    ⚠ Out of Balance by {{ number_format(abs($grandDebit - $grandCredit),2) }}
+                    ⚠ Out of Balance by {{ number_format(abs($grandDebit - $grandCredit), 2) }}
                   @endif
                 </td>
               </tr>
