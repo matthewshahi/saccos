@@ -17,30 +17,22 @@ class TrialBalanceExport implements FromCollection, WithHeadings
 
     public function collection()
     {
-        return $this->records->map(function ($r) {
-
-            $grossDebit  = $r->debit ?? 0;
-            $grossCredit = $r->credit ?? 0;
-
-            $debit  = 0;
-            $credit = 0;
-
-            if ($grossDebit > $grossCredit) {
-                $debit = $grossDebit - $grossCredit;
-            } elseif ($grossCredit > $grossDebit) {
-                $credit = $grossCredit - $grossDebit;
-            } else {
-                return null; // skip zero balance
-            }
-
-            return [
-                'Account Type' => strtoupper($r->main_account_type),
-                'Account Code' => $r->main_account_code.'/'.$r->sub_account_code,
-                'Account Name' => $r->sub_account_name,
-                'Debit'        => $debit,
-                'Credit'       => $credit,
-            ];
-        })->filter();
+        return $this->records
+            ->filter(function ($r) {
+                // Skip zero rows (controller already filtered, this is defensive)
+                return ((float) ($r->debit ?? 0) !== 0.0)
+                    || ((float) ($r->credit ?? 0) !== 0.0);
+            })
+            ->map(function ($r) {
+                return [
+                    'Account Type' => strtoupper((string) $r->main_account_type),
+                    'Account Code' => trim($r->main_account_code) . '/' . trim($r->sub_account_code),
+                    'Account Name' => trim($r->sub_account_name),
+                    'Debit'        => (float) ($r->debit ?? 0),
+                    'Credit'       => (float) ($r->credit ?? 0),
+                ];
+            })
+            ->values();
     }
 
     public function headings(): array

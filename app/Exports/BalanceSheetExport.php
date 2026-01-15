@@ -39,30 +39,43 @@ class BalanceSheetExport implements FromCollection, WithHeadings
     {
         $rows = [];
 
+        // Assets
         foreach ($this->assets as $a) {
             $rows[] = [
-                'Asset',
-                $a->sub_account_name,
-                ($a->main_account_code ?? '') . '/' . ($a->sub_account_code ?? ''),
-                max(0, ($a->debit ?? 0) - ($a->credit ?? 0)),
+                'Assets',
+                trim((string) $a->sub_account_name),
+                trim((string) $a->main_account_code) . '/' . trim((string) $a->sub_account_code),
+                (float) ($a->debit ?? 0),
             ];
         }
 
+        // Spacer
+        $rows[] = ['', '', '', ''];
+
+        // Liabilities
         foreach ($this->liabilities as $l) {
             $rows[] = [
-                'Liability',
-                $l->sub_account_name,
-                ($l->main_account_code ?? '') . '/' . ($l->sub_account_code ?? ''),
-                max(0, ($l->credit ?? 0) - ($l->debit ?? 0)),
+                'Liabilities',
+                trim((string) $l->sub_account_name),
+                trim((string) $l->main_account_code) . '/' . trim((string) $l->sub_account_code),
+                (float) ($l->credit ?? 0),
             ];
         }
 
+        // Spacer
+        $rows[] = ['', '', '', ''];
+
+        // Capital (including retained earnings row already prepared by controller)
         foreach ($this->capital as $c) {
             $rows[] = [
                 'Capital',
-                $c->sub_account_name,
-                ($c->main_account_code ?? '') . '/' . ($c->sub_account_code ?? ''),
-                max(0, ($c->credit ?? 0) - ($c->debit ?? 0)),
+                trim((string) $c->sub_account_name),
+                trim((string) $c->main_account_code) . '/' . trim((string) $c->sub_account_code),
+                (float) (
+                    ($c->credit ?? 0) > 0
+                        ? $c->credit
+                        : ($c->debit ?? 0)
+                ),
             ];
         }
 
