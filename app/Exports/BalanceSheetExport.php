@@ -39,47 +39,63 @@ class BalanceSheetExport implements FromCollection, WithHeadings
     {
         $rows = [];
 
-        // Assets
+        /* =========================
+         * ASSETS
+         * ========================= */
         foreach ($this->assets as $a) {
+            $amount = (float) ($a->debit ?? 0);
+            if ($amount <= 0) continue;
+
             $rows[] = [
                 'Assets',
                 trim((string) $a->sub_account_name),
                 trim((string) $a->main_account_code) . '/' . trim((string) $a->sub_account_code),
-                (float) ($a->debit ?? 0),
+                $amount,
             ];
         }
 
-        // Spacer
+        /* Spacer */
         $rows[] = ['', '', '', ''];
 
-        // Liabilities
+        /* =========================
+         * LIABILITIES
+         * ========================= */
         foreach ($this->liabilities as $l) {
+            $amount = (float) ($l->credit ?? 0);
+            if ($amount <= 0) continue;
+
             $rows[] = [
                 'Liabilities',
                 trim((string) $l->sub_account_name),
                 trim((string) $l->main_account_code) . '/' . trim((string) $l->sub_account_code),
-                (float) ($l->credit ?? 0),
+                $amount,
             ];
         }
 
-        // Spacer
+        /* Spacer */
         $rows[] = ['', '', '', ''];
 
-        // Capital (including retained earnings row already prepared by controller)
+        /* =========================
+         * CAPITAL (incl. retained earnings)
+         * ========================= */
         foreach ($this->capital as $c) {
+            $credit = (float) ($c->credit ?? 0);
+            $debit  = (float) ($c->debit ?? 0);
+
+            $amount = $credit > 0 ? $credit : $debit;
+            if ($amount <= 0) continue;
+
             $rows[] = [
                 'Capital',
                 trim((string) $c->sub_account_name),
                 trim((string) $c->main_account_code) . '/' . trim((string) $c->sub_account_code),
-                (float) (
-                    ($c->credit ?? 0) > 0
-                        ? $c->credit
-                        : ($c->debit ?? 0)
-                ),
+                $amount,
             ];
         }
 
-        // Totals
+        /* =========================
+         * TOTALS
+         * ========================= */
         $rows[] = ['', '', '', ''];
         $rows[] = ['TOTAL ASSETS', '', '', $this->totalAssets];
         $rows[] = ['TOTAL LIABILITIES', '', '', $this->totalLiabilities];

@@ -536,4 +536,90 @@ public function exportProfitLossPdf(Request $request)
     ])->download('profit_and_loss_' . $suffix . '.pdf');
 }
 
+public function exportBalanceSheetExcel(Request $request)
+{
+    $filters = $this->prepareFilters($request);
+    if (isset($filters['error'])) return $filters['error'];
+
+    // Reuse canonical TB
+    $tb = $this->getTrialBalanceRows(
+        $filters['period'],
+        $filters['dateFrom'],
+        $filters['dateTo']
+    );
+
+    // Normalize types
+    $tb = $tb->map(function ($r) {
+        $r->main_account_type = strtoupper(trim((string) $r->main_account_type));
+        return $r;
+    });
+
+    $assets = $tb->filter(fn($r) => str_starts_with($r->main_account_type, 'ASSET'))->values();
+    $liabilities = $tb->filter(fn($r) => str_starts_with($r->main_account_type, 'LIABILITY'))->values();
+    $capital = $tb->filter(fn($r) => str_starts_with($r->main_account_type, 'CAPITAL'))->values();
+
+    // Totals
+    $totalAssets = $assets->sum(fn($r) => ($r->debit ?? 0));
+    $totalLiabilities = $liabilities->sum(fn($r) => ($r->credit ?? 0));
+    $totalCapital = $capital->sum(fn($r) => ($r->credit ?? 0));
+    $totalRight = $totalLiabilities + $totalCapital;
+
+    $suffix = $filters['period']
+        ?: ($filters['dateFrom']->format('Ymd') . '_to_' . $filters['dateTo']->format('Ymd'));
+
+    return Excel::download(
+        new \App\Exports\BalanceSheetExport(
+            $assets,
+            $liabilities,
+            $capital,
+            $totalAssets,
+            $totalLiabilities,
+            $totalCapital,
+            $totalRight
+        ),
+        'balance_sheet_' . $suffix . '.xlsx'
+    );
+}
+
+public function exportBalanceSheetPdf(Request $request)
+{
+    $filters = $this->prepareFilters($request);
+    if (isset($filters['error'])) return $filters['error'];
+
+    $tb = $this->getTrialBalanceRows(
+        $filters['period'],
+        $filters['dateFrom'],
+        $filters['dateTo']
+    );
+
+    $tb = $tb->map(function ($r) {
+        $r->main_account_type = strtoupper(trim((string) $r->main_account_type));
+        return $r;
+    });
+
+    $assets = $tb->filter(fn($r) => str_starts_with($r->main_account_type, 'ASSET'))->values();
+    $liabilities = $tb->filter(fn($r) => str_starts_with($r->main_account_type, 'LIABILITY'))->values();
+    $capital = $tb->filter(fn($r) => str_starts_with($r->main_account_type, 'CAPITAL'))->values();
+
+    $totalAssets = $assets->sum(fn($r) => ($r->debit ?? 0));
+    $totalLiabilities = $liabilities->sum(fn($r) => ($r->credit ?? 0));
+    $totalCapital = $capital->sum(fn($r) => ($r->credit ?? 0));
+    $totalRight = $totalLiabilities + $totalCapital;
+
+    $suffix = $filters['period']
+        ?: ($filters['dateFrom']->format('Ymd') . '_to_' . $filters['dateTo']->format('Ymd'));
+
+    return Pdf::loadView('reports.accounts.balance_sheet_pdf', [
+        'assets'           => $assets,
+        'liabilities'      => $liabilities,
+        'capital'          => $capital,
+        'totalAssets'      => $totalAssets,
+        'totalLiabilities' => $totalLiabilities,
+        'totalCapital'     => $totalCapital,
+        'totalRight'       => $totalRight,
+        'periodLabel'      => $filters['period']
+            ?: ($filters['dateFrom']->format('d M Y') . ' to ' . $filters['dateTo']->format('d M Y')),
+    ])->download('balance_sheet_' . $suffix . '.pdf');
+}
+
 }
