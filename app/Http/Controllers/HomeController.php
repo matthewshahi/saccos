@@ -1314,15 +1314,16 @@ class HomeController extends Controller
         //     ->orderBy('loan_payments_paid_on')
         //     ->get();
 
-        $loanOpeningBalances = DB::table('sacco_loan_payments')
-    ->join('sacco_loans', 'sacco_loan_payments.loan_payments_loan_id', '=', 'sacco_loans.loan_id')
-    ->where('sacco_loans.loan_member', $id)
-    ->where('sacco_loan_payments.loan_payments_period', '<', $period_from)
-    ->groupBy('sacco_loan_payments.loan_payments_loan_id')
-    ->pluck(
-        DB::raw('SUM(sacco_loan_payments.loan_payments_amount)'),
-        'sacco_loan_payments.loan_payments_loan_id'
-    );
+       $loanOpeningBalances = DB::table('sacco_loan_payments as lp')
+    ->join('sacco_loans as l', 'lp.loan_payments_loan_id', '=', 'l.loan_id')
+    ->where('l.loan_member', $id)
+    ->where('lp.loan_payments_period', '<', $period_from)
+    ->select(
+        'lp.loan_payments_loan_id',
+        DB::raw('SUM(lp.loan_payments_amount) as opening_movement')
+    )
+    ->groupBy('lp.loan_payments_loan_id')
+    ->pluck('opening_movement', 'loan_payments_loan_id');
 
 
         $loanPayments = DB::table('sacco_loan_payments')
