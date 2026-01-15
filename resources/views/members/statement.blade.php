@@ -253,7 +253,8 @@
                             @php
                                 // Opening balance = original loan + movements before period_from
                                 $openingMovement = $data['loanOpeningBalances'][$loan->loan_id] ?? 0;
-                                $balance = $loan->loan_amount + $openingMovement;
+                                $balance = $loan->loan_amount - $openingMovement;
+
 
                                 $loanPayments = $data['paymentsByLoan'][$loan->loan_id] ?? collect();
                             @endphp
