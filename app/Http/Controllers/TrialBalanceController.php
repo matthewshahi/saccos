@@ -9,7 +9,7 @@ use App\Exports\TrialBalanceExport;
 use Maatwebsite\Excel\Facades\Excel;
 use Barryvdh\DomPDF\Facade\Pdf;
 use App\Exports\ProfitLossExport;
- 
+use App\Exports\BalanceSheetExport;
 class TrialBalanceController extends Controller
 {
     /**
@@ -432,5 +432,65 @@ public function exportProfitLossPdf(Request $request)
         ]
     )->download('profit_and_loss.pdf');
 }
+
+
+
+public function exportBalanceSheetExcel(Request $request)
+{
+    $filters = $this->prepareFilters($request);
+    if (isset($filters['error'])) return $filters['error'];
+
+    $records = $this->getAccountsData(
+        $filters['period'],
+        $filters['dateFrom'],
+        $filters['dateTo']
+    );
+
+    $records->transform(fn($r) => tap($r, function ($x) {
+        $x->main_account_type = strtoupper(trim($x->main_account_type));
+    }));
+
+    $assets      = $records->filter(fn($r) => str_starts_with($r->main_account_type, 'ASSET'));
+    $liabilities = $records->filter(fn($r) => str_starts_with($r->main_account_type, 'LIABILITY'));
+    $capital     = $records->filter(fn($r) => str_starts_with($r->main_account_type, 'CAPITAL'));
+
+    return Excel::download(
+        new BalanceSheetExport($assets, $liabilities, $capital),
+        'balance_sheet_'.$filters['period'].'.xlsx'
+    );
+}
+public function exportBalanceSheetPdf(Request $request)
+{
+    $filters = $this->prepareFilters($request);
+    if (isset($filters['error'])) return $filters['error'];
+
+    $records = $this->getAccountsData(
+        $filters['period'],
+        $filters['dateFrom'],
+        $filters['dateTo']
+    );
+
+    $records->transform(fn($r) => tap($r, function ($x) {
+        $x->main_account_type = strtoupper(trim($x->main_account_type));
+    }));
+
+    $assets      = $records->filter(fn($r) => str_starts_with($r->main_account_type, 'ASSET'));
+    $liabilities = $records->filter(fn($r) => str_starts_with($r->main_account_type, 'LIABILITY'));
+    $capital     = $records->filter(fn($r) => str_starts_with($r->main_account_type, 'CAPITAL'));
+
+    $rightSide = $liabilities->concat($capital);
+
+    return Pdf::loadView(
+        'reports.accounts.balance_sheet_pdf',
+        [
+            'assets'      => $assets,
+            'rightSide'   => $rightSide,
+            'totalAssets' => $assets->sum(fn($r) => ($r->debit ?? 0) - ($r->credit ?? 0)),
+            'totalRight'  => $rightSide->sum(fn($r) => ($r->credit ?? 0) - ($r->debit ?? 0)),
+            'dateTo'      => $filters['dateTo']->format('d M Y'),
+        ]
+    )->download('balance_sheet.pdf');
+}
+
 
     }

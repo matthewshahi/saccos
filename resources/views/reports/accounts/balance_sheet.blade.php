@@ -27,6 +27,13 @@
         @endif
 
         @include('includes.accounts_nav')
+<div class="d-flex gap-2 mb-3">
+  <a href="{{ route('reports.accounts.balance-sheet.excel', request()->query()) }}"
+     class="btn btn-success btn-sm">Export Excel</a>
+
+  <a href="{{ route('reports.accounts.balance-sheet.pdf', request()->query()) }}"
+     class="btn btn-danger btn-sm">Export PDF</a>
+</div>
 
         {{-- 🔍 Filters --}}
         <form method="GET" action="{{ route('reports.accounts.balance-sheet') }}" class="row g-3 mb-4">

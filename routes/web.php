@@ -944,6 +944,11 @@ Route::get(
     [TrialBalanceController::class, 'exportPdf']
 )->name('reports.accounts.trial-balance.pdf')->middleware('check_user_rights:rpt_trial_balance');
 
+Route::get(
+    'reports/accounts/balance-sheet/pdf',
+    [TrialBalanceController::class, 'exportBalanceSheetPdf']
+)->name('reports.accounts.balance-sheet.pdf'))->middleware('check_user_rights:rpt_trial_balance');
+
 
 Route::get(
     'reports/accounts/profit-loss/excel',
@@ -955,6 +960,10 @@ Route::get(
     [TrialBalanceController::class, 'exportProfitLossPdf']
 )->name('reports.accounts.profit-loss.pdf')->middleware('check_user_rights:rpt_profit_loss');
 
+Route::get(
+    'reports/accounts/balance-sheet/excel',
+    [TrialBalanceController::class, 'exportBalanceSheetExcel']
+)->name('reports.accounts.balance-sheet.excel')->middleware('check_user_rights:rpt_profit_loss');
 
 
     Route::get('/reports/accounts/profit-loss', [TrialBalanceController::class, 'profitLoss'])
