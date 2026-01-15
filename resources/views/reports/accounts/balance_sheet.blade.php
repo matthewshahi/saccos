@@ -54,6 +54,16 @@
           </div>
         </form>
 
+        <strong>Note:</strong>
+This Balance Sheet reflects the financial position
+<em>as at</em>
+<strong>{{ \Carbon\Carbon::parse($dateTo)->format('d M Y') }}</strong>,
+derived from transactions recorded during the selected reporting period
+({{ \Carbon\Carbon::parse($dateFrom)->format('d M Y') }}
+–
+{{ \Carbon\Carbon::parse($dateTo)->format('d M Y') }}).
+
+
         {{-- 🧾 Period summary --}}
         <p class="text-muted small">
           <strong>Period:</strong>
