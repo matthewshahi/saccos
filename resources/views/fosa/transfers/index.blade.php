@@ -202,9 +202,9 @@
     </form>
 
 </div>
-@endsection
 
-@section('scripts')
+
+
 <script>
 let fosaDataCache = [];
 
