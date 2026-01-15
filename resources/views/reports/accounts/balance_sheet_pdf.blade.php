@@ -1,4 +1,3 @@
-<!-- resources/views/reports/accounts/balance_sheet_pdf.blade.php -->
 <!DOCTYPE html>
 <html>
 <head>
@@ -69,8 +68,9 @@
 <p class="subtitle">
     <strong>{{ $periodLabel }}</strong><br>
     <em>
-        This statement reflects the financial position at the close of the selected period,
-        derived from transactions recorded within that period.
+        This statement is derived strictly from Trial Balance activity
+        recorded within the selected reporting period.
+        No opening or brought-forward balances are implied.
     </em>
 </p>
 
@@ -87,14 +87,15 @@
     </thead>
     <tbody>
         @foreach($assets as $a)
-            @php $amount = ($a->debit ?? 0); @endphp
-            @if($amount > 0)
+            @if(($a->debit ?? 0) > 0)
                 <tr>
                     <td>
                         {{ strtoupper($a->sub_account_name) }}<br>
                         <small>{{ $a->main_account_code }}/{{ $a->sub_account_code }}</small>
                     </td>
-                    <td class="right">{{ number_format($amount, 2) }}</td>
+                    <td class="right">
+                        {{ number_format((float)$a->debit, 2) }}
+                    </td>
                 </tr>
             @endif
         @endforeach
@@ -119,14 +120,15 @@
     </thead>
     <tbody>
         @foreach($liabilities as $l)
-            @php $amount = ($l->credit ?? 0); @endphp
-            @if($amount > 0)
+            @if(($l->credit ?? 0) > 0)
                 <tr>
                     <td>
                         {{ strtoupper($l->sub_account_name) }}<br>
                         <small>{{ $l->main_account_code }}/{{ $l->sub_account_code }}</small>
                     </td>
-                    <td class="right">{{ number_format($amount, 2) }}</td>
+                    <td class="right">
+                        {{ number_format((float)$l->credit, 2) }}
+                    </td>
                 </tr>
             @endif
         @endforeach
@@ -138,7 +140,7 @@
     </tbody>
 </table>
 
-{{-- ================= CAPITAL ================= --}}
+{{-- ================= CAPITAL (incl. period result) ================= --}}
 <table>
     <thead class="section-header">
         <tr>
@@ -152,8 +154,11 @@
     <tbody>
         @foreach($capital as $c)
             @php
-                $amount = ($c->credit ?? 0) > 0 ? $c->credit : ($c->debit ?? 0);
+                $amount = ($c->credit ?? 0) > 0
+                    ? (float)$c->credit
+                    : (float)($c->debit ?? 0);
             @endphp
+
             @if($amount > 0)
                 <tr>
                     <td>{{ strtoupper($c->sub_account_name) }}</td>
@@ -176,8 +181,9 @@
 
 {{-- ================= FOOTER ================= --}}
 <p class="footer-note">
-    This Balance Sheet is generated from the official accounting ledger
-    (<strong>sacco_accounts_trans</strong>) and is derived from the Trial Balance.
+    This Balance Sheet is generated exclusively from Trial Balance data
+    derived from the official accounting ledger
+    (<strong>sacco_accounts_trans</strong>).
     Figures are presented in Kenya Shillings (KES).
 </p>
 
