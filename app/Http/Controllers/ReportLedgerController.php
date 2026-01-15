@@ -13,8 +13,15 @@ class ReportLedgerController extends Controller
     {
         $startPeriod = $request->input('start_period', '000000');
         $endPeriod = $request->input('end_period', '999999');
-        $startDate = $request->input('start_date', now()->startOfMonth()->format('Y-m-d'));
-        $endDate = $request->input('end_date', now()->format('Y-m-d'));
+        $startDate = \Carbon\Carbon::parse(
+    $request->input('start_date', now()->startOfMonth())
+)->startOfDay();
+
+$endDate = \Carbon\Carbon::parse(
+    $request->input('end_date', now())
+)->endOfDay();
+
+
         $search = $request->input('search', '');
         $orderField = $request->input('order_field', 'accounts_trans_period');
         $orderDirection = $request->input('order_direction', 'asc');
