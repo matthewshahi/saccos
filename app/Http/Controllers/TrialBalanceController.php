@@ -44,85 +44,82 @@ class TrialBalanceController extends Controller
     /**
      * Balance Sheet view (derived from Trial Balance)
      */
-    public function balanceSheet(Request $request)
-    {
-        $filters = $this->prepareFilters($request);
-        if (isset($filters['error'])) return $filters['error'];
+   
+public function balanceSheet(Request $request)
+{
+    $filters = $this->prepareFilters($request);
+    if (isset($filters['error'])) return $filters['error'];
 
-        $tb = $this->getTrialBalanceRows(
-            $filters['period'],
-            $filters['dateFrom'],
-            $filters['dateTo']
-        );
+    // Canonical Trial Balance (already netted)
+    $tb = $this->getTrialBalanceRows(
+        $filters['period'],
+        $filters['dateFrom'],
+        $filters['dateTo']
+    );
 
-        // Normalize type casing once
-        $tb = $tb->map(function ($r) {
-            $r->main_account_type = strtoupper(trim((string) $r->main_account_type));
-            return $r;
-        });
+    // Normalize type casing once
+    $tb = $tb->map(function ($r) {
+        $r->main_account_type = strtoupper(trim((string) $r->main_account_type));
+        return $r;
+    });
 
-        $assets = $tb->filter(
-            fn($r) =>
-            str_starts_with($r->main_account_type, 'ASSET') || str_starts_with($r->main_account_type, 'ASSETS')
-        )->values();
+    // -------------------------------
+    // BALANCE SHEET SECTIONS
+    // -------------------------------
+    $assets = $tb->filter(fn ($r) =>
+        str_starts_with($r->main_account_type, 'ASSET')
+        || str_starts_with($r->main_account_type, 'ASSETS')
+    )->values();
 
-        $liabilities = $tb->filter(
-            fn($r) =>
-            str_starts_with($r->main_account_type, 'LIABILITY') || str_starts_with($r->main_account_type, 'LIABILITIES')
-        )->values();
+    $liabilities = $tb->filter(fn ($r) =>
+        str_starts_with($r->main_account_type, 'LIABILITY')
+        || str_starts_with($r->main_account_type, 'LIABILITIES')
+    )->values();
 
-        $capital = $tb->filter(fn($r) => str_starts_with($r->main_account_type, 'CAPITAL'))->values();
+    $capital = $tb->filter(fn ($r) =>
+        str_starts_with($r->main_account_type, 'CAPITAL')
+    )->values();
 
-        $income   = $tb->filter(fn($r) => str_contains($r->main_account_type, 'INCOME'))->values();
-        $expenses = $tb->filter(fn($r) => str_contains($r->main_account_type, 'EXPENSE'))->values();
+    // -------------------------------
+    // TOTALS (LEDGER-DRIVEN ONLY)
+    // -------------------------------
+    $totalAssets = $assets->sum(fn ($r) =>
+        ($r->debit ?? 0) - ($r->credit ?? 0)
+    );
 
-        // Totals from Trial Balance net columns (already netted)
-        $totalAssets      = $assets->sum(fn($r) => ($r->debit ?? 0) - ($r->credit ?? 0));
-        $totalLiabilities = $liabilities->sum(fn($r) => ($r->credit ?? 0) - ($r->debit ?? 0));
-        $totalCapitalBase = $capital->sum(fn($r) => ($r->credit ?? 0) - ($r->debit ?? 0));
+    $totalLiabilities = $liabilities->sum(fn ($r) =>
+        ($r->credit ?? 0) - ($r->debit ?? 0)
+    );
 
-        $totalIncome   = $income->sum(fn($r) => ($r->credit ?? 0) - ($r->debit ?? 0));
-        $totalExpenses = $expenses->sum(fn($r) => ($r->debit ?? 0) - ($r->credit ?? 0));
-        $netProfit     = $totalIncome - $totalExpenses; // +profit, -loss
+    // IMPORTANT:
+    // Capital already includes accumulated profit/loss from the ledger.
+    // DO NOT derive retained earnings again.
+    $totalCapital = $capital->sum(fn ($r) =>
+        ($r->credit ?? 0) - ($r->debit ?? 0)
+    );
 
-        // Retained earnings line (presentation)
-        $retainedEarnings = (object) [
-            'main_account_code' => '',
-            'main_account_name' => '',
-            'sub_account_code'  => '',
-            'sub_account_name'  => $netProfit >= 0 ? 'Retained Earnings (Profit)' : 'Accumulated Loss',
-            'debit'             => $netProfit < 0 ? abs($netProfit) : 0,
-            'credit'            => $netProfit >= 0 ? abs($netProfit) : 0,
-            'main_account_type' => 'CAPITAL',
-        ];
+    $totalRight = $totalLiabilities + $totalCapital;
 
-        // Capital display including retained earnings
-        $capitalDisplay = $capital->values()->push($retainedEarnings);
+    // -------------------------------
+    // VIEW SAFETY (PLACEHOLDERS)
+    // -------------------------------
+    $assets = $this->ensureNotEmptyRows($assets, 'No Asset Records', 'ASSET');
+    $liabilities = $this->ensureNotEmptyRows($liabilities, 'No Liability Records', 'LIABILITY');
+    $capital = $this->ensureNotEmptyRows($capital, 'No Capital Records', 'CAPITAL');
 
-        // Total capital including retained earnings
-        $totalCapitalAdjusted = $totalCapitalBase + $netProfit;
-
-        $totalRight = $totalLiabilities + $totalCapitalAdjusted;
-
-        // Stable placeholders if empty
-        $assets = $this->ensureNotEmptyRows($assets, 'No Asset Records', 'ASSET');
-        $liabilities = $this->ensureNotEmptyRows($liabilities, 'No Liability Records', 'LIABILITY');
-        $capitalDisplay = $this->ensureNotEmptyRows($capitalDisplay, 'No Capital Records', 'CAPITAL');
-
-        return view('reports.accounts.balance_sheet', [
-            'period'           => $filters['period'],
-            'dateFrom'         => $filters['dateFrom']->format('Y-m-d'),
-            'dateTo'           => $filters['dateTo']->format('Y-m-d'),
-            'assets'           => $assets->values(),
-            'liabilities'      => $liabilities->values(),
-            'capital'          => $capitalDisplay->values(),
-            'totalAssets'      => $totalAssets,
-            'totalLiabilities' => $totalLiabilities,
-            'totalCapital'     => $totalCapitalAdjusted,
-            'totalRight'       => $totalRight,
-            'netProfit'        => $netProfit,
-        ]);
-    }
+    return view('reports.accounts.balance_sheet', [
+        'period'           => $filters['period'],
+        'dateFrom'         => $filters['dateFrom']->format('Y-m-d'),
+        'dateTo'           => $filters['dateTo']->format('Y-m-d'),
+        'assets'           => $assets->values(),
+        'liabilities'      => $liabilities->values(),
+        'capital'          => $capital->values(),
+        'totalAssets'      => $totalAssets,
+        'totalLiabilities' => $totalLiabilities,
+        'totalCapital'     => $totalCapital,
+        'totalRight'       => $totalRight,
+    ]);
+}
 
     /**
      * Profit & Loss view (derived from Trial Balance)
