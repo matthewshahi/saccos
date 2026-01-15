@@ -232,103 +232,127 @@
 
             {{-- LOANS --}}
             <div class="card mb-5">
-                <div class="card-header bg-danger text-white fw-bold">Loan Statement</div>
-                <div class="card-body">
+    <div class="card-header bg-danger text-white fw-bold">Loan Statement</div>
+    <div class="card-body">
 
-                    @foreach ($data['loans'] as $loan)
-                        <div class="loan-box mb-4 p-3 border rounded">
+        @foreach ($data['loans'] as $loan)
 
-                            <h6 class="fw-bold text-danger">
-                                {{ $loan->loan_type_name }} ({{ $loan->loan_id }}) — {{ $loan->loan_doc_no }}
-                            </h6>
+            <div class="loan-box mb-4 p-3 border rounded">
 
-                            <p class="small mb-2">
-                                <strong>Period Taken:</strong> {{ $loan->loan_taken_period }} |
-                                <strong>Amount:</strong> Ksh {{ number_format($loan->loan_amount, 2) }} |
-                                <strong>Paid:</strong> Ksh {{ number_format($loan->loan_loan_paid, 2) }} |
-                                <strong>Commission:</strong> {{ number_format($loan->loan_commision, 2) }} |
-                                <strong>Insurance:</strong> {{ number_format($loan->loan_insurance, 2) }}
-                            </p>
+                <h6 class="fw-bold text-danger">
+                    {{ $loan->loan_type_name }} ({{ $loan->loan_id }}) — {{ $loan->loan_doc_no }}
+                </h6>
 
-                            @php
-                                // Opening balance = original loan + movements before period_from
-                                $openingMovement = $data['loanOpeningBalances'][$loan->loan_id] ?? 0;
-                                $balance = $loan->loan_amount - $openingMovement;
+                <p class="small mb-2">
+                    <strong>Period Taken:</strong> {{ $loan->loan_taken_period }} |
+                    <strong>Amount:</strong> Ksh {{ number_format($loan->loan_amount, 2) }} |
+                    <strong>Paid:</strong> Ksh {{ number_format($loan->loan_loan_paid, 2) }} |
+                    <strong>Commission:</strong> {{ number_format($loan->loan_commision, 2) }} |
+                    <strong>Insurance:</strong> {{ number_format($loan->loan_insurance, 2) }}
+                </p>
 
+                @php
+                    /**
+                     * Determine effective opening period:
+                     * - Loan cannot exist before loan_taken_period
+                     * - Avoid displaying 000000
+                     */
+                    $effectiveFromPeriod = $data['period_from'];
 
-                                $loanPayments = $data['paymentsByLoan'][$loan->loan_id] ?? collect();
-                            @endphp
+                    if (
+                        empty($effectiveFromPeriod) ||
+                        $effectiveFromPeriod === '000000' ||
+                        $loan->loan_taken_period > $effectiveFromPeriod
+                    ) {
+                        $effectiveFromPeriod = $loan->loan_taken_period;
+                    }
 
-                            <div class="table-responsive">
-                                <table class="table table-bordered table-sm mb-0">
-                                    <thead class="bg-light">
-                                        <tr>
-                                            <th>#</th>
-                                            <th>Period</th>
-                                            <th>Date</th>
-                                            <th>Doc No</th>
-                                            <th>Description</th>
-                                            <th class="text-end">Principal</th>
-                                            <th class="text-end">Interest</th>
-                                            <th class="text-end">Total</th>
-                                            <th class="text-end">Balance</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
+                    // Sum of principal paid BEFORE effective period
+                    $openingPaid = $data['loanOpeningBalances'][$loan->loan_id] ?? 0;
 
-                                        {{-- Opening balance row --}}
-                                        <tr class="table-secondary fw-bold">
-                                            <td colspan="8" class="text-end">
-                                                Opening Balance as at {{ $data['period_from'] }}
-                                            </td>
-                                            <td class="text-end">
-                                                {{ number_format($balance, 2) }}
-                                            </td>
-                                        </tr>
+                    // Outstanding balance at opening
+                    $balance = $loan->loan_amount - $openingPaid;
 
-                                        @foreach ($loanPayments as $i => $p)
-                                            @php
-                                                // loan_payments_amount is signed:
-                                                // +ve = repayment (reduces balance)
-                                                // -ve = loan increase / contra (increases balance)
-                                                $balance -= $p->loan_payments_amount;
-                                            @endphp
+                    $loanPayments = $data['paymentsByLoan'][$loan->loan_id] ?? collect();
+                @endphp
 
-                                            <tr>
-                                                <td>{{ $i + 1 }}</td>
-                                                <td>{{ $p->loan_payments_period }}</td>
-                                                <td>{{ \Carbon\Carbon::parse($p->loan_payments_paid_on)->format('d-m-Y') }}
-                                                </td>
-                                                <td>{{ $p->loan_payments_docno }}</td>
-                                                <td>{{ $p->loan_payments_description }}</td>
+                <div class="table-responsive">
+                    <table class="table table-bordered table-sm mb-0">
+                        <thead class="bg-light">
+                            <tr>
+                                <th>#</th>
+                                <th>Period</th>
+                                <th>Date</th>
+                                <th>Doc No</th>
+                                <th>Description</th>
+                                <th class="text-end">Principal</th>
+                                <th class="text-end">Interest</th>
+                                <th class="text-end">Total</th>
+                                <th class="text-end">Balance</th>
+                            </tr>
+                        </thead>
+                        <tbody>
 
-                                                <td class="text-end">
-                                                    {{ number_format($p->loan_payments_amount, 2) }}
-                                                </td>
+                            {{-- Opening balance row --}}
+                            <tr class="table-secondary fw-bold">
+                                <td colspan="8" class="text-end">
+                                    Opening Balance as at {{ $effectiveFromPeriod }}
+                                </td>
+                                <td class="text-end">
+                                    {{ number_format($balance, 2) }}
+                                </td>
+                            </tr>
 
-                                                <td class="text-end">
-                                                    {{ number_format($p->loan_payments_interest, 2) }}
-                                                </td>
+                            @foreach ($loanPayments as $i => $p)
 
-                                                <td class="text-end">
-                                                    {{ number_format($p->loan_payments_amount + $p->loan_payments_interest, 2) }}
-                                                </td>
+                                @php
+                                    /**
+                                     * loan_payments_amount is signed:
+                                     * +ve = repayment → reduces outstanding
+                                     * -ve = contra / loan increase → increases outstanding
+                                     */
+                                    $balance -= $p->loan_payments_amount;
+                                @endphp
 
-                                                <td class="text-end fw-bold">
-                                                    {{ number_format($balance, 2) }}
-                                                </td>
-                                            </tr>
-                                        @endforeach
+                                <tr>
+                                    <td>{{ $i + 1 }}</td>
+                                    <td>{{ $p->loan_payments_period }}</td>
+                                    <td>{{ \Carbon\Carbon::parse($p->loan_payments_paid_on)->format('d-m-Y') }}</td>
+                                    <td>{{ $p->loan_payments_docno }}</td>
+                                    <td>{{ $p->loan_payments_description }}</td>
 
-                                    </tbody>
-                                </table>
-                            </div>
+                                    <td class="text-end">
+                                        {{ number_format($p->loan_payments_amount, 2) }}
+                                    </td>
 
-                        </div>
-                    @endforeach
+                                    <td class="text-end">
+                                        {{ number_format($p->loan_payments_interest, 2) }}
+                                    </td>
 
+                                    <td class="text-end">
+                                        {{ number_format(
+                                            $p->loan_payments_amount + $p->loan_payments_interest,
+                                            2
+                                        ) }}
+                                    </td>
+
+                                    <td class="text-end fw-bold">
+                                        {{ number_format($balance, 2) }}
+                                    </td>
+                                </tr>
+
+                            @endforeach
+
+                        </tbody>
+                    </table>
                 </div>
+
             </div>
+
+        @endforeach
+
+    </div>
+</div>
 
         </div>
 
