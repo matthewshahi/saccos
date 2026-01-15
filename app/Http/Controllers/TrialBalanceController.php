@@ -44,88 +44,8 @@ class TrialBalanceController extends Controller
     /**
      * Balance Sheet view (derived from Trial Balance)
      */
-   public function balanceSheet(Request $request)
-{
-    $filters = $this->prepareFilters($request);
-    if (isset($filters['error'])) return $filters['error'];
+  
 
-    // Canonical Trial Balance (already netted)
-    $tb = $this->getTrialBalanceRows(
-        $filters['period'],
-        $filters['dateFrom'],
-        $filters['dateTo']
-    );
-
-    // Normalize account type once
-    $tb = $tb->map(function ($r) {
-        $r->main_account_type = strtoupper(trim((string) $r->main_account_type));
-        return $r;
-    });
-
-    // -------------------------------
-    // BALANCE SHEET SECTIONS (RAW TB ROWS)
-    // -------------------------------
-    $assets = $tb->filter(fn ($r) =>
-        str_starts_with($r->main_account_type, 'ASSET')
-        || str_starts_with($r->main_account_type, 'ASSETS')
-    )->values();
-
-    $liabilities = $tb->filter(fn ($r) =>
-        str_starts_with($r->main_account_type, 'LIABILITY')
-        || str_starts_with($r->main_account_type, 'LIABILITIES')
-    )->values();
-
-    $capital = $tb->filter(fn ($r) =>
-        str_starts_with($r->main_account_type, 'CAPITAL')
-    )->values();
-
-    // -------------------------------
-    // PERIOD RESULT (FROM SAME TB)
-    // -------------------------------
-    $income = $tb->filter(fn ($r) => str_contains($r->main_account_type, 'INCOME'));
-    $expenses = $tb->filter(fn ($r) => str_contains($r->main_account_type, 'EXPENSE'));
-
-    $totalIncome = $income->sum(fn ($r) => ($r->credit ?? 0) - ($r->debit ?? 0));
-    $totalExpenses = $expenses->sum(fn ($r) => ($r->debit ?? 0) - ($r->credit ?? 0));
-    $periodResult = $totalIncome - $totalExpenses;
-
-    // Presentation-only row (TB-consistent)
-    $periodResultRow = (object) [
-        'main_account_code' => '',
-        'main_account_name' => '',
-        'sub_account_code'  => '',
-        'sub_account_name'  => $periodResult >= 0 ? 'Period Profit' : 'Period Loss',
-        'debit'             => $periodResult < 0 ? abs($periodResult) : 0,
-        'credit'            => $periodResult >= 0 ? abs($periodResult) : 0,
-        'main_account_type' => 'CAPITAL',
-    ];
-
-    $capitalDisplay = $capital->values()->push($periodResultRow);
-
-    // -------------------------------
-    // TOTALS (NET, FROM TB RULES)
-    // -------------------------------
-    $totalAssets = $assets->sum(fn ($r) => ($r->debit ?? 0) - ($r->credit ?? 0));
-    $totalLiabilities = $liabilities->sum(fn ($r) => ($r->credit ?? 0) - ($r->debit ?? 0));
-    $totalCapital = $capitalDisplay->sum(fn ($r) => ($r->credit ?? 0) - ($r->debit ?? 0));
-
-    $totalRight = $totalLiabilities + $totalCapital;
-
-    return view('reports.accounts.balance_sheet', [
-        'period'           => $filters['period'],
-        'dateFrom'         => $filters['dateFrom']->format('Y-m-d'),
-        'dateTo'           => $filters['dateTo']->format('Y-m-d'),
-
-        'assets'           => $assets,
-        'liabilities'      => $liabilities,
-        'capital'          => $capitalDisplay,
-
-        'totalAssets'      => $totalAssets,
-        'totalLiabilities' => $totalLiabilities,
-        'totalCapital'     => $totalCapital,
-        'totalRight'       => $totalRight,
-    ]);
-}
 
 
 
@@ -552,52 +472,7 @@ class TrialBalanceController extends Controller
         ])->download('profit_and_loss_' . $suffix . '.pdf');
     }
 
-    public function exportBalanceSheetExcel(Request $request)
-    {
-        $filters = $this->prepareFilters($request);
-        if (isset($filters['error'])) return $filters['error'];
-
-        // Reuse canonical TB
-        $tb = $this->getTrialBalanceRows(
-            $filters['period'],
-            $filters['dateFrom'],
-            $filters['dateTo']
-        );
-
-        // Normalize types
-        $tb = $tb->map(function ($r) {
-            $r->main_account_type = strtoupper(trim((string) $r->main_account_type));
-            return $r;
-        });
-
-        $assets = $tb->filter(fn($r) => str_starts_with($r->main_account_type, 'ASSET'))->values();
-        $liabilities = $tb->filter(fn($r) => str_starts_with($r->main_account_type, 'LIABILITY'))->values();
-        $capital = $tb->filter(fn($r) => str_starts_with($r->main_account_type, 'CAPITAL'))->values();
-
-        // Totals
-        $totalAssets = $assets->sum(fn($r) => ($r->debit ?? 0) - ($r->credit ?? 0));
-        $totalLiabilities = $liabilities->sum(fn($r) => ($r->credit ?? 0) - ($r->debit ?? 0));
-        $totalCapital = $capital->sum(fn($r) => ($r->credit ?? 0) - ($r->debit ?? 0));
-
-
-        $totalRight = $totalLiabilities + $totalCapital;
-
-        $suffix = $filters['period']
-            ?: ($filters['dateFrom']->format('Ymd') . '_to_' . $filters['dateTo']->format('Ymd'));
-
-        return Excel::download(
-            new \App\Exports\BalanceSheetExport(
-                $assets,
-                $liabilities,
-                $capital,
-                $totalAssets,
-                $totalLiabilities,
-                $totalCapital,
-                $totalRight
-            ),
-            'balance_sheet_' . $suffix . '.xlsx'
-        );
-    }
+    
     public function exportBalanceSheetPdf(Request $request)
 {
     $filters = $this->prepareFilters($request);
@@ -678,6 +553,119 @@ class TrialBalanceController extends Controller
 
         'periodLabel'      => $periodLabel,
     ])->download('balance_sheet_' . $suffix . '.pdf');
+}
+public function balanceSheet(Request $request)
+{
+    $filters = $this->prepareFilters($request);
+    if (isset($filters['error'])) return $filters['error'];
+
+    /*
+     * Canonical source: Trial Balance rows
+     */
+    $tb = $this->getTrialBalanceRows(
+        $filters['period'],
+        $filters['dateFrom'],
+        $filters['dateTo']
+    );
+
+    // Normalize type casing
+    $tb = $tb->map(function ($r) {
+        $r->main_account_type = strtoupper(trim((string) $r->main_account_type));
+        return $r;
+    });
+
+    /*
+     * ----------------------------
+     * BALANCE SHEET SECTIONS
+     * ----------------------------
+     */
+    $assets = $tb->filter(fn ($r) =>
+        str_starts_with($r->main_account_type, 'ASSET')
+        || str_starts_with($r->main_account_type, 'ASSETS')
+    )->values();
+
+    $liabilities = $tb->filter(fn ($r) =>
+        str_starts_with($r->main_account_type, 'LIABILITY')
+        || str_starts_with($r->main_account_type, 'LIABILITIES')
+    )->values();
+
+    $capital = $tb->filter(fn ($r) =>
+        str_starts_with($r->main_account_type, 'CAPITAL')
+    )->values();
+
+    /*
+     * ----------------------------
+     * PERIOD RESULT (FROM SAME TB)
+     * ----------------------------
+     */
+    $income = $tb->filter(fn ($r) =>
+        str_contains($r->main_account_type, 'INCOME')
+    );
+
+    $expenses = $tb->filter(fn ($r) =>
+        str_contains($r->main_account_type, 'EXPENSE')
+    );
+
+    $totalIncome = $income->sum(
+        fn ($r) => ($r->credit ?? 0) - ($r->debit ?? 0)
+    );
+
+    $totalExpenses = $expenses->sum(
+        fn ($r) => ($r->debit ?? 0) - ($r->credit ?? 0)
+    );
+
+    $periodResult = $totalIncome - $totalExpenses;
+
+    /*
+     * Presentation-only Period Result row
+     */
+    $periodResultRow = (object) [
+        'main_account_code' => '',
+        'main_account_name' => '',
+        'sub_account_code'  => '',
+        'sub_account_name'  => $periodResult >= 0
+            ? 'Period Profit'
+            : 'Period Loss',
+        'debit'             => $periodResult < 0 ? abs($periodResult) : 0,
+        'credit'            => $periodResult >= 0 ? abs($periodResult) : 0,
+        'main_account_type' => 'CAPITAL',
+    ];
+
+    $capitalDisplay = $capital->values()->push($periodResultRow);
+
+    /*
+     * ----------------------------
+     * TOTALS (TB-CONSISTENT)
+     * ----------------------------
+     */
+    $totalAssets = $assets->sum(
+        fn ($r) => ($r->debit ?? 0) - ($r->credit ?? 0)
+    );
+
+    $totalLiabilities = $liabilities->sum(
+        fn ($r) => ($r->credit ?? 0) - ($r->debit ?? 0)
+    );
+
+    $totalCapital = $capitalDisplay->sum(
+        fn ($r) => ($r->credit ?? 0) - ($r->debit ?? 0)
+    );
+
+    $totalRight = $totalLiabilities + $totalCapital;
+
+    return view('reports.accounts.balance_sheet', [
+        'period'           => $filters['period'],
+        'dateFrom'         => $filters['dateFrom']->format('Y-m-d'),
+        'dateTo'           => $filters['dateTo']->format('Y-m-d'),
+
+        'assets'           => $assets,
+        'liabilities'      => $liabilities,
+        'capital'          => $capitalDisplay,
+
+        'totalAssets'      => $totalAssets,
+        'totalLiabilities' => $totalLiabilities,
+        'totalCapital'     => $totalCapital,
+        'totalRight'       => $totalRight,
+    ]);
 }
 
     

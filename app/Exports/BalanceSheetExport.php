@@ -40,10 +40,14 @@ class BalanceSheetExport implements FromCollection, WithHeadings
         $rows = [];
 
         /* =========================
-         * ASSETS
+         * ASSETS (show non-zero side)
          * ========================= */
         foreach ($this->assets as $a) {
-            $amount = (float) ($a->debit ?? 0);
+            $amount =
+                ($a->debit ?? 0) > 0
+                    ? (float) $a->debit
+                    : (float) ($a->credit ?? 0);
+
             if ($amount <= 0) continue;
 
             $rows[] = [
@@ -58,10 +62,14 @@ class BalanceSheetExport implements FromCollection, WithHeadings
         $rows[] = ['', '', '', ''];
 
         /* =========================
-         * LIABILITIES
+         * LIABILITIES (show non-zero side)
          * ========================= */
         foreach ($this->liabilities as $l) {
-            $amount = (float) ($l->credit ?? 0);
+            $amount =
+                ($l->credit ?? 0) > 0
+                    ? (float) $l->credit
+                    : (float) ($l->debit ?? 0);
+
             if ($amount <= 0) continue;
 
             $rows[] = [
@@ -76,25 +84,26 @@ class BalanceSheetExport implements FromCollection, WithHeadings
         $rows[] = ['', '', '', ''];
 
         /* =========================
-         * CAPITAL (incl. retained earnings)
+         * CAPITAL (incl. period result)
          * ========================= */
         foreach ($this->capital as $c) {
-            $credit = (float) ($c->credit ?? 0);
-            $debit  = (float) ($c->debit ?? 0);
+            $amount =
+                ($c->credit ?? 0) > 0
+                    ? (float) $c->credit
+                    : (float) ($c->debit ?? 0);
 
-            $amount = $credit > 0 ? $credit : $debit;
             if ($amount <= 0) continue;
 
             $rows[] = [
                 'Capital',
                 trim((string) $c->sub_account_name),
-                trim((string) $c->main_account_code) . '/' . trim((string) $c->sub_account_code),
+                trim((string) $c->main_account_code ?? '') . '/' . trim((string) $c->sub_account_code ?? ''),
                 $amount,
             ];
         }
 
         /* =========================
-         * TOTALS
+         * TOTALS (from controller)
          * ========================= */
         $rows[] = ['', '', '', ''];
         $rows[] = ['TOTAL ASSETS', '', '', $this->totalAssets];
