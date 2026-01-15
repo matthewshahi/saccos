@@ -168,24 +168,53 @@ class TrialBalanceController extends Controller
      * Trial Balance Excel export
      */
     public function exportExcel(Request $request)
-    {
-        $filters = $this->prepareFilters($request);
-        if (isset($filters['error'])) return $filters['error'];
-
-        $tb = $this->getTrialBalanceRows(
-            $filters['period'],
-            $filters['dateFrom'],
-            $filters['dateTo']
-        );
-
-        // Keep file naming stable even if period is empty (date-range export)
-        $suffix = $filters['period'] ?: ($filters['dateFrom']->format('Ymd') . '_to_' . $filters['dateTo']->format('Ymd'));
-
-        return Excel::download(
-            new TrialBalanceExport($tb),
-            'trial_balance_' . $suffix . '.xlsx'
-        );
+{
+    $filters = $this->prepareFilters($request);
+    if (isset($filters['error'])) {
+        return $filters['error'];
     }
+
+    // Canonical Trial Balance rows (already netted correctly)
+    $tb = $this->getTrialBalanceRows(
+        $filters['period'],
+        $filters['dateFrom'],
+        $filters['dateTo']
+    );
+
+    /*
+     |--------------------------------------------------------------------------
+     | File naming logic (professional & audit-safe)
+     |--------------------------------------------------------------------------
+     | 1. If period is provided (YYYYMM):
+     |    trial_balance_202601_generated_2026-01-15.xlsx
+     |
+     | 2. If date range is used:
+     |    trial_balance_2025-01-01_to_2026-01-31_generated_2026-01-15.xlsx
+     |--------------------------------------------------------------------------
+     */
+
+    if (!empty($filters['period'])) {
+        $label = 'period_' . $filters['period'];
+    } else {
+        $label =
+            $filters['dateFrom']->format('Y-m-d') .
+            '_to_' .
+            $filters['dateTo']->format('Y-m-d');
+    }
+
+    $filename =
+        'trial_balance_' .
+        $label .
+        '_generated_' .
+        now()->format('Y-m-d') .
+        '.xlsx';
+
+    return Excel::download(
+        new TrialBalanceExport($tb),
+        $filename
+    );
+}
+
 
     /**
      * Trial Balance PDF export (uses the same Trial Balance rows)
