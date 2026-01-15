@@ -17,7 +17,7 @@
         .subtitle {
             text-align: center;
             font-size: 10px;
-            margin-bottom: 15px;
+            margin-bottom: 12px;
         }
 
         table {
@@ -50,6 +50,7 @@
             font-size: 12px;
             font-weight: bold;
             text-align: right;
+            margin-top: 10px;
         }
 
         .footer-note {
@@ -69,15 +70,11 @@
     For the period:
     <strong>{{ $periodLabel }}</strong>
 </p>
-<p class="subtitle">
-    For the period:
-    <strong>{{ $periodLabel }}</strong>
-</p>
 
-<p class="subtitle" style="font-size:9px; margin-top:-5px;">
+<p class="subtitle" style="font-size:9px; margin-top:-4px;">
     This statement reflects income and expenses recorded during the selected period,
-    based on posted ledger transactions. It is not a cumulative or year-to-date report
-    unless the selected period spans those dates.
+    based on posted ledger transactions. It is not cumulative unless the selected
+    period spans multiple financial periods.
 </p>
 
 {{-- ================= INCOME ================= --}}
@@ -93,17 +90,12 @@
     </thead>
     <tbody>
         @foreach($income as $row)
-            @php
-                $amount = ($row->credit ?? 0);
-            @endphp
+            @php $amount = ($row->credit ?? 0); @endphp
             @if($amount > 0)
                 <tr>
                     <td>
-                        {{ strtoupper($row->sub_account_name) }}
-                        <br>
-                        <small>
-                            {{ $row->main_account_code }}/{{ $row->sub_account_code }}
-                        </small>
+                        {{ strtoupper($row->sub_account_name) }}<br>
+                        <small>{{ $row->main_account_code }}/{{ $row->sub_account_code }}</small>
                     </td>
                     <td class="right">{{ number_format($amount, 2) }}</td>
                 </tr>
@@ -130,17 +122,12 @@
     </thead>
     <tbody>
         @foreach($expenses as $row)
-            @php
-                $amount = ($row->debit ?? 0);
-            @endphp
+            @php $amount = ($row->debit ?? 0); @endphp
             @if($amount > 0)
                 <tr>
                     <td>
-                        {{ strtoupper($row->sub_account_name) }}
-                        <br>
-                        <small>
-                            {{ $row->main_account_code }}/{{ $row->sub_account_code }}
-                        </small>
+                        {{ strtoupper($row->sub_account_name) }}<br>
+                        <small>{{ $row->main_account_code }}/{{ $row->sub_account_code }}</small>
                     </td>
                     <td class="right">{{ number_format($amount, 2) }}</td>
                 </tr>
@@ -161,7 +148,8 @@
 </p>
 
 <p class="footer-note">
-    This statement is generated from the official ledger records and is derived from the Trial Balance.
+    This statement is system-generated from official ledger records and is derived
+    directly from the Trial Balance.
 </p>
 
 </body>
