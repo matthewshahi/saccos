@@ -44,37 +44,36 @@ class TrialBalanceController extends Controller
             $filters['dateTo']
         );
 
-        // Normalize types once
+        // Normalize type casing once (defensive)
         $records->transform(function ($r) {
-            $r->main_account_type = strtoupper(trim((string)$r->main_account_type));
+            $r->main_account_type = strtoupper(trim((string) $r->main_account_type));
             return $r;
         });
 
-        // Group by broad type (handles "ASSETS - CURRENT", etc.)
-        $assets      = $records->filter(fn($r) => str_starts_with($r->main_account_type, 'ASSET') || str_starts_with($r->main_account_type, 'ASSETS'));
-        $liabilities = $records->filter(fn($r) => str_starts_with($r->main_account_type, 'LIABILITY') || str_starts_with($r->main_account_type, 'LIABILITIES'));
-        $capital     = $records->filter(fn($r) => str_starts_with($r->main_account_type, 'CAPITAL'));
+        // Broad grouping (handles "ASSETS - CURRENT", "LIABILITIES - SHORT", etc.)
+        $assets = $records->filter(function ($r) {
+            return str_starts_with($r->main_account_type, 'ASSET') || str_starts_with($r->main_account_type, 'ASSETS');
+        });
+
+        $liabilities = $records->filter(function ($r) {
+            return str_starts_with($r->main_account_type, 'LIABILITY') || str_starts_with($r->main_account_type, 'LIABILITIES');
+        });
+
+        $capital = $records->filter(fn($r) => str_starts_with($r->main_account_type, 'CAPITAL'));
 
         // For retained earnings we need income & expense too
         $income   = $records->filter(fn($r) => str_contains($r->main_account_type, 'INCOME'));
         $expenses = $records->filter(fn($r) => str_contains($r->main_account_type, 'EXPENSE'));
 
-        /**
-         * IMPORTANT:
-         * We return RAW debit/credit from SQL.
-         * So we compute balances by normal accounting logic:
-         * - Assets normal: Debit - Credit
-         * - Liabilities/Capital normal: Credit - Debit
-         * - Income: Credit - Debit
-         * - Expense: Debit - Credit
-         */
+        // Compute section balances from RAW debit/credit
         $totalAssets      = $assets->sum(fn($r) => ($r->debit ?? 0) - ($r->credit ?? 0));
         $totalLiabilities = $liabilities->sum(fn($r) => ($r->credit ?? 0) - ($r->debit ?? 0));
         $totalCapital     = $capital->sum(fn($r) => ($r->credit ?? 0) - ($r->debit ?? 0));
 
+        // Net Profit/Loss
         $totalIncome   = $income->sum(fn($r) => ($r->credit ?? 0) - ($r->debit ?? 0));
         $totalExpenses = $expenses->sum(fn($r) => ($r->debit ?? 0) - ($r->credit ?? 0));
-        $netProfit     = $totalIncome - $totalExpenses; // positive = profit, negative = loss
+        $netProfit     = $totalIncome - $totalExpenses; // +profit, -loss
 
         // Retained earnings line: credit for profit, debit for loss
         $retainedEarnings = (object) [
@@ -86,41 +85,43 @@ class TrialBalanceController extends Controller
             'main_account_type' => 'CAPITAL',
         ];
 
-        // Add retained earnings to capital for display
+        // Add retained earnings to capital display
         $capital = $capital->values()->push($retainedEarnings);
 
-        // Recalculate capital including retained earnings balance effect
+        // Capital including retained earnings (note: adding netProfit is correct here)
         $totalCapitalAdjusted = $totalCapital + $netProfit;
         $totalRight           = $totalLiabilities + $totalCapitalAdjusted;
 
-        // Ensure placeholders if empty
+        // Ensure placeholders if empty (for view stability)
         if ($assets->isEmpty()) {
-            $assets = collect([(object)[
-                'sub_account_name' => 'No Asset Records',
+            $assets = collect([(object) [
+                'sub_account_name'  => 'No Asset Records',
                 'main_account_code' => '',
-                'sub_account_code' => '',
-                'debit' => 0,
-                'credit' => 0,
+                'sub_account_code'  => '',
+                'debit'             => 0,
+                'credit'            => 0,
                 'main_account_type' => 'ASSET',
             ]]);
         }
+
         if ($liabilities->isEmpty()) {
-            $liabilities = collect([(object)[
-                'sub_account_name' => 'No Liability Records',
+            $liabilities = collect([(object) [
+                'sub_account_name'  => 'No Liability Records',
                 'main_account_code' => '',
-                'sub_account_code' => '',
-                'debit' => 0,
-                'credit' => 0,
+                'sub_account_code'  => '',
+                'debit'             => 0,
+                'credit'            => 0,
                 'main_account_type' => 'LIABILITY',
             ]]);
         }
+
         if ($capital->isEmpty()) {
-            $capital = collect([(object)[
-                'sub_account_name' => 'No Capital Records',
+            $capital = collect([(object) [
+                'sub_account_name'  => 'No Capital Records',
                 'main_account_code' => '',
-                'sub_account_code' => '',
-                'debit' => 0,
-                'credit' => 0,
+                'sub_account_code'  => '',
+                'debit'             => 0,
+                'credit'            => 0,
                 'main_account_type' => 'CAPITAL',
             ]]);
         }
@@ -154,9 +155,9 @@ class TrialBalanceController extends Controller
             $filters['dateTo']
         );
 
-        // Normalize casing for safety
+        // Normalize type casing (defensive)
         $records->transform(function ($r) {
-            $r->main_account_type = strtoupper(trim((string)$r->main_account_type));
+            $r->main_account_type = strtoupper(trim((string) $r->main_account_type));
             return $r;
         });
 
@@ -168,23 +169,23 @@ class TrialBalanceController extends Controller
         $netProfit     = $totalIncome - $totalExpenses;
 
         if ($income->isEmpty()) {
-            $income = collect([(object)[
-                'sub_account_name' => 'No Income Records',
+            $income = collect([(object) [
+                'sub_account_name'  => 'No Income Records',
                 'main_account_code' => '',
-                'sub_account_code' => '',
-                'debit' => 0,
-                'credit' => 0,
+                'sub_account_code'  => '',
+                'debit'             => 0,
+                'credit'            => 0,
                 'main_account_type' => 'INCOME',
             ]]);
         }
 
         if ($expenses->isEmpty()) {
-            $expenses = collect([(object)[
-                'sub_account_name' => 'No Expense Records',
+            $expenses = collect([(object) [
+                'sub_account_name'  => 'No Expense Records',
                 'main_account_code' => '',
-                'sub_account_code' => '',
-                'debit' => 0,
-                'credit' => 0,
+                'sub_account_code'  => '',
+                'debit'             => 0,
+                'credit'            => 0,
                 'main_account_type' => 'EXPENSE',
             ]]);
         }
@@ -245,11 +246,11 @@ class TrialBalanceController extends Controller
     /**
      * Core query logic shared by Trial Balance / Balance Sheet / P&L.
      *
-     * Key fix:
-     * - Return RAW sums (debit and credit), do not net in SQL.
-     * Key fix:
-     * - If period is provided, filter by period ONLY (avoid double-filter loss).
-     * - Else filter by date range.
+     * Fixes:
+     * - Returns RAW debit and credit totals (no netting in SQL).
+     * - Filters by period OR by date range (never both) to avoid missing rows.
+     * - Uses COALESCE to prevent NULL totals.
+     * - Groups by raw DB columns for deterministic SQL, while selecting TRIM() aliases for display.
      */
     private function getAccountsData(?string $period, Carbon $dateFrom, Carbon $dateTo)
     {
@@ -262,9 +263,10 @@ class TrialBalanceController extends Controller
                 DB::raw('TRIM(m.main_account_type) as main_account_type'),
                 DB::raw('TRIM(s.sub_account_code) as sub_account_code'),
                 DB::raw('TRIM(s.sub_account_name) as sub_account_name'),
-                DB::raw('SUM(t.accounts_trans_debit)  as debit'),
-                DB::raw('SUM(t.accounts_trans_credit) as credit')
+                DB::raw('COALESCE(SUM(t.accounts_trans_debit),0)  as debit'),
+                DB::raw('COALESCE(SUM(t.accounts_trans_credit),0) as credit')
             )
+            // group by raw columns (not TRIM aliases) for SQL stability
             ->groupBy(
                 'm.main_account_code',
                 'm.main_account_name',
@@ -285,7 +287,6 @@ class TrialBalanceController extends Controller
             ->orderBy('m.main_account_code')
             ->orderBy('s.sub_account_code');
 
-        // IMPORTANT: Avoid filtering by BOTH period and date-range simultaneously
         if (!empty($period)) {
             $query->where('t.accounts_trans_period', $period);
         } else {
