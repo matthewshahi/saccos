@@ -4,18 +4,38 @@
 <div class="row">
   <div class="col-md-12">
     <div class="card o-hidden mb-4 shadow-sm">
+
       <div class="card-header d-flex align-items-center justify-content-between">
         <h3 class="m-0 fw-bold text-primary">Profit &amp; Loss Statement</h3>
       </div>
 
       <div class="card-body">
-        {{-- 🔍 FILTER FORM --}}
+
+        {{-- ✅ Session messages --}}
+        @if(session('error'))
+          <div class="alert alert-danger alert-dismissible fade show">
+            {{ session('error') }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          </div>
+        @endif
+
+        @if(session('success'))
+          <div class="alert alert-success alert-dismissible fade show">
+            {{ session('success') }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          </div>
+        @endif
+
+        {{-- Navigation --}}
         @include('includes.accounts_nav')
+
+        {{-- 🔍 FILTER FORM --}}
         <form method="GET" action="{{ route('reports.accounts.profit-loss') }}" class="row g-3 mb-4">
           <div class="col-md-3">
             <label class="form-label">Period (YYYYmm)</label>
             <input type="text" name="period" class="form-control"
-              value="{{ old('period', $period ?? '') }}" maxlength="6" pattern="\d{6}" placeholder="e.g. 202510">
+              value="{{ old('period', $period ?? '') }}"
+              maxlength="6" pattern="\d{6}" placeholder="e.g. 202510">
           </div>
 
           <div class="col-md-3">
@@ -31,7 +51,9 @@
           </div>
 
           <div class="col-md-3 d-flex align-items-end">
-            <button class="btn btn-primary w-100"><i class="i-Magnifi-Glass1 me-2"></i>Generate</button>
+            <button class="btn btn-primary w-100">
+              <i class="i-Magnifi-Glass1 me-2"></i>Generate
+            </button>
           </div>
         </form>
 
@@ -43,9 +65,10 @@
           {{ \Carbon\Carbon::parse($dateTo)->format('d M Y') }}
         </p>
 
-        {{-- 📊 TABLE --}}
+        {{-- 📊 PROFIT & LOSS TABLE --}}
         <div class="table-responsive">
           <table class="table table-bordered table-hover align-middle">
+
             <thead class="table-secondary text-center fw-bold">
               <tr>
                 <th colspan="2" class="bg-dark text-white">INCOME</th>
@@ -61,20 +84,20 @@
 
             <tbody>
               @php
-                $income = $income->values();
-                $expenses = $expenses->values();
-                $maxRows = max($income->count(), $expenses->count());
+                $incomeRows   = $income->values();
+                $expenseRows = $expenses->values();
+                $maxRows = max($incomeRows->count(), $expenseRows->count());
               @endphp
 
-              @for ($i = 0; $i < $maxRows; $i++)
+              @for($i = 0; $i < $maxRows; $i++)
                 @php
-                  $inc = $income[$i] ?? null;
-                  $exp = $expenses[$i] ?? null;
+                  $inc = $incomeRows[$i] ?? null;
+                  $exp = $expenseRows[$i] ?? null;
 
-                  // income = credit - debit, but display as positive
-                  $incomeAmt = $inc ? ($inc->credit - $inc->debit) : 0;
-                  // expenses = debit - credit
-                  $expenseAmt = $exp ? ($exp->debit - $exp->credit) : 0;
+                  // Controller already gives raw debit & credit
+                  // Net safely here for display
+                  $incomeAmount  = $inc ? max(0, ($inc->credit ?? 0) - ($inc->debit ?? 0)) : 0;
+                  $expenseAmount = $exp ? max(0, ($exp->debit ?? 0) - ($exp->credit ?? 0)) : 0;
                 @endphp
 
                 <tr>
@@ -82,26 +105,30 @@
                   <td>
                     @if($inc)
                       <strong>{{ strtoupper($inc->sub_account_name) }}</strong><br>
-                      <small class="text-muted">{{ $inc->main_account_code }}/{{ $inc->sub_account_code }}</small>
+                      <small class="text-muted">
+                        {{ $inc->main_account_code }}/{{ $inc->sub_account_code }}
+                      </small>
                     @else
                       <span class="text-muted">—</span>
                     @endif
                   </td>
-                  <td class="text-end fw-semibold {{ $incomeAmt < 0 ? 'text-danger' : '' }}">
-                    {{ number_format($incomeAmt, 2) }}
+                  <td class="text-end fw-semibold">
+                    {{ $incomeAmount > 0 ? number_format($incomeAmount, 2) : '' }}
                   </td>
 
-                  {{-- EXPENSES --}}
+                  {{-- EXPENSE --}}
                   <td>
                     @if($exp)
                       <strong>{{ strtoupper($exp->sub_account_name) }}</strong><br>
-                      <small class="text-muted">{{ $exp->main_account_code }}/{{ $exp->sub_account_code }}</small>
+                      <small class="text-muted">
+                        {{ $exp->main_account_code }}/{{ $exp->sub_account_code }}
+                      </small>
                     @else
                       <span class="text-muted">—</span>
                     @endif
                   </td>
-                  <td class="text-end fw-semibold {{ $expenseAmt < 0 ? 'text-danger' : '' }}">
-                    {{ number_format($expenseAmt, 2) }}
+                  <td class="text-end fw-semibold">
+                    {{ $expenseAmount > 0 ? number_format($expenseAmount, 2) : '' }}
                   </td>
                 </tr>
               @endfor
@@ -110,9 +137,9 @@
             <tfoot class="fw-bold">
               <tr class="bg-dark text-white">
                 <td class="text-end">Total Income</td>
-                <td class="text-end">{{ number_format(abs($totalIncome), 2) }}</td>
+                <td class="text-end">{{ number_format($totalIncome, 2) }}</td>
                 <td class="text-end">Total Expenses</td>
-                <td class="text-end">{{ number_format(abs($totalExpenses), 2) }}</td>
+                <td class="text-end">{{ number_format($totalExpenses, 2) }}</td>
               </tr>
               <tr class="{{ $netProfit >= 0 ? 'table-success' : 'table-danger' }}">
                 <td colspan="2" class="text-end">
@@ -123,14 +150,16 @@
                 </td>
               </tr>
             </tfoot>
+
           </table>
         </div>
+
       </div>
     </div>
   </div>
 </div>
 
-{{-- 🖋️ INLINE STYLES --}}
+{{-- 🖋️ STYLES --}}
 <style>
   .card-header {
     background: #f8f9fa;
