@@ -15,7 +15,7 @@
       <div class="card-body">
 
         {{-- ========================= --}}
-        {{-- FILTERS + EXPORT BUTTONS --}}
+        {{-- FILTERS --}}
         {{-- ========================= --}}
         <form method="GET"
               action="{{ route('reports.accounts.balance-sheet') }}"
@@ -27,8 +27,8 @@
                    name="period"
                    class="form-control"
                    value="{{ request('period', $period ?? '') }}"
-                   placeholder="e.g. 202510"
-                   maxlength="6">
+                   maxlength="6"
+                   placeholder="e.g. 202510">
           </div>
 
           <div class="col-md-3">
@@ -47,32 +47,26 @@
                    value="{{ request('date_to', $dateTo ?? '') }}">
           </div>
 
-          <div class="col-md-3 d-flex gap-2">
+          <div class="col-md-3">
             <button class="btn btn-primary w-100">Generate</button>
           </div>
-
         </form>
 
+        {{-- EXPORTS --}}
         <div class="d-flex gap-2 mb-3">
           <a href="{{ route('reports.accounts.balance-sheet.excel', request()->query()) }}"
-             class="btn btn-success btn-sm">
-            Export Excel
-          </a>
+             class="btn btn-success btn-sm">Export Excel</a>
 
           <a href="{{ route('reports.accounts.balance-sheet.pdf', request()->query()) }}"
-             class="btn btn-danger btn-sm">
-            Export PDF
-          </a>
+             class="btn btn-danger btn-sm">Export PDF</a>
         </div>
 
-        {{-- ================= --}}
         {{-- PRESENTATION NOTE --}}
-        {{-- ================= --}}
         <div class="alert alert-secondary small mb-3">
           <strong>Presentation Note:</strong><br>
-          This Balance Sheet treats the selected reporting period as a complete accounting universe.
-          No opening balances, closing balances, or brought-forward figures are implied.
-          All values are derived strictly from Trial Balance data recorded within the selected period.
+          This Balance Sheet is derived strictly from Trial Balance data within the
+          selected reporting period. No opening balances or brought-forward figures
+          are implied.
         </div>
 
         <p class="text-muted small mb-3">
@@ -83,7 +77,7 @@
         </p>
 
         {{-- ================= --}}
-        {{-- BALANCE SHEET TABLE --}}
+        {{-- BALANCE SHEET --}}
         {{-- ================= --}}
         <div class="table-responsive">
           <table class="table table-bordered align-middle">
@@ -92,30 +86,17 @@
               <tr>
                 <th width="45%">ASSETS</th>
                 <th width="15%">KES</th>
-                <th width="30%">LIABILITIES, CAPITAL &amp; PERIOD RESULT</th>
+                <th width="30%">LIABILITIES &amp; CAPITAL</th>
                 <th width="10%">KES</th>
               </tr>
             </thead>
 
+            @php
+              $rightSide = $liabilities->concat($capital);
+              $maxRows   = max($assets->count(), $rightSide->count());
+            @endphp
+
             <tbody>
-              @php
-                // Right side = Liabilities + Capital + Explicit Period Result
-                $rightSide = collect()
-                  ->concat($liabilities)
-                  ->concat($capital);
-
-                if ((float)$periodResult !== 0.0) {
-                  $rightSide->push((object)[
-                    'sub_account_name' =>
-                      $periodResult > 0 ? 'Period Profit' : 'Period Loss',
-                    'credit' => $periodResult > 0 ? abs($periodResult) : 0,
-                    'debit'  => $periodResult < 0 ? abs($periodResult) : 0,
-                  ]);
-                }
-
-                $maxRows = max($assets->count(), $rightSide->count());
-              @endphp
-
               @for ($i = 0; $i < $maxRows; $i++)
                 <tr>
                   {{-- ASSETS --}}
@@ -150,9 +131,7 @@
               <tr>
                 <td class="text-end">Total Assets</td>
                 <td class="text-end">{{ number_format($totalAssets, 2) }}</td>
-                <td class="text-end">
-                  Total Liabilities + Capital + Period Result
-                </td>
+                <td class="text-end">Total Liabilities &amp; Capital</td>
                 <td class="text-end">{{ number_format($totalRight, 2) }}</td>
               </tr>
 
@@ -174,21 +153,6 @@
 
           </table>
         </div>
-
-        {{-- ================= --}}
-        {{-- EXPLICIT RESULT NOTE --}}
-        {{-- ================= --}}
-        @if((float)$periodResult !== 0.0)
-          <div class="alert alert-info text-center mt-3">
-            <strong>
-              Period {{ $periodResult > 0 ? 'Profit' : 'Loss' }}:
-            </strong>
-            {{ number_format(abs($periodResult), 2) }} KES<br>
-            <small class="text-muted">
-              Displayed explicitly and not absorbed into Capital or Liabilities.
-            </small>
-          </div>
-        @endif
 
       </div>
     </div>
