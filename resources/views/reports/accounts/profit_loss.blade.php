@@ -58,6 +58,18 @@
             </button>
           </div>
         </form>
+{{-- Export buttons --}}
+<div class="d-flex gap-2 mb-3">
+    <a href="{{ route('reports.accounts.profit-loss.excel', request()->query()) }}"
+       class="btn btn-success btn-sm">
+        Export Excel
+    </a>
+
+    <a href="{{ route('reports.accounts.profit-loss.pdf', request()->query()) }}"
+       class="btn btn-danger btn-sm">
+        Export PDF
+    </a>
+</div>
 
 <div class="alert alert-warning small">
   <strong>Note:</strong>
