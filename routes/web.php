@@ -61,6 +61,7 @@ use App\Http\Controllers\KassContributionsImportController;
 
 use App\Http\Controllers\KassMemberMasterImportController;
 
+
 Route::prefix('kass')->group(function () {
     Route::get('/member-master-import', [KassMemberMasterImportController::class, 'index'])->name('kass.member_master_import.index');
     Route::post('/member-master-import/preview', [KassMemberMasterImportController::class, 'preview'])->name('kass.member_master_import.preview');
@@ -932,6 +933,17 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
 
     // Route::get('/reports/accounts/trial-balance', [HomeController::class, 'reportsAccountsTrialBalance'])->name('reports.accounts.trial-balance')->middleware('check_user_rights:rpt_trial_balance');
     Route::get('/reports/accounts/trial-balance', [TrialBalanceController::class, 'index'])->name('reports.accounts.trial-balance')->middleware('check_user_rights:rpt_trial_balance');
+
+    Route::get(
+    'reports/accounts/trial-balance/excel',
+    [TrialBalanceController::class, 'exportExcel']
+)->name('reports.accounts.trial-balance.excel')->middleware('check_user_rights:rpt_trial_balance');
+
+Route::get(
+    'reports/accounts/trial-balance/pdf',
+    [TrialBalanceController::class, 'exportPdf']
+)->name('reports.accounts.trial-balance.pdf')->middleware('check_user_rights:rpt_trial_balance');
+
 
 
     Route::get('/reports/accounts/profit-loss', [TrialBalanceController::class, 'profitLoss'])

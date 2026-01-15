@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
-
+use App\Exports\TrialBalanceExport;
+use Maatwebsite\Excel\Facades\Excel;
+use Barryvdh\DomPDF\Facade\Pdf;
 class TrialBalanceController extends Controller
 {
     /**
@@ -298,4 +300,61 @@ class TrialBalanceController extends Controller
 
         return $query->get();
     }
+public function exportExcel(Request $request)
+{
+    $filters = $this->prepareFilters($request);
+    if (isset($filters['error'])) return $filters['error'];
+
+    $records = $this->getAccountsData(
+        $filters['period'],
+        $filters['dateFrom'],
+        $filters['dateTo']
+    );
+
+    return Excel::download(
+        new TrialBalanceExport($records),
+        'trial_balance_'.$filters['period'].'.xlsx'
+    );
 }
+
+public function exportPdf(Request $request)
+{
+    $filters = $this->prepareFilters($request);
+    if (isset($filters['error'])) return $filters['error'];
+
+    $records = $this->getAccountsData(
+        $filters['period'],
+        $filters['dateFrom'],
+        $filters['dateTo']
+    );
+
+    $rows = [];
+
+    foreach ($records as $r) {
+        $grossDebit  = $r->debit ?? 0;
+        $grossCredit = $r->credit ?? 0;
+
+        if ($grossDebit > $grossCredit) {
+            $rows[] = [
+                'name'   => $r->sub_account_name,
+                'debit'  => number_format($grossDebit - $grossCredit,2),
+                'credit' => '',
+            ];
+        } elseif ($grossCredit > $grossDebit) {
+            $rows[] = [
+                'name'   => $r->sub_account_name,
+                'debit'  => '',
+                'credit' => number_format($grossCredit - $grossDebit,2),
+            ];
+        }
+    }
+
+    return Pdf::loadView(
+        'reports.accounts.trial_balance_pdf',
+        [
+            'rows'   => $rows,
+            'period' => $filters['period'],
+        ]
+    )->download('trial_balance.pdf');
+}
+    }
