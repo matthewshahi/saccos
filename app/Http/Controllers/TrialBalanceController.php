@@ -434,7 +434,6 @@ public function exportProfitLossPdf(Request $request)
 }
 
 
-
 public function exportBalanceSheetExcel(Request $request)
 {
     $filters = $this->prepareFilters($request);
@@ -446,13 +445,41 @@ public function exportBalanceSheetExcel(Request $request)
         $filters['dateTo']
     );
 
+    // Normalize types
     $records->transform(fn($r) => tap($r, function ($x) {
         $x->main_account_type = strtoupper(trim($x->main_account_type));
     }));
 
-    $assets      = $records->filter(fn($r) => str_starts_with($r->main_account_type, 'ASSET'));
-    $liabilities = $records->filter(fn($r) => str_starts_with($r->main_account_type, 'LIABILITY'));
-    $capital     = $records->filter(fn($r) => str_starts_with($r->main_account_type, 'CAPITAL'));
+    // Grouping (plural-safe)
+    $assets = $records->filter(fn($r) =>
+        str_starts_with($r->main_account_type, 'ASSET')
+        || str_starts_with($r->main_account_type, 'ASSETS')
+    );
+
+    $liabilities = $records->filter(fn($r) =>
+        str_starts_with($r->main_account_type, 'LIABILITY')
+        || str_starts_with($r->main_account_type, 'LIABILITIES')
+    );
+
+    $capital = $records->filter(fn($r) => str_starts_with($r->main_account_type, 'CAPITAL'));
+
+    // 🔑 Compute retained earnings (CRITICAL)
+    $income   = $records->filter(fn($r) => str_contains($r->main_account_type, 'INCOME'));
+    $expenses = $records->filter(fn($r) => str_contains($r->main_account_type, 'EXPENSE'));
+
+    $totalIncome   = $income->sum(fn($r) => ($r->credit ?? 0) - ($r->debit ?? 0));
+    $totalExpenses = $expenses->sum(fn($r) => ($r->debit ?? 0) - ($r->credit ?? 0));
+    $netProfit     = $totalIncome - $totalExpenses;
+
+    // Inject retained earnings
+    $capital = $capital->values()->push((object)[
+        'main_account_code' => '',
+        'sub_account_code'  => '',
+        'sub_account_name'  => $netProfit >= 0 ? 'Retained Earnings (Profit)' : 'Accumulated Loss',
+        'debit'             => $netProfit < 0 ? abs($netProfit) : 0,
+        'credit'            => $netProfit >= 0 ? abs($netProfit) : 0,
+        'main_account_type' => 'CAPITAL',
+    ]);
 
     return Excel::download(
         new BalanceSheetExport($assets, $liabilities, $capital),
@@ -474,9 +501,32 @@ public function exportBalanceSheetPdf(Request $request)
         $x->main_account_type = strtoupper(trim($x->main_account_type));
     }));
 
-    $assets      = $records->filter(fn($r) => str_starts_with($r->main_account_type, 'ASSET'));
-    $liabilities = $records->filter(fn($r) => str_starts_with($r->main_account_type, 'LIABILITY'));
-    $capital     = $records->filter(fn($r) => str_starts_with($r->main_account_type, 'CAPITAL'));
+    $assets = $records->filter(fn($r) =>
+        str_starts_with($r->main_account_type, 'ASSET')
+        || str_starts_with($r->main_account_type, 'ASSETS')
+    );
+
+    $liabilities = $records->filter(fn($r) =>
+        str_starts_with($r->main_account_type, 'LIABILITY')
+        || str_starts_with($r->main_account_type, 'LIABILITIES')
+    );
+
+    $capital = $records->filter(fn($r) => str_starts_with($r->main_account_type, 'CAPITAL'));
+
+    // 🔑 Retained earnings
+    $income   = $records->filter(fn($r) => str_contains($r->main_account_type, 'INCOME'));
+    $expenses = $records->filter(fn($r) => str_contains($r->main_account_type, 'EXPENSE'));
+
+    $totalIncome   = $income->sum(fn($r) => ($r->credit ?? 0) - ($r->debit ?? 0));
+    $totalExpenses = $expenses->sum(fn($r) => ($r->debit ?? 0) - ($r->credit ?? 0));
+    $netProfit     = $totalIncome - $totalExpenses;
+
+    $capital = $capital->values()->push((object)[
+        'sub_account_name'  => $netProfit >= 0 ? 'Retained Earnings (Profit)' : 'Accumulated Loss',
+        'debit'             => $netProfit < 0 ? abs($netProfit) : 0,
+        'credit'            => $netProfit >= 0 ? abs($netProfit) : 0,
+        'main_account_type' => 'CAPITAL',
+    ]);
 
     $rightSide = $liabilities->concat($capital);
 
@@ -491,6 +541,7 @@ public function exportBalanceSheetPdf(Request $request)
         ]
     )->download('balance_sheet.pdf');
 }
+
 
 
     }
