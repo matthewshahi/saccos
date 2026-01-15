@@ -4,30 +4,37 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Collection;
 use Carbon\Carbon;
-use App\Exports\TrialBalanceExport;
 use Maatwebsite\Excel\Facades\Excel;
 use Barryvdh\DomPDF\Facade\Pdf;
+
+use App\Exports\TrialBalanceExport;
 use App\Exports\ProfitLossExport;
+// If you have a BalanceSheetExport later, you can plug it in similarly.
 
 class TrialBalanceController extends Controller
 {
+    // ------------------------------------------------------------
+    // PUBLIC ENDPOINTS
+    // ------------------------------------------------------------
+
     /**
-     * Main Trial Balance view
+     * Trial Balance view (canonical base report)
      */
     public function index(Request $request)
     {
         $filters = $this->prepareFilters($request);
         if (isset($filters['error'])) return $filters['error'];
 
-        $records = $this->getAccountsData(
+        $tb = $this->getTrialBalanceRows(
             $filters['period'],
             $filters['dateFrom'],
             $filters['dateTo']
         );
 
         return view('reports.accounts.trial_balance', [
-            'records'  => $records,
+            'records'  => $tb,
             'period'   => $filters['period'],
             'dateFrom' => $filters['dateFrom']->format('Y-m-d'),
             'dateTo'   => $filters['dateTo']->format('Y-m-d'),
@@ -35,53 +42,51 @@ class TrialBalanceController extends Controller
     }
 
     /**
-     * Balance Sheet
+     * Balance Sheet view (derived from Trial Balance)
      */
     public function balanceSheet(Request $request)
     {
         $filters = $this->prepareFilters($request);
         if (isset($filters['error'])) return $filters['error'];
 
-        $records = $this->getAccountsData(
+        $tb = $this->getTrialBalanceRows(
             $filters['period'],
             $filters['dateFrom'],
             $filters['dateTo']
         );
 
-        // Normalize type casing once (defensive)
-        $records->transform(function ($r) {
+        // Normalize type casing once
+        $tb = $tb->map(function ($r) {
             $r->main_account_type = strtoupper(trim((string) $r->main_account_type));
             return $r;
         });
 
-        // Broad grouping (handles "ASSETS - CURRENT", "LIABILITIES - SHORT", etc.)
-        $assets = $records->filter(function ($r) {
-            return str_starts_with($r->main_account_type, 'ASSET') || str_starts_with($r->main_account_type, 'ASSETS');
-        });
+        $assets = $tb->filter(fn($r) =>
+            str_starts_with($r->main_account_type, 'ASSET') || str_starts_with($r->main_account_type, 'ASSETS')
+        )->values();
 
-        $liabilities = $records->filter(function ($r) {
-            return str_starts_with($r->main_account_type, 'LIABILITY') || str_starts_with($r->main_account_type, 'LIABILITIES');
-        });
+        $liabilities = $tb->filter(fn($r) =>
+            str_starts_with($r->main_account_type, 'LIABILITY') || str_starts_with($r->main_account_type, 'LIABILITIES')
+        )->values();
 
-        $capital = $records->filter(fn($r) => str_starts_with($r->main_account_type, 'CAPITAL'));
+        $capital = $tb->filter(fn($r) => str_starts_with($r->main_account_type, 'CAPITAL'))->values();
 
-        // For retained earnings we need income & expense too
-        $income   = $records->filter(fn($r) => str_contains($r->main_account_type, 'INCOME'));
-        $expenses = $records->filter(fn($r) => str_contains($r->main_account_type, 'EXPENSE'));
+        $income   = $tb->filter(fn($r) => str_contains($r->main_account_type, 'INCOME'))->values();
+        $expenses = $tb->filter(fn($r) => str_contains($r->main_account_type, 'EXPENSE'))->values();
 
-        // Compute section balances from RAW debit/credit
+        // Totals from Trial Balance net columns (already netted)
         $totalAssets      = $assets->sum(fn($r) => ($r->debit ?? 0) - ($r->credit ?? 0));
         $totalLiabilities = $liabilities->sum(fn($r) => ($r->credit ?? 0) - ($r->debit ?? 0));
-        $totalCapital     = $capital->sum(fn($r) => ($r->credit ?? 0) - ($r->debit ?? 0));
+        $totalCapitalBase = $capital->sum(fn($r) => ($r->credit ?? 0) - ($r->debit ?? 0));
 
-        // Net Profit/Loss
         $totalIncome   = $income->sum(fn($r) => ($r->credit ?? 0) - ($r->debit ?? 0));
         $totalExpenses = $expenses->sum(fn($r) => ($r->debit ?? 0) - ($r->credit ?? 0));
         $netProfit     = $totalIncome - $totalExpenses; // +profit, -loss
 
-        // Retained earnings line: credit for profit, debit for loss
+        // Retained earnings line (presentation)
         $retainedEarnings = (object) [
             'main_account_code' => '',
+            'main_account_name' => '',
             'sub_account_code'  => '',
             'sub_account_name'  => $netProfit >= 0 ? 'Retained Earnings (Profit)' : 'Accumulated Loss',
             'debit'             => $netProfit < 0 ? abs($netProfit) : 0,
@@ -89,46 +94,18 @@ class TrialBalanceController extends Controller
             'main_account_type' => 'CAPITAL',
         ];
 
-        // Add retained earnings to capital display
-        $capital = $capital->values()->push($retainedEarnings);
+        // Capital display including retained earnings
+        $capitalDisplay = $capital->values()->push($retainedEarnings);
 
-        // Capital including retained earnings (note: adding netProfit is correct here)
-        $totalCapitalAdjusted = $totalCapital + $netProfit;
-        $totalRight           = $totalLiabilities + $totalCapitalAdjusted;
+        // Total capital including retained earnings
+        $totalCapitalAdjusted = $totalCapitalBase + $netProfit;
 
-        // Ensure placeholders if empty (for view stability)
-        if ($assets->isEmpty()) {
-            $assets = collect([(object) [
-                'sub_account_name'  => 'No Asset Records',
-                'main_account_code' => '',
-                'sub_account_code'  => '',
-                'debit'             => 0,
-                'credit'            => 0,
-                'main_account_type' => 'ASSET',
-            ]]);
-        }
+        $totalRight = $totalLiabilities + $totalCapitalAdjusted;
 
-        if ($liabilities->isEmpty()) {
-            $liabilities = collect([(object) [
-                'sub_account_name'  => 'No Liability Records',
-                'main_account_code' => '',
-                'sub_account_code'  => '',
-                'debit'             => 0,
-                'credit'            => 0,
-                'main_account_type' => 'LIABILITY',
-            ]]);
-        }
-
-        if ($capital->isEmpty()) {
-            $capital = collect([(object) [
-                'sub_account_name'  => 'No Capital Records',
-                'main_account_code' => '',
-                'sub_account_code'  => '',
-                'debit'             => 0,
-                'credit'            => 0,
-                'main_account_type' => 'CAPITAL',
-            ]]);
-        }
+        // Stable placeholders if empty
+        $assets = $this->ensureNotEmptyRows($assets, 'No Asset Records', 'ASSET');
+        $liabilities = $this->ensureNotEmptyRows($liabilities, 'No Liability Records', 'LIABILITY');
+        $capitalDisplay = $this->ensureNotEmptyRows($capitalDisplay, 'No Capital Records', 'CAPITAL');
 
         return view('reports.accounts.balance_sheet', [
             'period'           => $filters['period'],
@@ -136,7 +113,7 @@ class TrialBalanceController extends Controller
             'dateTo'           => $filters['dateTo']->format('Y-m-d'),
             'assets'           => $assets->values(),
             'liabilities'      => $liabilities->values(),
-            'capital'          => $capital->values(),
+            'capital'          => $capitalDisplay->values(),
             'totalAssets'      => $totalAssets,
             'totalLiabilities' => $totalLiabilities,
             'totalCapital'     => $totalCapitalAdjusted,
@@ -146,53 +123,34 @@ class TrialBalanceController extends Controller
     }
 
     /**
-     * Profit & Loss
+     * Profit & Loss view (derived from Trial Balance)
      */
     public function profitLoss(Request $request)
     {
         $filters = $this->prepareFilters($request);
         if (isset($filters['error'])) return $filters['error'];
 
-        $records = $this->getAccountsData(
+        $tb = $this->getTrialBalanceRows(
             $filters['period'],
             $filters['dateFrom'],
             $filters['dateTo']
         );
 
-        // Normalize type casing (defensive)
-        $records->transform(function ($r) {
+        // Normalize type casing once
+        $tb = $tb->map(function ($r) {
             $r->main_account_type = strtoupper(trim((string) $r->main_account_type));
             return $r;
         });
 
-        $income   = $records->filter(fn($r) => str_contains($r->main_account_type, 'INCOME'))->values();
-        $expenses = $records->filter(fn($r) => str_contains($r->main_account_type, 'EXPENSE'))->values();
+        $income   = $tb->filter(fn($r) => str_contains($r->main_account_type, 'INCOME'))->values();
+        $expenses = $tb->filter(fn($r) => str_contains($r->main_account_type, 'EXPENSE'))->values();
 
         $totalIncome   = $income->sum(fn($r) => ($r->credit ?? 0) - ($r->debit ?? 0));
         $totalExpenses = $expenses->sum(fn($r) => ($r->debit ?? 0) - ($r->credit ?? 0));
         $netProfit     = $totalIncome - $totalExpenses;
 
-        if ($income->isEmpty()) {
-            $income = collect([(object) [
-                'sub_account_name'  => 'No Income Records',
-                'main_account_code' => '',
-                'sub_account_code'  => '',
-                'debit'             => 0,
-                'credit'            => 0,
-                'main_account_type' => 'INCOME',
-            ]]);
-        }
-
-        if ($expenses->isEmpty()) {
-            $expenses = collect([(object) [
-                'sub_account_name'  => 'No Expense Records',
-                'main_account_code' => '',
-                'sub_account_code'  => '',
-                'debit'             => 0,
-                'credit'            => 0,
-                'main_account_type' => 'EXPENSE',
-            ]]);
-        }
+        $income   = $this->ensureNotEmptyRows($income, 'No Income Records', 'INCOME');
+        $expenses = $this->ensureNotEmptyRows($expenses, 'No Expense Records', 'EXPENSE');
 
         return view('reports.accounts.profit_loss', [
             'period'        => $filters['period'],
@@ -206,9 +164,87 @@ class TrialBalanceController extends Controller
         ]);
     }
 
-    // ----------------------------------------------------------------
-    // PRIVATE SHARED FUNCTIONS
-    // ----------------------------------------------------------------
+    /**
+     * Trial Balance Excel export
+     */
+    public function exportExcel(Request $request)
+    {
+        $filters = $this->prepareFilters($request);
+        if (isset($filters['error'])) return $filters['error'];
+
+        $tb = $this->getTrialBalanceRows(
+            $filters['period'],
+            $filters['dateFrom'],
+            $filters['dateTo']
+        );
+
+        // Keep file naming stable even if period is empty (date-range export)
+        $suffix = $filters['period'] ?: ($filters['dateFrom']->format('Ymd') . '_to_' . $filters['dateTo']->format('Ymd'));
+
+        return Excel::download(
+            new TrialBalanceExport($tb),
+            'trial_balance_' . $suffix . '.xlsx'
+        );
+    }
+
+    /**
+     * Trial Balance PDF export (uses the same Trial Balance rows)
+     */
+    public function exportPdf(Request $request)
+    {
+        $filters = $this->prepareFilters($request);
+        if (isset($filters['error'])) return $filters['error'];
+
+        $tb = $this->getTrialBalanceRows(
+            $filters['period'],
+            $filters['dateFrom'],
+            $filters['dateTo']
+        );
+
+        // Provide rows in a simple structure commonly used by TB PDF blades
+        // IMPORTANT: now we NEVER re-net here. Trial Balance rows are already netted.
+        $rows = $tb->map(function ($r) {
+            return [
+                'name'   => $r->sub_account_name,
+                'debit'  => ($r->debit ?? 0) > 0 ? number_format((float) $r->debit, 2) : '',
+                'credit' => ($r->credit ?? 0) > 0 ? number_format((float) $r->credit, 2) : '',
+            ];
+        })->values()->all();
+
+        $suffix = $filters['period'] ?: ($filters['dateFrom']->format('Ymd') . '_to_' . $filters['dateTo']->format('Ymd'));
+
+        return Pdf::loadView('reports.accounts.trial_balance_pdf', [
+            'rows'   => $rows,
+            'period' => $filters['period'] ?: ('DATE RANGE: ' . $filters['dateFrom']->format('Y-m-d') . ' to ' . $filters['dateTo']->format('Y-m-d')),
+        ])->download('trial_balance_' . $suffix . '.pdf');
+    }
+
+    /**
+     * Profit & Loss Excel export (derived from Trial Balance, but export class may already filter)
+     * If your ProfitLossExport expects raw records, we pass TB rows so export matches the view.
+     */
+    public function exportProfitLossExcel(Request $request)
+    {
+        $filters = $this->prepareFilters($request);
+        if (isset($filters['error'])) return $filters['error'];
+
+        $tb = $this->getTrialBalanceRows(
+            $filters['period'],
+            $filters['dateFrom'],
+            $filters['dateTo']
+        );
+
+        $suffix = $filters['period'] ?: ($filters['dateFrom']->format('Ymd') . '_to_' . $filters['dateTo']->format('Ymd'));
+
+        return Excel::download(
+            new ProfitLossExport($tb),
+            'profit_and_loss_' . $suffix . '.xlsx'
+        );
+    }
+
+    // ------------------------------------------------------------
+    // PRIVATE SHARED FUNCTIONS (SINGLE SOURCE OF TRUTH: accounts_trans)
+    // ------------------------------------------------------------
 
     /**
      * Prepare validated filter dates/period.
@@ -221,17 +257,17 @@ class TrialBalanceController extends Controller
 
         // Validate period format (YYYYMM)
         if (!empty($period) && !preg_match('/^\d{6}$/', $period)) {
-            return ['error' => back()->with('error', 'Invalid period format. Use YYYYmm (e.g. 202510).')->withInput()];
+            return ['error' => back()->with('error', 'Invalid period format. Use YYYYMM (e.g. 202510).')->withInput()];
         }
 
-        // Default to current month if no dates provided
+        // If either date is missing, default to current month range
         if (empty($dateFrom) || empty($dateTo)) {
             $now = Carbon::now();
             $dateFrom = $now->copy()->startOfMonth()->startOfDay();
-            $dateTo   = $now->copy()->endOfMonth()->endOfDay(); // includes 23:59:59
+            $dateTo   = $now->copy()->endOfMonth()->endOfDay();
         } else {
             $dateFrom = Carbon::parse($dateFrom)->startOfDay();
-            $dateTo   = Carbon::parse($dateTo)->endOfDay(); // includes 23:59:59
+            $dateTo   = Carbon::parse($dateTo)->endOfDay();
         }
 
         // Validate range
@@ -248,49 +284,61 @@ class TrialBalanceController extends Controller
     }
 
     /**
-     * Core query logic shared by Trial Balance / Balance Sheet / P&L.
+     * Public-facing canonical Trial Balance rows.
      *
-     * Fixes:
-     * - Returns RAW debit and credit totals (no netting in SQL).
-     * - Filters by period OR by date range (never both) to avoid missing rows.
-     * - Uses COALESCE to prevent NULL totals.
-     * - Groups by raw DB columns for deterministic SQL, while selecting TRIM() aliases for display.
+     * This is the ONLY place where netting into a TB debit/credit happens.
+     * Everything else (Balance Sheet, P&L, exports) must use these rows.
      */
-    private function getAccountsData(?string $period, Carbon $dateFrom, Carbon $dateTo)
+    private function getTrialBalanceRows(?string $period, Carbon $dateFrom, Carbon $dateTo): Collection
+    {
+        $ledger = $this->getLedgerAggregates($period, $dateFrom, $dateTo);
+
+        // Build trial balance (net debit/credit per row)
+        $tb = $this->buildTrialBalance($ledger);
+
+        // Sort into statement order (assets, liabilities, capital, income, expense)
+        return $this->sortTrialBalance($tb);
+    }
+
+    /**
+     * LAYER 1: Extract authoritative aggregates from sacco_accounts_trans.
+     *
+     * Returns GROSS debit/credit per sub-account+main-account identity.
+     * No netting here.
+     */
+    private function getLedgerAggregates(?string $period, Carbon $dateFrom, Carbon $dateTo): Collection
     {
         $query = DB::table('sacco_accounts_trans as t')
             ->join('sacco_sub_account as s', 't.accounts_trans_sub_account', '=', 's.sub_account_id')
             ->join('sacco_main_account as m', 's.sub_account_main_account', '=', 'm.main_account_id')
             ->select(
-                DB::raw('TRIM(m.main_account_code) as main_account_code'),
-                DB::raw('TRIM(m.main_account_name) as main_account_name'),
-                DB::raw('TRIM(m.main_account_type) as main_account_type'),
-                DB::raw('TRIM(s.sub_account_code) as sub_account_code'),
-                DB::raw('TRIM(s.sub_account_name) as sub_account_name'),
-                DB::raw('COALESCE(SUM(t.accounts_trans_debit),0)  as debit'),
-                DB::raw('COALESCE(SUM(t.accounts_trans_credit),0) as credit')
+                'm.main_account_code',
+                'm.main_account_name',
+                'm.main_account_type',
+                's.sub_account_code',
+                's.sub_account_name',
+                DB::raw('COALESCE(SUM(t.accounts_trans_debit),0)  as gross_debit'),
+                DB::raw('COALESCE(SUM(t.accounts_trans_credit),0) as gross_credit')
             )
-            // group by raw columns (not TRIM aliases) for SQL stability
+            ->where(function ($q) {
+                // Optional: exclude soft-deleted chart items if you use those flags.
+                // Keep minimal and safe: only ignore explicitly deleted accounts.
+                $q->whereNull('m.main_account_deleted')->orWhere('m.main_account_deleted', 'N');
+            })
+            ->where(function ($q) {
+                $q->whereNull('s.sub_account_deleted')->orWhere('s.sub_account_deleted', 'N');
+            })
             ->groupBy(
                 'm.main_account_code',
                 'm.main_account_name',
                 'm.main_account_type',
                 's.sub_account_code',
                 's.sub_account_name'
-            )
-            ->orderByRaw("
-                CASE
-                    WHEN UPPER(m.main_account_type) LIKE 'ASSET%' OR UPPER(m.main_account_type) LIKE 'ASSETS%' THEN 1
-                    WHEN UPPER(m.main_account_type) LIKE 'LIABILITY%' OR UPPER(m.main_account_type) LIKE 'LIABILITIES%' THEN 2
-                    WHEN UPPER(m.main_account_type) LIKE 'CAPITAL%' THEN 3
-                    WHEN UPPER(m.main_account_type) LIKE 'INCOME%' THEN 4
-                    WHEN UPPER(m.main_account_type) LIKE 'EXPENSE%' THEN 5
-                    ELSE 6
-                END
-            ")
-            ->orderBy('m.main_account_code')
-            ->orderBy('s.sub_account_code');
+            );
 
+        // Filter strategy:
+        // - If period provided, filter strictly by period.
+        // - Else, filter strictly by date range.
         if (!empty($period)) {
             $query->where('t.accounts_trans_period', $period);
         } else {
@@ -300,82 +348,92 @@ class TrialBalanceController extends Controller
             ]);
         }
 
-        return $query->get();
-    }
-public function exportExcel(Request $request)
-{
-    $filters = $this->prepareFilters($request);
-    if (isset($filters['error'])) return $filters['error'];
+        // Keep stable deterministic base ordering
+        $query->orderBy('m.main_account_code')->orderBy('s.sub_account_code');
 
-    $records = $this->getAccountsData(
-        $filters['period'],
-        $filters['dateFrom'],
-        $filters['dateTo']
-    );
+        // Return trimmed display variants later; keep raw for SQL safety
+        return $query->get()->map(function ($r) {
+            // Defensive trimming for display
+            $r->main_account_code = trim((string) $r->main_account_code);
+            $r->main_account_name = trim((string) $r->main_account_name);
+            $r->main_account_type = trim((string) $r->main_account_type);
+            $r->sub_account_code  = trim((string) $r->sub_account_code);
+            $r->sub_account_name  = trim((string) $r->sub_account_name);
 
-    return Excel::download(
-        new TrialBalanceExport($records),
-        'trial_balance_'.$filters['period'].'.xlsx'
-    );
-}
+            $r->gross_debit  = (float) ($r->gross_debit ?? 0);
+            $r->gross_credit = (float) ($r->gross_credit ?? 0);
 
-public function exportPdf(Request $request)
-{
-    $filters = $this->prepareFilters($request);
-    if (isset($filters['error'])) return $filters['error'];
-
-    $records = $this->getAccountsData(
-        $filters['period'],
-        $filters['dateFrom'],
-        $filters['dateTo']
-    );
-
-    $rows = [];
-
-    foreach ($records as $r) {
-        $grossDebit  = $r->debit ?? 0;
-        $grossCredit = $r->credit ?? 0;
-
-        if ($grossDebit > $grossCredit) {
-            $rows[] = [
-                'name'   => $r->sub_account_name,
-                'debit'  => number_format($grossDebit - $grossCredit,2),
-                'credit' => '',
-            ];
-        } elseif ($grossCredit > $grossDebit) {
-            $rows[] = [
-                'name'   => $r->sub_account_name,
-                'debit'  => '',
-                'credit' => number_format($grossCredit - $grossDebit,2),
-            ];
-        }
+            return $r;
+        });
     }
 
-    return Pdf::loadView(
-        'reports.accounts.trial_balance_pdf',
-        [
-            'rows'   => $rows,
-            'period' => $filters['period'],
-        ]
-    )->download('trial_balance.pdf');
-}
- 
+    /**
+     * LAYER 2: Build Trial Balance rows by netting gross debits/credits.
+     *
+     * Rule:
+     * - Net debit  = max(gross_debit - gross_credit, 0)
+     * - Net credit = max(gross_credit - gross_debit, 0)
+     *
+     * IMPORTANT:
+     * - This is a standard trial balance presentation netting per account.
+     * - It does not alter the underlying gross totals (still auditable).
+     */
+    private function buildTrialBalance(Collection $ledger): Collection
+    {
+        return $ledger->map(function ($r) {
+            $grossDebit  = (float) ($r->gross_debit ?? 0);
+            $grossCredit = (float) ($r->gross_credit ?? 0);
 
-public function exportProfitLossExcel(Request $request)
-{
-    $filters = $this->prepareFilters($request);
-    if (isset($filters['error'])) return $filters['error'];
+            $diff = $grossDebit - $grossCredit;
 
-    $records = $this->getAccountsData(
-        $filters['period'],
-        $filters['dateFrom'],
-        $filters['dateTo']
-    );
+            $r->debit  = $diff > 0 ? $diff : 0.0;
+            $r->credit = $diff < 0 ? abs($diff) : 0.0;
 
-    return Excel::download(
-        new ProfitLossExport($records),
-        'profit_and_loss_'.$filters['period'].'.xlsx'
-    );
-}
+            // Keep names consistent with your blades/exports
+            unset($r->gross_debit, $r->gross_credit);
 
+            return $r;
+        })->filter(function ($r) {
+            // Hide pure zeros in TB (optional but typically desirable)
+            return ((float) ($r->debit ?? 0) !== 0.0) || ((float) ($r->credit ?? 0) !== 0.0);
+        })->values();
     }
+
+    /**
+     * LAYER 3: Sorting for consistent report order.
+     */
+    private function sortTrialBalance(Collection $tb): Collection
+    {
+        return $tb->sortBy(function ($r) {
+            $type = strtoupper(trim((string) $r->main_account_type));
+
+            $bucket =
+                (str_starts_with($type, 'ASSET') || str_starts_with($type, 'ASSETS')) ? 1 :
+                (str_starts_with($type, 'LIABILITY') || str_starts_with($type, 'LIABILITIES')) ? 2 :
+                (str_starts_with($type, 'CAPITAL')) ? 3 :
+                (str_contains($type, 'INCOME')) ? 4 :
+                (str_contains($type, 'EXPENSE')) ? 5 : 6;
+
+            // Combine bucket + codes for stable ordering
+            return sprintf('%d|%s|%s', $bucket, (string) $r->main_account_code, (string) $r->sub_account_code);
+        })->values();
+    }
+
+    /**
+     * Ensure the view gets at least one placeholder row (view stability).
+     */
+    private function ensureNotEmptyRows(Collection $rows, string $label, string $type): Collection
+    {
+        if ($rows->isNotEmpty()) return $rows->values();
+
+        return collect([(object) [
+            'main_account_code' => '',
+            'main_account_name' => '',
+            'sub_account_code'  => '',
+            'sub_account_name'  => $label,
+            'debit'             => 0,
+            'credit'            => 0,
+            'main_account_type' => $type,
+        ]]);
+    }
+}
