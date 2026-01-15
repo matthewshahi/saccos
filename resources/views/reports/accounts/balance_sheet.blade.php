@@ -54,6 +54,20 @@
           </div>
         </form>
 
+        {{-- Export buttons --}}
+<div class="d-flex gap-2 mb-3">
+    <a href="{{ route('reports.accounts.balance-sheet.excel', request()->query()) }}"
+       class="btn btn-success btn-sm">
+        Export Excel
+    </a>
+
+    <a href="{{ route('reports.accounts.balance-sheet.pdf', request()->query()) }}"
+       class="btn btn-danger btn-sm">
+        Export PDF
+    </a>
+</div>
+
+
         <strong>Note:</strong>
 This Balance Sheet reflects the financial position
 <em>as at</em>
