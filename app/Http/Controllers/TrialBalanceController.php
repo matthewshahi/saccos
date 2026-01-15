@@ -433,7 +433,6 @@ public function exportProfitLossPdf(Request $request)
     )->download('profit_and_loss.pdf');
 }
 
-
 public function exportBalanceSheetExcel(Request $request)
 {
     $filters = $this->prepareFilters($request);
@@ -445,12 +444,12 @@ public function exportBalanceSheetExcel(Request $request)
         $filters['dateTo']
     );
 
-    // Normalize types
+    // normalize
     $records->transform(fn($r) => tap($r, function ($x) {
         $x->main_account_type = strtoupper(trim($x->main_account_type));
     }));
 
-    // Grouping (plural-safe)
+    // group exactly like screen
     $assets = $records->filter(fn($r) =>
         str_starts_with($r->main_account_type, 'ASSET')
         || str_starts_with($r->main_account_type, 'ASSETS')
@@ -461,21 +460,20 @@ public function exportBalanceSheetExcel(Request $request)
         || str_starts_with($r->main_account_type, 'LIABILITIES')
     );
 
-    $capital = $records->filter(fn($r) => str_starts_with($r->main_account_type, 'CAPITAL'));
+    $capital = $records->filter(fn($r) =>
+        str_starts_with($r->main_account_type, 'CAPITAL')
+    );
 
-    // 🔑 Compute retained earnings (CRITICAL)
+    // retained earnings — SAME as screen
     $income   = $records->filter(fn($r) => str_contains($r->main_account_type, 'INCOME'));
     $expenses = $records->filter(fn($r) => str_contains($r->main_account_type, 'EXPENSE'));
 
-    $totalIncome   = $income->sum(fn($r) => ($r->credit ?? 0) - ($r->debit ?? 0));
-    $totalExpenses = $expenses->sum(fn($r) => ($r->debit ?? 0) - ($r->credit ?? 0));
-    $netProfit     = $totalIncome - $totalExpenses;
+    $netProfit =
+        $income->sum(fn($r) => ($r->credit ?? 0) - ($r->debit ?? 0))
+      - $expenses->sum(fn($r) => ($r->debit ?? 0) - ($r->credit ?? 0));
 
-    // Inject retained earnings
     $capital = $capital->values()->push((object)[
-        'main_account_code' => '',
-        'sub_account_code'  => '',
-        'sub_account_name'  => $netProfit >= 0 ? 'Retained Earnings (Profit)' : 'Accumulated Loss',
+        'sub_account_name'  => 'Retained Earnings (Profit)',
         'debit'             => $netProfit < 0 ? abs($netProfit) : 0,
         'credit'            => $netProfit >= 0 ? abs($netProfit) : 0,
         'main_account_type' => 'CAPITAL',
@@ -511,18 +509,20 @@ public function exportBalanceSheetPdf(Request $request)
         || str_starts_with($r->main_account_type, 'LIABILITIES')
     );
 
-    $capital = $records->filter(fn($r) => str_starts_with($r->main_account_type, 'CAPITAL'));
+    $capital = $records->filter(fn($r) =>
+        str_starts_with($r->main_account_type, 'CAPITAL')
+    );
 
-    // 🔑 Retained earnings
+    // retained earnings — SAME as screen
     $income   = $records->filter(fn($r) => str_contains($r->main_account_type, 'INCOME'));
     $expenses = $records->filter(fn($r) => str_contains($r->main_account_type, 'EXPENSE'));
 
-    $totalIncome   = $income->sum(fn($r) => ($r->credit ?? 0) - ($r->debit ?? 0));
-    $totalExpenses = $expenses->sum(fn($r) => ($r->debit ?? 0) - ($r->credit ?? 0));
-    $netProfit     = $totalIncome - $totalExpenses;
+    $netProfit =
+        $income->sum(fn($r) => ($r->credit ?? 0) - ($r->debit ?? 0))
+      - $expenses->sum(fn($r) => ($r->debit ?? 0) - ($r->credit ?? 0));
 
     $capital = $capital->values()->push((object)[
-        'sub_account_name'  => $netProfit >= 0 ? 'Retained Earnings (Profit)' : 'Accumulated Loss',
+        'sub_account_name'  => 'Retained Earnings (Profit)',
         'debit'             => $netProfit < 0 ? abs($netProfit) : 0,
         'credit'            => $netProfit >= 0 ? abs($netProfit) : 0,
         'main_account_type' => 'CAPITAL',
@@ -535,13 +535,16 @@ public function exportBalanceSheetPdf(Request $request)
         [
             'assets'      => $assets,
             'rightSide'   => $rightSide,
-            'totalAssets' => $assets->sum(fn($r) => ($r->debit ?? 0) - ($r->credit ?? 0)),
-            'totalRight'  => $rightSide->sum(fn($r) => ($r->credit ?? 0) - ($r->debit ?? 0)),
+            'totalAssets' => $assets->sum(fn($r) =>
+                max(0, ($r->debit ?? 0) - ($r->credit ?? 0))
+            ),
+            'totalRight'  => $rightSide->sum(fn($r) =>
+                max(0, ($r->credit ?? 0) - ($r->debit ?? 0))
+            ),
             'dateTo'      => $filters['dateTo']->format('d M Y'),
         ]
     )->download('balance_sheet.pdf');
 }
-
 
 
     }
