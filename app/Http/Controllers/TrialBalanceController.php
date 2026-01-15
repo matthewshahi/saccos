@@ -402,22 +402,33 @@ class TrialBalanceController extends Controller
     /**
      * LAYER 3: Sorting for consistent report order.
      */
-    private function sortTrialBalance(Collection $tb): Collection
-    {
-        return $tb->sortBy(function ($r) {
-            $type = strtoupper(trim((string) $r->main_account_type));
+   private function sortTrialBalance(Collection $tb): Collection
+{
+    return $tb->sortBy(function ($r) {
+        $type = strtoupper(trim((string) $r->main_account_type));
 
-            $bucket =
-                (str_starts_with($type, 'ASSET') || str_starts_with($type, 'ASSETS')) ? 1 :
-                (str_starts_with($type, 'LIABILITY') || str_starts_with($type, 'LIABILITIES')) ? 2 :
-                (str_starts_with($type, 'CAPITAL')) ? 3 :
-                (str_contains($type, 'INCOME')) ? 4 :
-                (str_contains($type, 'EXPENSE')) ? 5 : 6;
+        if (str_starts_with($type, 'ASSET') || str_starts_with($type, 'ASSETS')) {
+            $bucket = 1;
+        } elseif (str_starts_with($type, 'LIABILITY') || str_starts_with($type, 'LIABILITIES')) {
+            $bucket = 2;
+        } elseif (str_starts_with($type, 'CAPITAL')) {
+            $bucket = 3;
+        } elseif (str_contains($type, 'INCOME')) {
+            $bucket = 4;
+        } elseif (str_contains($type, 'EXPENSE')) {
+            $bucket = 5;
+        } else {
+            $bucket = 6;
+        }
 
-            // Combine bucket + codes for stable ordering
-            return sprintf('%d|%s|%s', $bucket, (string) $r->main_account_code, (string) $r->sub_account_code);
-        })->values();
-    }
+        return sprintf(
+            '%d|%s|%s',
+            $bucket,
+            (string) $r->main_account_code,
+            (string) $r->sub_account_code
+        );
+    })->values();
+}
 
     /**
      * Ensure the view gets at least one placeholder row (view stability).
