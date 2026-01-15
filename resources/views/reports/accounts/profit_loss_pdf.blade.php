@@ -2,150 +2,155 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Balance Sheet</title>
-
     <style>
         body {
             font-family: DejaVu Sans, sans-serif;
             font-size: 11px;
+            color: #000;
         }
 
-        h2, h4 {
+        h2, h3 {
             text-align: center;
             margin: 0;
         }
 
-        h4 {
-            margin-top: 5px;
-            font-weight: normal;
+        .subtitle {
+            text-align: center;
+            font-size: 10px;
+            margin-bottom: 12px;
         }
 
         table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 12px;
+            margin-bottom: 15px;
         }
 
         th, td {
             border: 1px solid #000;
-            padding: 6px;
+            padding: 5px;
         }
 
         th {
             background: #f0f0f0;
+            font-weight: bold;
             text-align: left;
         }
 
-        td.amount {
+        .right {
             text-align: right;
-        }
-
-        .section-title {
-            background: #ddd;
-            font-weight: bold;
         }
 
         .total-row {
             font-weight: bold;
-            background: #f9f9f9;
+            background: #fafafa;
+        }
+
+        .net-profit {
+            font-size: 12px;
+            font-weight: bold;
+            text-align: right;
+            margin-top: 10px;
+        }
+
+        .footer-note {
+            font-size: 9px;
+            margin-top: 20px;
+            text-align: center;
+            color: #555;
         }
     </style>
 </head>
 <body>
 
-    <h2>Balance Sheet</h2>
-    <h4>{{ $periodLabel }}</h4>
+<h2>Profit &amp; Loss Statement</h2>
+<h3>{{ config('app.name') }}</h3>
 
-    {{-- ASSETS --}}
-    <table>
-        <thead>
-            <tr>
-                <th colspan="2">ASSETS</th>
-            </tr>
-            <tr>
-                <th>Description</th>
-                <th class="amount">Amount</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach ($assets as $row)
+<p class="subtitle">
+    For the period:
+    <strong>{{ $periodLabel }}</strong>
+</p>
+
+<p class="subtitle" style="font-size:9px; margin-top:-4px;">
+    This statement reflects income and expenses recorded during the selected period,
+    based on posted ledger transactions. It is not cumulative unless the selected
+    period spans multiple financial periods.
+</p>
+
+{{-- ================= INCOME ================= --}}
+<table>
+    <thead>
+        <tr>
+            <th colspan="2">INCOME</th>
+        </tr>
+        <tr>
+            <th>Account</th>
+            <th class="right">KES</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach($income as $row)
+            @php $amount = ($row->credit ?? 0); @endphp
+            @if($amount > 0)
                 <tr>
-                    <td>{{ $row->sub_account_name }}</td>
-                    <td class="amount">
-                        {{ number_format(($row->debit ?? 0) - ($row->credit ?? 0), 2) }}
+                    <td>
+                        {{ strtoupper($row->sub_account_name) }}<br>
+                        <small>{{ $row->main_account_code }}/{{ $row->sub_account_code }}</small>
                     </td>
+                    <td class="right">{{ number_format($amount, 2) }}</td>
                 </tr>
-            @endforeach
-            <tr class="total-row">
-                <td>Total Assets</td>
-                <td class="amount">{{ number_format($totalAssets, 2) }}</td>
-            </tr>
-        </tbody>
-    </table>
+            @endif
+        @endforeach
 
-    {{-- LIABILITIES --}}
-    <table>
-        <thead>
-            <tr>
-                <th colspan="2">LIABILITIES</th>
-            </tr>
-            <tr>
-                <th>Description</th>
-                <th class="amount">Amount</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach ($liabilities as $row)
+        <tr class="total-row">
+            <td>Total Income</td>
+            <td class="right">{{ number_format($totalIncome, 2) }}</td>
+        </tr>
+    </tbody>
+</table>
+
+{{-- ================= EXPENSES ================= --}}
+<table>
+    <thead>
+        <tr>
+            <th colspan="2">EXPENSES</th>
+        </tr>
+        <tr>
+            <th>Account</th>
+            <th class="right">KES</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach($expenses as $row)
+            @php $amount = ($row->debit ?? 0); @endphp
+            @if($amount > 0)
                 <tr>
-                    <td>{{ $row->sub_account_name }}</td>
-                    <td class="amount">
-                        {{ number_format(($row->credit ?? 0) - ($row->debit ?? 0), 2) }}
+                    <td>
+                        {{ strtoupper($row->sub_account_name) }}<br>
+                        <small>{{ $row->main_account_code }}/{{ $row->sub_account_code }}</small>
                     </td>
+                    <td class="right">{{ number_format($amount, 2) }}</td>
                 </tr>
-            @endforeach
-            <tr class="total-row">
-                <td>Total Liabilities</td>
-                <td class="amount">{{ number_format($totalLiabilities, 2) }}</td>
-            </tr>
-        </tbody>
-    </table>
+            @endif
+        @endforeach
 
-    {{-- CAPITAL --}}
-    <table>
-        <thead>
-            <tr>
-                <th colspan="2">CAPITAL</th>
-            </tr>
-            <tr>
-                <th>Description</th>
-                <th class="amount">Amount</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach ($capital as $row)
-                <tr>
-                    <td>{{ $row->sub_account_name }}</td>
-                    <td class="amount">
-                        {{ number_format(($row->credit ?? 0) - ($row->debit ?? 0), 2) }}
-                    </td>
-                </tr>
-            @endforeach
-            <tr class="total-row">
-                <td>Total Capital</td>
-                <td class="amount">{{ number_format($totalCapital, 2) }}</td>
-            </tr>
-        </tbody>
-    </table>
+        <tr class="total-row">
+            <td>Total Expenses</td>
+            <td class="right">{{ number_format($totalExpenses, 2) }}</td>
+        </tr>
+    </tbody>
+</table>
 
-    {{-- BALANCING --}}
-    <table>
-        <tbody>
-            <tr class="total-row">
-                <td style="width: 80%">Total Liabilities + Capital</td>
-                <td class="amount">{{ number_format($totalRight, 2) }}</td>
-            </tr>
-        </tbody>
-    </table>
+{{-- ================= NET RESULT ================= --}}
+<p class="net-profit">
+    {{ $netProfit >= 0 ? 'Net Profit' : 'Net Loss' }}:
+    {{ number_format(abs($netProfit), 2) }} KES
+</p>
+
+<p class="footer-note">
+    This statement is system-generated from official ledger records and is derived
+    directly from the Trial Balance.
+</p>
 
 </body>
 </html>

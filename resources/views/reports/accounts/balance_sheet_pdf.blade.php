@@ -67,7 +67,7 @@
 <h3>{{ config('app.name') }}</h3>
 
 <p class="subtitle">
-    As at <strong>{{ \Carbon\Carbon::parse($periodLabel ?? now())->format('d M Y') }}</strong><br>
+    <strong>{{ $periodLabel }}</strong><br>
     <em>
         This statement reflects the financial position at the close of the selected period,
         derived from transactions recorded within that period.
@@ -87,16 +87,12 @@
     </thead>
     <tbody>
         @foreach($assets as $a)
-            @php
-                $amount = ($a->debit ?? 0);
-            @endphp
+            @php $amount = ($a->debit ?? 0); @endphp
             @if($amount > 0)
                 <tr>
                     <td>
                         {{ strtoupper($a->sub_account_name) }}<br>
-                        <small>
-                            {{ $a->main_account_code }}/{{ $a->sub_account_code }}
-                        </small>
+                        <small>{{ $a->main_account_code }}/{{ $a->sub_account_code }}</small>
                     </td>
                     <td class="right">{{ number_format($amount, 2) }}</td>
                 </tr>
@@ -123,16 +119,12 @@
     </thead>
     <tbody>
         @foreach($liabilities as $l)
-            @php
-                $amount = ($l->credit ?? 0);
-            @endphp
+            @php $amount = ($l->credit ?? 0); @endphp
             @if($amount > 0)
                 <tr>
                     <td>
                         {{ strtoupper($l->sub_account_name) }}<br>
-                        <small>
-                            {{ $l->main_account_code }}/{{ $l->sub_account_code }}
-                        </small>
+                        <small>{{ $l->main_account_code }}/{{ $l->sub_account_code }}</small>
                     </td>
                     <td class="right">{{ number_format($amount, 2) }}</td>
                 </tr>
@@ -164,9 +156,7 @@
             @endphp
             @if($amount > 0)
                 <tr>
-                    <td>
-                        {{ strtoupper($c->sub_account_name) }}
-                    </td>
+                    <td>{{ strtoupper($c->sub_account_name) }}</td>
                     <td class="right">{{ number_format($amount, 2) }}</td>
                 </tr>
             @endif
