@@ -22,23 +22,33 @@
         @include('includes.accounts_nav')
 
         {{-- Filters --}}
-        <form method="GET" action="{{ route('reports.accounts.balance-sheet') }}" class="row g-3 mb-4">
+        <form method="GET"
+              action="{{ route('reports.accounts.balance-sheet') }}"
+              class="row g-3 mb-4">
+
           <div class="col-md-3">
             <label class="form-label">Period (YYYYMM)</label>
-            <input type="text" name="period" class="form-control"
+            <input type="text"
+                   name="period"
+                   class="form-control"
                    value="{{ old('period', $period ?? '') }}"
-                   maxlength="6" pattern="\d{6}">
+                   maxlength="6"
+                   pattern="\d{6}">
           </div>
 
           <div class="col-md-3">
             <label class="form-label">From Date</label>
-            <input type="date" name="date_from" class="form-control"
+            <input type="date"
+                   name="date_from"
+                   class="form-control"
                    value="{{ $dateFrom }}">
           </div>
 
           <div class="col-md-3">
             <label class="form-label">To Date</label>
-            <input type="date" name="date_to" class="form-control"
+            <input type="date"
+                   name="date_to"
+                   class="form-control"
                    value="{{ $dateTo }}">
           </div>
 
@@ -47,23 +57,24 @@
           </div>
         </form>
 
-        {{-- Exports --}}
+        {{-- Export buttons --}}
         <div class="d-flex gap-2 mb-3">
           <a href="{{ route('reports.accounts.balance-sheet.excel', request()->query()) }}"
              class="btn btn-success btn-sm">Export Excel</a>
+
           <a href="{{ route('reports.accounts.balance-sheet.pdf', request()->query()) }}"
              class="btn btn-danger btn-sm">Export PDF</a>
         </div>
 
-        {{-- Presentation Note --}}
-        <div class="alert alert-secondary small">
+        {{-- Presentation note --}}
+        <div class="alert alert-secondary small mb-3">
           <strong>Presentation note:</strong>
           This Balance Sheet assumes the selected period represents the
           <em>entire accounting universe</em>.
           No opening or closing balances are implied.
         </div>
 
-        {{-- Balance Sheet --}}
+        {{-- Balance Sheet Table --}}
         <div class="table-responsive">
           <table class="table table-bordered align-middle">
             <thead class="table-light text-center">
@@ -81,7 +92,7 @@
                 $maxRows = max($assets->count(), $rightSide->count());
               @endphp
 
-              @for($i = 0; $i < $maxRows; $i++)
+              @for ($i = 0; $i < $maxRows; $i++)
                 <tr>
                   {{-- Assets --}}
                   <td>
@@ -91,9 +102,9 @@
                     {{ isset($assets[$i]) ? number_format($assets[$i]->debit, 2) : '' }}
                   </td>
 
-                  {{-- Liabilities + Capital --}}
+                  {{-- Liabilities & Capital --}}
                   <td>
-                    {{ $rightSide[$i]->sub_account_name ?? '' }} {{-- FIX: no type prefix --}}
+                    {{ $rightSide[$i]->sub_account_name ?? '' }}
                   </td>
                   <td class="text-end">
                     {{ isset($rightSide[$i]) ? number_format($rightSide[$i]->credit, 2) : '' }}
@@ -106,20 +117,12 @@
               <tr>
                 <td class="text-end">Total Assets</td>
                 <td class="text-end">{{ number_format($totalAssets, 2) }}</td>
-                <td class="text-end">Total Liabilities + Capital</td>
+                <td class="text-end">Total Liabilities &amp; Capital</td>
                 <td class="text-end">{{ number_format($totalRight, 2) }}</td>
               </tr>
             </tfoot>
           </table>
         </div>
-
-        {{-- Period Result --}}
-        @if(isset($periodResult))
-          <div class="alert alert-info mt-3 text-center">
-            Period {{ $periodResult >= 0 ? 'Profit' : 'Loss' }}:
-            <strong>{{ number_format(abs($periodResult), 2) }} KES</strong>
-          </div>
-        @endif
 
       </div>
     </div>
