@@ -83,15 +83,15 @@ class HomeController extends Controller
     public function index()
     {
 
-       // Set loan_loan_paid to 0 where it is NULL
-DB::table('sacco_loans')
-    ->whereNull('loan_loan_paid')
-    ->update(['loan_loan_paid' => 0]);
+        // Set loan_loan_paid to 0 where it is NULL
+        DB::table('sacco_loans')
+            ->whereNull('loan_loan_paid')
+            ->update(['loan_loan_paid' => 0]);
 
-// Set loan_start_deduction_period to '00000' where it is NULL
-DB::table('sacco_loans')
-    ->whereNull('loan_start_deduction_period')
-    ->update(['loan_start_deduction_period' => '00000']);
+        // Set loan_start_deduction_period to '00000' where it is NULL
+        DB::table('sacco_loans')
+            ->whereNull('loan_start_deduction_period')
+            ->update(['loan_start_deduction_period' => '00000']);
 
         $activeMembersCount = $this->dashboard_getActiveMembersCount();
         $newMembersCount = $this->dashboard_getNewMembersCount();
@@ -268,81 +268,81 @@ DB::table('sacco_loans')
 
 
     private function dashboard_getDelinquentLoansCount()
-{
-    // Correct current period format (YYYYMM)
-    $PeriodNow = date('Ym');
-    $IgnoreLoanBalanceBelow = 5;
+    {
+        // Correct current period format (YYYYMM)
+        $PeriodNow = date('Ym');
+        $IgnoreLoanBalanceBelow = 5;
 
-    $periodNowYear  = (int) substr($PeriodNow, 0, 4);
-    $periodNowMonth = (int) substr($PeriodNow, 4, 2);
+        $periodNowYear  = (int) substr($PeriodNow, 0, 4);
+        $periodNowMonth = (int) substr($PeriodNow, 4, 2);
 
-    // Months difference calculator (period-based, not date-based)
-    $monthsDifference = function ($relevantPeriod) use ($periodNowYear, $periodNowMonth) {
+        // Months difference calculator (period-based, not date-based)
+        $monthsDifference = function ($relevantPeriod) use ($periodNowYear, $periodNowMonth) {
 
-        // Normalize & validate
-        $relevantPeriod = preg_replace('/\D/', '', (string) $relevantPeriod);
+            // Normalize & validate
+            $relevantPeriod = preg_replace('/\D/', '', (string) $relevantPeriod);
 
-        if (!preg_match('/^\d{6}$/', $relevantPeriod)) {
-            return 999; // treat invalid as very old (delinquent)
+            if (!preg_match('/^\d{6}$/', $relevantPeriod)) {
+                return 999; // treat invalid as very old (delinquent)
+            }
+
+            $relevantYear  = (int) substr($relevantPeriod, 0, 4);
+            $relevantMonth = (int) substr($relevantPeriod, 4, 2);
+
+            return ($periodNowYear - $relevantYear) * 12
+                + ($periodNowMonth - $relevantMonth);
+        };
+
+        // Subquery: ONE row per loan → last repayment PERIOD
+        $latestPaymentSub = DB::table('sacco_loan_payments')
+            ->selectRaw('loan_payments_loan_id, MAX(loan_payments_period) as last_paid_period')
+            ->groupBy('loan_payments_loan_id');
+
+        $loans = DB::table('sacco_loans as l')
+            ->leftJoinSub($latestPaymentSub, 'lp', function ($join) {
+                $join->on('l.loan_id', '=', 'lp.loan_payments_loan_id');
+            })
+            ->select(
+                'l.loan_taken_period',
+                'l.loan_taken_start_period',
+                'lp.last_paid_period',
+                DB::raw('(l.loan_amount - IFNULL(l.loan_loan_paid, 0)) as OutstandingAmount')
+            )
+            ->whereRaw('(l.loan_amount - IFNULL(l.loan_loan_paid, 0)) > ?', [$IgnoreLoanBalanceBelow])
+            ->get();
+
+        $count = 0;
+
+        foreach ($loans as $loan) {
+
+            // Correct start-period fallback
+            $startPeriod = $loan->loan_taken_start_period ?: $loan->loan_taken_period;
+
+            // Relevant period = last payment OR start period
+            $relevantPeriod = $loan->last_paid_period ?: $startPeriod;
+
+            // Normalize for comparison
+            $relevantPeriodInt = (int) preg_replace('/\D/', '', (string) $relevantPeriod);
+            $startPeriodInt    = (int) preg_replace('/\D/', '', (string) $startPeriod);
+            $PeriodNowInt      = (int) $PeriodNow;
+
+            // Clamp bad data: repayment before loan start
+            if ($startPeriodInt > 0 && $relevantPeriodInt > 0 && $relevantPeriodInt < $startPeriodInt) {
+                $relevantPeriodInt = ($startPeriodInt > $PeriodNowInt)
+                    ? $PeriodNowInt
+                    : $startPeriodInt;
+            }
+
+            $monthsDiff = $monthsDifference($relevantPeriodInt);
+
+            // Delinquent = NOT CURRENT
+            if ($monthsDiff > 2) {
+                $count++;
+            }
         }
 
-        $relevantYear  = (int) substr($relevantPeriod, 0, 4);
-        $relevantMonth = (int) substr($relevantPeriod, 4, 2);
-
-        return ($periodNowYear - $relevantYear) * 12
-             + ($periodNowMonth - $relevantMonth);
-    };
-
-    // Subquery: ONE row per loan → last repayment PERIOD
-    $latestPaymentSub = DB::table('sacco_loan_payments')
-        ->selectRaw('loan_payments_loan_id, MAX(loan_payments_period) as last_paid_period')
-        ->groupBy('loan_payments_loan_id');
-
-    $loans = DB::table('sacco_loans as l')
-        ->leftJoinSub($latestPaymentSub, 'lp', function ($join) {
-            $join->on('l.loan_id', '=', 'lp.loan_payments_loan_id');
-        })
-        ->select(
-            'l.loan_taken_period',
-            'l.loan_taken_start_period',
-            'lp.last_paid_period',
-            DB::raw('(l.loan_amount - IFNULL(l.loan_loan_paid, 0)) as OutstandingAmount')
-        )
-        ->whereRaw('(l.loan_amount - IFNULL(l.loan_loan_paid, 0)) > ?', [$IgnoreLoanBalanceBelow])
-        ->get();
-
-    $count = 0;
-
-    foreach ($loans as $loan) {
-
-        // Correct start-period fallback
-        $startPeriod = $loan->loan_taken_start_period ?: $loan->loan_taken_period;
-
-        // Relevant period = last payment OR start period
-        $relevantPeriod = $loan->last_paid_period ?: $startPeriod;
-
-        // Normalize for comparison
-        $relevantPeriodInt = (int) preg_replace('/\D/', '', (string) $relevantPeriod);
-        $startPeriodInt    = (int) preg_replace('/\D/', '', (string) $startPeriod);
-        $PeriodNowInt      = (int) $PeriodNow;
-
-        // Clamp bad data: repayment before loan start
-        if ($startPeriodInt > 0 && $relevantPeriodInt > 0 && $relevantPeriodInt < $startPeriodInt) {
-            $relevantPeriodInt = ($startPeriodInt > $PeriodNowInt)
-                ? $PeriodNowInt
-                : $startPeriodInt;
-        }
-
-        $monthsDiff = $monthsDifference($relevantPeriodInt);
-
-        // Delinquent = NOT CURRENT
-        if ($monthsDiff > 2) {
-            $count++;
-        }
+        return $count;
     }
-
-    return $count;
-}
 
     private function dashboard_getLoansAndRepayments()
     {
@@ -408,9 +408,9 @@ DB::table('sacco_loans')
             ->whereNull('loan_loan_paid')
             ->update(['loan_loan_paid' => 0]);
 
-            DB::table('sacco_loans')
-    ->whereNull('loan_start_deduction_period')
-    ->update(['loan_start_deduction_period' => '00000']);
+        DB::table('sacco_loans')
+            ->whereNull('loan_start_deduction_period')
+            ->update(['loan_start_deduction_period' => '00000']);
 
         $orderby = $request->input('orderby', 'member_name');
         $sort_order = 'asc';
@@ -463,16 +463,13 @@ DB::table('sacco_loans')
             ->select('position_id', 'position_name')
             ->get();
         $guardians = DB::table('sacco_members')
-    ->where('member_is_junior', 0)
-    ->where('member_deleted', '<>', 'Y')
-    ->select('member_id', 'member_name', 'member_email')
-    ->orderBy('member_name')
-    ->get();
+            ->where('member_is_junior', 0)
+            ->where('member_deleted', '<>', 'Y')
+            ->select('member_id', 'member_name', 'member_email')
+            ->orderBy('member_name')
+            ->get();
 
-return view('members.add', compact('departments', 'positions', 'guardians'));
- 
-
-         
+        return view('members.add', compact('departments', 'positions', 'guardians'));
     }
 
     public function storeNewMember(Request $request)
@@ -519,7 +516,7 @@ return view('members.add', compact('departments', 'positions', 'guardians'));
             'bank_name',
             'bank_branch',
             'bank_account_number',
-            
+
         ]);
 
         $data['member_active'] = 'Y';
@@ -567,7 +564,7 @@ return view('members.add', compact('departments', 'positions', 'guardians'));
             ->select('*')
             ->limit($limit)
             ->get();
-    } 
+    }
 
     public function editMember($id)
     {
@@ -589,23 +586,23 @@ return view('members.add', compact('departments', 'positions', 'guardians'));
         ];
 
         $allMembers = DB::table('sacco_members')
-    ->select('member_id', 'member_name', 'member_sacco_id')
-    ->where('member_active', 'Y')
-    ->orderBy('member_name')
-    ->get();
+            ->select('member_id', 'member_name', 'member_sacco_id')
+            ->where('member_active', 'Y')
+            ->orderBy('member_name')
+            ->get();
 
-$data = [
-    'member' => $member,
-    'departments' => $departments,
-    'positions' => $positions,
-    'allMembers' => $allMembers
-];
+        $data = [
+            'member' => $member,
+            'departments' => $departments,
+            'positions' => $positions,
+            'allMembers' => $allMembers
+        ];
 
-        
+
         return view('members.edit', [
-    'data' => $data,
-    'allMembers' => $allMembers
-]);
+            'data' => $data,
+            'allMembers' => $allMembers
+        ]);
     }
 
     public function updateMember(Request $request, $id)
@@ -629,7 +626,7 @@ $data = [
             'member_active' => 'required|in:Y,N',
             'member_deleted' => 'required|in:Y,N',
             'member_is_junior' => 'nullable|boolean',
-'member_guardian_id' => 'nullable|integer|exists:sacco_members,member_id',
+            'member_guardian_id' => 'nullable|integer|exists:sacco_members,member_id',
 
 
         ]);
@@ -661,7 +658,7 @@ $data = [
                 'member_active' => $request->input('member_active'),
                 'member_deleted' => $request->input('member_deleted'),
                 'member_is_junior' => $request->input('member_is_junior', 0),
-'member_guardian_id' => $request->input('member_guardian_id'),
+                'member_guardian_id' => $request->input('member_guardian_id'),
 
             ]);
 
@@ -797,7 +794,7 @@ $data = [
             ->get();
 
         $relationTypes = DB::table('sacco_kin_type')
-           // ->where('kin_type_deleted', '<>', 'Y')
+            // ->where('kin_type_deleted', '<>', 'Y')
             ->orderBy('kin_type_name')
             ->get();
 
@@ -1136,7 +1133,7 @@ $data = [
             $nmsg = "Error, this member has been under guaranteed<br>";
         }
 
-       $g_factor = 1;
+        $g_factor = 1;
         if ($val > 0) {
             $g_factor = $batch_tied_shares_to_pay / $val;
         }
@@ -1221,31 +1218,31 @@ $data = [
 
         // Fetch FOSA contributions
         $fosaContributions = DB::table('sacco_fosas')
-    ->leftJoin('sacco_fosa_types', 'sacco_fosas.fosa_type_id', '=', 'sacco_fosa_types.type_id')
-    ->join('sacco_members', 'sacco_fosas.fosa_member_id', '=', 'sacco_members.member_id')
-    ->join('sacco_department', 'sacco_members.member_dept', '=', 'sacco_department.department_id')
-    ->join('sacco_company', 'sacco_department.department_company_id', '=', 'sacco_company.company_id')
-    ->where('sacco_members.member_deleted', '<>', 'Y')
-    ->where('sacco_fosas.fosa_member_id', $id)
-    ->orderBy('sacco_fosas.fosa_type_id')
-    ->orderBy('sacco_fosas.fosa_period')
-    ->orderBy('sacco_fosas.fosa_date_paid')
-    ->select(
-        'sacco_fosas.*',
-        'sacco_members.member_name',
-        'sacco_department.department_name',
-        'sacco_company.company_name',
-        'sacco_fosa_types.type_name',
-        'sacco_fosa_types.type_prefix'
-    )
-    ->get();
+            ->leftJoin('sacco_fosa_types', 'sacco_fosas.fosa_type_id', '=', 'sacco_fosa_types.type_id')
+            ->join('sacco_members', 'sacco_fosas.fosa_member_id', '=', 'sacco_members.member_id')
+            ->join('sacco_department', 'sacco_members.member_dept', '=', 'sacco_department.department_id')
+            ->join('sacco_company', 'sacco_department.department_company_id', '=', 'sacco_company.company_id')
+            ->where('sacco_members.member_deleted', '<>', 'Y')
+            ->where('sacco_fosas.fosa_member_id', $id)
+            ->orderBy('sacco_fosas.fosa_type_id')
+            ->orderBy('sacco_fosas.fosa_period')
+            ->orderBy('sacco_fosas.fosa_date_paid')
+            ->select(
+                'sacco_fosas.*',
+                'sacco_members.member_name',
+                'sacco_department.department_name',
+                'sacco_company.company_name',
+                'sacco_fosa_types.type_name',
+                'sacco_fosa_types.type_prefix'
+            )
+            ->get();
 
 
-$fosaGrouped = $fosaContributions->groupBy(function ($row) {
-    return $row->type_name ?: 'UNSPECIFIED';
-});
+        $fosaGrouped = $fosaContributions->groupBy(function ($row) {
+            return $row->type_name ?: 'UNSPECIFIED';
+        });
 
-    
+
 
         // Calculate opening balance for shares
         $openingBalanceShares = DB::table('sacco_shares')
@@ -1280,27 +1277,59 @@ $fosaGrouped = $fosaContributions->groupBy(function ($row) {
             ->get();
 
         // Fetch loans
+        //     $loans = DB::table('sacco_loans')
+        //         ->join('sacco_loan_types', 'sacco_loans.loan_loan_type', '=', 'sacco_loan_types.loan_type_id')
+        //         ->join('sacco_loan_category', 'sacco_loans.loan_loan_category', '=', 'sacco_loan_category.loan_category_id')
+        //         ->where('sacco_loans.loan_member', $id)
+        //         ->select('sacco_loans.*', 'sacco_loan_types.loan_type_name', 'sacco_loan_category.loan_category_name')
+        //         ->orderBy('sacco_loans.loan_taken_period')
+        //        ->orderBy('sacco_loans.loan_taken_period', 'asc')
+        // ->orderBy('sacco_loans.loan_on', 'asc')
+        // ->orderBy('sacco_loans.loan_loan_type', 'asc')
+        //         ->get();
+
+
         $loans = DB::table('sacco_loans')
             ->join('sacco_loan_types', 'sacco_loans.loan_loan_type', '=', 'sacco_loan_types.loan_type_id')
             ->join('sacco_loan_category', 'sacco_loans.loan_loan_category', '=', 'sacco_loan_category.loan_category_id')
             ->where('sacco_loans.loan_member', $id)
-            ->select('sacco_loans.*', 'sacco_loan_types.loan_type_name', 'sacco_loan_category.loan_category_name')
-            ->orderBy('sacco_loans.loan_taken_period')
-           ->orderBy('sacco_loans.loan_taken_period', 'asc')
-    ->orderBy('sacco_loans.loan_on', 'asc')
-    ->orderBy('sacco_loans.loan_loan_type', 'asc')
+            ->where('sacco_loans.loan_taken_period', '<=', $period_to)
+            ->select(
+                'sacco_loans.*',
+                'sacco_loan_types.loan_type_name',
+                'sacco_loan_category.loan_category_name'
+            )
+            ->orderBy('sacco_loans.loan_taken_period', 'asc')
+            ->orderBy('sacco_loans.loan_on', 'asc')
+            ->orderBy('sacco_loans.loan_loan_type', 'asc')
             ->get();
 
 
-      
         // Fetch all loan payments
+        // $loanPayments = DB::table('sacco_loan_payments')
+        //     ->join('sacco_loans', 'sacco_loan_payments.loan_payments_loan_id', '=', 'sacco_loans.loan_id')
+        //     ->where('sacco_loans.loan_member', $id)
+        //     ->select('sacco_loan_payments.*', 'sacco_loans.loan_loan_type')
+        //     ->orderBy('loan_payments_period')
+        //     ->orderBy('loan_payments_paid_on')
+        //     ->get();
+
         $loanPayments = DB::table('sacco_loan_payments')
             ->join('sacco_loans', 'sacco_loan_payments.loan_payments_loan_id', '=', 'sacco_loans.loan_id')
             ->where('sacco_loans.loan_member', $id)
-            ->select('sacco_loan_payments.*', 'sacco_loans.loan_loan_type')
-            ->orderBy('loan_payments_period')
-            ->orderBy('loan_payments_paid_on')
+            ->whereBetween(
+                'sacco_loan_payments.loan_payments_period',
+                [$period_from, $period_to]
+            )
+            ->select(
+                'sacco_loan_payments.*',
+                'sacco_loans.loan_loan_type'
+            )
+            ->orderBy('loan_payments_period', 'asc')
+            ->orderBy('loan_payments_paid_on', 'asc')
             ->get();
+
+
 
         // Group loan payments by loan_id
         $paymentsByLoan = $loanPayments->groupBy('loan_payments_loan_id');
@@ -1695,7 +1724,7 @@ $fosaGrouped = $fosaContributions->groupBy(function ($row) {
 
         $period_name = strtoupper($request->input('period_name'));
 
-      
+
 
         $currentYear = date('Y');
         $currentMonth = date('n');
@@ -3651,8 +3680,8 @@ $fosaGrouped = $fosaContributions->groupBy(function ($row) {
             'batch_trans_pay1' => 'nullable|file|mimes:jpg,jpeg,png,gif|max:200',
             'batch_trans_pay2' => 'nullable|file|mimes:jpg,jpeg,png,gif|max:200',
             'batch_trans_payroll_number' => 'nullable|string|max:50',
-    'batch_trans_present_designation' => 'nullable|string|max:100',
-    'batch_trans_terms_of_employment' => 'nullable|string|max:100',
+            'batch_trans_present_designation' => 'nullable|string|max:100',
+            'batch_trans_terms_of_employment' => 'nullable|string|max:100',
 
         ], [
             'batch_trans_pay1.mimes' => 'File must be of type jpg, jpeg, png, gif.',
@@ -3853,7 +3882,7 @@ $fosaGrouped = $fosaContributions->groupBy(function ($row) {
 
         // Under-guarantee check
         $batch_trans_loan_guaranteed = $loanAmount * $loanType->loan_type_guaranteable_percent / 100;
-$g_factor = 1;
+        $g_factor = 1;
         if ($loanType->loan_type_guaranteable_percent > 0) {
             if ($batch_trans_loan_guaranteed > $totalGuaranteed) {
                 $nmsg .= "Error, this member has been under guaranteed. ";
@@ -3918,8 +3947,8 @@ $g_factor = 1;
             'batch_trans_payslip1' => $payslip1Path,
             'batch_trans_payslip2' => $payslip2Path,
             'batch_trans_payroll_number' => $data['batch_trans_payroll_number'] ?? null,
-    'batch_trans_present_designation' => $data['batch_trans_present_designation'] ?? null,
-    'batch_trans_terms_of_employment' => $data['batch_trans_terms_of_employment'] ?? null,
+            'batch_trans_present_designation' => $data['batch_trans_present_designation'] ?? null,
+            'batch_trans_terms_of_employment' => $data['batch_trans_terms_of_employment'] ?? null,
         ];
 
         // Generate the SQL query
@@ -5132,48 +5161,48 @@ $g_factor = 1;
     }
 
     public function updateLoanType(Request $request, $id)
-{
-    $request->validate([
-        'loan_type_name' => 'required|string|max:250',
-        'loan_type_interest' => 'required|numeric',
-        'loan_type_interest_type' => 'required|string|max:100',
-        'loan_type_duration' => 'required|integer',
-        'loan_type_guaranteable_percent' => 'required|integer',
-        'loan_type_code' => 'required|string|max:100',
-        'loan_type_max_amount' => 'required|numeric',
-        'loan_type_qualification_period' => 'required|integer',
-        'loan_type_acount' => 'required|integer',
-        'loan_type_int_account' => 'required|integer',
-        'loan_type_comm_account' => 'required|integer',
-        'loan_type_insurable' => 'required|string|max:1',
+    {
+        $request->validate([
+            'loan_type_name' => 'required|string|max:250',
+            'loan_type_interest' => 'required|numeric',
+            'loan_type_interest_type' => 'required|string|max:100',
+            'loan_type_duration' => 'required|integer',
+            'loan_type_guaranteable_percent' => 'required|integer',
+            'loan_type_code' => 'required|string|max:100',
+            'loan_type_max_amount' => 'required|numeric',
+            'loan_type_qualification_period' => 'required|integer',
+            'loan_type_acount' => 'required|integer',
+            'loan_type_int_account' => 'required|integer',
+            'loan_type_comm_account' => 'required|integer',
+            'loan_type_insurable' => 'required|string|max:1',
 
-        // ⭐ NEW FIELD
-        'loan_type_instant_qualification' => 'nullable|in:1'
-    ]);
-
-    DB::table('sacco_loan_types')
-        ->where('loan_type_id', $id)
-        ->update([
-            'loan_type_name' => $request->loan_type_name,
-            'loan_type_interest' => $request->loan_type_interest,
-            'loan_type_interest_type' => $request->loan_type_interest_type,
-            'loan_type_duration' => $request->loan_type_duration,
-            'loan_type_guaranteable_percent' => $request->loan_type_guaranteable_percent,
-            'loan_type_code' => $request->loan_type_code,
-            'loan_type_max_amount' => $request->loan_type_max_amount,
-            'loan_type_qualification_period' => $request->loan_type_qualification_period,
-            'loan_type_acount' => $request->loan_type_acount,
-            'loan_type_int_account' => $request->loan_type_int_account,
-            'loan_type_comm_account' => $request->loan_type_comm_account,
-            'loan_type_insurable' => $request->loan_type_insurable,
-
-            // ⭐ SAVE AS 1 OR 0
-            'loan_type_instant_qualification' =>
-                $request->has('loan_type_instant_qualification') ? 1 : 0,
+            // ⭐ NEW FIELD
+            'loan_type_instant_qualification' => 'nullable|in:1'
         ]);
 
-    return redirect()->route('loans.types')->with('success', 'Loan type updated successfully.');
-}
+        DB::table('sacco_loan_types')
+            ->where('loan_type_id', $id)
+            ->update([
+                'loan_type_name' => $request->loan_type_name,
+                'loan_type_interest' => $request->loan_type_interest,
+                'loan_type_interest_type' => $request->loan_type_interest_type,
+                'loan_type_duration' => $request->loan_type_duration,
+                'loan_type_guaranteable_percent' => $request->loan_type_guaranteable_percent,
+                'loan_type_code' => $request->loan_type_code,
+                'loan_type_max_amount' => $request->loan_type_max_amount,
+                'loan_type_qualification_period' => $request->loan_type_qualification_period,
+                'loan_type_acount' => $request->loan_type_acount,
+                'loan_type_int_account' => $request->loan_type_int_account,
+                'loan_type_comm_account' => $request->loan_type_comm_account,
+                'loan_type_insurable' => $request->loan_type_insurable,
+
+                // ⭐ SAVE AS 1 OR 0
+                'loan_type_instant_qualification' =>
+                $request->has('loan_type_instant_qualification') ? 1 : 0,
+            ]);
+
+        return redirect()->route('loans.types')->with('success', 'Loan type updated successfully.');
+    }
 
 
     public function createLoanType()
@@ -5203,7 +5232,7 @@ $g_factor = 1;
             'loan_type_int_account' => 'required|integer',
             'loan_type_comm_account' => 'required|integer',
             'loan_type_insurable' => 'required|string|max:1',
-             'loan_type_instant_qualification' => 'nullable|in:1',
+            'loan_type_instant_qualification' => 'nullable|in:1',
         ]);
 
         DB::table('sacco_loan_types')->insert([
@@ -6720,68 +6749,67 @@ $g_factor = 1;
 
         return response()->json(['data' => $loanRepayments]);
     }
-public function membersListCsv(Request $request)
-{
-    $orderby = $request->input('orderby', 'member_name');
-    $sort_order = 'asc';
-    $search = $request->input('pms_srch', '');
+    public function membersListCsv(Request $request)
+    {
+        $orderby = $request->input('orderby', 'member_name');
+        $sort_order = 'asc';
+        $search = $request->input('pms_srch', '');
 
-    $members = $this->getMembers($orderby, $sort_order, $search, 50000); // large export
+        $members = $this->getMembers($orderby, $sort_order, $search, 50000); // large export
 
-    $filename = "members_" . date('Ymd_His') . ".csv";
+        $filename = "members_" . date('Ymd_His') . ".csv";
 
-    $headers = [
-        "Content-Type"        => "text/csv",
-        "Content-Disposition" => "attachment; filename=$filename",
-        "Pragma"              => "no-cache",
-        "Cache-Control"       => "must-revalidate, post-check=0, pre-check=0",
-        "Expires"             => "0"
-    ];
+        $headers = [
+            "Content-Type"        => "text/csv",
+            "Content-Disposition" => "attachment; filename=$filename",
+            "Pragma"              => "no-cache",
+            "Cache-Control"       => "must-revalidate, post-check=0, pre-check=0",
+            "Expires"             => "0"
+        ];
 
-    $columns = [
-        'Name',
-        'Sacco ID',
-        'National ID',
-        'Phone',
-        'Email',
-        'Company',
-        'Department',
-        'Position',
-        'Status',
-        'Account Type',
-    ];
+        $columns = [
+            'Name',
+            'Sacco ID',
+            'National ID',
+            'Phone',
+            'Email',
+            'Company',
+            'Department',
+            'Position',
+            'Status',
+            'Account Type',
+        ];
 
-    $callback = function() use ($members, $columns) {
-        $file = fopen('php://output', 'w');
+        $callback = function () use ($members, $columns) {
+            $file = fopen('php://output', 'w');
 
-        // Header row
-        fputcsv($file, $columns);
+            // Header row
+            fputcsv($file, $columns);
 
-        foreach ($members as $m) {
+            foreach ($members as $m) {
 
-            // Ensure Excel treats these values as TEXT
-            $saccoId     = '="' . $m->member_sacco_id . '"';
-            $nationalId  = '="' . $m->member_national_id . '"';
-            $phone       = '="' . $m->member_phone_no . '"';
+                // Ensure Excel treats these values as TEXT
+                $saccoId     = '="' . $m->member_sacco_id . '"';
+                $nationalId  = '="' . $m->member_national_id . '"';
+                $phone       = '="' . $m->member_phone_no . '"';
 
-            fputcsv($file, [
-                $m->member_name,
-                $saccoId,
-                $nationalId,
-                $phone,
-                $m->member_email,
-                $m->company_name,
-                $m->department_name,
-                $m->position_name,
-                $m->member_active == 'Y' ? 'Active' : 'Inactive',
-                $m->member_is_junior ? 'Junior' : 'Standard',
-            ]);
-        }
+                fputcsv($file, [
+                    $m->member_name,
+                    $saccoId,
+                    $nationalId,
+                    $phone,
+                    $m->member_email,
+                    $m->company_name,
+                    $m->department_name,
+                    $m->position_name,
+                    $m->member_active == 'Y' ? 'Active' : 'Inactive',
+                    $m->member_is_junior ? 'Junior' : 'Standard',
+                ]);
+            }
 
-        fclose($file);
-    };
+            fclose($file);
+        };
 
-    return response()->stream($callback, 200, $headers);
-}
-
+        return response()->stream($callback, 200, $headers);
+    }
 }
