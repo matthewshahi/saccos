@@ -204,9 +204,13 @@ public function profitLoss(Request $request)
             return ['error' => back()->with('error', 'Start date cannot be after end date.')->withInput()];
         }
 
-        if ($dateFrom->diffInDays($dateTo) > 366 || $dateFrom->diffInMonths($dateTo) > 12) {
-            return ['error' => back()->with('error', 'Date range cannot exceed 12 months (366 days).')->withInput()];
-        }
+        if ($dateFrom->diffInDays($dateTo) > 732 || $dateFrom->diffInMonths($dateTo) > 24) {
+    return ['error' => back()
+        ->with('error', 'Date range cannot exceed 24 months (2 years).')
+        ->withInput()
+    ];
+}
+
 
         return compact('period', 'dateFrom', 'dateTo');
     }
