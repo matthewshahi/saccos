@@ -29,6 +29,18 @@
         {{-- Navigation --}}
         @include('includes.accounts_nav')
 
+<div class="d-flex gap-2 mb-3">
+  <a href="{{ route('reports.accounts.profit-loss.excel', request()->query()) }}"
+     class="btn btn-success btn-sm">
+     Export Excel
+  </a>
+
+  <a href="{{ route('reports.accounts.profit-loss.pdf', request()->query()) }}"
+     class="btn btn-danger btn-sm">
+     Export PDF
+  </a>
+</div>
+
         {{-- 🔍 FILTER FORM --}}
         <form method="GET" action="{{ route('reports.accounts.profit-loss') }}" class="row g-3 mb-4">
           <div class="col-md-3">

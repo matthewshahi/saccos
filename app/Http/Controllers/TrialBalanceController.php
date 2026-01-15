@@ -8,6 +8,8 @@ use Carbon\Carbon;
 use App\Exports\TrialBalanceExport;
 use Maatwebsite\Excel\Facades\Excel;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Exports\ProfitLossExport;
+ 
 class TrialBalanceController extends Controller
 {
     /**
@@ -357,4 +359,78 @@ public function exportPdf(Request $request)
         ]
     )->download('trial_balance.pdf');
 }
+ 
+
+public function exportProfitLossExcel(Request $request)
+{
+    $filters = $this->prepareFilters($request);
+    if (isset($filters['error'])) return $filters['error'];
+
+    $records = $this->getAccountsData(
+        $filters['period'],
+        $filters['dateFrom'],
+        $filters['dateTo']
+    );
+
+    return Excel::download(
+        new ProfitLossExport($records),
+        'profit_and_loss_'.$filters['period'].'.xlsx'
+    );
+}
+public function exportProfitLossPdf(Request $request)
+{
+    $filters = $this->prepareFilters($request);
+    if (isset($filters['error'])) return $filters['error'];
+
+    $records = $this->getAccountsData(
+        $filters['period'],
+        $filters['dateFrom'],
+        $filters['dateTo']
+    );
+
+    $income   = [];
+    $expenses = [];
+
+    $totalIncome = 0;
+    $totalExpenses = 0;
+
+    foreach ($records as $r) {
+        $type = strtoupper(trim($r->main_account_type));
+
+        if (str_contains($type, 'INCOME')) {
+            $amt = ($r->credit ?? 0) - ($r->debit ?? 0);
+            if ($amt != 0) {
+                $income[] = [
+                    'name'   => $r->sub_account_name,
+                    'amount' => number_format(abs($amt),2),
+                ];
+                $totalIncome += $amt;
+            }
+        }
+
+        if (str_contains($type, 'EXPENSE')) {
+            $amt = ($r->debit ?? 0) - ($r->credit ?? 0);
+            if ($amt != 0) {
+                $expenses[] = [
+                    'name'   => $r->sub_account_name,
+                    'amount' => number_format(abs($amt),2),
+                ];
+                $totalExpenses += $amt;
+            }
+        }
+    }
+
+    $netProfit = $totalIncome - $totalExpenses;
+
+    return Pdf::loadView(
+        'reports.accounts.profit_loss_pdf',
+        [
+            'period'   => $filters['period'],
+            'income'   => $income,
+            'expenses' => $expenses,
+            'netProfit'=> $netProfit,
+        ]
+    )->download('profit_and_loss.pdf');
+}
+
     }

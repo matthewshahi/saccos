@@ -60,7 +60,7 @@ use App\Http\Controllers\KasMemberImportController;
 use App\Http\Controllers\KassContributionsImportController;
 
 use App\Http\Controllers\KassMemberMasterImportController;
-
+ 
 
 Route::prefix('kass')->group(function () {
     Route::get('/member-master-import', [KassMemberMasterImportController::class, 'index'])->name('kass.member_master_import.index');
@@ -943,6 +943,17 @@ Route::get(
     'reports/accounts/trial-balance/pdf',
     [TrialBalanceController::class, 'exportPdf']
 )->name('reports.accounts.trial-balance.pdf')->middleware('check_user_rights:rpt_trial_balance');
+
+
+Route::get(
+    'reports/accounts/profit-loss/excel',
+    [TrialBalanceController::class, 'exportProfitLossExcel']
+)->name('reports.accounts.profit-loss.excel')->middleware('check_user_rights:rpt_profit_loss');
+
+Route::get(
+    'reports/accounts/profit-loss/pdf',
+    [TrialBalanceController::class, 'exportProfitLossPdf']
+)->name('reports.accounts.profit-loss.pdf')->middleware('check_user_rights:rpt_profit_loss');
 
 
 
