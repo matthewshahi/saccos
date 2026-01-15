@@ -11,7 +11,7 @@
 
       <div class="card-body">
 
-        {{-- Session messages --}}
+        {{-- ✅ Session messages --}}
         @if(session('error'))
           <div class="alert alert-danger alert-dismissible fade show">
             {{ session('error') }}
@@ -19,37 +19,34 @@
           </div>
         @endif
 
+        @if(session('success'))
+          <div class="alert alert-success alert-dismissible fade show">
+            {{ session('success') }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          </div>
+        @endif
+
         @include('includes.accounts_nav')
 
-        {{-- Filters --}}
-        <form method="GET"
-              action="{{ route('reports.accounts.balance-sheet') }}"
-              class="row g-3 mb-4">
-
+        {{-- 🔍 Filters --}}
+        <form method="GET" action="{{ route('reports.accounts.balance-sheet') }}" class="row g-3 mb-4">
           <div class="col-md-3">
-            <label class="form-label">Period (YYYYMM)</label>
-            <input type="text"
-                   name="period"
-                   class="form-control"
-                   value="{{ request('period', $period ?? '') }}"
-                   maxlength="6"
-                   pattern="\d{6}">
+            <label class="form-label">Period (YYYYmm)</label>
+            <input type="text" name="period" class="form-control"
+              value="{{ old('period', $period ?? '') }}"
+              maxlength="6" pattern="\d{6}" placeholder="e.g. 202510">
           </div>
 
           <div class="col-md-3">
             <label class="form-label">From Date</label>
-            <input type="date"
-                   name="date_from"
-                   class="form-control"
-                   value="{{ request('date_from', $dateFrom) }}">
+            <input type="date" name="date_from" class="form-control"
+              value="{{ old('date_from', $dateFrom ?? now()->startOfMonth()->format('Y-m-d')) }}">
           </div>
 
           <div class="col-md-3">
             <label class="form-label">To Date</label>
-            <input type="date"
-                   name="date_to"
-                   class="form-control"
-                   value="{{ request('date_to', $dateTo) }}">
+            <input type="date" name="date_to" class="form-control"
+              value="{{ old('date_to', $dateTo ?? now()->endOfMonth()->format('Y-m-d')) }}">
           </div>
 
           <div class="col-md-3 d-flex align-items-end">
@@ -60,23 +57,35 @@
         {{-- Export buttons --}}
         <div class="d-flex gap-2 mb-3">
           <a href="{{ route('reports.accounts.balance-sheet.excel', request()->query()) }}"
-             class="btn btn-success btn-sm">Export Excel</a>
+             class="btn btn-success btn-sm">
+              Export Excel
+          </a>
 
           <a href="{{ route('reports.accounts.balance-sheet.pdf', request()->query()) }}"
-             class="btn btn-danger btn-sm">Export PDF</a>
+             class="btn btn-danger btn-sm">
+              Export PDF
+          </a>
         </div>
 
-        {{-- Period note --}}
-        <p class="text-muted small mb-3">
-          <strong>As at:</strong>
-          {{ \Carbon\Carbon::parse($dateTo)->format('d M Y') }}<br>
+        {{-- ✅ Note block (keep as you had it) --}}
+        <strong>Note:</strong>
+        This Balance Sheet reflects the financial position
+        <em>as at</em>
+        <strong>{{ \Carbon\Carbon::parse($dateTo)->format('d M Y') }}</strong>,
+        derived from transactions recorded during the selected reporting period
+        ({{ \Carbon\Carbon::parse($dateFrom)->format('d M Y') }}
+        –
+        {{ \Carbon\Carbon::parse($dateTo)->format('d M Y') }}).
+
+        {{-- 🧾 Period summary --}}
+        <p class="text-muted small mt-2">
           <strong>Period:</strong>
           {{ \Carbon\Carbon::parse($dateFrom)->format('d M Y') }}
           –
           {{ \Carbon\Carbon::parse($dateTo)->format('d M Y') }}
         </p>
 
-        {{-- Balance Sheet Table --}}
+        {{-- 📊 Balance Sheet --}}
         <div class="table-responsive">
           <table class="table table-bordered align-middle">
             <thead class="table-light text-center">
@@ -90,41 +99,45 @@
 
             <tbody>
               @php
+                // Combine liabilities + capital exactly as passed from controller
                 $rightSide = $liabilities->concat($capital)->values();
-                $rows = max($assets->count(), $rightSide->count());
+
+                // Ensure deterministic count even if collections are empty
+                $maxRows = max($assets->count(), $rightSide->count());
               @endphp
 
-              @for($i = 0; $i < $rows; $i++)
+              @for($i = 0; $i < $maxRows; $i++)
                 <tr>
                   {{-- Assets --}}
                   <td>
                     {{ $assets[$i]->sub_account_name ?? '' }}
-                    @isset($assets[$i]->sub_account_code)
+                    @if(!empty($assets[$i]->sub_account_code ?? null))
                       <small class="text-muted">
                         ({{ $assets[$i]->main_account_code }}/{{ $assets[$i]->sub_account_code }})
                       </small>
-                    @endisset
+                    @endif
                   </td>
                   <td class="text-end">
-                    {{ isset($assets[$i]) ? number_format($assets[$i]->debit ?? 0, 2) : '0.00' }}
+                    {{-- IMPORTANT: TB rows are already netted. Assets show DEBIT directly. --}}
+                    {{ isset($assets[$i]) ? number_format((float)($assets[$i]->debit ?? 0), 2) : '0.00' }}
                   </td>
 
-                  {{-- Liabilities & Capital --}}
+                  {{-- Liabilities + Capital --}}
                   <td>
-                    @isset($rightSide[$i])
-                      {{ strtoupper($rightSide[$i]->main_account_type) }}
-                      — {{ $rightSide[$i]->sub_account_name }}
-                      @isset($rightSide[$i]->sub_account_code)
+                    @if(isset($rightSide[$i]))
+                      {{ strtoupper($rightSide[$i]->main_account_type) }} — {{ $rightSide[$i]->sub_account_name }}
+                      @if(!empty($rightSide[$i]->sub_account_code ?? null))
                         <small class="text-muted">
                           ({{ $rightSide[$i]->main_account_code }}/{{ $rightSide[$i]->sub_account_code }})
                         </small>
-                      @endisset
+                      @endif
                     @else
-                      <span class="text-muted">—</span>
-                    @endisset
+                      <em class="text-muted">—</em>
+                    @endif
                   </td>
                   <td class="text-end">
-                    {{ isset($rightSide[$i]) ? number_format($rightSide[$i]->credit ?? 0, 2) : '0.00' }}
+                    {{-- IMPORTANT: TB rows are already netted. Right side shows CREDIT directly. --}}
+                    {{ isset($rightSide[$i]) ? number_format((float)($rightSide[$i]->credit ?? 0), 2) : '0.00' }}
                   </td>
                 </tr>
               @endfor
@@ -133,23 +146,31 @@
             <tfoot class="table-dark fw-bold">
               <tr>
                 <td class="text-end">Total Assets</td>
-                <td class="text-end">{{ number_format($totalAssets, 2) }}</td>
+                <td class="text-end">{{ number_format((float)$totalAssets, 2) }}</td>
                 <td class="text-end">Total Liabilities + Capital</td>
-                <td class="text-end">{{ number_format($totalRight, 2) }}</td>
+                <td class="text-end">{{ number_format((float)$totalRight, 2) }}</td>
               </tr>
               <tr>
                 <td colspan="4" class="text-center">
-                  @if(round($totalAssets,2) === round($totalRight,2))
+                  @if(round($totalAssets, 2) === round($totalRight, 2))
                     ✅ Balance Sheet Balances
                   @else
-                    ⚠ Out of Balance by
-                    {{ number_format(abs($totalAssets - $totalRight), 2) }}
+                    ⚠ Out of Balance by {{ number_format(abs($totalAssets - $totalRight), 2) }}
                   @endif
                 </td>
               </tr>
             </tfoot>
           </table>
         </div>
+
+        {{-- Net Profit/Loss info (safe: only show if controller provides it) --}}
+        @if(isset($netProfit) && (float)$netProfit != 0)
+          <div class="alert alert-info mt-3 text-center">
+            <strong>Note:</strong>
+            Net {{ $netProfit >= 0 ? 'Profit' : 'Loss' }} for this period is
+            <strong>{{ number_format(abs($netProfit), 2) }} KES</strong>
+          </div>
+        @endif
 
       </div>
     </div>
