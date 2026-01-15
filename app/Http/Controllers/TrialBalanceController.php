@@ -44,13 +44,12 @@ class TrialBalanceController extends Controller
     /**
      * Balance Sheet view (derived from Trial Balance)
      */
-   
-public function balanceSheet(Request $request)
+   public function balanceSheet(Request $request)
 {
     $filters = $this->prepareFilters($request);
     if (isset($filters['error'])) return $filters['error'];
 
-    // Canonical Trial Balance (already netted, period-isolated)
+    // Canonical Trial Balance (already netted)
     $tb = $this->getTrialBalanceRows(
         $filters['period'],
         $filters['dateFrom'],
@@ -64,7 +63,7 @@ public function balanceSheet(Request $request)
     });
 
     // -------------------------------
-    // BALANCE SHEET SECTIONS
+    // BALANCE SHEET SECTIONS (RAW TB ROWS)
     // -------------------------------
     $assets = $tb->filter(fn ($r) =>
         str_starts_with($r->main_account_type, 'ASSET')
@@ -81,54 +80,21 @@ public function balanceSheet(Request $request)
     )->values();
 
     // -------------------------------
-    // PERIOD RESULT (FROM TB)
+    // PERIOD RESULT (FROM SAME TB)
     // -------------------------------
-    $income = $tb->filter(fn ($r) =>
-        str_contains($r->main_account_type, 'INCOME')
-    );
+    $income = $tb->filter(fn ($r) => str_contains($r->main_account_type, 'INCOME'));
+    $expenses = $tb->filter(fn ($r) => str_contains($r->main_account_type, 'EXPENSE'));
 
-    $expenses = $tb->filter(fn ($r) =>
-        str_contains($r->main_account_type, 'EXPENSE')
-    );
-
-    $totalIncome = $income->sum(
-        fn ($r) => ($r->credit ?? 0) - ($r->debit ?? 0)
-    );
-
-    $totalExpenses = $expenses->sum(
-        fn ($r) => ($r->debit ?? 0) - ($r->credit ?? 0)
-    );
-
+    $totalIncome = $income->sum(fn ($r) => ($r->credit ?? 0) - ($r->debit ?? 0));
+    $totalExpenses = $expenses->sum(fn ($r) => ($r->debit ?? 0) - ($r->credit ?? 0));
     $periodResult = $totalIncome - $totalExpenses;
 
-    // -------------------------------
-    // TOTALS
-    // -------------------------------
-    $totalAssets = $assets->sum(
-        fn ($r) => ($r->debit ?? 0) - ($r->credit ?? 0)
-    );
-
-    $totalLiabilities = $liabilities->sum(
-        fn ($r) => ($r->credit ?? 0) - ($r->debit ?? 0)
-    );
-
-    $totalCapital = $capital->sum(
-        fn ($r) => ($r->credit ?? 0) - ($r->debit ?? 0)
-    );
-
-    // Balance equation (explicit)
-    $totalRight = $totalLiabilities + $totalCapital + $periodResult;
-
-    // -------------------------------
-    // PRESENTATION ROW (NOT LEDGER)
-    // -------------------------------
+    // Presentation-only row (TB-consistent)
     $periodResultRow = (object) [
         'main_account_code' => '',
         'main_account_name' => '',
         'sub_account_code'  => '',
-        'sub_account_name'  => $periodResult >= 0
-            ? 'Period Profit'
-            : 'Period Loss',
+        'sub_account_name'  => $periodResult >= 0 ? 'Period Profit' : 'Period Loss',
         'debit'             => $periodResult < 0 ? abs($periodResult) : 0,
         'credit'            => $periodResult >= 0 ? abs($periodResult) : 0,
         'main_account_type' => 'CAPITAL',
@@ -137,11 +103,13 @@ public function balanceSheet(Request $request)
     $capitalDisplay = $capital->values()->push($periodResultRow);
 
     // -------------------------------
-    // VIEW SAFETY
+    // TOTALS (NET, FROM TB RULES)
     // -------------------------------
-    $assets          = $this->ensureNotEmptyRows($assets, 'No Asset Records', 'ASSET');
-    $liabilities     = $this->ensureNotEmptyRows($liabilities, 'No Liability Records', 'LIABILITY');
-    $capitalDisplay  = $this->ensureNotEmptyRows($capitalDisplay, 'No Capital Records', 'CAPITAL');
+    $totalAssets = $assets->sum(fn ($r) => ($r->debit ?? 0) - ($r->credit ?? 0));
+    $totalLiabilities = $liabilities->sum(fn ($r) => ($r->credit ?? 0) - ($r->debit ?? 0));
+    $totalCapital = $capitalDisplay->sum(fn ($r) => ($r->credit ?? 0) - ($r->debit ?? 0));
+
+    $totalRight = $totalLiabilities + $totalCapital;
 
     return view('reports.accounts.balance_sheet', [
         'period'           => $filters['period'],
@@ -152,14 +120,13 @@ public function balanceSheet(Request $request)
         'liabilities'      => $liabilities,
         'capital'          => $capitalDisplay,
 
-        'periodResult'     => $periodResult,
-
         'totalAssets'      => $totalAssets,
         'totalLiabilities' => $totalLiabilities,
         'totalCapital'     => $totalCapital,
         'totalRight'       => $totalRight,
     ]);
 }
+
 
 
     /**
