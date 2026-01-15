@@ -1010,31 +1010,28 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
     }
 
     Route::prefix('reports/members')
-    ->group(function () {
-
-    
-        Route::get(
-            '/financial-position',
-            [MemberFinancialPositionController::class, 'index']
-        )
-        ->name('reports.members.financial_position')
-        ->middleware('check_user_rights:rpt_reports');
-
-        Route::get(
-            '/financial-position/data',
-            [MemberFinancialPositionController::class, 'data']
-        )
-        ->name('reports.members.financial_position.data')
-        ->middleware('check_user_rights:rpt_reports');
-
-        Route::get(
-            '/financial-position/export',
-            [MemberFinancialPositionController::class, 'export']
-        )
-        ->name('reports.members.financial_position.export')
-        ->middleware('check_user_rights:rpt_reports');
-    });
+        ->group(function () {
 
 
+            Route::get(
+                '/financial-position',
+                [MemberFinancialPositionController::class, 'index']
+            )
+                ->name('reports.members.financial_position')
+                ->middleware('check_user_rights:rpt_reports');
 
+            Route::get(
+                '/financial-position/data',
+                [MemberFinancialPositionController::class, 'data']
+            )
+                ->name('reports.members.financial_position.data')
+                ->middleware('check_user_rights:rpt_reports');
+
+            Route::get(
+                '/financial-position/export',
+                [MemberFinancialPositionController::class, 'export']
+            )
+                ->name('reports.members.financial_position.export')
+                ->middleware('check_user_rights:rpt_reports');
+        });
 });
