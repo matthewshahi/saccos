@@ -947,7 +947,7 @@ Route::get(
 Route::get(
     'reports/accounts/balance-sheet/pdf',
     [TrialBalanceController::class, 'exportBalanceSheetPdf']
-)->name('reports.accounts.balance-sheet.pdf'))->middleware('check_user_rights:rpt_trial_balance');
+)->name('reports.accounts.balance-sheet.pdf')->middleware('check_user_rights:rpt_trial_balance');
 
 
 Route::get(
