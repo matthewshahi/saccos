@@ -59,6 +59,16 @@
           </div>
         </form>
 
+<div class="alert alert-warning small">
+  <strong>Note:</strong>
+  This Profit &amp; Loss Statement reflects income and expenses
+  recognised for the selected reporting period
+  ({{ \Carbon\Carbon::parse($dateFrom)->format('d M Y') }}
+  –
+  {{ \Carbon\Carbon::parse($dateTo)->format('d M Y') }}),
+  based on posted ledger transactions.
+</div>
+
         {{-- 📅 PERIOD SUMMARY --}}
         <p class="text-muted small mb-4">
           <strong>Period:</strong>
