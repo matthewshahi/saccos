@@ -1346,6 +1346,40 @@ class HomeController extends Controller
         // Group loan payments by loan_id
         $paymentsByLoan = $loanPayments->groupBy('loan_payments_loan_id');
 
+        $clearedFilter = request('cleared_loans', 'all');
+
+if ($clearedFilter !== 'all') {
+
+    $loans = $loans->filter(function ($loan) use (
+        $loanOpeningBalances,
+        $paymentsByLoan,
+        $threshold_amount,
+        $clearedFilter
+    ) {
+
+        // Principal paid before period
+        $openingPaid = $loanOpeningBalances[$loan->loan_id] ?? 0;
+
+        // Principal paid within period
+        $periodPaid = ($paymentsByLoan[$loan->loan_id] ?? collect())
+            ->sum('loan_payments_amount');
+
+        // Outstanding balance
+        $outstanding = $loan->loan_amount - ($openingPaid + $periodPaid);
+
+        if ($clearedFilter === 'cleared') {
+            return $outstanding <= $threshold_amount;
+        }
+
+        if ($clearedFilter === 'uncleared') {
+            return $outstanding > $threshold_amount;
+        }
+
+        return true;
+    });
+}
+
+
         $data = [
             'member' => $member,
             'fosaContributions' => $fosaContributions,
