@@ -2048,14 +2048,11 @@ class LoanController extends Controller
         return $this->$calcFunction($loanAmount, $durationMonths, $loanType, $member, $commission);
     }
 
-    private function calc_loan_interest_insurance_adom()
+   private function calc_loan_interest_insurance_adom()
 {
     $args = func_get_args();
     $argc = func_num_args();
 
-    // -----------------------------------------
-    // Resolve arguments (LEGACY vs NEW)
-    // -----------------------------------------
     if ($argc === 3) {
         // LEGACY MODE
         [$loanTypeId, $loanAmount, $months] = $args;
@@ -2064,17 +2061,9 @@ class LoanController extends Controller
             ->where('loan_type_id', $loanTypeId)
             ->first();
 
-        if (!$loanType) {
-            throw new \InvalidArgumentException('Invalid loan type ID supplied');
-        }
-
     } elseif ($argc === 5) {
         // NEW MODE
         [$loanAmount, $months, $loanType, $member, $commission] = $args;
-
-        if (!is_object($loanType)) {
-            throw new \InvalidArgumentException('Loan type object not supplied');
-        }
 
     } else {
         throw new \InvalidArgumentException(
@@ -2082,76 +2071,73 @@ class LoanController extends Controller
         );
     }
 
-    // -----------------------------------------
-    // ADOM / MEPIP actuarial insurance
-    // -----------------------------------------
+    /* ===============================
+       ADOM / MEPIP INSURANCE
+       =============================== */
     $base_insu = ((5.03 * $months + 3.03) * $loanAmount) / 6000;
     $base_insu = max($base_insu, 100);
 
-    // PHCF (0.25%) – borne by member
     $phcf = $base_insu * 0.0025;
-
-    // Total insurance
     $insu = $base_insu + $phcf;
 
-    // Non-insurable override
     if ($loanType->loan_type_insurable !== 'Y') {
         $insu = 0;
     }
 
-    // -----------------------------------------
-    // Interest & EMI calculation
-    // -----------------------------------------
-    $interest_amount_payable_f = 0;
-    $monthly_repayment_principal_f = 0;
-    $emi = 0;
+    /* ===============================
+       INTEREST + EMI
+       =============================== */
+    if (strtoupper($loanType->loan_type_interest_type) === 'FIXED INTEREST') {
 
-    if (strtoupper(trim($loanType->loan_type_interest_type)) === 'FIXED INTEREST') {
-
-        $interest_amount_payable_f =
+        $interest =
             round(($loanAmount + $insu) * $loanType->loan_type_interest / 100, 0);
 
         $emi =
-            ceil(($loanAmount + $interest_amount_payable_f + $insu) / $months);
+            ceil(($loanAmount + $interest + $insu) / $months);
 
-        $monthly_repayment_principal_f =
+        $principal =
             ($loanAmount + $insu) / $months;
 
     } else {
-        // Reducing / amortised
-        $loan_amount_f1 = $loanAmount + $insu;
-        $interest_percent_f = $loanType->loan_type_interest / 12 / 100;
 
-        if ($interest_percent_f > 0) {
+        $loanPlus = $loanAmount + $insu;
+        $rate = $loanType->loan_type_interest / 12 / 100;
+
+        if ($rate > 0) {
             $emi =
-                ($loan_amount_f1 * $interest_percent_f)
-                * pow(1 + $interest_percent_f, $months)
-                / (pow(1 + $interest_percent_f, $months) - 1);
+                ($loanPlus * $rate)
+                * pow(1 + $rate, $months)
+                / (pow(1 + $rate, $months) - 1);
         } else {
-            $emi = $loan_amount_f1 / $months;
+            $emi = $loanPlus / $months;
         }
 
-        $interest_amount_payable_f =
-            ($emi * $months) - $loan_amount_f1;
-
-        $monthly_repayment_principal_f =
-            $emi - ($loan_amount_f1 * $interest_percent_f);
+        $interest = ($emi * $months) - $loanPlus;
+        $principal = $emi - ($loanPlus * $rate);
 
         $emi = ceil($emi);
-        $monthly_repayment_principal_f = ceil($monthly_repayment_principal_f);
+        $principal = ceil($principal);
     }
 
-    // -----------------------------------------
-    // LEGACY return contract (unchanged)
-    // -----------------------------------------
+    /* ===============================
+       DUAL RETURN (CRITICAL)
+       =============================== */
     return [
-        "",
+        // LEGACY (numeric)
+        "", 
         $emi,
-        $interest_amount_payable_f,
-        $monthly_repayment_principal_f,
-        $insu
+        $interest,
+        $principal,
+        $insu,
+
+        // NEW (associative)
+        'monthly_payment' => $emi,
+        'monthly_payment_principal' => $principal,
+        'expected_interest' => $interest,
+        'insurance' => $insu,
     ];
 }
+
 
     private function calc_loan_interest_insurance_yes($loanAmount, $durationMonths, $loanType, $member, $commission = 0)
     {
