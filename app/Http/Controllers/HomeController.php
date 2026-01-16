@@ -3938,15 +3938,16 @@ class HomeController extends Controller
 
         $insuranceValues = $this->$loan_interest_insurance($data['batch_trans_loan_type'], $loanAmount, $data['batch_trans_loan_duration']);
 
-        if (str_contains(request()->getHost(), 'adomsacco.com')) {
-            dd([
-                'db_default_method' => $loan_interest_insurance,
-                'loan_amount' => $loanAmount,
-                'duration' => $data['batch_trans_loan_duration'],
-                'returned_insurance' => $insuranceValues[4],
-                'returned_array' => $insuranceValues,
-            ]);
-        }
+       if (request()->getHost() === 'adomsacco.com') {
+    dd([
+        'db_default_method' => $loan_interest_insurance,
+        'loan_amount' => $loanAmount,
+        'duration' => $data['batch_trans_loan_duration'],
+        'returned_insurance' => $insuranceValues[4],
+        'returned_array' => $insuranceValues,
+    ]);
+}
+
 
         $insertData = [
             'batch_trans_batch_id' => Auth::user()->id,
