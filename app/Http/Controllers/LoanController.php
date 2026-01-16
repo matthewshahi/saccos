@@ -2035,18 +2035,36 @@ class LoanController extends Controller
 
 
 
-    private function calculateLoanFinancials($loanAmount, $durationMonths, $loanType, $member, $commission = 0)
-    {
-        $calcFunction = DB::table('sacco_defaults')
-            ->where('default_name', 'loan_interest_insurance')
-            ->value('default_value');
+    // private function calculateLoanFinancials($loanAmount, $durationMonths, $loanType, $member, $commission = 0)
+    // {
+    //     $calcFunction = DB::table('sacco_defaults')
+    //         ->where('default_name', 'loan_interest_insurance')
+    //         ->value('default_value');
 
-        if (!$calcFunction || !method_exists($this, $calcFunction)) {
-            $calcFunction = 'default_calc_loan_interest_insurance'; // Use new default
-        }
+    //     if (!$calcFunction || !method_exists($this, $calcFunction)) {
+    //         $calcFunction = 'default_calc_loan_interest_insurance'; // Use new default
+    //     }
 
-        return $this->$calcFunction($loanAmount, $durationMonths, $loanType, $member, $commission);
+    //     return $this->$calcFunction($loanAmount, $durationMonths, $loanType, $member, $commission);
+    // }
+
+    private function calculateLoanFinancials($loanTypeId, $loanAmount, $durationMonths)
+{
+    $calcFunction = DB::table('sacco_defaults')
+        ->where('default_name', 'loan_interest_insurance')
+        ->value('default_value');
+
+    if (!$calcFunction || !method_exists($this, $calcFunction)) {
+        $calcFunction = 'calc_loan_interest_insurance'; // existing default
     }
+
+    return $this->$calcFunction(
+        $loanTypeId,
+        $loanAmount,
+        $durationMonths
+    );
+}
+
 
     private function calc_loan_interest_insurance_yes($loanAmount, $durationMonths, $loanType, $member, $commission = 0)
     {
