@@ -1314,16 +1314,16 @@ class HomeController extends Controller
         //     ->orderBy('loan_payments_paid_on')
         //     ->get();
 
-       $loanOpeningBalances = DB::table('sacco_loan_payments as lp')
-    ->join('sacco_loans as l', 'lp.loan_payments_loan_id', '=', 'l.loan_id')
-    ->where('l.loan_member', $id)
-    ->where('lp.loan_payments_period', '<', $period_from)
-    ->select(
-        'lp.loan_payments_loan_id',
-        DB::raw('SUM(lp.loan_payments_amount) as opening_movement')
-    )
-    ->groupBy('lp.loan_payments_loan_id')
-    ->pluck('opening_movement', 'loan_payments_loan_id');
+        $loanOpeningBalances = DB::table('sacco_loan_payments as lp')
+            ->join('sacco_loans as l', 'lp.loan_payments_loan_id', '=', 'l.loan_id')
+            ->where('l.loan_member', $id)
+            ->where('lp.loan_payments_period', '<', $period_from)
+            ->select(
+                'lp.loan_payments_loan_id',
+                DB::raw('SUM(lp.loan_payments_amount) as opening_movement')
+            )
+            ->groupBy('lp.loan_payments_loan_id')
+            ->pluck('opening_movement', 'loan_payments_loan_id');
 
 
         $loanPayments = DB::table('sacco_loan_payments')
@@ -1345,40 +1345,6 @@ class HomeController extends Controller
 
         // Group loan payments by loan_id
         $paymentsByLoan = $loanPayments->groupBy('loan_payments_loan_id');
-
-        $clearedFilter = request('cleared_loans', 'all');
-
-if ($clearedFilter !== 'all') {
-
-    $loans = $loans->filter(function ($loan) use (
-        $loanOpeningBalances,
-        $paymentsByLoan,
-        $threshold_amount,
-        $clearedFilter
-    ) {
-
-        // Principal paid before period
-        $openingPaid = $loanOpeningBalances[$loan->loan_id] ?? 0;
-
-        // Principal paid within period
-        $periodPaid = ($paymentsByLoan[$loan->loan_id] ?? collect())
-            ->sum('loan_payments_amount');
-
-        // Outstanding balance
-        $outstanding = $loan->loan_amount - ($openingPaid + $periodPaid);
-
-        if ($clearedFilter === 'cleared') {
-            return $outstanding <= $threshold_amount;
-        }
-
-        if ($clearedFilter === 'uncleared') {
-            return $outstanding > $threshold_amount;
-        }
-
-        return true;
-    });
-}
-
 
         $data = [
             'member' => $member,
@@ -4150,6 +4116,62 @@ if ($clearedFilter !== 'all') {
         return ["", $emi, $interest_amount_payable_f, $monthly_repayment_principal_f, $insu];
     }
 
+    private function calc_loan_interest_insurance_adom($loan_type_Id_f, $loan_amount_f, $repayment_period_f)
+    {
+        // Step 1: Base ADOM / MEPIP actuarial insurance
+        $base_insu = ((5.03 * $repayment_period_f + 3.03) * $loan_amount_f) / 6000;
+        $base_insu = max($base_insu, 100);
+
+        // Step 2: Add PHCF (0.25%) – cost borne by member
+        $phcf = $base_insu * 0.0025;
+
+        // Total insurance payable
+        $insu = $base_insu + $phcf;
+
+        // Fetch loan type
+        $loanType = DB::table('sacco_loan_types')
+            ->where('loan_type_id', $loan_type_Id_f)
+            ->first();
+
+        // If loan is not insurable, override insurance completely
+        if ($loanType->loan_type_insurable != "Y") {
+            $insu = 0;
+        }
+
+        // Interest + EMI calculation (unchanged pattern)
+        if ($loanType->loan_type_interest_type == "FIXED INTEREST") {
+
+            $interest_amount_payable_f =
+                round(($loan_amount_f + $insu) * $loanType->loan_type_interest / 100, 0);
+
+            $emi =
+                ceil(($loan_amount_f + $interest_amount_payable_f + $insu) / $repayment_period_f);
+
+            $monthly_repayment_principal_f =
+                ($loan_amount_f + $insu) / $repayment_period_f;
+        } else {
+
+            $loan_amount_f1 = $loan_amount_f + $insu;
+            $interest_percent_f = $loanType->loan_type_interest / 12 / 100;
+
+            $emi =
+                ($loan_amount_f1 * $interest_percent_f)
+                * pow(1 + $interest_percent_f, $repayment_period_f)
+                / (pow(1 + $interest_percent_f, $repayment_period_f) - 1);
+
+            $interest_amount_payable_f =
+                ($emi * $repayment_period_f) - $loan_amount_f1;
+
+            $monthly_repayment_principal_f =
+                $emi - ($loan_amount_f1 * $interest_percent_f);
+
+            $emi = ceil($emi);
+            $monthly_repayment_principal_f = ceil($monthly_repayment_principal_f);
+        }
+
+        // Preserve exact return structure
+        return ["", $emi, $interest_amount_payable_f, $monthly_repayment_principal_f, $insu];
+    }
 
     public function listGuaranteeRequests(Request $request)
     {
