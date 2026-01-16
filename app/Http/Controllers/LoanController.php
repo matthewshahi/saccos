@@ -2048,52 +2048,91 @@ class LoanController extends Controller
         return $this->$calcFunction($loanAmount, $durationMonths, $loanType, $member, $commission);
     }
 
-    private function calc_loan_interest_insurance_adom($loan_type_Id_f, $loan_amount_f, $repayment_period_f)
+    private function calc_loan_interest_insurance_adom()
 {
-    // Step 1: Base ADOM / MEPIP actuarial insurance
-    $base_insu = ((5.03 * $repayment_period_f + 3.03) * $loan_amount_f) / 6000;
+    $args = func_get_args();
+    $argc = func_num_args();
+
+    // -----------------------------------------
+    // Resolve arguments (LEGACY vs NEW)
+    // -----------------------------------------
+    if ($argc === 3) {
+        // LEGACY MODE
+        [$loanTypeId, $loanAmount, $months] = $args;
+
+        $loanType = DB::table('sacco_loan_types')
+            ->where('loan_type_id', $loanTypeId)
+            ->first();
+
+        if (!$loanType) {
+            throw new \InvalidArgumentException('Invalid loan type ID supplied');
+        }
+
+    } elseif ($argc === 5) {
+        // NEW MODE
+        [$loanAmount, $months, $loanType, $member, $commission] = $args;
+
+        if (!is_object($loanType)) {
+            throw new \InvalidArgumentException('Loan type object not supplied');
+        }
+
+    } else {
+        throw new \InvalidArgumentException(
+            'Invalid arguments for calc_loan_interest_insurance_adom'
+        );
+    }
+
+    // -----------------------------------------
+    // ADOM / MEPIP actuarial insurance
+    // -----------------------------------------
+    $base_insu = ((5.03 * $months + 3.03) * $loanAmount) / 6000;
     $base_insu = max($base_insu, 100);
 
-    // Step 2: Add PHCF (0.25%) – cost borne by member
+    // PHCF (0.25%) – borne by member
     $phcf = $base_insu * 0.0025;
 
-    // Total insurance payable
+    // Total insurance
     $insu = $base_insu + $phcf;
 
-    // Fetch loan type
-    $loanType = DB::table('sacco_loan_types')
-        ->where('loan_type_id', $loan_type_Id_f)
-        ->first();
-
-    // If loan is not insurable, override insurance completely
-    if ($loanType->loan_type_insurable != "Y") {
+    // Non-insurable override
+    if ($loanType->loan_type_insurable !== 'Y') {
         $insu = 0;
     }
 
-    // Interest + EMI calculation (unchanged pattern)
-    if ($loanType->loan_type_interest_type == "FIXED INTEREST") {
+    // -----------------------------------------
+    // Interest & EMI calculation
+    // -----------------------------------------
+    $interest_amount_payable_f = 0;
+    $monthly_repayment_principal_f = 0;
+    $emi = 0;
+
+    if (strtoupper(trim($loanType->loan_type_interest_type)) === 'FIXED INTEREST') {
 
         $interest_amount_payable_f =
-            round(($loan_amount_f + $insu) * $loanType->loan_type_interest / 100, 0);
+            round(($loanAmount + $insu) * $loanType->loan_type_interest / 100, 0);
 
         $emi =
-            ceil(($loan_amount_f + $interest_amount_payable_f + $insu) / $repayment_period_f);
+            ceil(($loanAmount + $interest_amount_payable_f + $insu) / $months);
 
         $monthly_repayment_principal_f =
-            ($loan_amount_f + $insu) / $repayment_period_f;
+            ($loanAmount + $insu) / $months;
 
     } else {
-
-        $loan_amount_f1 = $loan_amount_f + $insu;
+        // Reducing / amortised
+        $loan_amount_f1 = $loanAmount + $insu;
         $interest_percent_f = $loanType->loan_type_interest / 12 / 100;
 
-        $emi =
-            ($loan_amount_f1 * $interest_percent_f)
-            * pow(1 + $interest_percent_f, $repayment_period_f)
-            / (pow(1 + $interest_percent_f, $repayment_period_f) - 1);
+        if ($interest_percent_f > 0) {
+            $emi =
+                ($loan_amount_f1 * $interest_percent_f)
+                * pow(1 + $interest_percent_f, $months)
+                / (pow(1 + $interest_percent_f, $months) - 1);
+        } else {
+            $emi = $loan_amount_f1 / $months;
+        }
 
         $interest_amount_payable_f =
-            ($emi * $repayment_period_f) - $loan_amount_f1;
+            ($emi * $months) - $loan_amount_f1;
 
         $monthly_repayment_principal_f =
             $emi - ($loan_amount_f1 * $interest_percent_f);
@@ -2102,8 +2141,16 @@ class LoanController extends Controller
         $monthly_repayment_principal_f = ceil($monthly_repayment_principal_f);
     }
 
-    // Preserve exact return structure
-    return ["", $emi, $interest_amount_payable_f, $monthly_repayment_principal_f, $insu];
+    // -----------------------------------------
+    // LEGACY return contract (unchanged)
+    // -----------------------------------------
+    return [
+        "",
+        $emi,
+        $interest_amount_payable_f,
+        $monthly_repayment_principal_f,
+        $insu
+    ];
 }
 
     private function calc_loan_interest_insurance_yes($loanAmount, $durationMonths, $loanType, $member, $commission = 0)
