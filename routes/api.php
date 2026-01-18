@@ -3,10 +3,12 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\MpesaTheController;
 use App\Http\Controllers\PaymentInquiryController;
+use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\MemberDashboardController;
 
-Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
-    return $request->user();
-});
+// Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
+//     return $request->user();
+// });
 
 // M-Pesa-related routes
 Route::prefix('mobile')->group(function () {
@@ -32,4 +34,25 @@ Route::prefix('mobile')->group(function () {
         ->middleware('safaricom.ip');
 });
 
- 
+
+Route::post('/auth/login', [AuthController::class, 'login'])
+    ->middleware('throttle:5,1');
+Route::post('/auth/refresh', [AuthController::class, 'refresh'])
+    ->middleware('throttle:10,1');
+
+Route::middleware(['auth.api'])->group(function () {
+    Route::get('/auth/dashboard', [MemberDashboardController::class, 'index']);
+
+    // ✅ Share Savings
+    Route::get('/auth/savings', [MemberDashboardController::class, 'savings']);
+
+    // ✅ FOSA Savings
+    Route::get('/auth/fosa', [MemberDashboardController::class, 'fosaSavings']);
+
+    // ✅ Loans (NEW)
+    Route::get('/auth/loans', [MemberDashboardController::class, 'loans']);
+     Route::get('/auth/profile', [MemberDashboardController::class, 'profile']);
+});
+
+
+

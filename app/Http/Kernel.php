@@ -68,5 +68,7 @@ class Kernel extends HttpKernel
         'check_user_rights' => \App\Http\Middleware\CheckUserRights::class,
         'check_member_position' => \App\Http\Middleware\CheckMemberPosition::class,
         'safaricom.ip' => \App\Http\Middleware\CheckSafaricomIP::class,
+        'auth.api' => \App\Http\Middleware\ApiAuthenticate::class,
+
     ];
 }
