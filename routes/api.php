@@ -5,6 +5,8 @@ use App\Http\Controllers\MpesaTheController;
 use App\Http\Controllers\PaymentInquiryController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\MemberDashboardController;
+use App\Http\Controllers\Api\LoanApplicationController;
+
 
 // Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 //     return $request->user();
@@ -52,6 +54,20 @@ Route::middleware(['auth.api'])->group(function () {
     // ✅ Loans (NEW)
     Route::get('/auth/loans', [MemberDashboardController::class, 'loans']);
      Route::get('/auth/profile', [MemberDashboardController::class, 'profile']);
+});
+
+
+Route::middleware(['auth.api'])->prefix('auth/loan-applications')->group(function () {
+
+    // Fetch available loan products for application
+    Route::get('/products', [LoanApplicationController::class, 'products']);
+
+    // (Future) Submit a loan application
+    // Route::post('/apply', [LoanApplicationController::class, 'apply']);
+
+    // (Future) View member’s loan applications
+    // Route::get('/', [LoanApplicationController::class, 'index']);
+
 });
 
 
