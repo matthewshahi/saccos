@@ -183,21 +183,18 @@ class LoanApplicationController extends Controller
     }
 
     /**
-     * POST /api/auth/loan-applications/apply
-     *
-     * Receives a loan application request.
-     * This step only validates structure and authentication.
-     * NO eligibility logic, NO DB writes yet.
-     */
-    /**
-     * POST /api/auth/loan-applications/apply
-     *
-     * Submits a loan application request.
-     * Fully server-authoritative. No client trust.
-     */
-    use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
-
+ * POST /api/auth/loan-applications/apply
+ *
+ * Receives a loan application request.
+ * This step only validates structure and authentication.
+ * NO eligibility logic, NO DB writes yet.
+ */
+/**
+ * POST /api/auth/loan-applications/apply
+ *
+ * Submits a loan application request.
+ * Fully server-authoritative. No client trust.
+ */
 public function apply(Request $request)
 {
     /*
@@ -215,25 +212,164 @@ public function apply(Request $request)
 
     /*
     |--------------------------------------------------
-    | 2. Capture incoming payload (NO validation yet)
+    | 2. Validate request shape (NOT business rules)
     |--------------------------------------------------
     */
-    $payload = $request->all();
+    $data = $request->validate([
+        'loan_type_id'  => 'required|integer',
+        'amount'        => 'required|numeric|min:1',
+        'topup_loan_id' => 'nullable|integer',
+        'employment'    => 'nullable|array',
+        'employment.*'  => 'nullable',
+        'declaration'   => 'required|boolean',
+    ]);
 
-    Log::info('Loan application received', [
-        'member_id' => $memberId,
-        'payload'   => $payload,
+    if ($data['declaration'] !== true) {
+        return response()->json([
+            'message' => 'Loan declaration must be accepted.',
+        ], 422);
+    }
+
+    /*
+    |--------------------------------------------------
+    | 3. Fetch loan product (authoritative)
+    |--------------------------------------------------
+    */
+    $loanType = DB::table('sacco_loan_types')
+        ->where('loan_type_id', $data['loan_type_id'])
+        ->where('loan_type_deleted', 'N')
+        ->first();
+
+    if (!$loanType) {
+        return response()->json([
+            'message' => 'Invalid or inactive loan product.',
+        ], 422);
+    }
+
+    /*
+    |--------------------------------------------------
+    | 4. Fetch member financial posture
+    |--------------------------------------------------
+    */
+    $memberRow = DB::table('sacco_members')
+        ->where('member_id', $memberId)
+        ->where('member_active', 'Y')
+        ->first();
+
+    if (!$memberRow) {
+        return response()->json([
+            'message' => 'Member not found or inactive.',
+        ], 422);
+    }
+
+    $totalShares  = (float) ($memberRow->member_total_share ?? 0);
+    $monthsInSacco = 0;
+
+    if (!empty($memberRow->member_date_joined)) {
+        $monthsInSacco = \Carbon\Carbon::parse($memberRow->member_date_joined)
+            ->diffInMonths(now());
+    }
+
+    /*
+    |--------------------------------------------------
+    | 5. Qualification checks
+    |--------------------------------------------------
+    */
+    $qualificationPeriod = (int) ($loanType->loan_type_qualification_period ?? 0);
+    $instantQualification = $loanType->loan_type_instant_qualification === 'Y';
+
+    if (!$instantQualification && $monthsInSacco < $qualificationPeriod) {
+        return response()->json([
+            'message' => 'Member has not met the qualification period.',
+        ], 422);
+    }
+
+    if ($memberRow->member_is_junior === 'Y' && empty($memberRow->member_guardian_id)) {
+        return response()->json([
+            'message' => 'Junior member requires a guardian.',
+        ], 422);
+    }
+
+    /*
+    |--------------------------------------------------
+    | 6. Validate top-up loan (if any) and recompute balance
+    |--------------------------------------------------
+    */
+    $topupBalance = 0;
+    $topupLoanId  = null;
+
+    if (!empty($data['topup_loan_id'])) {
+        $topupLoan = DB::table('sacco_loans')
+            ->where('loan_id', $data['topup_loan_id'])
+            ->where('loan_member', $memberId)
+            ->where('loan_stoped', 'N')
+            ->first();
+
+        if (!$topupLoan) {
+            return response()->json([
+                'message' => 'Invalid top-up loan selected.',
+            ], 422);
+        }
+
+        $principal = (float) ($topupLoan->loan_amount ?? 0);
+        $paid      = (float) ($topupLoan->loan_loan_paid ?? 0);
+
+        $topupBalance = max(0, $principal - $paid);
+        $topupLoanId  = (int) $topupLoan->loan_id;
+    }
+
+    /*
+    |--------------------------------------------------
+    | 7. Compute maximum allowable amount
+    |--------------------------------------------------
+    */
+    $shareFactor = (int) ($loanType->loan_type_share_factor ?? 1);
+    $maxByShares = $totalShares * $shareFactor;
+    $maxByProduct = (float) ($loanType->loan_type_max_amount ?? 0);
+
+    $maximumAllowed = min($maxByShares, $maxByProduct);
+
+    $requestedAmount = (float) $data['amount'];
+
+    if ($requestedAmount > $maximumAllowed) {
+        return response()->json([
+            'message' => 'Requested amount exceeds allowable limit.',
+            'limits' => [
+                'maximum_allowed' => $maximumAllowed,
+            ],
+        ], 422);
+    }
+
+    /*
+    |--------------------------------------------------
+    | 8. Persist loan application (pending)
+    |--------------------------------------------------
+    */
+    $applicationId = DB::table('sacco_loan_applications')->insertGetId([
+        'application_member_id'   => $memberId,
+        'application_loan_type'   => $loanType->loan_type_id,
+        'application_amount'      => $requestedAmount,
+        'application_topup_loan'  => $topupLoanId,
+        'application_status'      => 'PENDING',
+        'application_employment'  => isset($data['employment'])
+            ? json_encode($data['employment'])
+            : null,
+        'application_created_at'  => now(),
+        'application_created_by'  => $memberId,
+        'application_ip'          => $request->ip(),
     ]);
 
     /*
     |--------------------------------------------------
-    | 3. Respond to client
+    | 9. Final response
     |--------------------------------------------------
     */
     return response()->json([
-        'success' => true,
-        'message' => 'Your loan application has been received and is being processed.'
-    ]);
+        'status'        => 'submitted',
+        'message'       => 'Loan application submitted successfully.',
+        'application_id'=> $applicationId,
+    ], 201);
 }
+
 
 }
