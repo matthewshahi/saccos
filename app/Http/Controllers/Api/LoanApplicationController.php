@@ -5,7 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-
+ 
+use Illuminate\Support\Facades\Log;
 class LoanApplicationController extends Controller
 {
     /**
@@ -195,8 +196,7 @@ class LoanApplicationController extends Controller
      * Submits a loan application request.
      * Fully server-authoritative. No client trust.
      */
-    use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
+
 
 public function apply(Request $request)
 {
