@@ -181,4 +181,72 @@ class LoanApplicationController extends Controller
             'topup_loans' => $loans,
         ]);
     }
+
+    /**
+ * POST /api/auth/loan-applications/apply
+ *
+ * Receives a loan application request.
+ * This step only validates structure and authentication.
+ * NO eligibility logic, NO DB writes yet.
+ */
+public function apply(Request $request)
+{
+    /*
+    |--------------------------------------------------
+    | 1. Authenticate member (authoritative)
+    |--------------------------------------------------
+    */
+    $member = $request->user();
+
+    if (!$member || !isset($member->member_id)) {
+        return response()->json([
+            'message' => 'Unauthenticated.',
+        ], 401);
+    }
+
+    /*
+    |--------------------------------------------------
+    | 2. Validate request SHAPE only
+    |--------------------------------------------------
+    | Do NOT validate business rules yet.
+    | Do NOT trust any amounts.
+    */
+    $data = $request->validate([
+        // Core application
+        'loan_type_id'     => 'required|integer',
+
+        // Requested amount (informational only for now)
+        'amount'           => 'required|numeric|min:1',
+
+        // Optional top-up
+        'topup_loan_id'    => 'nullable|integer',
+
+        // Employment / metadata (optional, pass-through)
+        'employment'       => 'nullable|array',
+        'employment.*'     => 'nullable',
+
+        // Declaration
+        'declaration'      => 'required|boolean',
+    ]);
+
+    /*
+    |--------------------------------------------------
+    | 3. Temporary response (contract acknowledgement)
+    |--------------------------------------------------
+    | This confirms:
+    | - route works
+    | - auth works
+    | - payload is accepted
+    */
+    return response()->json([
+        'status'  => 'received',
+        'message' => 'Loan application payload received.',
+        'debug'   => [
+            'member_id'      => (int) $member->member_id,
+            'loan_type_id'   => (int) $data['loan_type_id'],
+            'topup_loan_id'  => $data['topup_loan_id'] ?? null,
+        ],
+    ], 202);
+}
+
 }

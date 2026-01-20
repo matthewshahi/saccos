@@ -111,6 +111,7 @@ Route::middleware(['auth.api'])
         | Route::get('/', [LoanApplicationController::class, 'index']);
         */
 
+         Route::post('/apply', [LoanApplicationController::class, 'apply']);
     });
 
 
