@@ -230,10 +230,16 @@ public function apply(Request $request)
     | 3. Respond to client
     |--------------------------------------------------
     */
+
     return response()->json([
-        'success' => true,
-        'message' => 'Your loan application has been received and is being processed.'
-    ]);
+    'success' => false,
+    'message' => 'We were unable to process your loan application at this time. Please try again later.'
+], 400);
+
+    // return response()->json([
+    //     'success' => true,
+    //     'message' => 'Your loan application has been received and is being processed.'
+    // ]);
 }
 
 }
