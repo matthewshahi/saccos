@@ -57,18 +57,62 @@ Route::middleware(['auth.api'])->group(function () {
 });
 
 
-Route::middleware(['auth.api'])->prefix('auth/loan-applications')->group(function () {
+Route::middleware(['auth.api'])
+    ->prefix('auth/loan-applications')
+    ->group(function () {
 
-    // Fetch available loan products for application
-    Route::get('/products', [LoanApplicationController::class, 'products']);
+        /*
+        |--------------------------------------------------------------------------
+        | Loan Products (Catalog)
+        |--------------------------------------------------------------------------
+        | What loan types exist and their rules.
+        | Stateless. Cacheable. No member state.
+        */
+        Route::get('/products', [
+            LoanApplicationController::class,
+            'products'
+        ]);
 
-    // (Future) Submit a loan application
-    // Route::post('/apply', [LoanApplicationController::class, 'apply']);
+        /*
+        |--------------------------------------------------------------------------
+        | Loan Application Context (Member Info)
+        |--------------------------------------------------------------------------
+        | Returns authenticated member details needed for application UI
+        | (name, phone, sacco id, join date, etc.)
+        */
+        Route::get('/context', [
+            LoanApplicationController::class,
+            'context'
+        ]);
 
-    // (Future) View member’s loan applications
-    // Route::get('/', [LoanApplicationController::class, 'index']);
+        /*
+        |--------------------------------------------------------------------------
+        | Top-Up Eligible Loans
+        |--------------------------------------------------------------------------
+        | Returns member's outstanding loans eligible for top-up
+        | (loan id, type, balance).
+        */
+        Route::get('/topup-loans', [
+            LoanApplicationController::class,
+            'topupLoans'
+        ]);
 
-});
+        /*
+        |--------------------------------------------------------------------------
+        | (Future) Submit Loan Application
+        |--------------------------------------------------------------------------
+        | Route::post('/apply', [LoanApplicationController::class, 'apply']);
+        */
+
+        /*
+        |--------------------------------------------------------------------------
+        | (Future) View Member Loan Applications
+        |--------------------------------------------------------------------------
+        | Route::get('/', [LoanApplicationController::class, 'index']);
+        */
+
+    });
+
 
 
 
