@@ -178,6 +178,143 @@
   background-color: #5A2A83;
   color: #fff;
 }
+@extends('layouts.app')
+
+@section('content')
+<div class="col-md-12">
+    <div class="card o-hidden mb-4">
+
+        <!-- Header -->
+        <div class="card-header d-flex align-items-center border-0">
+            <h3 class="w-50 float-start card-title m-0">
+                <i class="bi bi-graph-up-arrow me-1"></i> Insurance Loan Report
+            </h3>
+
+            <div class="w-50 float-end text-end d-flex justify-content-end gap-2">
+
+                <!-- Export -->
+                <a href="{{ route('reports.loans.insurance.export', ['period' => request('period', $period), 'pms_srch' => request('pms_srch')]) }}"
+                   class="btn btn-sm btn-outline-success">
+                    <i class="bi bi-file-earmark-spreadsheet"></i> Export CSV
+                </a>
+
+                <!-- Filters -->
+                <form method="GET" action="{{ route('reports.loans.insurance') }}" class="d-flex gap-2">
+
+                    <input type="text"
+                           name="pms_srch"
+                           value="{{ request('pms_srch') }}"
+                           class="form-control form-control-sm"
+                           placeholder="Search member...">
+
+                    <input type="number"
+                           name="period"
+                           value="{{ request('period', $period) }}"
+                           class="form-control form-control-sm text-center"
+                           style="width:110px"
+                           placeholder="YYYYMM">
+
+                    <button class="btn btn-sm btn-primary">
+                        <i class="bi bi-funnel"></i>
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Body -->
+        <div class="table-responsive">
+            <table class="table table-striped table-hover align-middle">
+
+                <thead class="table-light">
+                    <tr>
+                        <th class="text-center">#</th>
+                        <th class="text-start">Member Name</th>
+                        <th class="text-start">Member ID</th>
+                        <th class="text-start">Gender</th>
+                        <th class="text-start">Loan Type</th>
+                        <th class="text-end">Loan Amount (KES)</th>
+                        <th class="text-start">Approval Date</th>
+                        <th class="text-center">Loan Period</th>
+                        <th class="text-center">Tenure (Months)</th>
+                        <th class="text-end">Outstanding (KES)</th>
+                        <th class="text-center">Remaining</th>
+                        <th class="text-center">Interest (%)</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                @forelse($records as $index => $rec)
+                    <tr>
+                        <td class="text-center">{{ $index + 1 }}</td>
+
+                        <!-- Member -->
+                        <td class="text-start">
+                            <div class="fw-semibold">{{ strtoupper($rec['member_name']) }}</div>
+                            <div class="small text-muted">
+                                @if($rec['member_phone_no'])
+                                    {{ $rec['member_phone_no'] }} |
+                                @endif
+                                {{ $rec['member_national_id'] }}
+                            </div>
+                        </td>
+
+                        <td class="text-start">{{ $rec['member_sacco_id'] }}</td>
+                        <td class="text-start">{{ $rec['member_gender'] }}</td>
+                        <td class="text-start">{{ $rec['loan_type_name'] }}</td>
+
+                        <!-- Amounts -->
+                        <td class="text-end fw-semibold text-success">
+                            {{ number_format($rec['loan_amount'], 2) }}
+                        </td>
+
+                        <!-- Dates / Periods -->
+                        <td class="text-start">
+                            {{ \Carbon\Carbon::parse($rec['loan_on'])->format('d-M-Y') }}
+                        </td>
+
+                        <td class="text-center fw-semibold">
+                            {{ $rec['loan_taken_period'] }}
+                        </td>
+
+                        <td class="text-center">
+                            {{ $rec['loan_payment_period'] }}
+                        </td>
+
+                        <!-- Balances -->
+                        <td class="text-end fw-bold {{ $rec['loan_balance'] > 0 ? 'text-danger' : 'text-muted' }}">
+                            {{ number_format($rec['loan_balance'], 2) }}
+                        </td>
+
+                        <td class="text-center">
+                            {!! $rec['months_remaining'] !!}
+                        </td>
+
+                        <td class="text-center">
+                            {{ $rec['loan_type_interest'] }}
+                        </td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="12" class="text-center text-muted py-4">
+                            No records found for this period
+                        </td>
+                    </tr>
+                @endforelse
+                </tbody>
+
+            </table>
+        </div>
+
+        <!-- Footer -->
+        @if(count($records))
+            <div class="card-footer text-end small text-muted">
+                Showing {{ count($records) }} records for period <strong>{{ $period }}</strong>
+            </div>
+        @endif
+
+    </div>
+</div>
+@endsection
 
 .small.text-muted i {
   color: #6c757d;
@@ -187,4 +324,141 @@
   font-size: 0.95rem;
 }
 </style>
+@endsection
+@extends('layouts.app')
+
+@section('content')
+<div class="col-md-12">
+    <div class="card o-hidden mb-4">
+
+        <!-- Header -->
+        <div class="card-header d-flex align-items-center border-0">
+            <h3 class="w-50 float-start card-title m-0">
+                <i class="bi bi-graph-up-arrow me-1"></i> Insurance Loan Report
+            </h3>
+
+            <div class="w-50 float-end text-end d-flex justify-content-end gap-2">
+
+                <!-- Export -->
+                <a href="{{ route('reports.loans.insurance.export', ['period' => request('period', $period), 'pms_srch' => request('pms_srch')]) }}"
+                   class="btn btn-sm btn-outline-success">
+                    <i class="bi bi-file-earmark-spreadsheet"></i> Export CSV
+                </a>
+
+                <!-- Filters -->
+                <form method="GET" action="{{ route('reports.loans.insurance') }}" class="d-flex gap-2">
+
+                    <input type="text"
+                           name="pms_srch"
+                           value="{{ request('pms_srch') }}"
+                           class="form-control form-control-sm"
+                           placeholder="Search member...">
+
+                    <input type="number"
+                           name="period"
+                           value="{{ request('period', $period) }}"
+                           class="form-control form-control-sm text-center"
+                           style="width:110px"
+                           placeholder="YYYYMM">
+
+                    <button class="btn btn-sm btn-primary">
+                        <i class="bi bi-funnel"></i>
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Body -->
+        <div class="table-responsive">
+            <table class="table table-striped table-hover align-middle">
+
+                <thead class="table-light">
+                    <tr>
+                        <th class="text-center">#</th>
+                        <th class="text-start">Member Name</th>
+                        <th class="text-start">Member ID</th>
+                        <th class="text-start">Gender</th>
+                        <th class="text-start">Loan Type</th>
+                        <th class="text-end">Loan Amount (KES)</th>
+                        <th class="text-start">Approval Date</th>
+                        <th class="text-center">Loan Period</th>
+                        <th class="text-center">Tenure (Months)</th>
+                        <th class="text-end">Outstanding (KES)</th>
+                        <th class="text-center">Remaining</th>
+                        <th class="text-center">Interest (%)</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                @forelse($records as $index => $rec)
+                    <tr>
+                        <td class="text-center">{{ $index + 1 }}</td>
+
+                        <!-- Member -->
+                        <td class="text-start">
+                            <div class="fw-semibold">{{ strtoupper($rec['member_name']) }}</div>
+                            <div class="small text-muted">
+                                @if($rec['member_phone_no'])
+                                    {{ $rec['member_phone_no'] }} |
+                                @endif
+                                {{ $rec['member_national_id'] }}
+                            </div>
+                        </td>
+
+                        <td class="text-start">{{ $rec['member_sacco_id'] }}</td>
+                        <td class="text-start">{{ $rec['member_gender'] }}</td>
+                        <td class="text-start">{{ $rec['loan_type_name'] }}</td>
+
+                        <!-- Amounts -->
+                        <td class="text-end fw-semibold text-success">
+                            {{ number_format($rec['loan_amount'], 2) }}
+                        </td>
+
+                        <!-- Dates / Periods -->
+                        <td class="text-start">
+                            {{ \Carbon\Carbon::parse($rec['loan_on'])->format('d-M-Y') }}
+                        </td>
+
+                        <td class="text-center fw-semibold">
+                            {{ $rec['loan_taken_period'] }}
+                        </td>
+
+                        <td class="text-center">
+                            {{ $rec['loan_payment_period'] }}
+                        </td>
+
+                        <!-- Balances -->
+                        <td class="text-end fw-bold {{ $rec['loan_balance'] > 0 ? 'text-danger' : 'text-muted' }}">
+                            {{ number_format($rec['loan_balance'], 2) }}
+                        </td>
+
+                        <td class="text-center">
+                            {!! $rec['months_remaining'] !!}
+                        </td>
+
+                        <td class="text-center">
+                            {{ $rec['loan_type_interest'] }}
+                        </td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="12" class="text-center text-muted py-4">
+                            No records found for this period
+                        </td>
+                    </tr>
+                @endforelse
+                </tbody>
+
+            </table>
+        </div>
+
+        <!-- Footer -->
+        @if(count($records))
+            <div class="card-footer text-end small text-muted">
+                Showing {{ count($records) }} records for period <strong>{{ $period }}</strong>
+            </div>
+        @endif
+
+    </div>
+</div>
 @endsection
