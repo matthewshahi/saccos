@@ -15,7 +15,7 @@
           <i class="bi bi-file-earmark-spreadsheet"></i> Export CSV
         </a>
 
-        <!-- 🔍 Search + Period Filter -->
+        <!-- Search + Period Filter -->
         <form method="GET" action="{{ route('reports.loans.insurance') }}" class="row g-2 align-items-center justify-content-end mt-1">
 
           <!-- Search -->
@@ -65,12 +65,12 @@
               <th>#</th>
               <th>Member Name</th>
               <th>Member ID</th>
-  
               <th>Gender</th>
               <th>Loan Type</th>
               <th class="text-end">Loan Amount (KES)</th>
-              <th>Loan Date</th>
-              <th class="text-center">Period (Months)</th>
+              <th>Approval Date</th>
+              <th class="text-center">Loan Period</th>
+              <th class="text-center">Tenure (Months)</th>
               <th class="text-end">Outstanding (KES)</th>
               <th class="text-center">Remaining</th>
               <th class="text-center">Interest (%)</th>
@@ -80,6 +80,7 @@
             @forelse($records as $index => $rec)
               <tr>
                 <td>{{ $index + 1 }}</td>
+
                 <td class="text-start">
                   <div class="fw-semibold text-dark">{{ strtoupper($rec['member_name']) }}</div>
                   <div class="small text-muted mt-1">
@@ -87,25 +88,47 @@
                       <i class="bi bi-telephone me-1"></i>{{ $rec['member_phone_no'] }}
                     @endif
                     @if(!empty($rec['member_national_id']))
-                      <span class="mx-2">|</span><i class="bi bi-person-badge me-1"></i>{{ $rec['member_national_id'] }}
+                      <span class="mx-2">|</span>
+                      <i class="bi bi-person-badge me-1"></i>{{ $rec['member_national_id'] }}
                     @endif
                     @if(!empty($rec['member_kra_pin']))
-                      <span class="mx-2">|</span><i class="bi bi-credit-card-2-front me-1"></i>KAR PIN:{{ $rec['member_kra_pin'] }}
+                      <span class="mx-2">|</span>
+                      <i class="bi bi-credit-card-2-front me-1"></i>KRA PIN: {{ $rec['member_kra_pin'] }}
                     @endif
                   </div>
                 </td>
+
                 <td>{{ $rec['member_sacco_id'] }}</td>
-           
                 <td>{{ $rec['member_gender'] }}</td>
                 <td>{{ $rec['loan_type_name'] }}</td>
-                <td class="text-end text-success fw-semibold">{{ number_format($rec['loan_amount'], 2) }}</td>
-                <td>{{ \Carbon\Carbon::parse($rec['loan_on'])->format('d-M-Y') }}</td>
-                <td class="text-center">{{ $rec['loan_payment_period'] }}</td>
+
+                <td class="text-end text-success fw-semibold">
+                  {{ number_format($rec['loan_amount'], 2) }}
+                </td>
+
+                <td>
+                  {{ \Carbon\Carbon::parse($rec['loan_on'])->format('d-M-Y') }}
+                </td>
+
+                <td class="text-center fw-semibold">
+                  {{ $rec['loan_taken_period'] }}
+                </td>
+
+                <td class="text-center">
+                  {{ $rec['loan_payment_period'] }}
+                </td>
+
                 <td class="text-end fw-bold {{ $rec['loan_balance'] > 0 ? 'text-danger' : 'text-muted' }}">
                   {{ number_format($rec['loan_balance'], 2) }}
                 </td>
-                <td class="text-center">{!! $rec['months_remaining'] !!}</td>
-                <td class="text-center">{{ $rec['loan_type_interest'] }}</td>
+
+                <td class="text-center">
+                  {!! $rec['months_remaining'] !!}
+                </td>
+
+                <td class="text-center">
+                  {{ $rec['loan_type_interest'] }}
+                </td>
               </tr>
             @empty
               <tr>
@@ -134,7 +157,7 @@
 }
 
 .card-title {
-  color: #5A2A83; /* SupplyChain purple */
+  color: #5A2A83;
   font-weight: 600;
 }
 
@@ -159,6 +182,7 @@
 .small.text-muted i {
   color: #6c757d;
 }
+
 .fw-semibold.text-dark {
   font-size: 0.95rem;
 }

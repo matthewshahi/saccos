@@ -80,6 +80,8 @@ class InsuranceLoanReportController extends Controller
                 'loan_type_interest'   => $loan->loan_type_interest,
                 'loan_type_name'       => $loan->loan_type_name,
                 'loan_id'              => $loan->loan_id,
+                'loan_taken_period' => $loan->loan_taken_period,
+
             ];
         }
 
