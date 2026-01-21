@@ -69,12 +69,11 @@ class InsuranceLoanReportController extends Controller
                 $monthsRemaining = "<span class='text-danger'>Overdue</span>";
             }
 
-            /** 🔑 FIX: NORMALISED DISPLAY DATE **/
+            // 🔑 NORMALISED DISPLAY DATE
             $approvalYm = date('Ym', strtotime($loan->loan_on));
-            $periodYm   = (string) $loan->loan_taken_period;
+            $periodYm   = (string)$loan->loan_taken_period;
 
             if ($approvalYm !== $periodYm) {
-                // loan period is truth → mid-month of period
                 $displayLoanDate = sprintf(
                     '%04d-%02d-15',
                     floor((int)$periodYm / 100),
@@ -145,14 +144,14 @@ class InsuranceLoanReportController extends Controller
     public function export(Request $request)
     {
         $defaultPeriod = $this->currentPeriod ? $this->currentPeriod->period_name : date('Ym');
-        $period   = $request->input('period', $defaultPeriod);
-        $pms_srch = '%' . ($request->input('pms_srch') ?? '') . '%';
+        $period = $request->input('period', $defaultPeriod);
 
         $loans = DB::table('sacco_loans')
             ->join('sacco_members', 'sacco_loans.loan_member', '=', 'sacco_members.member_id')
             ->join('sacco_loan_types', 'sacco_loans.loan_loan_type', '=', 'sacco_loan_types.loan_type_id')
             ->select(
                 'sacco_members.member_name',
+                'sacco_members.member_sacco_id',
                 'sacco_members.member_phone_no',
                 'sacco_members.member_national_id',
                 'sacco_members.member_kra_pin',
@@ -176,16 +175,27 @@ class InsuranceLoanReportController extends Controller
             $out = fopen('php://output', 'w');
             fwrite($out, "\xEF\xBB\xBF");
 
+            // CSV HEADER
             fputcsv($out, [
-                'Member Name','Phone','National ID','KRA PIN',
-                'Loan Type','Interest (%)','Loan Amount (KES)',
-                'Loan Date','Loan Period','Tenure (Months)',
-                'Outstanding (KES)','Remaining (Months)'
+                'Member Name',
+                'Member SACCO ID',
+                'Phone',
+                'National ID',
+                'KRA PIN',
+                'Loan Type',
+                'Interest (%)',
+                'Loan Amount (KES)',
+                'Loan Date',
+                'Loan Period',
+                'Tenure (Months)',
+                'Outstanding (KES)',
+                'Remaining (Months)'
             ]);
 
             foreach ($loans as $loan) {
 
                 $balance = $this->getLoanBalance($loan->loan_id, $loan->loan_amount, $period);
+
                 [$monthsRemaining, $loanEnd] =
                     $this->calculateRemainingMonths(
                         $loan->loan_taken_period,
@@ -197,7 +207,6 @@ class InsuranceLoanReportController extends Controller
                     $monthsRemaining = 'OVERDUE';
                 }
 
-                // SAME NORMALISATION LOGIC
                 $approvalYm = date('Ym', strtotime($loan->loan_on));
                 $periodYm   = (string)$loan->loan_taken_period;
 
@@ -211,8 +220,10 @@ class InsuranceLoanReportController extends Controller
                     $displayLoanDate = date('Y-m-d', strtotime($loan->loan_on));
                 }
 
+                // CSV ROW
                 fputcsv($out, [
                     strtoupper($loan->member_name),
+                    $loan->member_sacco_id,
                     $loan->member_phone_no,
                     $loan->member_national_id,
                     $loan->member_kra_pin,
