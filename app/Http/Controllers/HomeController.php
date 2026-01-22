@@ -3676,9 +3676,14 @@ class HomeController extends Controller
 
 
 
+    // public function submitLoanApplication(Request $request)
+
     public function submitLoanApplication(Request $request)
     {
-        $logged_in_user = auth()->id();
+        $context = $request->is('api/*') ? 'api' : 'web';
+
+        $logged_in_user = auth()->id() ?? optional($request->user())->member_id;
+
         // Define validation rules
         $request->validate([
             'batch_trans_member_id' => 'required|exists:sacco_members,member_id',
@@ -3711,7 +3716,8 @@ class HomeController extends Controller
 
 
         // Check if the current route matches 'loans.application.submit'
-        if ($request->route()->getName() === 'loans.application.submit') {
+      if ($request->route() && $request->route()->getName() === 'loans.application.submit') {
+
             // Check if the member ID matches the logged-in user
             if ($request->input('batch_trans_member_id') != $logged_in_user) {
                 return redirect()->back()->withErrors(['error' => 'Error: Wrong user trying to access the system.']);
@@ -3834,7 +3840,7 @@ class HomeController extends Controller
                     'default_name' => $defaultName,
                     'default_value' => 1, // Default is always 1
                     'default_transdate' => now(),
-                    'default_userid' => auth()->id(),
+                    'default_userid' => $logged_in_user,
                     'default_ip' => request()->ip(),
                 ]);
             }
@@ -3910,8 +3916,16 @@ class HomeController extends Controller
 
         // Final validation before saving
         if (!empty($nmsg)) {
+            if ($context === 'api') {
+                return response()->json([
+                    'success' => false,
+                    'message' => trim($nmsg),
+                ], 422);
+            }
+
             return redirect()->back()->withErrors($nmsg)->withInput();
         }
+
 
         // Handle file uploads and get file paths
         $payslip1Path = null;
@@ -3938,19 +3952,11 @@ class HomeController extends Controller
 
         $insuranceValues = $this->$loan_interest_insurance($data['batch_trans_loan_type'], $loanAmount, $data['batch_trans_loan_duration']);
 
-       if (request()->getHost() === 'adomsacco.com') {
-    dd([
-        'db_default_method' => $loan_interest_insurance,
-        'loan_amount' => $loanAmount,
-        'duration' => $data['batch_trans_loan_duration'],
-        'returned_insurance' => $insuranceValues[4],
-        'returned_array' => $insuranceValues,
-    ]);
-}
+
 
 
         $insertData = [
-            'batch_trans_batch_id' => Auth::user()->id,
+            'batch_trans_batch_id' => $logged_in_user,
             'batch_trans_loan_type' => $data['batch_trans_loan_type'],
             'batch_trans_loan_category' => $data['batch_trans_loan_category'],
             'batch_trans_loan_amount' => $loanAmount,
@@ -3966,7 +3972,7 @@ class HomeController extends Controller
             'batch_trans_expected_interest' => $insuranceValues[2],
             'batch_trans_loan_guaranteed' => $batch_trans_loan_guaranteed,
             'batch_trans_loan_to_top_up_amount' => $batch_trans_loan_to_top_up_amount_bal ?? 0,
-            'batch_trans_by' => Auth::user()->id,
+            'batch_trans_by' => $logged_in_user,
             'batch_trans_ip' => $request->ip(),
             'batch_trans_payslip1' => $payslip1Path,
             'batch_trans_payslip2' => $payslip2Path,
@@ -3989,12 +3995,23 @@ class HomeController extends Controller
                 'guarantors_loan_batch_trans_id' => $loanId,
                 'guarantors_guarantor_id' => $guarantor['id'],
                 'guarantors_amount_guaranteed' => $proratedAmount,
-                'guarantors_by' => Auth::user()->id,
+                'guarantors_by' => $logged_in_user,
                 'guarantors_ip' => $request->ip(),
             ]);
         }
 
-        return redirect()->route('loans.apply')->with('success', 'Loan application submitted successfully.');
+        
+
+        if ($context === 'api') {
+            return response()->json([
+                'success' => true,
+                'message' => 'Loan application submitted successfully.',
+                'loan_batch_trans_id' => $loanId,
+            ], 201);
+        }
+
+        return redirect()->route('loans.apply')
+            ->with('success', 'Loan application submitted successfully.');
     }
 
 

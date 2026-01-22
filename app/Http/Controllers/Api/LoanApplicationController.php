@@ -5,8 +5,13 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
- 
+
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
+use Carbon\Carbon;
+
+    use Illuminate\Support\Facades\Validator;
+ 
 class LoanApplicationController extends Controller
 {
     /**
@@ -39,6 +44,7 @@ class LoanApplicationController extends Controller
         */
         $loanTypes = DB::table('sacco_loan_types')
             ->where('loan_type_deleted', 'N')
+            ->where('loan_type_guaranteable_percent', 0)
             ->orderBy('loan_type_name')
             ->get()
             ->map(function ($t) {
@@ -198,48 +204,193 @@ class LoanApplicationController extends Controller
      */
 
 
+
 public function apply(Request $request)
 {
-    /*
-    |--------------------------------------------------
-    | 1. Authenticate member
-    |--------------------------------------------------
-    */
+    // 1) Auth
     $member = $request->user();
-
     if (!$member || !isset($member->member_id)) {
-        return response()->json(['message' => 'Unauthenticated.'], 401);
+        return response()->json([
+            'success' => false,
+            'message' => 'Unauthenticated.'
+        ], 401);
     }
 
     $memberId = (int) $member->member_id;
 
-    /*
-    |--------------------------------------------------
-    | 2. Capture incoming payload (NO validation yet)
-    |--------------------------------------------------
-    */
-    $payload = $request->all();
+    // 2) Force JSON validation (no redirects)
+    $validator = Validator::make($request->all(), [
+        'loan_type_id'      => 'required|integer',
+        'loan_category_id'  => 'nullable|integer',   // you reference it later
+        'amount'            => 'required|numeric|min:1',
+        'duration_months'   => 'required|integer|min:1',
+        'reason'            => 'nullable|string|max:255',
 
-    Log::info('Loan application received', [
-        'member_id' => $memberId,
-        'payload'   => $payload,
+        'topup_loan_id'     => 'nullable|integer',
+        'payroll_number'    => 'nullable|string|max:50',
+        'designation'       => 'nullable|string|max:100',
+        'employment_terms'  => 'nullable|string|max:100',
+
+        // IMPORTANT: do this instead of manual FILTER_VALIDATE_BOOLEAN
+        'agree'             => 'required|accepted',
+    ], [
+        'agree.accepted' => 'You must agree to the terms and conditions before submitting a loan application.',
     ]);
 
-    /*
-    |--------------------------------------------------
-    | 3. Respond to client
-    |--------------------------------------------------
-    */
+    if ($validator->fails()) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Validation failed.',
+            'errors'  => $validator->errors(),
+        ], 422);
+    }
 
-    return response()->json([
-    'success' => false,
-    'message' => 'We were unable to process your loan application at this time. Please try again later.'
-], 400);
+    $validated = $validator->validated();
 
-    // return response()->json([
-    //     'success' => true,
-    //     'message' => 'Your loan application has been received and is being processed.'
-    // ]);
+    // 3) Stable payload hash (avoid float weirdness by normalizing)
+    $hashSource = [
+        'member_id'        => $memberId,
+        'loan_type_id'      => (int) $validated['loan_type_id'],
+        'loan_category_id'  => (int) ($validated['loan_category_id'] ?? 1),
+        'amount'            => (string) number_format((float) $validated['amount'], 2, '.', ''),
+        'duration_months'   => (int) $validated['duration_months'],
+        'reason'            => trim((string) ($validated['reason'] ?? '')),
+        'topup_loan_id'     => $validated['topup_loan_id'] ?? null,
+        'payroll_number'    => trim((string) ($validated['payroll_number'] ?? '')),
+        'designation'       => trim((string) ($validated['designation'] ?? '')),
+        'employment_terms'  => trim((string) ($validated['employment_terms'] ?? '')),
+        'agree'             => 1,
+    ];
+
+    $payloadHash = hash('sha256', json_encode($hashSource));
+
+    // 4) Duplicates
+    $existsExact = DB::table('sacco_mobile_app_loan_applications')
+        ->where('mobile_app_payload_hash', $payloadHash)
+        ->exists();
+
+    if ($existsExact) {
+        return response()->json([
+            'success' => false,
+            'message' => 'A similar loan application has already been submitted. Please wait before trying again.'
+        ], 409);
+    }
+
+    $recentCutoff = Carbon::now()->subMinutes(2);
+
+    $existsRecent = DB::table('sacco_mobile_app_loan_applications')
+        ->where('mobile_app_member_id', $memberId)
+        ->where('mobile_app_submitted_at', '>=', $recentCutoff)
+        ->exists();
+
+    if ($existsRecent) {
+        return response()->json([
+            'success' => false,
+            'message' => 'You recently submitted a loan application. Please wait about 2 minutes before trying again.'
+        ], 429);
+    }
+
+    // 5) Save + forward safely
+    return DB::transaction(function () use ($request, $member, $memberId, $validated, $payloadHash) {
+
+        DB::table('sacco_mobile_app_loan_applications')->insert([
+            'mobile_app_member_id'         => $memberId,
+            'mobile_app_loan_type_id'      => (int) $validated['loan_type_id'],
+            'mobile_app_amount'            => (float) $validated['amount'],
+            'mobile_app_duration_months'   => (int) $validated['duration_months'],
+            'mobile_app_reason'            => $validated['reason'] ?? null,
+            'mobile_app_topup_loan_id'     => $validated['topup_loan_id'] ?? null,
+
+            'mobile_app_payroll_number'    => $validated['payroll_number'] ?? null,
+            'mobile_app_designation'       => $validated['designation'] ?? null,
+            'mobile_app_employment_terms'  => $validated['employment_terms'] ?? null,
+
+            'mobile_app_agree'             => 1,
+            'mobile_app_payload_hash'      => $payloadHash,
+            'mobile_app_submitted_at'      => now(),
+            'mobile_app_status'            => 'pending',
+
+            'mobile_app_submitted_ip'      => $request->ip(),
+            'mobile_app_submitted_by'      => 'mobile_app',
+        ]);
+
+        // Forward to legacy (make it look like an AJAX/JSON request)
+        $legacyRequest = Request::create('/legacy/submit-loan', 'POST', [
+            'batch_trans_member_id'            => $memberId,
+            'batch_trans_member_name'          => $member->member_name,
+            'batch_trans_loan_type'            => (int) $validated['loan_type_id'],
+            'batch_trans_loan_category'        => (int) ($validated['loan_category_id'] ?? 1),
+            'batch_trans_loan_amount'          => (float) $validated['amount'],
+            'batch_trans_loan_duration'        => (int) $validated['duration_months'],
+            'batch_trans_description'          => $validated['reason'] ?? null,
+            'batch_trans_loan_to_top_up'       => $validated['topup_loan_id'] ?? null,
+            'batch_trans_payroll_number'       => $validated['payroll_number'] ?? null,
+            'batch_trans_present_designation'  => $validated['designation'] ?? null,
+            'batch_trans_terms_of_employment'  => $validated['employment_terms'] ?? null,
+        ]);
+
+        // --------------------------------------------------
+// Force API context for legacy handler
+// --------------------------------------------------
+$legacyRequest = Request::create(
+    '/api/legacy/submit-loan', // MUST match api/*
+    'POST',
+    array_merge(
+        $legacyRequest->request->all() ?? [],
+        [
+            'context' => 'api', // explicit override (belt + braces)
+        ]
+    )
+);
+
+// Bind authenticated user
+$legacyRequest->setUserResolver(fn () => $request->user());
+
+// Force API headers
+$legacyRequest->headers->set('Accept', 'application/json');
+$legacyRequest->headers->set('X-Requested-With', 'XMLHttpRequest');
+
+// --------------------------------------------------
+// 🔎 Diagnostics — REMOVE after confirmation
+// --------------------------------------------------
+Log::info('Forwarding loan application to legacy handler', [
+    'legacy_path'   => $legacyRequest->path(),
+    'is_api_path'   => $legacyRequest->is('api/*'),
+    'context_param' => $legacyRequest->get('context'),
+    'expects_json'  => $legacyRequest->expectsJson(),
+    'member_id'     => optional($request->user())->member_id,
+]);
+
+// Execute legacy handler
+$legacyResponse = app(\App\Http\Controllers\HomeController::class)
+    ->submitLoanApplication($legacyRequest);
+
+// --------------------------------------------------
+// 🔎 Capture legacy response shape
+// --------------------------------------------------
+Log::info('Legacy loan submission response', [
+    'response_type' => is_object($legacyResponse)
+        ? get_class($legacyResponse)
+        : gettype($legacyResponse),
+    'status'        => method_exists($legacyResponse, 'status')
+        ? $legacyResponse->status()
+        : null,
+]);
+
+// --------------------------------------------------
+// Normalize response for API
+// --------------------------------------------------
+if ($legacyResponse instanceof \Illuminate\Http\JsonResponse) {
+    return $legacyResponse;
+}
+
+
+        // Otherwise normalize to API response
+        return response()->json([
+            'success' => true,
+            'message' => 'Your loan application has been received and saved for further processing.',
+        ], 201);
+    });
 }
 
 }
