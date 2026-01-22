@@ -6,7 +6,7 @@ use App\Http\Controllers\PaymentInquiryController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\MemberDashboardController;
 use App\Http\Controllers\Api\LoanApplicationController;
-
+use App\Http\Controllers\Api\MpesaApiTheController;
 
 // Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 //     return $request->user();
@@ -114,6 +114,14 @@ Route::middleware(['auth.api'])
          Route::post('/apply', [LoanApplicationController::class, 'apply']);
     });
 
+Route::middleware(['auth.api'])->group(function () {
+
+    Route::post(
+        '/auth/payments/stkpush',
+        [MpesaApiTheController::class, 'initiateStkPushFromApp']
+    );
+
+});
 
 
 
