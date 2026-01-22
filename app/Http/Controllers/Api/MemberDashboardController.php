@@ -129,30 +129,96 @@ $snapshot = [
     | 4. Final response (Home Dashboard Contract)
     |--------------------------------------------------------------------------
     */
-        return response()->json([
-            'member' => [
-                'name'          => $row->member_name,
-                'member_number' => 'SACCO / ' . str_pad(
-                    (string) $row->member_sacco_id,
-                    5,
-                    '0',
-                    STR_PAD_LEFT
-                ),
-                'status' => $row->member_active === 'Y'
-                    ? 'Active'
-                    : 'Inactive',
-            ],
 
-            'snapshot' => $snapshot,
+    $quickPayments = $this->getQuickPayments($memberId);
 
-            'attention' => [
-                'count' => count($attention),
-                'items' => $attention,
-            ],
-        ]);
+    return response()->json([
+    'member' => [
+        'name'          => $row->member_name,
+        'member_number' => 'SACCO / ' . str_pad(
+            (string) $row->member_sacco_id,
+            5,
+            '0',
+            STR_PAD_LEFT
+        ),
+        'status' => $row->member_active === 'Y'
+            ? 'Active'
+            : 'Inactive',
+    ],
+
+    'snapshot' => $snapshot,
+
+    // ✅ ADD THIS
+    'quick_payments' => $quickPayments,
+
+    'attention' => [
+        'count' => count($attention),
+        'items' => $attention,
+    ],
+]);
+
     }
 
-private function getFosaBreakdown(int $memberId): array
+    /**
+ * --------------------------------------------------------------------------
+ * Quick Payments (M-PESA Tap-to-Pay)
+ * Builds all payable payment codes for the member
+ * --------------------------------------------------------------------------
+ */
+private function getQuickPayments(int $memberId): array
+{
+    // Savings & Capital (static)
+    $payments = [
+        'savings' => [
+            'label' => 'Savings',
+            'code'  => 'SH' . $memberId,
+        ],
+        'capital' => [
+            'label' => 'Capital Shares',
+            'code'  => 'CA' . $memberId,
+        ],
+        'loans' => [],
+        'fosa'  => [],
+    ];
+
+    // Outstanding loans
+    $loans = DB::table('sacco_loans as l')
+        ->join('sacco_loan_types as t', 'l.loan_loan_type', '=', 't.loan_type_id')
+        ->where('l.loan_member', $memberId)
+        ->whereRaw('l.loan_amount - COALESCE(l.loan_loan_paid,0) > 1')
+        ->select(
+            'l.loan_id',
+            't.loan_type_name'
+        )
+        ->orderByDesc('l.loan_taken_period')
+        ->get();
+
+    foreach ($loans as $loan) {
+        $payments['loans'][] = [
+            'loan_id' => $loan->loan_id,
+            'label'   => strtoupper($loan->loan_type_name),
+            'code'    => 'LN' . $loan->loan_id,
+        ];
+    }
+
+    // Active FOSA types
+    $fosaTypes = DB::table('sacco_fosa_types')
+        ->where('type_active', 'Y')
+        ->orderBy('type_prefix')
+        ->get();
+
+    foreach ($fosaTypes as $type) {
+        $payments['fosa'][] = [
+            'type'   => strtoupper($type->type_name),
+            'prefix'=> $type->type_prefix,
+            'code'  => $type->type_prefix . $memberId,
+        ];
+    }
+
+    return $payments;
+}
+
+    private function getFosaBreakdown(int $memberId): array
 {
     $rows = DB::table('sacco_fosas')
         ->leftJoin(
