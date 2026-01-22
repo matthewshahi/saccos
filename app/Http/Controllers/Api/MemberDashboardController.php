@@ -217,158 +217,76 @@ class MemberDashboardController extends Controller
         'transactions'  => $transactions,
     ]);
 }
-// public function fosaSavings(Request $request)
-// {
-//     // 🔐 Authenticated member
-//     $member = $request->user();
-
-//     if (!$member || !isset($member->member_id)) {
-//         return response()->json([
-//             'message' => 'Unauthenticated.',
-//         ], 401);
-//     }
-
-//     $memberId = $member->member_id;
-
-//     /*
-//     |----------------------------------------------------------------------
-//     | 1. Total FOSA balance (authoritative)
-//     |----------------------------------------------------------------------
-//     | Use sacco_members if you track total there,
-//     | otherwise compute from sacco_fosas.
-//     */
-//     $row = DB::table('sacco_members')
-//         ->where('member_id', $memberId)
-//         ->where('member_active', 'Y')
-//         ->first();
-
-//     if (!$row) {
-//         return response()->json([
-//             'message' => 'Member not found or inactive.',
-//         ], 401);
-//     }
-
-//     // If you already maintain this total (recommended)
-//     $totalFosa = (float) ($row->member_total_fosa ?? 0);
-
-//     /*
-//     |----------------------------------------------------------------------
-//     | 2. Last 10 FOSA transactions (authoritative ordering)
-//     |----------------------------------------------------------------------
-//     */
-//     $transactions = DB::table('sacco_fosas')
-//         ->where('fosa_member_id', $memberId)
-//         ->orderByDesc('fosa_period')
-//         ->orderByDesc('fosa_date_paid')
-//         ->orderByDesc('fosa_id')
-//         ->limit(10)
-//         ->get()
-//         ->map(function ($f) {
-//             $amount = (float) $f->fosa_amount_paying;
-
-//             $description = $f->fosa_description ?? 'FOSA Transaction';
-//             $description = preg_replace('/^(CR|DR)\s*-\s*/i', '', $description);
-
-//             return [
-//                 'date'        => Carbon::parse($f->fosa_date_paid)->format('d M Y'),
-//                 'description' => $description,
-//                 'amount'      => abs($amount),
-//                 'is_credit'   => $amount > 0,
-//             ];
-//         });
-
-//     /*
-//     |----------------------------------------------------------------------
-//     | 3. Response (same contract shape as Shares)
-//     |----------------------------------------------------------------------
-//     */
-//     return response()->json([
-//         'total_savings' => $totalFosa,
-//         'transactions'  => $transactions,
-//     ]);
-// }
-
 public function fosaSavings(Request $request)
 {
+    // 🔐 Authenticated member
     $member = $request->user();
 
     if (!$member || !isset($member->member_id)) {
-        return response()->json(['message' => 'Unauthenticated.'], 401);
+        return response()->json([
+            'message' => 'Unauthenticated.',
+        ], 401);
     }
 
     $memberId = $member->member_id;
 
-    // 1. Authoritative total (summary)
+    /*
+    |----------------------------------------------------------------------
+    | 1. Total FOSA balance (authoritative)
+    |----------------------------------------------------------------------
+    | Use sacco_members if you track total there,
+    | otherwise compute from sacco_fosas.
+    */
     $row = DB::table('sacco_members')
         ->where('member_id', $memberId)
         ->where('member_active', 'Y')
         ->first();
 
     if (!$row) {
-        return response()->json(['message' => 'Member not found or inactive.'], 404);
+        return response()->json([
+            'message' => 'Member not found or inactive.',
+        ], 401);
     }
 
+    // If you already maintain this total (recommended)
     $totalFosa = (float) ($row->member_total_fosa ?? 0);
 
-    // 2. Fetch FOSA contributions (groupable)
-    $fosaContributions = DB::table('sacco_fosas')
-        ->leftJoin(
-            'sacco_fosa_types',
-            'sacco_fosas.fosa_type_id',
-            '=',
-            'sacco_fosa_types.type_id'
-        )
-        ->where('sacco_fosas.fosa_member_id', $memberId)
-        ->orderBy('sacco_fosas.fosa_type_id')
-        ->orderByDesc('sacco_fosas.fosa_period')
-        ->orderByDesc('sacco_fosas.fosa_date_paid')
-        ->select(
-            'sacco_fosas.*',
-            'sacco_fosa_types.type_name',
-            'sacco_fosa_types.type_prefix'
-        )
-        ->get();
+    /*
+    |----------------------------------------------------------------------
+    | 2. Last 10 FOSA transactions (authoritative ordering)
+    |----------------------------------------------------------------------
+    */
+    $transactions = DB::table('sacco_fosas')
+        ->where('fosa_member_id', $memberId)
+        ->orderByDesc('fosa_period')
+        ->orderByDesc('fosa_date_paid')
+        ->orderByDesc('fosa_id')
+        ->limit(10)
+        ->get()
+        ->map(function ($f) {
+            $amount = (float) $f->fosa_amount_paying;
 
-    // 3. Group by savings type (Welfare, Holiday, etc.)
-    $grouped = $fosaContributions->groupBy(function ($row) {
-        return $row->type_name ?: 'UNSPECIFIED';
-    });
+            $description = $f->fosa_description ?? 'FOSA Transaction';
+            $description = preg_replace('/^(CR|DR)\s*-\s*/i', '', $description);
 
-    // 4. Shape response per group
-    $groups = [];
+            return [
+                'date'        => Carbon::parse($f->fosa_date_paid)->format('d M Y'),
+                'description' => $description,
+                'amount'      => abs($amount),
+                'is_credit'   => $amount > 0,
+            ];
+        });
 
-    foreach ($grouped as $type => $rows) {
-        $groups[] = [
-            'type'         => $type,
-            'prefix'       => $rows->first()->type_prefix,
-            'total'        => $rows->sum(fn ($r) => (float) $r->fosa_amount_paying),
-            'transactions' => $rows
-                ->take(10)
-                ->map(function ($f) {
-                    $amount = (float) $f->fosa_amount_paying;
-
-                    return [
-                        'date'        => Carbon::parse($f->fosa_date_paid)->format('d M Y'),
-                        'description' => preg_replace(
-                            '/^(CR|DR)\s*-\s*/i',
-                            '',
-                            $f->fosa_description ?? 'FOSA Transaction'
-                        ),
-                        'amount'    => abs($amount),
-                        'is_credit' => $amount > 0,
-                    ];
-                })
-                ->values(),
-        ];
-    }
-
-    // 5. Final response
+    /*
+    |----------------------------------------------------------------------
+    | 3. Response (same contract shape as Shares)
+    |----------------------------------------------------------------------
+    */
     return response()->json([
         'total_savings' => $totalFosa,
-        'groups'        => $groups,
+        'transactions'  => $transactions,
     ]);
 }
-
 
 public function loans(Request $request)
 {
