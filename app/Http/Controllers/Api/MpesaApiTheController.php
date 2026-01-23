@@ -14,26 +14,40 @@ class MpesaApiTheController extends Controller
 {
     /**
      * Receive STK push initiation request from mobile app
-     * Payload example:
+     *
+     * Expected payload (Tap / Quick Payments):
      * {
-     *   user_id: 900,
-     *   phone: "254722343454",
-     *   amount: 3000,
-     *   reference: "LN6321"
+     *   phone: "0722400737",
+     *   amount: 1,
+     *   reference: "CA250"
      * }
+     *
+     * Member is resolved authoritatively via auth.api middleware.
      */
     public function initiateStkPushFromApp(Request $request)
     {
         // -------------------------------------------------
-        // 0. Log raw payload (authoritative reference)
+        // 0. Log raw payload (for traceability only)
         // -------------------------------------------------
         Log::info('STK PUSH INITIATION (APP)', $request->all());
 
         // -------------------------------------------------
-        // 1. Validate payload structure
+        // 1. Resolve authenticated member (authoritative)
+        // -------------------------------------------------
+        $member = $request->user();
+
+        if (!$member || !isset($member->member_id)) {
+            return response()->json([
+                'message' => 'Unauthenticated.',
+            ], 401);
+        }
+
+        $memberId = (int) $member->member_id;
+
+        // -------------------------------------------------
+        // 2. Validate payload (NO user_id here)
         // -------------------------------------------------
         $validator = Validator::make($request->all(), [
-            'user_id'   => 'required|integer',
             'phone'     => 'required|string',
             'amount'    => 'required|numeric',
             'reference' => 'required|string',
@@ -47,10 +61,8 @@ class MpesaApiTheController extends Controller
             ], 422);
         }
 
-        $memberId = (int) $request->user_id;
-
         // -------------------------------------------------
-        // 2. Normalise Safaricom phone
+        // 3. Normalise & validate Safaricom phone
         // -------------------------------------------------
         $rawPhone = trim($request->phone);
         $phone = preg_replace('/[^0-9]/', '', $rawPhone);
@@ -82,7 +94,7 @@ class MpesaApiTheController extends Controller
         }
 
         // -------------------------------------------------
-        // 3. Validate amount
+        // 4. Validate amount
         // -------------------------------------------------
         $amount = (float) $request->amount;
 
@@ -94,7 +106,7 @@ class MpesaApiTheController extends Controller
         }
 
         // -------------------------------------------------
-        // 4. Duplicate pending protection (2 minutes)
+        // 5. Duplicate pending protection (2 minutes)
         // -------------------------------------------------
         $twoMinutesAgo = Carbon::now()->subMinutes(2);
 
@@ -114,7 +126,7 @@ class MpesaApiTheController extends Controller
         }
 
         // -------------------------------------------------
-        // 5. Persist request
+        // 6. Persist STK request
         // -------------------------------------------------
         DB::table('mpesa_app_stk_requests')->insert([
             'member_id'  => $memberId,
@@ -128,7 +140,7 @@ class MpesaApiTheController extends Controller
         ]);
 
         // -------------------------------------------------
-        // 6. Hand off to canonical STK engine
+        // 7. Hand off to canonical STK engine
         // -------------------------------------------------
         $stkRequest = new Request([
             'phone'  => $phone,
@@ -139,18 +151,19 @@ class MpesaApiTheController extends Controller
         $stkController = app(MpesaTheController::class);
         $stkResponse = $stkController->storeStkPush($stkRequest);
 
-        if (method_exists($stkResponse, 'getStatusCode') && $stkResponse->getStatusCode() !== 200) {
+        if (method_exists($stkResponse, 'getStatusCode')
+            && $stkResponse->getStatusCode() !== 200) {
             return $stkResponse;
         }
 
         // -------------------------------------------------
-        // 7. Final response
+        // 8. Final response
         // -------------------------------------------------
         return response()->json([
             'status'  => 'ok',
             'message' => 'STK request received and queued successfully',
             'data'    => [
-                'user_id'   => $memberId,
+                'member_id' => $memberId,
                 'phone'     => $phone,
                 'amount'    => $amount,
                 'reference' => $request->reference,
