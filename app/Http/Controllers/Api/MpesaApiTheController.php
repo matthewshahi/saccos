@@ -18,6 +18,9 @@ class MpesaApiTheController extends Controller
      */
     public function initiateStkPushFromApp(Request $request)
     {
+
+    Log::info('RAW PAYLOAD', $request->all());
+
         // -----------------------------
         // 1. Basic validation
         // -----------------------------
