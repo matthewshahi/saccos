@@ -5,33 +5,39 @@ namespace App\Http\Controllers\Api;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Controller;
 use Carbon\Carbon;
 use App\Http\Controllers\MpesaTheController;
-
 
 class MpesaApiTheController extends Controller
 {
     /**
      * Receive STK push initiation request from mobile app
-     * (VALIDATE + CHECK DUPLICATE + SAVE ONLY)
+     * Payload example:
+     * {
+     *   user_id: 900,
+     *   phone: "254722343454",
+     *   amount: 3000,
+     *   reference: "LN6321"
+     * }
      */
     public function initiateStkPushFromApp(Request $request)
     {
+        // -------------------------------------------------
+        // 0. Log raw payload (authoritative reference)
+        // -------------------------------------------------
+        Log::info('STK PUSH INITIATION (APP)', $request->all());
 
-    Log::info('RAW PAYLOAD', $request->all());
-
-        // -----------------------------
-        // 1. Basic validation
-        // -----------------------------
+        // -------------------------------------------------
+        // 1. Validate payload structure
+        // -------------------------------------------------
         $validator = Validator::make($request->all(), [
-    'user_id'   => 'required|integer',
-    'phone'     => 'required|string',
-    'amount'    => 'required|numeric',
-    'reference' => 'required|string',
-]);
-
-
+            'user_id'   => 'required|integer',
+            'phone'     => 'required|string',
+            'amount'    => 'required|numeric',
+            'reference' => 'required|string',
+        ]);
 
         if ($validator->fails()) {
             return response()->json([
@@ -41,9 +47,11 @@ class MpesaApiTheController extends Controller
             ], 422);
         }
 
-        // -----------------------------
-        // 2. Clean & normalize phone
-        // -----------------------------
+        $memberId = (int) $request->user_id;
+
+        // -------------------------------------------------
+        // 2. Normalise Safaricom phone
+        // -------------------------------------------------
         $rawPhone = trim($request->phone);
         $phone = preg_replace('/[^0-9]/', '', $rawPhone);
 
@@ -73,32 +81,21 @@ class MpesaApiTheController extends Controller
             ], 422);
         }
 
-        // -----------------------------
+        // -------------------------------------------------
         // 3. Validate amount
-        // -----------------------------
+        // -------------------------------------------------
         $amount = (float) $request->amount;
 
-        if ($amount <= 0) {
+        if ($amount <= 0 || $amount > 1000000) {
             return response()->json([
                 'status'  => 'error',
-                'message' => 'Amount must be greater than zero',
+                'message' => 'Invalid transaction amount',
             ], 422);
         }
 
-        if ($amount > 1000000) {
-            return response()->json([
-                'status'  => 'error',
-                'message' => 'Amount exceeds allowed limit',
-            ], 422);
-        }
-
-        // -----------------------------
-        // 4. Duplicate check (DB-based)
-        // -----------------------------
-        // $memberId = optional($request->user())->id;
-        $memberId = (int) $request->user_id;
-
-
+        // -------------------------------------------------
+        // 4. Duplicate pending protection (2 minutes)
+        // -------------------------------------------------
         $twoMinutesAgo = Carbon::now()->subMinutes(2);
 
         $existing = DB::table('mpesa_app_stk_requests')
@@ -109,17 +106,16 @@ class MpesaApiTheController extends Controller
             ->first();
 
         if ($existing) {
-    return response()->json([
-        'status'  => 'error',
-        'code'    => 'DUPLICATE_PENDING',
-        'message' => 'A similar transaction is already pending. Please wait for 2 minutes before retrying.',
-    ], 409);
-}
+            return response()->json([
+                'status'  => 'error',
+                'code'    => 'DUPLICATE_PENDING',
+                'message' => 'A similar transaction is already pending. Please wait before retrying.',
+            ], 409);
+        }
 
-
-        // -----------------------------
-        // 5. Save to database
-        // -----------------------------
+        // -------------------------------------------------
+        // 5. Persist request
+        // -------------------------------------------------
         DB::table('mpesa_app_stk_requests')->insert([
             'member_id'  => $memberId,
             'phone'      => $phone,
@@ -131,33 +127,30 @@ class MpesaApiTheController extends Controller
             'updated_at' => now(),
         ]);
 
-        // -----------------------------
-// 6. Hand off to canonical STK processor
-// -----------------------------
-$stkRequest = new Request([
-    'phone'  => $phone,
-    'uniq'   => $request->reference,
-    'amount' => $amount,
-]);
+        // -------------------------------------------------
+        // 6. Hand off to canonical STK engine
+        // -------------------------------------------------
+        $stkRequest = new Request([
+            'phone'  => $phone,
+            'uniq'   => $request->reference,
+            'amount' => $amount,
+        ]);
 
-$stkController = app(MpesaTheController::class);
- 
+        $stkController = app(MpesaTheController::class);
+        $stkResponse = $stkController->storeStkPush($stkRequest);
 
-$stkResponse = $stkController->storeStkPush($stkRequest);
+        if (method_exists($stkResponse, 'getStatusCode') && $stkResponse->getStatusCode() !== 200) {
+            return $stkResponse;
+        }
 
-if (method_exists($stkResponse, 'getStatusCode') && $stkResponse->getStatusCode() !== 200) {
-    return $stkResponse;
-}
-
-
-
-        // -----------------------------
-        // 6. Response
-        // -----------------------------
+        // -------------------------------------------------
+        // 7. Final response
+        // -------------------------------------------------
         return response()->json([
             'status'  => 'ok',
             'message' => 'STK request received and queued successfully',
             'data'    => [
+                'user_id'   => $memberId,
                 'phone'     => $phone,
                 'amount'    => $amount,
                 'reference' => $request->reference,
