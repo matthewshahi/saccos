@@ -85,10 +85,10 @@ class KassLoanImportController extends Controller
         ];
 
         $groups = DB::table('kass_staging_loans')
-            ->orderBy('raw_name')
-            ->orderBy('loan_type')   // loan stream identity
-            ->orderBy('year')
-            ->orderByRaw("
+    ->orderBy('raw_name')
+    ->orderBy('loan_type')   // raw ordering is fine
+    ->orderBy('year')
+    ->orderByRaw("
         CASE UPPER(month)
             WHEN 'JAN' THEN 1
             WHEN 'FEB' THEN 2
@@ -105,10 +105,16 @@ class KassLoanImportController extends Controller
             ELSE 99
         END
     ")
-            ->get()
-            ->groupBy(['raw_name', 'loan_type']);
+    ->get()
+    ->map(function ($r) {
+        $r->loan_type = $this->resolveLoanType($r->loan_type);
+        return $r;
+    })
+    ->groupBy(['raw_name', 'loan_type']);
 
 
+
+            
 
 
 
@@ -117,9 +123,15 @@ class KassLoanImportController extends Controller
 
                 $loanType = $loanRows[0]->loan_type;
 
-                $loanRows = collect($loanRows)
-                    ->filter(fn($r) => $r->loan_type === $loanType)
-                    ->values();
+                // $loanRows = collect($loanRows)
+                //     ->filter(fn($r) => $r->loan_type === $loanType)
+                //     ->values();
+
+//                 $loanRows = collect($loanRows)->map(function ($r) {
+//     $r->loan_type = $this->resolveLoanType($r->loan_type);
+//     return $r;
+// })->values();
+
 
 
                 $loanRows = $loanRows->values();
@@ -316,57 +328,37 @@ class KassLoanImportController extends Controller
         /* ------------------------------------------
      * 2) Resolve Loan Type
      * ------------------------------------------ */
-        // $loanTypeName = $this->resolveLoanType($first->loan_type);
-        $loanTypeName = strtoupper(trim($first->loan_type));
+         $loanTypeName = $this->resolveLoanType($first->loan_type);
+        // $loanTypeName = strtoupper(trim($first->loan_type));
 
         $loanTypeId   = $this->getLoanTypeId($loanTypeName);
 
         /* ------------------------------------------
      * 3) Identify if this cycle is a TOP-UP
      * ------------------------------------------ */
-        $previousLoanId = $this->lastLoan[$memberId][$loanTypeId] ?? null;
-        $isTopUp = false;
+        /* ------------------------------------------
+ * 3) Identify if this cycle is a TOP-UP
+ * ------------------------------------------ */
+$previousLoanId = $this->lastLoan[$memberId][$loanTypeId] ?? null;
+
+$isTopUp = (
+    $previousLoanId &&
+    is_numeric($first->period_index) &&
+    (int) $first->period_index > 0
+);
+
+
+   
 
         // period_index is required
         $cycleIndex = is_numeric($first->period_index)
             ? (int) $first->period_index
             : null;
 
-        if ($previousLoanId && $cycleIndex !== null && $cycleIndex > 0) {
+ 
 
-            $prevLoan = DB::table('sacco_loans')
-                ->where('loan_id', $previousLoanId)
-                ->first();
 
-            if ($prevLoan) {
-
-                $loanAmt  = (float) ($prevLoan->loan_amount ?? 0);
-                $loanPaid = (float) ($prevLoan->loan_loan_paid ?? 0);
-
-                // Previous loan must still be active
-                if ($loanAmt > $loanPaid) {
-                    $lastPaymentPeriod = DB::table('sacco_loan_payments')
-                        ->where('loan_payments_loan_id', $previousLoanId)
-                        ->max('loan_payments_period');
-
-                    if ($lastPaymentPeriod) {
-
-                        // Extract last repayment year + month
-                        $prevYear  = (int) substr($lastPaymentPeriod, 0, 4);
-                        $prevMonth = (int) substr($lastPaymentPeriod, 4, 2);
-
-                        $curYear  = (int) $first->year;
-                        $curMonth = $this->safeMonth($first->month);
-
-                        // STRICT RULE: must be immediately consecutive
-                        if ($this->monthDiff($prevYear, $prevMonth, $curYear, $curMonth) === 1) {
-                            $isTopUp = true;
-                        }
-                    }
-                }
-            }
-        }
-
+       
 
 
         $initialOutstanding = (float)$cycle[0]->outstanding_balance;
@@ -498,9 +490,13 @@ class KassLoanImportController extends Controller
     /* ============================================================
      * NORMALISE VALUES (ONCE — DO NOT REPEAT)
      * ============================================================ */
+    // $prevOutstanding = $this->moneyToCents($prev->outstanding_balance);
+    // $curOutstanding  = $this->moneyToCents($cur->outstanding_balance);
+    // $prevPrincipal   = $this->moneyToCents($prev->principal_paid);
+
     $prevOutstanding = $this->moneyToCents($prev->outstanding_balance);
-    $curOutstanding  = $this->moneyToCents($cur->outstanding_balance);
-    $prevPrincipal   = $this->moneyToCents($prev->principal_paid);
+$curOutstanding  = $this->moneyToCents($cur->outstanding_balance);
+$prevPrincipal = $this->moneyToCents($prev->principal_paid ?? 0);
 
     /* ============================================================
      * HARD STOPS — ABSOLUTE (NO SYS-ADJ BEYOND THIS POINT)
@@ -512,9 +508,14 @@ class KassLoanImportController extends Controller
     }
 
     // 2. Principal clears or over-clears balance
-    if ($prevOutstanding > 0 && abs($prevPrincipal) >= $prevOutstanding) {
-        continue;
-    }
+//    $prevPrincipal = $this->moneyToCents($prev->principal_paid ?? 0);
+
+// 2. Principal clears or over-clears balance
+if ($prevOutstanding > 0 && abs($prevPrincipal) >= $prevOutstanding) {
+    continue;
+}
+
+
 
     // 3. Explained jump (new loan / top-up)
     if (is_numeric($cur->period_index) && (int)$cur->period_index > 0) {
@@ -530,13 +531,18 @@ class KassLoanImportController extends Controller
     if ($prevOutstanding === 0) {
         continue;
     }
+    // 6. Current row has its own principal — handled by normal repayment
+// if ($cur->principal_paid !== null && (float)$cur->principal_paid > 0) {
+//     continue;
+// }
+
 
     /* ============================================================
      * RECONCILIATION (ONLY REACHED IF ALL HARD STOPS PASSED)
      * ============================================================ */
 
-    $expectedNext = $prevOutstanding - $prevPrincipal;
-    $deltaCents   = $curOutstanding - $expectedNext;
+$expectedNext = $prevOutstanding - $prevPrincipal;
+$deltaCents   = $curOutstanding - $expectedNext;
 
     // Ignore rounding noise (≤ KES 2)
     if (abs($deltaCents) <= 200) {

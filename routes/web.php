@@ -99,6 +99,10 @@ Route::prefix('kass_loan_imports')->name('kassloan.')->group(function () {
         ->name('reset');
 });
 
+//use this for loans, the other one isnt good
+Route::get('kass_loan_imports_loan_only', [\App\Http\Controllers\KassLoanOnlyImportController::class, 'run'])
+        ->name('index_import');
+
 
 
 Route::prefix('kas-member-import')->name('kasmember.')->group(function () {

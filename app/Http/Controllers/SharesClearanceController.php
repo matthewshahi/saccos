@@ -31,7 +31,7 @@ class SharesClearanceController extends Controller
             'd.department_name',
             'c.company_name'
         )
-        ->where('m.member_active', 'Y')
+        // ->where('m.member_active', 'Y')
         ->where('m.member_deleted', 'N')
         ->where('m.member_total_share', '>', 0); // ✅ Only positive shares
 
@@ -85,7 +85,7 @@ class SharesClearanceController extends Controller
                 'c.company_name',
                 'd.department_name'
             )
-            ->where('m.member_active', 'Y')
+            // ->where('m.member_active', 'Y')
             ->where('m.member_deleted', 'N')
             ->when($term, function ($q) use ($term) {
                 $q->where(function ($q2) use ($term) {
@@ -193,7 +193,7 @@ $currentPeriod = $request->period ?? $activePeriod;
                 'required',
                 'integer',
                 Rule::exists('sacco_members', 'member_id')
-                    ->where('member_active', 'Y')
+                    // ->where('member_active', 'Y')
                     ->where('member_deleted', 'N')
             ],
             'loan_ids'       => 'required|array',

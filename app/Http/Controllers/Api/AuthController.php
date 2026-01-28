@@ -30,17 +30,17 @@ class AuthController extends Controller
         $passwordHash = md5($validated['password']); // legacy SACCO auth
 
         $member = Member::where(function ($q) use ($login) {
-                $q->where('member_email', $login)
-                  ->orWhere('member_phone_no', $login);
-            })
+            $q->where('member_email', $login)
+                ->orWhere('member_phone_no', $login);
+        })
             ->where('member_password', $passwordHash)
             ->where('member_active', 'Y')
             ->first();
 
         if (!$member) {
-            throw ValidationException::withMessages([
-                'login' => ['Invalid credentials.'],
-            ]);
+            return response()->json([
+                'message' => 'Invalid credentials.',
+            ], 401);
         }
 
         // 🔒 Revoke any existing active session for this device

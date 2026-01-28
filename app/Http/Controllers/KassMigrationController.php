@@ -212,6 +212,71 @@ class KassMigrationController extends Controller
 
 
 
+    private function resolveLoanName(
+    \PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet,
+    int $yearCol,
+    int $headerRow
+): string {
+
+    // Scan rows ABOVE the YEAR header (header band)
+    $startRow = 1;
+    $endRow   = $headerRow - 1;
+
+    if ($endRow < $startRow) {
+        throw new \RuntimeException("No header band available to resolve loan name.");
+    }
+
+    // Scan ONLY columns belonging to this loan block
+    // (YEAR → PERIOD, max +6 columns for safety)
+    $startCol = $yearCol;
+    $endCol   = $yearCol + 6;
+
+    for ($row = $startRow; $row <= $endRow; $row++) {
+        for ($col = $startCol; $col <= $endCol; $col++) {
+
+            $cell = $sheet->getCellByColumnAndRow($col, $row);
+            $val  = trim((string) $cell->getValue());
+
+            if ($val === '') {
+                continue;
+            }
+
+            // Reject numeric / dates
+            if (is_numeric($val)) {
+                continue;
+            }
+
+            $upper = strtoupper($val);
+
+            // Reject known headers & noise
+            if (in_array($upper, [
+                'YEAR','MONTH','DR','CR','INT','INTEREST','PERIOD',
+                'NAME','ADM NO','COMP',
+                'PAYROLL','RECOVERIES','OVER/UNDER'
+            ])) {
+                continue;
+            }
+
+            // Reject months
+            if (in_array($upper, [
+                'JAN','FEB','MAR','APR','MAY','JUN',
+                'JUL','AUG','SEP','OCT','NOV','DEC'
+            ])) {
+                continue;
+            }
+
+            // ✅ THIS IS A LOAN NAME
+            return preg_replace('/\s+/', ' ', $upper);
+        }
+    }
+
+    // ❌ HARD FAIL — NO FALLBACK
+    throw new \RuntimeException(
+        "Loan name could not be resolved above YEAR column {$yearCol}"
+    );
+}
+
+
     //    public function processAll()
     // {
     //     try {
@@ -1579,7 +1644,50 @@ class KassMigrationController extends Controller
             }
 
             // Detect loan label from row ABOVE header
-            $label = 'LOAN_' . ($loanNo + 1);
+            // $label = 'LOAN_' . ($loanNo + 1);
+           
+
+            // Detect loan label from row ABOVE header
+$label = null;
+
+if ($labelRow !== null) {
+
+    // Scan across THIS loan block header band (YEAR → PERIOD)
+    $scanUntil = min($i + 7, count($labelRow) - 1);
+
+    for ($k = $i; $k <= $scanUntil; $k++) {
+
+        $raw = strtoupper(trim((string) ($labelRow[$k] ?? '')));
+
+        if ($raw === '') {
+            continue;
+        }
+
+        // Ignore headers / noise
+        if (in_array($raw, [
+            'YEAR','MONTH','DR','CR','INT','INTEREST','PERIOD',
+            'NAME','ADM NO','COMP',
+            'PAYROLL','RECOVERIES','OVER/UNDER',
+            'JAN','FEB','MAR','APR','MAY','JUN',
+            'JUL','AUG','SEP','OCT','NOV','DEC'
+        ])) {
+            continue;
+        }
+
+        // Found a valid loan name
+        $label = $raw;
+        break;
+    }
+}
+
+// ❌ NO FALLBACK — FAIL HARD
+if ($label === null) {
+    throw new \RuntimeException(
+        "Loan name could not be resolved for loan block starting at column {$i}"
+    );
+}
+
+
 
             if ($labelRow !== null) {
                 $raw = $labelRow[$i] ?? '';
