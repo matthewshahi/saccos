@@ -232,9 +232,9 @@ class TrialBalanceController extends Controller
         }
 
         // 24 months max
-        if ($dateFrom->diffInDays($dateTo) > 732 || $dateFrom->diffInMonths($dateTo) > 24) {
-            return ['error' => back()->with('error', 'Date range cannot exceed 24 months (2 years).')->withInput()];
-        }
+        // if ($dateFrom->diffInDays($dateTo) > 732 || $dateFrom->diffInMonths($dateTo) > 24) {
+        //     return ['error' => back()->with('error', 'Date range cannot exceed 24 months (2 years).')->withInput()];
+        // }
 
         return compact('period', 'dateFrom', 'dateTo');
     }
