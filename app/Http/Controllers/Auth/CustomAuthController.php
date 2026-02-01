@@ -24,44 +24,87 @@ class CustomAuthController extends Controller
         ]);
 
 
-   // ------------------------------------------------------
-// 🔒 Verify reCAPTCHA v3 ONLY in Production
-// ------------------------------------------------------
-if (app()->environment('production')) {
+        // ------------------------------------------------------
+        // 🔒 Verify reCAPTCHA v3 ONLY in Production
+        // ------------------------------------------------------
+        // ------------------------------------------------------
+        // 🔒 Verify reCAPTCHA v3 ONLY in Production
+        // ------------------------------------------------------
+        if (app()->environment('production')) {
+            $token = (string) $request->input('recaptcha_token', '');
 
-    $recaptchaToken = $request->input('recaptcha_token');
+            if ($token === '') {
+                return back()->withErrors([
+                    'login' => 'Security check could not load. Please disable any ad-blocker and refresh the page.',
+                ])->withInput($request->only('login'));
+            }
 
-    $secret = env('RECAPTCHA_SECRET_KEY');
-    $verifyUrl = 'https://www.google.com/recaptcha/api/siteverify';
-    $response = @file_get_contents($verifyUrl . '?secret=' . $secret . '&response=' . $recaptchaToken);
+            $secret = (string) config('services.recaptcha.secret');
+            $verifyUrl = 'https://www.google.com/recaptcha/api/siteverify';
 
-    if (!$response) {
-        return back()->withErrors([
-            'login' => 'Unable to verify reCAPTCHA. Please refresh and try again.',
-        ]);
-    }
+            try {
+                $http = Http::asForm()->timeout(5)->post($verifyUrl, [
+                    'secret'   => $secret,
+                    'response' => $token,
+                    'remoteip' => $request->ip(), // optional but helpful
+                ]);
 
-    $responseData = json_decode($response);
+                if (!$http->ok()) {
+                    Log::warning('reCAPTCHA siteverify HTTP error', [
+                        'status' => $http->status(),
+                        'body'   => $http->body(),
+                    ]);
 
-    // Safely handle missing fields (prevents "Undefined property: score")
-    $success = $responseData->success ?? false;
-    $score   = $responseData->score   ?? 0;
+                    return back()->withErrors([
+                        'login' => 'Unable to verify security check. Please try again.',
+                    ])->withInput($request->only('login'));
+                }
 
-    if (!$success || $score < 0.5) {
-        return back()->withErrors([
-            'login' => 'Suspicious activity detected. Please try again.',
-        ])->withInput($request->only('login'));
-    }
-}
+                $data = $http->json();
+
+                $success = (bool)($data['success'] ?? false);
+                $score   = (float)($data['score'] ?? 0.0);
+                $action  = (string)($data['action'] ?? '');
+                $host    = (string)($data['hostname'] ?? '');
+                $errors  = $data['error-codes'] ?? [];
+
+                // Log only on failure (or keep temporarily while tuning)
+                if (!$success || $action !== 'login') {
+                    Log::warning('reCAPTCHA rejected login', compact('success', 'score', 'action', 'host', 'errors'));
+                }
+
+                // ✅ Must match the action you used on frontend
+                if (!$success || $action !== 'login') {
+                    return back()->withErrors([
+                        'login' => 'Security check failed. Please refresh the page and try again.',
+                    ])->withInput($request->only('login'));
+                }
+
+                // ✅ Tune this threshold after reviewing logs
+                $threshold = 0.35; // start lower for login to reduce false positives
+                if ($score < $threshold) {
+                    Log::warning('reCAPTCHA low score login', ['score' => $score, 'threshold' => $threshold, 'host' => $host]);
+                    return back()->withErrors([
+                        'login' => 'Login blocked by security check. If you are using a VPN/ad-blocker, disable it and try again.',
+                    ])->withInput($request->only('login'));
+                }
+            } catch (\Throwable $e) {
+                Log::warning('reCAPTCHA verify exception', ['error' => $e->getMessage()]);
+                return back()->withErrors([
+                    'login' => 'Unable to verify security check. Please try again.',
+                ])->withInput($request->only('login'));
+            }
+        }
+
 
         $login    = $request->input('login');
         $password = md5($request->input('password'));
 
         // ✅ Check if member exists by email or phone
         $member = Member::where(function ($query) use ($login) {
-                $query->where('member_email', $login)
-                      ->orWhere('member_phone_no', $login);
-            })
+            $query->where('member_email', $login)
+                ->orWhere('member_phone_no', $login);
+        })
             ->where('member_password', $password)
             ->where('member_active', 'Y')
             ->first();

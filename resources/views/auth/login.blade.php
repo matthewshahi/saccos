@@ -67,6 +67,13 @@
     .login-footer a:hover {
         text-decoration: underline;
     }
+
+    .recaptcha-note {
+        font-size: 0.85rem;
+        color: #666;
+        margin-top: 0.75rem;
+        text-align: center;
+    }
 </style>
 
 <div class="login-wrapper">
@@ -74,7 +81,7 @@
         <div class="sacco-brand">{{ $defaultCompanyName }}</div>
         <h5>Member Login</h5>
 
-        <form method="POST" action="{{ route('login') }}">
+        <form method="POST" action="{{ route('login') }}" id="loginForm">
             @csrf
 
             <div class="form-group mb-3">
@@ -93,28 +100,20 @@
                 @endif
             </div>
 
+            {{-- reCAPTCHA v3 token --}}
+            <input type="hidden" name="recaptcha_token" id="recaptcha_token">
+
             <div class="d-grid mb-3">
-                <button type="submit" class="btn btn-primary btn-block">Login</button>
+                <button type="submit" class="btn btn-primary btn-block" id="loginBtn">Login</button>
             </div>
 
             <div class="text-center mb-3">
                 <a href="{{ url('/register') }}" class="text-decoration-none">Click here to apply for membership</a>
             </div>
 
-
-            <input type="hidden" name="recaptcha_token" id="recaptcha_token">
-
-<script src="https://www.google.com/recaptcha/api.js?render={{ env('RECAPTCHA_SITE_KEY') }}"></script>
-<script>
-grecaptcha.ready(function() {
-    grecaptcha.execute('{{ env('RECAPTCHA_SITE_KEY') }}', {action: 'login'})
-        .then(function(token) {
-            document.getElementById('recaptcha_token').value = token;
-        });
-});
-</script>
-
-
+            <div class="recaptcha-note" id="recaptchaNote" style="display:none;">
+                reCAPTCHA is blocked or slow. If login fails, disable any ad-blocker for this site and try again.
+            </div>
         </form>
 
         <div class="login-footer">
@@ -127,4 +126,51 @@ grecaptcha.ready(function() {
         </div>
     </div>
 </div>
+
+{{-- reCAPTCHA v3 script --}}
+<script src="https://www.google.com/recaptcha/api.js?render={{ config('services.recaptcha.site_key') }}"></script>
+<script>
+(function() {
+  const SITE_KEY = "{{ config('services.recaptcha.site_key') }}";
+  const form = document.getElementById('loginForm');
+  const tokenInput = document.getElementById('recaptcha_token');
+  const note = document.getElementById('recaptchaNote');
+
+  // If user edits fields after token was set, clear it so we always generate a fresh one on submit.
+  const clearToken = () => { tokenInput.value = ''; };
+  document.getElementById('login').addEventListener('input', clearToken);
+  document.getElementById('password').addEventListener('input', clearToken);
+
+  form.addEventListener('submit', function(e) {
+    // If script blocked, allow submit (backend should reject with clear message)
+    if (typeof grecaptcha === 'undefined') {
+      if (note) note.style.display = 'block';
+      return;
+    }
+
+    // If token already set, allow normal submit
+    if (tokenInput.value) return;
+
+    e.preventDefault();
+
+    grecaptcha.ready(function() {
+      grecaptcha.execute(SITE_KEY, { action: 'login' }).then(function(token) {
+        tokenInput.value = token;
+        form.submit();
+      }).catch(function() {
+        if (note) note.style.display = 'block';
+        // allow submit anyway; backend should handle missing token
+        form.submit();
+      });
+    });
+  });
+
+  // Optional: show a hint if token is never generated (slow/blocked)
+  setTimeout(function() {
+    if (typeof grecaptcha === 'undefined') {
+      if (note) note.style.display = 'block';
+    }
+  }, 2500);
+})();
+</script>
 @endsection
