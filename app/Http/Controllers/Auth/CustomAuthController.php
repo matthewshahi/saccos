@@ -9,6 +9,8 @@ use Illuminate\Support\Facades\Auth;
 use App\Models\Member;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Http;
+
 
 class CustomAuthController extends Controller
 {
