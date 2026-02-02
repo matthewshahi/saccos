@@ -465,142 +465,173 @@
 
 <script>
 document.getElementById("downloadExcel").addEventListener("click", function () {
-    const container = document.getElementById("printableArea");
-    if (!container) {
-        alert("printableArea not found.");
-        return;
+  const container = document.getElementById("printableArea");
+  if (!container) return alert("printableArea not found.");
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet([]);
+  let rowCursor = 0;
+
+  // Report header (optional)
+  const title = `Member Statement - ${memberName || ""}`.trim();
+  XLSX.utils.sheet_add_aoa(ws, [[title]], { origin: { r: rowCursor, c: 0 } });
+  rowCursor += 2;
+
+  // Walk through printable area in document order
+  const blocks = extractExportBlocks(container);
+
+  blocks.forEach(block => {
+    if (block.type === "text") {
+      XLSX.utils.sheet_add_aoa(ws, [[block.value]], { origin: { r: rowCursor, c: 0 } });
+      rowCursor += 1;
     }
 
-    // ✅ Pick all tables in the printable report
-    const tables = container.querySelectorAll("table");
-    if (!tables.length) {
-        alert("No tables found in the statement to export.");
-        return;
+    if (block.type === "table") {
+      const aoa = tableToAOAWithSpans(block.node);
+      XLSX.utils.sheet_add_aoa(ws, aoa, { origin: { r: rowCursor, c: 0 } });
+      rowCursor += aoa.length + 2;
     }
+  });
 
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.aoa_to_sheet([]);
-    let rowCursor = 0;
+  ws["!cols"] = autoFitCols(ws);
+  XLSX.utils.book_append_sheet(wb, ws, "Statement");
 
-    // ✅ Optional: add a report header at the top
-    const title = `Member Statement - ${memberName || ""}`.trim();
-    XLSX.utils.sheet_add_aoa(ws, [[title]], { origin: { r: rowCursor, c: 0 } });
-    rowCursor += 2;
+  const safeName = (memberName || "member_statement")
+    .replace(/[^a-z0-9]+/gi, "_")
+    .toLowerCase();
 
-    tables.forEach((table, idx) => {
-        // ✅ Try to extract a "section title" from the nearest card-header
-        const sectionTitle = getSectionTitle(table, idx);
-
-        // Add section title row
-        XLSX.utils.sheet_add_aoa(ws, [[sectionTitle]], { origin: { r: rowCursor, c: 0 } });
-        rowCursor += 1;
-
-        // Convert table -> AOA (supports colspan/rowspan reasonably)
-        const aoa = tableToAOAWithSpans(table);
-
-        // Add table data
-        XLSX.utils.sheet_add_aoa(ws, aoa, { origin: { r: rowCursor, c: 0 } });
-
-        // Move cursor down (table height + spacing)
-        rowCursor += aoa.length + 2;
-    });
-
-    // Auto fit columns (simple heuristic)
-    ws["!cols"] = autoFitCols(ws);
-
-    XLSX.utils.book_append_sheet(wb, ws, "Statement");
-
-    const safeName = (memberName || "member_statement")
-        .replace(/[^a-z0-9]+/gi, "_")
-        .toLowerCase();
-
-    XLSX.writeFile(wb, `${safeName}_member_statement.xlsx`);
+  XLSX.writeFile(wb, `${safeName}_member_statement.xlsx`);
 });
 
-function getSectionTitle(table, idx) {
-    // Walk up to find .card then .card-header
-    const card = table.closest(".card");
-    const header = card ? card.querySelector(".card-header") : null;
-    const text = header ? header.innerText.trim() : "";
-    return text ? text : `Table ${idx + 1}`;
+/**
+ * Collects export blocks (text + tables) in visual order.
+ * - Captures headings, paragraphs, and "type header" divs.
+ * - Captures tables fully.
+ * - Avoids duplicating text inside tables.
+ * - Lets you exclude anything by adding: data-export="ignore"
+ */
+function extractExportBlocks(container) {
+  const blocks = [];
+  const seenText = new Set();
+
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_ELEMENT, {
+    acceptNode(node) {
+      // Ignore scripts/styles
+      if (node.tagName === "SCRIPT" || node.tagName === "STYLE") return NodeFilter.FILTER_REJECT;
+
+      // Allow manual ignore
+      if (node.getAttribute && node.getAttribute("data-export") === "ignore") {
+        return NodeFilter.FILTER_REJECT;
+      }
+
+      // If it's a table, accept (and skip walking inside it to avoid duplicates)
+      if (node.tagName === "TABLE") return NodeFilter.FILTER_ACCEPT;
+
+      // For text blocks we only accept a few tags that represent “outside-table text”
+      const textTags = ["H1","H2","H3","H4","H5","H6","P","DIV","SPAN"];
+      if (textTags.includes(node.tagName)) return NodeFilter.FILTER_ACCEPT;
+
+      return NodeFilter.FILTER_SKIP;
+    }
+  });
+
+  let node;
+  while ((node = walker.nextNode())) {
+    // Skip anything inside a table (prevents exporting table cell text twice)
+    if (node.closest && node.closest("table") && node.tagName !== "TABLE") continue;
+
+    if (node.tagName === "TABLE") {
+      blocks.push({ type: "table", node });
+      // Skip traversing inside table
+      walker.currentNode = node;
+      continue;
+    }
+
+    // Only export “meaningful” text, and prefer block-level things
+    const text = (node.innerText || "")
+      .replace(/\u00A0/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    if (!text) continue;
+
+    // Avoid dumping huge duplicated chunks from wrapper divs:
+    // Only export leaf-ish text blocks (no nested table, not too long, etc.)
+    const hasTableDesc = node.querySelector && node.querySelector("table");
+    if (hasTableDesc) continue;
+
+    // De-duplicate identical lines
+    if (seenText.has(text)) continue;
+    seenText.add(text);
+
+    blocks.push({ type: "text", value: text });
+  }
+
+  return blocks;
 }
 
-/**
- * Converts an HTML table into AOA while handling colspan/rowspan.
- * This is important because your "Opening Balance" uses colspan.
- */
 function tableToAOAWithSpans(table) {
-    const rows = Array.from(table.querySelectorAll("tr"));
-    const grid = [];
-    const spanMap = {}; // key: "r,c" => remaining rowspan
+  const rows = Array.from(table.querySelectorAll("tr"));
+  const grid = [];
+  const spanMap = {};
 
-    rows.forEach((tr, r) => {
-        grid[r] = grid[r] || [];
-        let c = 0;
+  rows.forEach((tr, r) => {
+    grid[r] = grid[r] || [];
+    let c = 0;
+    while (spanMap[`${r},${c}`]) c++;
 
-        // skip over cells occupied by rowspans
-        while (spanMap[`${r},${c}`]) c++;
+    const cells = Array.from(tr.querySelectorAll("th,td"));
+    cells.forEach(cell => {
+      while (spanMap[`${r},${c}`]) c++;
 
-        const cells = Array.from(tr.querySelectorAll("th,td"));
-        cells.forEach(cell => {
-            while (spanMap[`${r},${c}`]) c++;
+      const text = (cell.innerText || "")
+        .replace(/\u00A0/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
 
-            const text = (cell.innerText || "")
-                .replace(/\u00A0/g, " ")
-                .replace(/\s+/g, " ")
-                .trim();
+      const colspan = parseInt(cell.getAttribute("colspan") || "1", 10);
+      const rowspan = parseInt(cell.getAttribute("rowspan") || "1", 10);
 
-            const colspan = parseInt(cell.getAttribute("colspan") || "1", 10);
-            const rowspan = parseInt(cell.getAttribute("rowspan") || "1", 10);
+      grid[r][c] = text;
+      for (let cc = 1; cc < colspan; cc++) grid[r][c + cc] = "";
 
-            // put text in main cell
-            grid[r][c] = text;
+      if (rowspan > 1) {
+        for (let rr = 1; rr < rowspan; rr++) {
+          for (let cc = 0; cc < colspan; cc++) {
+            spanMap[`${r + rr},${c + cc}`] = true;
+          }
+        }
+      }
 
-            // fill blanks for colspan
-            for (let cc = 1; cc < colspan; cc++) {
-                grid[r][c + cc] = "";
-            }
-
-            // mark rowspan occupancy for future rows
-            if (rowspan > 1) {
-                for (let rr = 1; rr < rowspan; rr++) {
-                    for (let cc = 0; cc < colspan; cc++) {
-                        spanMap[`${r + rr},${c + cc}`] = true;
-                    }
-                }
-            }
-
-            c += colspan;
-        });
+      c += colspan;
     });
+  });
 
-    // normalize rows to same length
-    const maxCols = Math.max(...grid.map(r => r.length));
-    return grid.map(r => {
-        const row = r.slice();
-        while (row.length < maxCols) row.push("");
-        return row;
-    });
+  const maxCols = Math.max(...grid.map(r => r.length));
+  return grid.map(r => {
+    const row = r.slice();
+    while (row.length < maxCols) row.push("");
+    return row;
+  });
 }
 
 function autoFitCols(ws) {
-    const ref = ws["!ref"];
-    if (!ref) return [];
-    const range = XLSX.utils.decode_range(ref);
-    const colWidths = [];
+  const ref = ws["!ref"];
+  if (!ref) return [];
+  const range = XLSX.utils.decode_range(ref);
+  const colWidths = [];
 
-    for (let C = range.s.c; C <= range.e.c; ++C) {
-        let maxLen = 10;
-        for (let R = range.s.r; R <= range.e.r; ++R) {
-            const addr = XLSX.utils.encode_cell({ r: R, c: C });
-            const cell = ws[addr];
-            if (!cell || cell.v == null) continue;
-            const len = String(cell.v).length;
-            if (len > maxLen) maxLen = len;
-        }
-        colWidths[C] = { wch: Math.min(maxLen + 2, 70) };
+  for (let C = range.s.c; C <= range.e.c; ++C) {
+    let maxLen = 10;
+    for (let R = range.s.r; R <= range.e.r; ++R) {
+      const addr = XLSX.utils.encode_cell({ r: R, c: C });
+      const cell = ws[addr];
+      if (!cell || cell.v == null) continue;
+      maxLen = Math.max(maxLen, String(cell.v).length);
     }
-    return colWidths;
+    colWidths[C] = { wch: Math.min(maxLen + 2, 70) };
+  }
+  return colWidths;
 }
 </script>
 
