@@ -634,18 +634,17 @@ class FinalAccountsController extends Controller
     foreach ($rows as $r) {
         $g = $r->main_group ?? $this->normMainGroup((string) $r->main_account_type);
 
-        $dr = (float) ($r->debit ?? 0);   // net debit
-        $cr = (float) ($r->credit ?? 0);  // net credit
+        $net = (float) ($r->net_effect ?? 0); // Cr - Dr (SIGNED)
 
         if ($g === 'INCOME') {
-            $income += $cr; // income normally nets to credit
+            $income += $net;           // income net_effect should be positive; reversals reduce it
         } elseif ($g === 'EXPENSE') {
-            $expense += $dr; // expenses normally net to debit
-        } elseif ($g === 'TAXATION') {
-            // if you classify taxation separately, decide policy:
-            $expense += $dr; // common: treat tax as expense
+            $expense += (-1 * $net);   // expenses net_effect is usually negative, so flip to positive
         }
     }
+
+    // Safety: if data is messy and some expense nets positive, this still behaves sensibly.
+    if ($expense < 0) $expense = abs($expense);
 
     return [
         'income_total'  => $income,

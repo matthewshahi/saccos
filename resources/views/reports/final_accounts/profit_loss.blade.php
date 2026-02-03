@@ -29,6 +29,9 @@
 @php
   $rows = $rows ?? collect();
 
+  // ---------------------------
+  // Range label (chip)
+  // ---------------------------
   $rangeLabel = '';
   if (($ctx['mode'] ?? '') === 'period') {
       $rangeLabel = ($ctx['period_from'] ?? '') . ' → ' . ($ctx['period_to'] ?? '');
@@ -39,10 +42,9 @@
           (isset($ctx['date_to']) && $ctx['date_to'] ? $ctx['date_to']->format('Y-m-d') : '');
   }
 
-  $incomeTotal  = (float) ($totals['income_total'] ?? 0);
-  $expenseTotal = (float) ($totals['expense_total'] ?? 0);
-  $netSurplus   = (float) ($totals['net_surplus'] ?? 0);
-
+  // ---------------------------
+  // Badge class helper
+  // ---------------------------
   $badgeClass = function ($g) {
       $g = strtoupper(trim((string) $g));
       return match ($g) {
@@ -51,6 +53,35 @@
           default   => 'bg-secondary',
       };
   };
+
+  // ---------------------------
+  // IMPORTANT FIX:
+  // Totals derived from what we display: net_effect (Cr - Dr)
+  // This prevents "totals don't match rows" and handles reversals properly.
+  // ---------------------------
+  $incomeTotal  = 0.0; // positive
+  $expenseTotal = 0.0; // positive
+  $otherCount   = 0;
+
+  foreach ($rows as $rr) {
+      $g = strtoupper((string) ($rr->main_group ?? ''));
+      $g = $g ?: 'OTHER';
+
+      $net = (float) ($rr->net_effect ?? 0); // SIGNED (Cr - Dr)
+
+      if ($g === 'INCOME') {
+          $incomeTotal += $net;           // reversals reduce income
+      } elseif ($g === 'EXPENSE') {
+          $expenseTotal += (-1 * $net);   // flip sign => positive expenses
+      } else {
+          $otherCount++;
+      }
+  }
+
+  // Round for currency presentation
+  $incomeTotal  = round($incomeTotal, 2);
+  $expenseTotal = round($expenseTotal, 2);
+  $netSurplus   = round($incomeTotal - $expenseTotal, 2);
 @endphp
 
 <div class="row pl-wrap">
@@ -87,6 +118,13 @@
                 <li>{{ $n }}</li>
               @endforeach
             </ul>
+          </div>
+        @endif
+
+        @if($otherCount > 0)
+          <div class="alert alert-warning mb-3">
+            {{ $otherCount }} line(s) are classified as <strong>OTHER</strong> and are excluded from Income/Expense totals.
+            Fix your <code>main_account_type</code> mapping so P&amp;L rows are only INCOME/EXPENSE.
           </div>
         @endif
 
