@@ -4,54 +4,71 @@
 <head>
   <meta charset="UTF-8">
   <title>Profit &amp; Loss</title>
-  <style>
-    @page { margin: 22px 22px; }
-    body{ font-family: DejaVu Sans, sans-serif; font-size: 11px; color:#111827; }
 
-    .header{ margin-bottom: 10px; }
-    .title{ font-size: 16px; font-weight: 800; margin:0; }
-    .sub{ font-size: 10px; color:#6b7280; margin-top:4px; }
-    .chip{
-      display:inline-block; margin-top:8px;
-      padding:4px 10px; border-radius:999px;
-      border:1px solid #e5e7eb; background:#f6f3ff; color:#5b2aa3;
-      font-weight:800; font-size:10px;
+  <style>
+    /* ✅ LANDSCAPE + tight margins */
+    @page {
+      size: A4 landscape;
+      margin: 14px 14px;
     }
 
-    .notices{ margin:10px 0 12px; padding:10px; border:1px solid #f59e0b; background:#fff7ed; border-radius:10px; }
+    body{
+      font-family: DejaVu Sans, sans-serif;
+      font-size: 10px;                /* slightly smaller to fit */
+      color:#111827;
+    }
+
+    /* Keep tables inside the page width */
+    table { width:100%; border-collapse:collapse; table-layout: fixed; }
+    th, td { box-sizing:border-box; }
+
+    .header{ margin-bottom: 8px; }
+    .title{ font-size: 15px; font-weight: 800; margin:0; }
+    .sub{ font-size: 9px; color:#6b7280; margin-top:3px; }
+
+    .chip{
+      display:inline-block; margin-top:6px;
+      padding:3px 10px; border-radius:999px;
+      border:1px solid #e5e7eb; background:#f6f3ff; color:#5b2aa3;
+      font-weight:800; font-size:9px;
+    }
+
+    .notices{ margin:8px 0 10px; padding:8px; border:1px solid #f59e0b; background:#fff7ed; border-radius:10px; }
     .notices ul{ margin:0; padding-left:16px; }
 
-    .kpis{ width:100%; border-collapse:collapse; margin:10px 0 12px; }
+    .kpis{ width:100%; border-collapse:collapse; margin:8px 0 10px; table-layout: fixed; }
     .kpis td{
       border:1px solid #e5e7eb;
-      padding:10px; vertical-align:top;
+      padding:8px; vertical-align:top;
     }
-    .k{ font-size:10px; color:#6b7280; font-weight:800; }
-    .v{ font-size:13px; font-weight:900; margin-top:4px; }
+    .k{ font-size:9px; color:#6b7280; font-weight:800; }
+    .v{ font-size:12px; font-weight:900; margin-top:3px; }
     .good{ color:#065f46; }
     .bad{ color:#b91c1c; }
 
-    table{ width:100%; border-collapse:collapse; }
     thead th{
       background:#f3f4f6; border:1px solid #e5e7eb;
-      padding:7px 6px; font-size:10px; text-transform:uppercase; letter-spacing:.3px;
+      padding:6px 5px; font-size:9px; text-transform:uppercase; letter-spacing:.3px;
       white-space:nowrap;
     }
     tbody td{
-      border:1px solid #e5e7eb; padding:6px 6px; vertical-align:top;
+      border:1px solid #e5e7eb; padding:5px 5px; vertical-align:top;
+      overflow:hidden; text-overflow:ellipsis;
     }
     tfoot td{
-      border:1px solid #e5e7eb; padding:7px 6px; font-weight:900; background:#f3f4f6;
+      border:1px solid #e5e7eb; padding:6px 5px; font-weight:900; background:#f3f4f6;
+      overflow:hidden; text-overflow:ellipsis;
     }
 
     .text-right{ text-align:right; }
     .text-center{ text-align:center; }
-    .muted{ color:#6b7280; font-size:10px; }
+    .muted{ color:#6b7280; font-size:9px; }
     .mono{ font-family: DejaVu Sans Mono, monospace; }
 
     .badge{
-      display:inline-block; padding:2px 8px; border-radius:999px; font-size:9px; font-weight:900;
+      display:inline-block; padding:2px 7px; border-radius:999px; font-size:8px; font-weight:900;
       border:1px solid #e5e7eb;
+      white-space:nowrap;
     }
     .b-inc{ background:#dcfce7; }
     .b-exp{ background:#fee2e2; }
@@ -60,6 +77,10 @@
     .nowrap{ white-space:nowrap; }
     .acc-main{ font-weight:800; }
     .acc-sub{ margin-top:2px; }
+
+    /* ✅ Fit-to-page friendly: don’t break rows */
+    tr { page-break-inside: avoid; }
+
   </style>
 </head>
 <body>
@@ -69,7 +90,7 @@
   $ctx  = $ctx  ?? [];
   $totals = $totals ?? [];
 
-  // Range label (match your web chip logic)
+  // Range label (match web chip logic)
   if (($ctx['mode'] ?? '') === 'period') {
       $rangeLabel = ($ctx['period_from'] ?? '') . ' → ' . ($ctx['period_to'] ?? '');
   } else {
@@ -79,7 +100,7 @@
           (isset($ctx['date_to']) && $ctx['date_to'] ? $ctx['date_to']->format('Y-m-d') : '');
   }
 
-  // IMPORTANT: derive totals from rows (same logic as your web Blade)
+  // ✅ derive totals from rows (same logic as web blade)
   $incomeTotal  = 0.0;
   $expenseTotal = 0.0;
   $otherCount   = 0;
@@ -91,9 +112,9 @@
       $net = (float) ($rr->net_effect ?? 0); // SIGNED (Cr - Dr)
 
       if ($g === 'INCOME') {
-          $incomeTotal += $net;           // reversals reduce income
+          $incomeTotal += $net;
       } elseif ($g === 'EXPENSE') {
-          $expenseTotal += (-1 * $net);   // flip sign => positive expenses
+          $expenseTotal += (-1 * $net);
       } else {
           $otherCount++;
       }
@@ -160,12 +181,12 @@
 <table>
   <thead>
     <tr>
-      <th style="width:30px;">#</th>
-      <th style="width:90px;">Type</th>
-      <th class="text-left">Sub Account</th>
-      <th style="width:110px;" class="text-right">Debit</th>
-      <th style="width:110px;" class="text-right">Credit</th>
-      <th style="width:130px;" class="text-right">Net (Cr - Dr)</th>
+      <th style="width:26px;">#</th>
+      <th style="width:80px;">Type</th>
+      <th>Sub Account</th>
+      <th style="width:95px;" class="text-right">Debit</th>
+      <th style="width:95px;" class="text-right">Credit</th>
+      <th style="width:110px;" class="text-right">Net (Cr - Dr)</th>
     </tr>
   </thead>
 
@@ -178,9 +199,8 @@
         $g = $g ?: 'OTHER';
         $net = (float) ($r->net_effect ?? 0);
 
-        // labels (match web: show sub then main)
-        $subLabel  = trim(($r->sub_account_code ?? '').' '.$r->sub_account_name);
-        $mainLabel = trim(($r->main_account_code ?? '').' '.$r->main_account_name);
+        $subLabel  = trim(($r->sub_account_code ?? '').' - '.($r->sub_account_name ?? ''));
+        $mainLabel = trim(($r->main_account_code ?? '').' - '.($r->main_account_name ?? ''));
       @endphp
 
       <tr>
