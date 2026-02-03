@@ -295,7 +295,7 @@
                   <td class="text-start">
                     <div class="fw-bold bs-main">
                       @if(!empty($r->sub_account_name))
-                        {{ $r->sub_account_code ?? '' }} - {{ $r->sub_account_name ?? '' }}
+                       {{ $r->sub_account_name ?? '' }}
                       @else
                         {{ $r->main_account_name ?? '' }}
                       @endif
@@ -303,7 +303,7 @@
 
                     @if(!empty($r->sub_account_name))
                       <div class="bs-subtle">
-                        {{ $r->main_account_code ?? '' }} - {{ $r->main_account_name ?? '' }}
+                         {{ $r->main_account_name ?? '' }}
                       </div>
                     @endif
                   </td>
