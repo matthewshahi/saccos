@@ -162,8 +162,7 @@
                 <th>Sub</th>
                 <th class="text-end">Debit</th>
                 <th class="text-end">Credit</th>
-                <th class="text-end">Closing Dr</th>
-                <th class="text-end">Closing Cr</th>
+                
               </tr>
             </thead>
             <tbody>
@@ -187,10 +186,10 @@
                     <div class="fw-bold">{{ $r->sub_account_code }} - {{ $r->sub_account_name }}</div>
                   </td>
 
-                  <td class="text-end">{{ number_format($r->debit ?? 0, 2) }}</td>
-                  <td class="text-end">{{ number_format($r->credit ?? 0, 2) }}</td>
-                  <td class="text-end">{{ number_format($r->closing_debit ?? 0, 2) }}</td>
-                  <td class="text-end">{{ number_format($r->closing_credit ?? 0, 2) }}</td>
+      <td class="text-end">{{ number_format($r->tb_debit ?? 0, 2) }}</td>
+<td class="text-end">{{ number_format($r->tb_credit ?? 0, 2) }}</td>
+
+                  
                 </tr>
               @empty
                 <tr>

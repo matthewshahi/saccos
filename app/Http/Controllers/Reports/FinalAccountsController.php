@@ -514,69 +514,61 @@ class FinalAccountsController extends Controller
     // ============================================================
 
     private function getTrialBalanceRows(array $ctx)
-    {
-        $q = $this->baseJoinQuery();
-        $q = $this->applyAsAtFilter($q, $ctx);
+{
+    $q = $this->applyAsAtFilter($this->baseJoinQuery(), $ctx);
 
-        // Null-safe sums everywhere.
-        // net = Dr - Cr
-        // closing_debit = max(net, 0)
-        // closing_credit = max(-net, 0)
-        $rows = $q->select([
-                'ma.main_account_id',
-                'ma.main_account_code',
-                'ma.main_account_name',
-                'ma.main_account_type',
-                'sa.sub_account_id',
-                'sa.sub_account_code',
-                'sa.sub_account_name',
-                DB::raw('SUM(COALESCE(t.accounts_trans_debit,0))  AS debit'),
-                DB::raw('SUM(COALESCE(t.accounts_trans_credit,0)) AS credit'),
-                DB::raw('(SUM(COALESCE(t.accounts_trans_debit,0)) - SUM(COALESCE(t.accounts_trans_credit,0))) AS net'),
-                DB::raw('GREATEST((SUM(COALESCE(t.accounts_trans_debit,0)) - SUM(COALESCE(t.accounts_trans_credit,0))), 0) AS closing_debit'),
-                DB::raw('GREATEST((SUM(COALESCE(t.accounts_trans_credit,0)) - SUM(COALESCE(t.accounts_trans_debit,0))), 0) AS closing_credit'),
-            ])
-            ->groupBy(
-                'ma.main_account_id',
-                'ma.main_account_code',
-                'ma.main_account_name',
-                'ma.main_account_type',
-                'sa.sub_account_id',
-                'sa.sub_account_code',
-                'sa.sub_account_name',
-            )
-            ->orderBy('ma.main_account_code')
-            ->orderBy('sa.sub_account_code')
-            ->get();
+    return $q->select([
+            'ma.main_account_id',
+            'ma.main_account_code',
+            'ma.main_account_name',
+            'ma.main_account_type',
+            'sa.sub_account_id',
+            'sa.sub_account_code',
+            'sa.sub_account_name',
 
-        return $rows;
+            // totals (optional to keep)
+            DB::raw('SUM(COALESCE(t.accounts_trans_debit,0))  AS total_debit'),
+            DB::raw('SUM(COALESCE(t.accounts_trans_credit,0)) AS total_credit'),
+
+            // net balance as at cutoff
+            DB::raw('(SUM(COALESCE(t.accounts_trans_debit,0)) - SUM(COALESCE(t.accounts_trans_credit,0))) AS net'),
+
+            // ✅ trial balance columns (NETTED)
+            DB::raw('GREATEST((SUM(COALESCE(t.accounts_trans_debit,0)) - SUM(COALESCE(t.accounts_trans_credit,0))), 0) AS tb_debit'),
+            DB::raw('GREATEST((SUM(COALESCE(t.accounts_trans_credit,0)) - SUM(COALESCE(t.accounts_trans_debit,0))), 0) AS tb_credit'),
+        ])
+        ->groupBy(
+            'ma.main_account_id',
+            'ma.main_account_code',
+            'ma.main_account_name',
+            'ma.main_account_type',
+            'sa.sub_account_id',
+            'sa.sub_account_code',
+            'sa.sub_account_name'
+        )
+        ->orderBy('ma.main_account_code')
+        ->orderBy('sa.sub_account_code')
+        ->get();
+}
+
+
+   private function computeTrialBalanceTotals($rows): array
+{
+    $dr = 0.0;
+    $cr = 0.0;
+
+    foreach ($rows as $r) {
+        $dr += (float)($r->tb_debit ?? 0);
+        $cr += (float)($r->tb_credit ?? 0);
     }
 
-    private function computeTrialBalanceTotals($rows): array
-    {
-        $totDebit = 0.0;
-        $totCredit = 0.0;
-        $totNet = 0.0;
-        $totClosingDr = 0.0;
-        $totClosingCr = 0.0;
+    return [
+        'debit'  => $dr,
+        'credit' => $cr,
+        'diff'   => $dr - $cr,
+    ];
+}
 
-        foreach ($rows as $r) {
-            $totDebit += (float) ($r->debit ?? 0);
-            $totCredit += (float) ($r->credit ?? 0);
-            $totNet += (float) ($r->net ?? 0);
-            $totClosingDr += (float) ($r->closing_debit ?? 0);
-            $totClosingCr += (float) ($r->closing_credit ?? 0);
-        }
-
-        return [
-            'debit'         => $totDebit,
-            'credit'        => $totCredit,
-            'net'           => $totNet,
-            'closing_debit' => $totClosingDr,
-            'closing_credit'=> $totClosingCr,
-            'diff'          => $totDebit - $totCredit,
-        ];
-    }
 
     // ============================================================
     // PROFIT & LOSS (MAIN-ACCOUNT ROLLUP)
