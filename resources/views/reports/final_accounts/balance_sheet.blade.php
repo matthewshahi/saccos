@@ -2,28 +2,88 @@
 
 @section('content')
 <style>
-  /* ====== BS page polish (scoped) ====== */
-  .bs-wrap{ --bs-primary:#5b2aa3; --bs-soft:#f6f3ff; --bs-ink:#111827; --bs-muted:#6b7280; --bs-border:#e5e7eb; }
-  .bs-card{ border:1px solid var(--bs-border); border-radius:14px; box-shadow:0 10px 24px rgba(17,24,39,.06); }
-  .bs-card .card-header{ background:linear-gradient(180deg, #ffffff, #fbfbff); border-bottom:1px solid var(--bs-border); border-top-left-radius:14px; border-top-right-radius:14px; }
+  /* ====== Balance Sheet page polish (scoped) ====== */
+  .bs-wrap{
+    --bs-primary:#5b2aa3;
+    --bs-soft:#f6f3ff;
+    --bs-ink:#111827;
+    --bs-muted:#6b7280;
+    --bs-border:#e5e7eb;
+  }
+  .bs-card{
+    border:1px solid var(--bs-border);
+    border-radius:14px;
+    box-shadow:0 10px 24px rgba(17,24,39,.06);
+  }
+  .bs-card .card-header{
+    background:linear-gradient(180deg, #ffffff, #fbfbff);
+    border-bottom:1px solid var(--bs-border);
+    border-top-left-radius:14px;
+    border-top-right-radius:14px;
+  }
   .bs-title{ font-weight:800; letter-spacing:.2px; color:var(--bs-ink); }
   .bs-subtle{ color:var(--bs-muted); font-size:12px; white-space:nowrap; }
   .bs-label{ font-weight:800; color:var(--bs-ink); white-space:nowrap; }
-  .bs-input, .bs-select{ border-radius:12px; border:1px solid var(--bs-border); }
-  .bs-input:focus, .bs-select:focus{ border-color:rgba(91,42,163,.45); box-shadow:0 0 0 .2rem rgba(91,42,163,.12); }
-  .bs-chip{ display:inline-flex; align-items:center; gap:.45rem; background:var(--bs-soft); border:1px solid rgba(91,42,163,.18); color:var(--bs-primary); padding:.35rem .7rem; border-radius:999px; font-weight:800; font-size:12px; white-space:nowrap; }
-  .bs-btn{ border-radius:12px; font-weight:900; letter-spacing:.2px; padding:.85rem 1rem; }
+
+  .bs-input, .bs-select{
+    border-radius:12px;
+    border:1px solid var(--bs-border);
+  }
+  .bs-input:focus, .bs-select:focus{
+    border-color:rgba(91,42,163,.45);
+    box-shadow:0 0 0 .2rem rgba(91,42,163,.12);
+  }
+
+  .bs-chip{
+    display:inline-flex;
+    align-items:center;
+    gap:.45rem;
+    background:var(--bs-soft);
+    border:1px solid rgba(91,42,163,.18);
+    color:var(--bs-primary);
+    padding:.35rem .7rem;
+    border-radius:999px;
+    font-weight:800;
+    font-size:12px;
+    white-space:nowrap;
+  }
+
+  .bs-btn{
+    border-radius:12px;
+    font-weight:900;
+    letter-spacing:.2px;
+    padding:.85rem 1rem;
+  }
   .bs-btn-primary{ background:var(--bs-primary); border-color:var(--bs-primary); }
   .bs-btn-primary:hover{ filter:brightness(.95); }
-  .bs-kpi{ border-radius:14px; border:1px solid var(--bs-border); background:#fff; padding:14px 16px; }
+
+  .bs-kpi{
+    border-radius:14px;
+    border:1px solid var(--bs-border);
+    background:#fff;
+    padding:14px 16px;
+  }
   .bs-kpi .k{ font-size:12px; color:var(--bs-muted); font-weight:800; white-space:nowrap; }
   .bs-kpi .v{ font-size:18px; font-weight:900; color:var(--bs-ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .bs-kpi.good .v{ color:#065f46; }
   .bs-kpi.bad .v{ color:#b91c1c; }
+
   .bs-table thead th{ white-space:nowrap; }
   .bs-table td{ vertical-align:middle; }
-  .bs-main{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:420px; }
-  .bs-badge{ font-weight:900; letter-spacing:.2px; border-radius:999px; padding:.35rem .6rem; white-space:nowrap; }
+  .bs-main{
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    max-width:520px;
+    display:block;
+  }
+  .bs-badge{
+    font-weight:900;
+    letter-spacing:.2px;
+    border-radius:999px;
+    padding:.35rem .6rem;
+    white-space:nowrap;
+  }
 </style>
 
 <div class="row bs-wrap">
@@ -36,7 +96,9 @@
           <h3 class="card-title m-0 bs-title">Balance Sheet</h3>
           <span class="bs-chip">
             <i class="nav-icon i-Financial"></i>
-            {{ (($ctx['mode'] ?? '') === 'period') ? ($ctx['as_at_period'] ?? '') : (isset($ctx['as_at_date']) ? $ctx['as_at_date']->format('Y-m-d') : '') }}
+            {{ (($ctx['mode'] ?? '') === 'period')
+                ? ($ctx['as_at_period'] ?? '')
+                : (isset($ctx['as_at_date']) ? $ctx['as_at_date']->format('Y-m-d') : '') }}
           </span>
         </div>
 
@@ -203,7 +265,7 @@
               <tr>
                 <th>#</th>
                 <th>Group</th>
-                <th class="text-start">Main Account</th>
+                <th class="text-start">Account</th>
                 <th class="text-end">Debit</th>
                 <th class="text-end">Credit</th>
                 <th class="text-end">Balance</th>
@@ -212,29 +274,49 @@
 
             <tbody>
               @php $i=1; @endphp
+
               @forelse($rows as $r)
                 @php
                   $g = strtoupper((string) ($r->main_group ?? ''));
                   $g = $g ?: 'OTHER';
+
+                  $bal = (float) ($r->balance ?? 0);
+                  $balSide = $bal >= 0 ? 'Dr' : 'Cr';
                 @endphp
+
                 <tr>
                   <td>{{ $i++ }}</td>
+
                   <td>
                     <span class="badge bs-badge {{ $badgeClass($g) }}">{{ $g }}</span>
                   </td>
 
+                  {{-- Sub account (preferred) with fallback to main account --}}
                   <td class="text-start">
-                    <div class="bs-main fw-bold">{{ $r->main_account_name }}</div>
+                    <div class="fw-bold bs-main">
+                      @if(!empty($r->sub_account_name))
+                        {{ $r->sub_account_code ?? '' }} - {{ $r->sub_account_name ?? '' }}
+                      @else
+                        {{ $r->main_account_name ?? '' }}
+                      @endif
+                    </div>
+
+                    @if(!empty($r->sub_account_name))
+                      <div class="bs-subtle">
+                        {{ $r->main_account_code ?? '' }} - {{ $r->main_account_name ?? '' }}
+                      </div>
+                    @endif
                   </td>
 
-                  {{-- ✅ netted columns from your controller: only one side should show a value --}}
                   <td class="text-end" style="white-space:nowrap;">{{ number_format($r->debit ?? 0, 2) }}</td>
                   <td class="text-end" style="white-space:nowrap;">{{ number_format($r->credit ?? 0, 2) }}</td>
 
-                  {{-- ✅ show absolute “balance” for readability, sign implied by group --}}
-                  @php $bal = (float) ($r->balance ?? 0); @endphp
-                  <td class="text-end" style="white-space:nowrap;">{{ number_format(abs($bal), 2) }}</td>
+                  <td class="text-end" style="white-space:nowrap;">
+                    {{ number_format(abs($bal), 2) }}
+                    <span class="text-muted" style="font-size:12px;">{{ $balSide }}</span>
+                  </td>
                 </tr>
+
               @empty
                 <tr>
                   <td colspan="6" class="text-muted">No records found for the selected cutoff.</td>

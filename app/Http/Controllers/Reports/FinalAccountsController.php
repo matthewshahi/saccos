@@ -657,23 +657,33 @@ class FinalAccountsController extends Controller
 
     $rows = $q->select([
             'ma.main_account_id',
+            'ma.main_account_code',
             'ma.main_account_name',
             'ma.main_account_type',
 
-            // raw totals (optional, but useful for audit / debugging)
+            'sa.sub_account_id',
+            'sa.sub_account_code',
+            'sa.sub_account_name',
+
             DB::raw('SUM(COALESCE(t.accounts_trans_debit,0))  AS raw_debit'),
             DB::raw('SUM(COALESCE(t.accounts_trans_credit,0)) AS raw_credit'),
 
-            // ✅ net balance (Dr - Cr)
             DB::raw('(SUM(COALESCE(t.accounts_trans_debit,0)) - SUM(COALESCE(t.accounts_trans_credit,0))) AS balance'),
-
-            // ✅ netted presentation columns (only one side > 0)
             DB::raw('GREATEST((SUM(COALESCE(t.accounts_trans_debit,0)) - SUM(COALESCE(t.accounts_trans_credit,0))), 0) AS debit'),
             DB::raw('GREATEST((SUM(COALESCE(t.accounts_trans_credit,0)) - SUM(COALESCE(t.accounts_trans_debit,0))), 0) AS credit'),
         ])
-        ->groupBy('ma.main_account_id', 'ma.main_account_name', 'ma.main_account_type')
+        ->groupBy(
+            'ma.main_account_id',
+            'ma.main_account_code',
+            'ma.main_account_name',
+            'ma.main_account_type',
+            'sa.sub_account_id',
+            'sa.sub_account_code',
+            'sa.sub_account_name'
+        )
         ->orderBy('ma.main_account_type')
-        ->orderBy('ma.main_account_name')
+        ->orderBy('ma.main_account_code')
+        ->orderBy('sa.sub_account_code')
         ->get();
 
     foreach ($rows as $r) {
