@@ -568,34 +568,43 @@ class FinalAccountsController extends Controller
     // ============================================================
 
     private function getProfitLossRows(array $ctx)
-    {
-        $q = $this->applyRangeFilter($this->baseJoinQuery(), $ctx);
+{
+    $q = $this->applyRangeFilter($this->baseJoinQuery(), $ctx);
 
-        $q->where(function ($w) {
-            $w->where('ma.main_account_type', 'like', 'INCOME%')
-              ->orWhere('ma.main_account_type', 'like', 'EXPENSE%');
-        });
+    $q->where(function ($w) {
+        $w->where('ma.main_account_type', 'like', 'INCOME%')
+          ->orWhere('ma.main_account_type', 'like', 'EXPENSE%')
+          ->orWhere('ma.main_account_type', 'like', 'TAX%'); // optional if you store taxation separately
+    });
 
-        $rows = $q->select([
-                'ma.main_account_id',
-                'ma.main_account_name',
-                'ma.main_account_type',
-                DB::raw('SUM(COALESCE(t.accounts_trans_debit,0))  AS debit'),
-                DB::raw('SUM(COALESCE(t.accounts_trans_credit,0)) AS credit'),
-                // keep the signed effect too (useful)
-                DB::raw('(SUM(COALESCE(t.accounts_trans_credit,0)) - SUM(COALESCE(t.accounts_trans_debit,0))) AS net_effect'),
-            ])
-            ->groupBy('ma.main_account_id', 'ma.main_account_name', 'ma.main_account_type')
-            ->orderBy('ma.main_account_type')
-            ->orderBy('ma.main_account_name')
-            ->get();
+    $rows = $q->select([
+            'ma.main_account_id',
+            'ma.main_account_name',
+            'ma.main_account_type',
 
-        foreach ($rows as $r) {
-            $r->main_group = $this->normMainGroup((string) $r->main_account_type);
-        }
+            // raw totals (optional to keep for audit)
+            DB::raw('SUM(COALESCE(t.accounts_trans_debit,0))  AS raw_debit'),
+            DB::raw('SUM(COALESCE(t.accounts_trans_credit,0)) AS raw_credit'),
 
-        return $rows;
+            // net effect (Cr - Dr)
+            DB::raw('(SUM(COALESCE(t.accounts_trans_credit,0)) - SUM(COALESCE(t.accounts_trans_debit,0))) AS net_effect'),
+
+            // ✅ netted presentation columns (only one side will be > 0)
+            DB::raw('GREATEST((SUM(COALESCE(t.accounts_trans_debit,0)) - SUM(COALESCE(t.accounts_trans_credit,0))), 0) AS debit'),
+            DB::raw('GREATEST((SUM(COALESCE(t.accounts_trans_credit,0)) - SUM(COALESCE(t.accounts_trans_debit,0))), 0) AS credit'),
+        ])
+        ->groupBy('ma.main_account_id', 'ma.main_account_name', 'ma.main_account_type')
+        ->orderBy('ma.main_account_type')
+        ->orderBy('ma.main_account_name')
+        ->get();
+
+    foreach ($rows as $r) {
+        $r->main_group = $this->normMainGroup((string) $r->main_account_type);
     }
+
+    return $rows;
+}
+
 
     /**
      * Totals are presented as:
@@ -604,33 +613,33 @@ class FinalAccountsController extends Controller
      * - net_surplus = income_total - expense_total
      */
     private function computeProfitLossTotals($rows): array
-    {
-        $incomeTotal  = 0.0;
-        $expenseTotal = 0.0;
+{
+    $income = 0.0;
+    $expense = 0.0;
 
-        foreach ($rows as $r) {
-            $debit  = (float) ($r->debit ?? 0);
-            $credit = (float) ($r->credit ?? 0);
+    foreach ($rows as $r) {
+        $g = $r->main_group ?? $this->normMainGroup((string) $r->main_account_type);
 
-            $g = $r->main_group ?? $this->normMainGroup((string) $r->main_account_type);
+        $dr = (float) ($r->debit ?? 0);   // net debit
+        $cr = (float) ($r->credit ?? 0);  // net credit
 
-            if ($g === 'INCOME') {
-                // Income normal: credit - debit
-                $incomeTotal += ($credit - $debit);
-            } elseif ($g === 'EXPENSE') {
-                // Expenses normal: debit - credit (positive)
-                $expenseTotal += ($debit - $credit);
-            }
+        if ($g === 'INCOME') {
+            $income += $cr; // income normally nets to credit
+        } elseif ($g === 'EXPENSE') {
+            $expense += $dr; // expenses normally net to debit
+        } elseif ($g === 'TAXATION') {
+            // if you classify taxation separately, decide policy:
+            $expense += $dr; // common: treat tax as expense
         }
-
-        $net = $incomeTotal - $expenseTotal;
-
-        return [
-            'income_total'  => $incomeTotal,
-            'expense_total' => $expenseTotal,
-            'net_surplus'   => $net,
-        ];
     }
+
+    return [
+        'income_total'  => $income,
+        'expense_total' => $expense,
+        'net_surplus'   => $income - $expense,
+    ];
+}
+
 
     // ============================================================
     // BALANCE SHEET (AS AT)
