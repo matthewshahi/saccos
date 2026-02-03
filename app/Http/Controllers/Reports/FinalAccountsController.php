@@ -646,65 +646,72 @@ class FinalAccountsController extends Controller
     // ============================================================
 
     private function getBalanceSheetRows(array $ctx)
-    {
-        $q = $this->applyAsAtFilter($this->baseJoinQuery(), $ctx);
+{
+    $q = $this->applyAsAtFilter($this->baseJoinQuery(), $ctx);
 
-        $q->where(function ($w) {
-            $w->where('ma.main_account_type', 'like', 'ASSET%')
-              ->orWhere('ma.main_account_type', 'like', 'LIABILIT%')
-              ->orWhere('ma.main_account_type', 'like', 'CAPITAL%');
-        });
+    $q->where(function ($w) {
+        $w->where('ma.main_account_type', 'like', 'ASSET%')
+          ->orWhere('ma.main_account_type', 'like', 'LIABILIT%')
+          ->orWhere('ma.main_account_type', 'like', 'CAPITAL%');
+    });
 
-        $rows = $q->select([
-                'ma.main_account_id',
-                'ma.main_account_name',
-                'ma.main_account_type',
-                DB::raw('SUM(COALESCE(t.accounts_trans_debit,0))  AS debit'),
-                DB::raw('SUM(COALESCE(t.accounts_trans_credit,0)) AS credit'),
-                DB::raw('(SUM(COALESCE(t.accounts_trans_debit,0)) - SUM(COALESCE(t.accounts_trans_credit,0))) AS balance'),
-            ])
-            ->groupBy('ma.main_account_id', 'ma.main_account_name', 'ma.main_account_type')
-            ->orderBy('ma.main_account_type')
-            ->orderBy('ma.main_account_name')
-            ->get();
+    $rows = $q->select([
+            'ma.main_account_id',
+            'ma.main_account_name',
+            'ma.main_account_type',
 
-        foreach ($rows as $r) {
-            $r->main_group = $this->normMainGroup((string) $r->main_account_type);
-        }
+            // raw totals (optional, but useful for audit / debugging)
+            DB::raw('SUM(COALESCE(t.accounts_trans_debit,0))  AS raw_debit'),
+            DB::raw('SUM(COALESCE(t.accounts_trans_credit,0)) AS raw_credit'),
 
-        return $rows;
+            // ✅ net balance (Dr - Cr)
+            DB::raw('(SUM(COALESCE(t.accounts_trans_debit,0)) - SUM(COALESCE(t.accounts_trans_credit,0))) AS balance'),
+
+            // ✅ netted presentation columns (only one side > 0)
+            DB::raw('GREATEST((SUM(COALESCE(t.accounts_trans_debit,0)) - SUM(COALESCE(t.accounts_trans_credit,0))), 0) AS debit'),
+            DB::raw('GREATEST((SUM(COALESCE(t.accounts_trans_credit,0)) - SUM(COALESCE(t.accounts_trans_debit,0))), 0) AS credit'),
+        ])
+        ->groupBy('ma.main_account_id', 'ma.main_account_name', 'ma.main_account_type')
+        ->orderBy('ma.main_account_type')
+        ->orderBy('ma.main_account_name')
+        ->get();
+
+    foreach ($rows as $r) {
+        $r->main_group = $this->normMainGroup((string) $r->main_account_type);
     }
+
+    return $rows;
+}
+
 
     private function computeBalanceSheetTotals($rows): array
-    {
-        $assets      = 0.0;
-        $liabilities = 0.0;
-        $capital     = 0.0;
+{
+    $assets = 0.0;
+    $liabilities = 0.0;
+    $capital = 0.0;
 
-        foreach ($rows as $r) {
-            $bal = (float) ($r->balance ?? 0);
-            $g   = $r->main_group ?? $this->normMainGroup((string) $r->main_account_type);
+    foreach ($rows as $r) {
+        $g = $r->main_group ?? $this->normMainGroup((string) $r->main_account_type);
 
-            if ($g === 'ASSET') {
-                // Assets: usually positive under (Dr - Cr)
-                $assets += $bal;
-            } elseif ($g === 'LIABILITY') {
-                // Liabilities: usually negative under (Dr - Cr); invert to positive
-                $liabilities += (-1 * $bal);
-            } elseif ($g === 'CAPITAL') {
-                // Capital: usually negative under (Dr - Cr); invert to positive
-                $capital += (-1 * $bal);
-            }
+        $dr = (float) ($r->debit ?? 0);   // net Dr
+        $cr = (float) ($r->credit ?? 0);  // net Cr
+
+        if ($g === 'ASSET') {
+            $assets += $dr;              // assets normally net to Dr
+        } elseif ($g === 'LIABILITY') {
+            $liabilities += $cr;         // liabilities normally net to Cr
+        } elseif ($g === 'CAPITAL') {
+            $capital += $cr;             // capital normally net to Cr
         }
-
-        $lc = $liabilities + $capital;
-
-        return [
-            'total_assets'             => $assets,
-            'total_liabilities'        => $liabilities,
-            'total_capital'            => $capital,
-            'liabilities_plus_capital' => $lc,
-            'diff'                     => $assets - $lc,
-        ];
     }
+
+    $lc = $liabilities + $capital;
+
+    return [
+        'total_assets'             => $assets,
+        'total_liabilities'        => $liabilities,
+        'total_capital'            => $capital,
+        'liabilities_plus_capital' => $lc,
+        'diff'                     => $assets - $lc,
+    ];
 }
