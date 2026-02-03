@@ -1,16 +1,52 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="row">
+<style>
+  /* ====== P&L page polish (scoped) ====== */
+  .pl-wrap{ --pl-primary:#5b2aa3; --pl-soft:#f6f3ff; --pl-ink:#111827; --pl-muted:#6b7280; --pl-border:#e5e7eb; }
+  .pl-card{ border:1px solid var(--pl-border); border-radius:14px; box-shadow:0 10px 24px rgba(17,24,39,.06); }
+  .pl-card .card-header{ background:linear-gradient(180deg, #ffffff, #fbfbff); border-bottom:1px solid var(--pl-border); border-top-left-radius:14px; border-top-right-radius:14px; }
+  .pl-title{ font-weight:800; letter-spacing:.2px; color:var(--pl-ink); }
+  .pl-subtle{ color:var(--pl-muted); font-size:12px; white-space:nowrap; }
+  .pl-label{ font-weight:800; color:var(--pl-ink); white-space:nowrap; }
+  .pl-input, .pl-select{ border-radius:12px; border:1px solid var(--pl-border); }
+  .pl-input:focus, .pl-select:focus{ border-color:rgba(91,42,163,.45); box-shadow:0 0 0 .2rem rgba(91,42,163,.12); }
+  .pl-chip{ display:inline-flex; align-items:center; gap:.45rem; background:var(--pl-soft); border:1px solid rgba(91,42,163,.18); color:var(--pl-primary); padding:.35rem .7rem; border-radius:999px; font-weight:800; font-size:12px; white-space:nowrap; }
+  .pl-btn{ border-radius:12px; font-weight:900; letter-spacing:.2px; padding:.85rem 1rem; }
+  .pl-btn-primary{ background:var(--pl-primary); border-color:var(--pl-primary); }
+  .pl-btn-primary:hover{ filter:brightness(.95); }
+  .pl-kpi{ border-radius:14px; border:1px solid var(--pl-border); background:#fff; padding:14px 16px; }
+  .pl-kpi .k{ font-size:12px; color:var(--pl-muted); font-weight:800; white-space:nowrap; }
+  .pl-kpi .v{ font-size:18px; font-weight:900; color:var(--pl-ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .pl-kpi.good .v{ color:#065f46; }
+  .pl-kpi.bad .v{ color:#b91c1c; }
+  .pl-table thead th{ white-space:nowrap; }
+  .pl-table td{ vertical-align:middle; }
+  .pl-main{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:520px; }
+  .pl-badge{ font-weight:900; letter-spacing:.2px; border-radius:999px; padding:.35rem .6rem; white-space:nowrap; }
+</style>
+
+<div class="row pl-wrap">
 
   {{-- FILTER CARD --}}
-  <div class="col-md-12">
-    <div class="card o-hidden mb-4">
-      <div class="card-header d-flex align-items-center">
-        <h3 class="w-50 float-start card-title m-0">Profit &amp; Loss (Income &amp; Expenditure)</h3>
+  <div class="col-12">
+    <div class="card pl-card mb-4">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <div class="d-flex align-items-center gap-2">
+          <h3 class="card-title m-0 pl-title">Profit &amp; Loss</h3>
+          <span class="pl-chip">
+            <i class="nav-icon i-Financial"></i>
+            @if(($ctx['mode'] ?? '') === 'period')
+              {{ ($ctx['period_from'] ?? '') . ' → ' . ($ctx['period_to'] ?? '') }}
+            @else
+              {{ (isset($ctx['date_from']) ? $ctx['date_from']->format('Y-m-d') : '') . ' → ' . (isset($ctx['date_to']) ? $ctx['date_to']->format('Y-m-d') : '') }}
+            @endif
+          </span>
+        </div>
 
-        <div class="dropdown dropleft text-end w-50 float-end">
-          <button class="btn bg-gray-100" id="dropdownMenuButton_pl" type="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+        <div class="dropdown dropleft text-end">
+          <button class="btn bg-gray-100" id="dropdownMenuButton_pl" type="button
+            button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
             <i class="nav-icon i-Gear-2"></i>
           </button>
           <div class="dropdown-menu" aria-labelledby="dropdownMenuButton_pl">
@@ -21,8 +57,9 @@
       </div>
 
       <div class="card-body">
+
         @if (!empty($notices))
-          <div class="alert alert-warning">
+          <div class="alert alert-warning mb-3">
             <ul class="mb-0">
               @foreach ($notices as $n)
                 <li>{{ $n }}</li>
@@ -32,86 +69,128 @@
         @endif
 
         <form method="GET" action="{{ route('reports.final_accounts.profit_loss') }}">
-          <div class="row">
+          <div class="row g-3 align-items-end">
 
-            <div class="col-md-3">
-              <label class="form-label fw-bold">Mode</label>
-              <select name="mode" class="form-control">
-                <option value="period" {{ (request('mode', $ctx['mode'] ?? 'period')=='period') ? 'selected' : '' }}>Period Range (YYYYMM)</option>
+            {{-- MODE --}}
+            <div class="col-12 col-md-3">
+              <label class="form-label pl-label mb-1">Mode</label>
+              <select name="mode" class="form-control pl-select">
+                <option value="period" {{ (request('mode', $ctx['mode'] ?? 'period')=='period') ? 'selected' : '' }}>Period Range</option>
                 <option value="date" {{ (request('mode', $ctx['mode'] ?? '')=='date') ? 'selected' : '' }}>Date Range</option>
               </select>
-              <small class="text-muted">P&amp;L is always activity within a range.</small>
+              <div class="pl-subtle mt-1">P&amp;L is activity within a range.</div>
             </div>
 
-            <div class="col-md-3">
-              <label class="form-label fw-bold">Period From</label>
-              <input type="text"
-                     name="period_from"
-                     value="{{ request('period_from', $ctx['period_from'] ?? '') }}"
-                     class="form-control"
-                     placeholder="YYYYMM">
-              <small class="text-muted">Used when mode=period.</small>
+            {{-- PERIOD FROM --}}
+            <div class="col-12 col-md-3">
+              <label class="form-label pl-label mb-1">Period From</label>
+              <div class="input-group">
+                <span class="input-group-text" style="border-radius:12px 0 0 12px; border:1px solid var(--pl-border); background:#fff; white-space:nowrap;">YYYYMM</span>
+                <input
+                  type="text"
+                  name="period_from"
+                  value="{{ request('period_from', $ctx['period_from'] ?? '') }}"
+                  class="form-control pl-input"
+                  inputmode="numeric"
+                  maxlength="6"
+                  pattern="\d{6}"
+                  placeholder="202601"
+                  oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,6)"
+                  style="border-radius:0 12px 12px 0;"
+                >
+              </div>
+              <div class="pl-subtle mt-1">Exactly 6 digits.</div>
             </div>
 
-            <div class="col-md-3">
-              <label class="form-label fw-bold">Period To</label>
-              <input type="text"
-                     name="period_to"
-                     value="{{ request('period_to', $ctx['period_to'] ?? '') }}"
-                     class="form-control"
-                     placeholder="YYYYMM">
-              <small class="text-muted">Used when mode=period.</small>
+            {{-- PERIOD TO --}}
+            <div class="col-12 col-md-3">
+              <label class="form-label pl-label mb-1">Period To</label>
+              <div class="input-group">
+                <span class="input-group-text" style="border-radius:12px 0 0 12px; border:1px solid var(--pl-border); background:#fff; white-space:nowrap;">YYYYMM</span>
+                <input
+                  type="text"
+                  name="period_to"
+                  value="{{ request('period_to', $ctx['period_to'] ?? '') }}"
+                  class="form-control pl-input"
+                  inputmode="numeric"
+                  maxlength="6"
+                  pattern="\d{6}"
+                  placeholder="202602"
+                  oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,6)"
+                  style="border-radius:0 12px 12px 0;"
+                >
+              </div>
+              <div class="pl-subtle mt-1">Exactly 6 digits.</div>
             </div>
 
-            <div class="col-md-3 d-flex align-items-end">
-              <button class="btn btn-primary w-100" type="submit">
-                <i class="nav-icon i-Search-People me-1"></i> Run Report
+            {{-- RUN --}}
+            <div class="col-12 col-md-3">
+              <button class="btn pl-btn pl-btn-primary w-100 text-white" type="submit">
+                <i class="nav-icon i-Search-People me-2"></i> Run Report
               </button>
+              <div class="pl-subtle mt-1 text-center">Totals + lines.</div>
             </div>
 
-            <div class="col-md-3 mt-3">
-              <label class="form-label fw-bold">Date From</label>
-              <input type="date"
-                     name="date_from"
-                     value="{{ request('date_from', isset($ctx['date_from']) && $ctx['date_from'] ? $ctx['date_from']->format('Y-m-d') : '') }}"
-                     class="form-control">
-              <small class="text-muted">Used when mode=date.</small>
+            {{-- DATE FROM --}}
+            <div class="col-12 col-md-3">
+              <label class="form-label pl-label mb-1">Date From</label>
+              <div class="input-group">
+                <span class="input-group-text" style="border-radius:12px 0 0 12px; border:1px solid var(--pl-border); background:#fff; white-space:nowrap;">
+                  <i class="nav-icon i-Calendar-4"></i>
+                </span>
+                <input
+                  type="date"
+                  name="date_from"
+                  value="{{ request('date_from', isset($ctx['date_from']) && $ctx['date_from'] ? $ctx['date_from']->format('Y-m-d') : '') }}"
+                  class="form-control pl-input"
+                  style="border-radius:0 12px 12px 0;"
+                >
+              </div>
+              <div class="pl-subtle mt-1">Used when mode=date.</div>
             </div>
 
-            <div class="col-md-3 mt-3">
-              <label class="form-label fw-bold">Date To</label>
-              <input type="date"
-                     name="date_to"
-                     value="{{ request('date_to', isset($ctx['date_to']) && $ctx['date_to'] ? $ctx['date_to']->format('Y-m-d') : '') }}"
-                     class="form-control">
-              <small class="text-muted">End-of-day applied.</small>
+            {{-- DATE TO --}}
+            <div class="col-12 col-md-3">
+              <label class="form-label pl-label mb-1">Date To</label>
+              <div class="input-group">
+                <span class="input-group-text" style="border-radius:12px 0 0 12px; border:1px solid var(--pl-border); background:#fff; white-space:nowrap;">
+                  <i class="nav-icon i-Calendar-4"></i>
+                </span>
+                <input
+                  type="date"
+                  name="date_to"
+                  value="{{ request('date_to', isset($ctx['date_to']) && $ctx['date_to'] ? $ctx['date_to']->format('Y-m-d') : '') }}"
+                  class="form-control pl-input"
+                  style="border-radius:0 12px 12px 0;"
+                >
+              </div>
+              <div class="pl-subtle mt-1">End-of-day applied.</div>
             </div>
 
           </div>
         </form>
 
-        <hr>
+        <hr class="my-4">
 
-        <div class="row">
-          <div class="col-md-4">
-            <div class="p-3 bg-light rounded">
-              <div class="text-muted">Total Income</div>
-              <div class="fw-bold text-success">{{ number_format($totals['income_total'] ?? 0, 2) }}</div>
+        {{-- KPI SUMMARY --}}
+        <div class="row g-3">
+          <div class="col-12 col-md-4">
+            <div class="pl-kpi good">
+              <div class="k">Total Income</div>
+              <div class="v">{{ number_format($totals['income_total'] ?? 0, 2) }}</div>
             </div>
           </div>
-          <div class="col-md-4">
-            <div class="p-3 bg-light rounded">
-              <div class="text-muted">Total Expenses</div>
-              {{-- Controller totals already return expenses as positive --}}
-              <div class="fw-bold text-danger">{{ number_format(($totals['expense_total'] ?? 0), 2) }}</div>
+          <div class="col-12 col-md-4">
+            <div class="pl-kpi bad">
+              <div class="k">Total Expenses</div>
+              <div class="v">{{ number_format($totals['expense_total'] ?? 0, 2) }}</div>
             </div>
           </div>
-          <div class="col-md-4">
-            <div class="p-3 bg-light rounded">
-              <div class="text-muted">Net Surplus / (Deficit)</div>
-              <div class="fw-bold {{ (($totals['net_surplus'] ?? 0) >= 0) ? 'text-success' : 'text-danger' }}">
-                {{ number_format($totals['net_surplus'] ?? 0, 2) }}
-              </div>
+          <div class="col-12 col-md-4">
+            @php $ns = (float) ($totals['net_surplus'] ?? 0); @endphp
+            <div class="pl-kpi {{ $ns >= 0 ? 'good' : 'bad' }}">
+              <div class="k">Net Surplus / (Deficit)</div>
+              <div class="v">{{ number_format($ns, 2) }}</div>
             </div>
           </div>
         </div>
@@ -121,12 +200,12 @@
   </div>
 
   {{-- TABLE CARD --}}
-  <div class="col-md-12">
-    <div class="card o-hidden mb-4">
-      <div class="card-header d-flex align-items-center">
-        <h3 class="w-50 float-start card-title m-0">Profit &amp; Loss Lines</h3>
+  <div class="col-12">
+    <div class="card pl-card mb-4">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <h3 class="card-title m-0 pl-title">Profit &amp; Loss Lines</h3>
 
-        <div class="dropdown dropleft text-end w-50 float-end">
+        <div class="dropdown dropleft text-end">
           <button class="btn bg-gray-100" id="dropdownMenuButton_pl2" type="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
             <i class="nav-icon i-Gear-2"></i>
           </button>
@@ -137,9 +216,13 @@
         </div>
       </div>
 
+      @php
+        $rows = $rows ?? collect();
+      @endphp
+
       <div class="card-body">
         <div class="table-responsive">
-          <table class="table text-center table-sm">
+          <table class="table table-sm pl-table text-center">
             <thead>
               <tr>
                 <th>#</th>
@@ -147,32 +230,41 @@
                 <th class="text-start">Main Account</th>
                 <th class="text-end">Debit</th>
                 <th class="text-end">Credit</th>
-                <th class="text-end">Net (Cr - Dr)</th>
+                <th class="text-end">Net</th>
               </tr>
             </thead>
 
             <tbody>
               @php $i=1; @endphp
 
-              @forelse(($rows ?? collect()) as $r)
+              @forelse($rows as $r)
                 @php
                   $g = strtoupper((string) ($r->main_group ?? ''));
-                  $badge = ($g === 'INCOME') ? 'bg-success' : (($g === 'EXPENSE') ? 'bg-danger' : 'bg-secondary');
-                  // New controller uses net_effect, older used pnl_effect. Support both.
-                  $net = isset($r->net_effect) ? $r->net_effect : ($r->pnl_effect ?? 0);
+                  $g = $g ?: 'OTHER';
+
+                  $badge = match($g){
+                    'INCOME' => 'bg-success',
+                    'EXPENSE' => 'bg-danger',
+                    default => 'bg-secondary',
+                  };
+
+                  // Controller provides net_effect
+                  $net = (float) ($r->net_effect ?? 0);
                 @endphp
 
                 <tr>
                   <td>{{ $i++ }}</td>
-                  <td>
-                    <span class="badge {{ $badge }}">
-                      {{ $g ?: 'OTHER' }}
-                    </span>
+                  <td><span class="badge pl-badge {{ $badge }}">{{ $g }}</span></td>
+
+                  <td class="text-start">
+                    <div class="pl-main fw-bold">{{ $r->main_account_name }}</div>
                   </td>
-                  <td class="text-start fw-bold">{{ $r->main_account_name }}</td>
-                  <td class="text-end">{{ number_format($r->debit ?? 0, 2) }}</td>
-                  <td class="text-end">{{ number_format($r->credit ?? 0, 2) }}</td>
-                  <td class="text-end {{ ($net >= 0) ? 'text-success' : 'text-danger' }}">
+
+                  {{-- ✅ netted columns from your controller: only one side should be > 0 --}}
+                  <td class="text-end" style="white-space:nowrap;">{{ number_format($r->debit ?? 0, 2) }}</td>
+                  <td class="text-end" style="white-space:nowrap;">{{ number_format($r->credit ?? 0, 2) }}</td>
+
+                  <td class="text-end {{ $net >= 0 ? 'text-success' : 'text-danger' }}" style="white-space:nowrap;">
                     {{ number_format($net, 2) }}
                   </td>
                 </tr>
@@ -184,11 +276,11 @@
               @endforelse
             </tbody>
 
-            @if(($rows ?? collect())->count() > 0)
+            @if($rows->count() > 0)
               <tfoot>
-                <tr class="fw-bold">
+                <tr class="fw-bold table-secondary">
                   <td colspan="5" class="text-end">NET SURPLUS / (DEFICIT)</td>
-                  <td class="text-end {{ (($totals['net_surplus'] ?? 0) >= 0) ? 'text-success' : 'text-danger' }}">
+                  <td class="text-end {{ (($totals['net_surplus'] ?? 0) >= 0) ? 'text-success' : 'text-danger' }}" style="white-space:nowrap;">
                     {{ number_format($totals['net_surplus'] ?? 0, 2) }}
                   </td>
                 </tr>
