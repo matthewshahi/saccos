@@ -14,7 +14,7 @@ class FinalAccountsController extends Controller
     /**
      * Default timezone for date cutoffs.
      */
-    private const TZ = 'Africa/Nairobi';
+   public const TZ = 'Africa/Nairobi';
 
     // ============================================================
     // PUBLIC: TRIAL BALANCE (STANDARD: AS AT ONLY)
@@ -36,25 +36,27 @@ class FinalAccountsController extends Controller
     }
 
     public function trialBalancePdf(Request $request)
-    {
-        $ctx = $this->resolveContext($request, 'TB');
+{
+    $ctx = $this->resolveContext($request, 'TB');
 
-        $rows   = $this->getTrialBalanceRows($ctx);
-        $totals = $this->computeTrialBalanceTotals($rows);
+    $rows   = $this->getTrialBalanceRows($ctx);
+    $totals = $this->computeTrialBalanceTotals($rows);
 
-        $pdf = Pdf::loadView('reports.final_accounts.trial_balance_pdf', [
-            'rows'    => $rows,
-            'totals'  => $totals,
-            'ctx'     => $ctx,
-            'notices' => $ctx['notices'],
-        ]);
+    $pdf = Pdf::loadView('reports.final_accounts.trial_balance_pdf', [
+        'rows'    => $rows,
+        'totals'  => $totals,
+        'ctx'     => $ctx,
+        'notices' => $ctx['notices'],
+        'tz'      => self::TZ, // pass timezone into the blade
+    ]);
 
-        $suffix = ($ctx['mode'] === 'period')
-            ? $ctx['as_at_period']
-            : $ctx['as_at_date']->format('Y-m-d');
+    $suffix = ($ctx['mode'] === 'period')
+        ? $ctx['as_at_period']
+        : $ctx['as_at_date']->format('Y-m-d');
 
-        return $pdf->download("trial_balance_{$suffix}.pdf");
-    }
+    return $pdf->download("trial_balance_{$suffix}.pdf");
+}
+
 
     public function trialBalanceExcel(Request $request)
     {
