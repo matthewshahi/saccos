@@ -4,54 +4,72 @@
 <head>
   <meta charset="UTF-8">
   <title>Balance Sheet</title>
+
   <style>
-    @page { margin: 22px 22px; }
-    body{ font-family: DejaVu Sans, sans-serif; font-size: 11px; color:#111827; }
-    .header{ margin-bottom: 10px; }
-    .title{ font-size: 16px; font-weight: 800; margin:0; }
-    .sub{ font-size: 10px; color:#6b7280; margin-top:4px; }
+    /* ✅ LANDSCAPE + tighter margins to stop right cut-off */
+    @page {
+      size: A4 landscape;
+      margin: 14px 14px;
+    }
+
+    body{ font-family: DejaVu Sans, sans-serif; font-size: 10px; color:#111827; }
+
+    /* ✅ Fit-to-page friendly tables */
+    table{ width:100%; border-collapse:collapse; table-layout: fixed; }
+    th, td{ box-sizing:border-box; }
+    tr{ page-break-inside: avoid; }
+
+    .header{ margin-bottom: 8px; }
+    .title{ font-size: 15px; font-weight: 800; margin:0; }
+    .sub{ font-size: 9px; color:#6b7280; margin-top:3px; }
     .chip{
-      display:inline-block; margin-top:8px;
-      padding:4px 10px; border-radius:999px;
+      display:inline-block; margin-top:6px;
+      padding:3px 10px; border-radius:999px;
       border:1px solid #e5e7eb; background:#f6f3ff; color:#5b2aa3;
-      font-weight:800; font-size:10px;
+      font-weight:800; font-size:9px;
     }
-    .notices{ margin:10px 0 12px; padding:10px; border:1px solid #f59e0b; background:#fff7ed; border-radius:10px; }
+
+    .notices{ margin:8px 0 10px; padding:8px; border:1px solid #f59e0b; background:#fff7ed; border-radius:10px; }
     .notices ul{ margin:0; padding-left:16px; }
-    .kpis{ width:100%; border-collapse:collapse; margin:10px 0 12px; }
+
+    .kpis{ width:100%; border-collapse:collapse; margin:8px 0 10px; table-layout: fixed; }
     .kpis td{
-      border:1px solid #e5e7eb; border-radius:10px;
-      padding:10px; vertical-align:top;
+      border:1px solid #e5e7eb;
+      padding:8px; vertical-align:top;
     }
-    .k{ font-size:10px; color:#6b7280; font-weight:800; }
-    .v{ font-size:13px; font-weight:900; margin-top:4px; }
+    .k{ font-size:9px; color:#6b7280; font-weight:800; }
+    .v{ font-size:12px; font-weight:900; margin-top:3px; }
     .good{ color:#065f46; }
     .bad{ color:#b91c1c; }
 
-    table{ width:100%; border-collapse:collapse; }
     thead th{
       background:#f3f4f6; border:1px solid #e5e7eb;
-      padding:7px 6px; font-size:10px; text-transform:uppercase; letter-spacing:.3px;
+      padding:6px 5px; font-size:9px; text-transform:uppercase; letter-spacing:.3px;
       white-space:nowrap;
     }
     tbody td{
-      border:1px solid #e5e7eb; padding:6px 6px; vertical-align:top;
+      border:1px solid #e5e7eb; padding:5px 5px; vertical-align:top;
+      overflow:hidden; text-overflow:ellipsis;
     }
     tfoot td{
-      border:1px solid #e5e7eb; padding:7px 6px; font-weight:900; background:#f3f4f6;
+      border:1px solid #e5e7eb; padding:6px 5px; font-weight:900; background:#f3f4f6;
+      overflow:hidden; text-overflow:ellipsis;
     }
+
     .text-right{ text-align:right; }
     .text-center{ text-align:center; }
-    .muted{ color:#6b7280; font-size:10px; }
+    .muted{ color:#6b7280; font-size:9px; }
     .mono{ font-family: DejaVu Sans Mono, monospace; }
+
     .badge{
-      display:inline-block; padding:2px 8px; border-radius:999px; font-size:9px; font-weight:900;
-      border:1px solid #e5e7eb;
+      display:inline-block; padding:2px 7px; border-radius:999px; font-size:8px; font-weight:900;
+      border:1px solid #e5e7eb; white-space:nowrap;
     }
     .b-asset{ background:#e0f2fe; }
     .b-liab{ background:#fef3c7; }
     .b-cap{ background:#e5e7eb; }
     .b-oth{ background:#f3f4f6; }
+
     .nowrap{ white-space:nowrap; }
     .acc-main{ font-weight:800; }
     .acc-sub{ margin-top:2px; }
@@ -84,9 +102,7 @@
 
 <div class="header">
   <div class="title">Balance Sheet</div>
-  <div class="sub">
-    Generated: {{ now()->format('Y-m-d H:i') }} (Africa/Nairobi)
-  </div>
+  <div class="sub">Generated: {{ now()->format('Y-m-d H:i') }} (Africa/Nairobi)</div>
   <div class="chip">As at: <span class="mono">{{ $cutoffLabel }}</span></div>
 </div>
 
@@ -126,12 +142,12 @@
 <table>
   <thead>
     <tr>
-      <th style="width:30px;">#</th>
-      <th style="width:90px;">Group</th>
-      <th class="text-left">Account</th>
-      <th style="width:110px;" class="text-right">Debit</th>
-      <th style="width:110px;" class="text-right">Credit</th>
-      <th style="width:130px;" class="text-right">Balance</th>
+      <th style="width:26px;">#</th>
+      <th style="width:80px;">Group</th>
+      <th>Account</th>
+      <th style="width:95px;" class="text-right">Debit</th>
+      <th style="width:95px;" class="text-right">Credit</th>
+      <th style="width:120px;" class="text-right">Balance</th>
     </tr>
   </thead>
 
@@ -146,15 +162,14 @@
         $bal = (float) ($r->balance ?? 0); // (Dr - Cr)
         $side = $bal >= 0 ? 'Dr' : 'Cr';
 
-        // Display label: prefer sub account when available
         $labelTop = '';
         $labelSub = '';
 
         if (!empty($r->sub_account_name)) {
-            $labelTop = trim(($r->sub_account_code ?? '').' '.$r->sub_account_name);
-            $labelSub = trim(($r->main_account_code ?? '').' '.$r->main_account_name);
+            $labelTop = trim(($r->sub_account_code ?? '').' - '.($r->sub_account_name ?? ''));
+            $labelSub = trim(($r->main_account_code ?? '').' - '.($r->main_account_name ?? ''));
         } else {
-            $labelTop = trim(($r->main_account_code ?? '').' '.$r->main_account_name);
+            $labelTop = trim(($r->main_account_code ?? '').' - '.($r->main_account_name ?? ''));
         }
       @endphp
 
