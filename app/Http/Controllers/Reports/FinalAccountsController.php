@@ -683,8 +683,7 @@ class FinalAccountsController extends Controller
     return $rows;
 }
 
-
-    private function computeBalanceSheetTotals($rows): array
+private function computeBalanceSheetTotals($rows): array
 {
     $assets = 0.0;
     $liabilities = 0.0;
@@ -714,4 +713,6 @@ class FinalAccountsController extends Controller
         'liabilities_plus_capital' => $lc,
         'diff'                     => $assets - $lc,
     ];
+}
+
 }
