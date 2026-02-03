@@ -52,7 +52,8 @@ use App\Http\Controllers\ManualMpesaRecoveryController;
 use App\Http\Controllers\FosaMembersReportController;
 use App\Http\Controllers\MemberFinancialPositionController;
 use App\Http\Controllers\FosaTransferController;
-
+use App\Http\Controllers\Reports\FinalAccountsController;
+use App\Http\Controllers\Reports\LedgerController;
 
 use App\Http\Controllers\KassMigrationController;
 use App\Http\Controllers\KasMemberImportController;
@@ -60,7 +61,7 @@ use App\Http\Controllers\KasMemberImportController;
 use App\Http\Controllers\KassContributionsImportController;
 
 use App\Http\Controllers\KassMemberMasterImportController;
- 
+
 /* good imports
 Route::prefix('kass')->group(function () {
     Route::get('/member-master-import', [KassMemberMasterImportController::class, 'index'])->name('kass.member_master_import.index');
@@ -939,35 +940,35 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
     Route::get('/reports/accounts/trial-balance', [TrialBalanceController::class, 'index'])->name('reports.accounts.trial-balance')->middleware('check_user_rights:rpt_trial_balance');
 
     Route::get(
-    'reports/accounts/trial-balance/excel',
-    [TrialBalanceController::class, 'exportExcel']
-)->name('reports.accounts.trial-balance.excel')->middleware('check_user_rights:rpt_trial_balance');
+        'reports/accounts/trial-balance/excel',
+        [TrialBalanceController::class, 'exportExcel']
+    )->name('reports.accounts.trial-balance.excel')->middleware('check_user_rights:rpt_trial_balance');
 
-Route::get(
-    'reports/accounts/trial-balance/pdf',
-    [TrialBalanceController::class, 'exportPdf']
-)->name('reports.accounts.trial-balance.pdf')->middleware('check_user_rights:rpt_trial_balance');
+    Route::get(
+        'reports/accounts/trial-balance/pdf',
+        [TrialBalanceController::class, 'exportPdf']
+    )->name('reports.accounts.trial-balance.pdf')->middleware('check_user_rights:rpt_trial_balance');
 
-Route::get(
-    'reports/accounts/balance-sheet/pdf',
-    [TrialBalanceController::class, 'exportBalanceSheetPdf']
-)->name('reports.accounts.balance-sheet.pdf')->middleware('check_user_rights:rpt_trial_balance');
+    Route::get(
+        'reports/accounts/balance-sheet/pdf',
+        [TrialBalanceController::class, 'exportBalanceSheetPdf']
+    )->name('reports.accounts.balance-sheet.pdf')->middleware('check_user_rights:rpt_trial_balance');
 
 
-Route::get(
-    'reports/accounts/profit-loss/excel',
-    [TrialBalanceController::class, 'exportProfitLossExcel']
-)->name('reports.accounts.profit-loss.excel')->middleware('check_user_rights:rpt_profit_loss');
+    Route::get(
+        'reports/accounts/profit-loss/excel',
+        [TrialBalanceController::class, 'exportProfitLossExcel']
+    )->name('reports.accounts.profit-loss.excel')->middleware('check_user_rights:rpt_profit_loss');
 
-Route::get(
-    'reports/accounts/profit-loss/pdf',
-    [TrialBalanceController::class, 'exportProfitLossPdf']
-)->name('reports.accounts.profit-loss.pdf')->middleware('check_user_rights:rpt_profit_loss');
+    Route::get(
+        'reports/accounts/profit-loss/pdf',
+        [TrialBalanceController::class, 'exportProfitLossPdf']
+    )->name('reports.accounts.profit-loss.pdf')->middleware('check_user_rights:rpt_profit_loss');
 
-Route::get(
-    'reports/accounts/balance-sheet/excel',
-    [TrialBalanceController::class, 'exportBalanceSheetExcel']
-)->name('reports.accounts.balance-sheet.excel')->middleware('check_user_rights:rpt_profit_loss');
+    Route::get(
+        'reports/accounts/balance-sheet/excel',
+        [TrialBalanceController::class, 'exportBalanceSheetExcel']
+    )->name('reports.accounts.balance-sheet.excel')->middleware('check_user_rights:rpt_profit_loss');
 
 
     Route::get('/reports/accounts/profit-loss', [TrialBalanceController::class, 'profitLoss'])
@@ -1094,4 +1095,80 @@ Route::get(
             [FosaTransferController::class, 'ledgerSearch']
         )->name('fosa.transfers.ledger_search')->middleware('check_user_rights:trasfer_fosa');
     });
+
+ 
+     // =========================
+    // TRIAL BALANCE
+    // =========================
+    Route::get('/reports/final-accounts/trial-balance',
+        [FinalAccountsController::class, 'trialBalance']
+    )->name('reports.final_accounts.trial_balance')
+     ->middleware('check_user_rights:rpt_trial_balance');
+
+    Route::get('/reports/final-accounts/trial-balance/pdf',
+        [FinalAccountsController::class, 'trialBalancePdf']
+    )->name('reports.final_accounts.trial_balance.pdf')
+     ->middleware('check_user_rights:rpt_trial_balance');
+
+    Route::get('/reports/final-accounts/trial-balance/excel',
+        [FinalAccountsController::class, 'trialBalanceExcel']
+    )->name('reports.final_accounts.trial_balance.excel')
+     ->middleware('check_user_rights:rpt_trial_balance');
+
+
+    // =========================
+    // PROFIT & LOSS
+    // =========================
+    Route::get('/reports/final-accounts/profit-loss',
+        [FinalAccountsController::class, 'profitLoss']
+    )->name('reports.final_accounts.profit_loss')
+     ->middleware('check_user_rights:rpt_profit_loss');
+
+    Route::get('/reports/final-accounts/profit-loss/pdf',
+        [FinalAccountsController::class, 'profitLossPdf']
+    )->name('reports.final_accounts.profit_loss.pdf')
+     ->middleware('check_user_rights:rpt_profit_loss');
+
+    Route::get('/reports/final-accounts/profit-loss/excel',
+        [FinalAccountsController::class, 'profitLossExcel']
+    )->name('reports.final_accounts.profit_loss.excel')
+     ->middleware('check_user_rights:rpt_profit_loss');
+
+
+    // =========================
+    // BALANCE SHEET
+    // =========================
+    Route::get('/reports/final-accounts/balance-sheet',
+        [FinalAccountsController::class, 'balanceSheet']
+    )->name('reports.final_accounts.balance_sheet')
+     ->middleware('check_user_rights:rpt_balance_sheet');
+
+    Route::get('/reports/final-accounts/balance-sheet/pdf',
+        [FinalAccountsController::class, 'balanceSheetPdf']
+    )->name('reports.final_accounts.balance_sheet.pdf')
+     ->middleware('check_user_rights:rpt_balance_sheet');
+
+    Route::get('/reports/final-accounts/balance-sheet/excel',
+        [FinalAccountsController::class, 'balanceSheetExcel']
+    )->name('reports.final_accounts.balance_sheet.excel')
+     ->middleware('check_user_rights:rpt_balance_sheet');
+
+
+    // =========================
+    // LEDGERS (DRILL-DOWN)
+    // =========================
+    Route::get('/reports/ledgers/sub-account/{sub_account_id}',
+        [LedgerController::class, 'subAccountLedger']
+    )->name('reports.ledgers.sub_account')
+     ->middleware('check_user_rights:rpt_general_ledger');
+
+    Route::get('/reports/ledgers/sub-account/{sub_account_id}/pdf',
+        [LedgerController::class, 'subAccountLedgerPdf']
+    )->name('reports.ledgers.sub_account.pdf')
+     ->middleware('check_user_rights:rpt_general_ledger');
+
+    Route::get('/reports/ledgers/sub-account/{sub_account_id}/excel',
+        [LedgerController::class, 'subAccountLedgerExcel']
+    )->name('reports.ledgers.sub_account.excel')
+     ->middleware('check_user_rights:rpt_general_ledger');
 });
