@@ -37,8 +37,8 @@
             <div class="col-md-3">
               <label class="form-label fw-bold">Mode</label>
               <select name="mode" class="form-control">
-                <option value="period" {{ (request('mode','period')=='period') ? 'selected' : '' }}>As at Period (YYYYMM)</option>
-                <option value="date" {{ (request('mode')=='date') ? 'selected' : '' }}>As at Date</option>
+                <option value="period" {{ (request('mode', $ctx['mode'] ?? 'period')=='period') ? 'selected' : '' }}>As at Period (YYYYMM)</option>
+                <option value="date" {{ (request('mode', $ctx['mode'] ?? '')=='date') ? 'selected' : '' }}>As at Date</option>
               </select>
               <small class="text-muted">Period is recommended for SACCO month-end.</small>
             </div>
@@ -46,7 +46,7 @@
             <div class="col-md-3">
               <label class="form-label fw-bold">As at Period</label>
               <input type="text" name="as_at_period"
-                     value="{{ $ctx['as_at_period'] ?? request('as_at_period') }}"
+                     value="{{ request('as_at_period', $ctx['as_at_period'] ?? '') }}"
                      class="form-control" placeholder="YYYYMM e.g. 202512">
               <small class="text-muted">Used when mode=period.</small>
             </div>
@@ -54,7 +54,7 @@
             <div class="col-md-3">
               <label class="form-label fw-bold">As at Date</label>
               <input type="date" name="as_at_date"
-                     value="{{ isset($ctx['as_at_date']) && $ctx['as_at_date'] ? $ctx['as_at_date']->format('Y-m-d') : request('as_at_date') }}"
+                     value="{{ request('as_at_date', isset($ctx['as_at_date']) && $ctx['as_at_date'] ? $ctx['as_at_date']->format('Y-m-d') : '') }}"
                      class="form-control">
               <small class="text-muted">Used when mode=date. End-of-day is applied.</small>
             </div>
@@ -70,7 +70,7 @@
 
         <hr>
 
-        {{-- SUMMARY --}}
+        {{-- SUMMARY (Grand totals: Opening + Movements) --}}
         <div class="row">
           <div class="col-md-3">
             <div class="p-3 bg-light rounded">
@@ -110,7 +110,6 @@
     </div>
   </div>
 
-
   {{-- TB TABLE CARD --}}
   <div class="col-md-12">
     <div class="card o-hidden mb-4">
@@ -148,6 +147,11 @@
             default => 'bg-secondary',
           };
         };
+
+        // Expect controller to pass these:
+        // $openingRows, $movementRows, $openingTotals, $movementTotals
+        $openingRows = $openingRows ?? collect();
+        $movementRows = $movementRows ?? collect();
       @endphp
 
       <div class="card-body">
@@ -156,58 +160,93 @@
             <thead>
               <tr>
                 <th>#</th>
+                <th>Section</th>
                 <th>Group</th>
-                <th>Main</th>
+                <th class="text-start">Main</th>
                 <th>Main Type</th>
-                <th>Sub</th>
+                <th class="text-start">Sub</th>
                 <th class="text-end">Debit</th>
                 <th class="text-end">Credit</th>
-                
               </tr>
             </thead>
+
             <tbody>
               @php $i=1; @endphp
-              @forelse($rows as $r)
-                @php $g = $groupOf($r->main_account_type); @endphp
-                <tr>
-                  <td>{{ $i++ }}</td>
 
-                  <td>
-                    <span class="badge {{ $badgeClass($g) }}">{{ $g }}</span>
-                  </td>
-
-                  <td class="text-start">
-                    <div class="fw-bold">{{ $r->main_account_code }} - {{ $r->main_account_name }}</div>
-                  </td>
-
-                  <td>{{ $r->main_account_type }}</td>
-
-                  <td class="text-start">
-                    <div class="fw-bold">{{ $r->sub_account_code }} - {{ $r->sub_account_name }}</div>
-                  </td>
-
-      <td class="text-end">{{ number_format($r->tb_debit ?? 0, 2) }}</td>
-<td class="text-end">{{ number_format($r->tb_credit ?? 0, 2) }}</td>
-
-                  
+              {{-- =========================
+                   OPENING BALANCES
+              ========================== --}}
+              @if($openingRows->count() > 0)
+                <tr class="table-light fw-bold">
+                  <td colspan="8" class="text-start">OPENING BALANCES (TB_IMPORT)</td>
                 </tr>
-              @empty
-                <tr>
-                  <td colspan="9" class="text-muted">No records found for the selected cutoff.</td>
+
+                @foreach($openingRows as $r)
+                  @php $g = $groupOf($r->main_account_type); @endphp
+                  <tr>
+                    <td>{{ $i++ }}</td>
+                    <td><span class="badge bg-dark">OPENING</span></td>
+                    <td><span class="badge {{ $badgeClass($g) }}">{{ $g }}</span></td>
+                    <td class="text-start"><div class="fw-bold">{{ $r->main_account_code }} - {{ $r->main_account_name }}</div></td>
+                    <td>{{ $r->main_account_type }}</td>
+                    <td class="text-start"><div class="fw-bold">{{ $r->sub_account_code }} - {{ $r->sub_account_name }}</div></td>
+                    <td class="text-end">{{ number_format($r->tb_debit ?? 0, 2) }}</td>
+                    <td class="text-end">{{ number_format($r->tb_credit ?? 0, 2) }}</td>
+                  </tr>
+                @endforeach
+
+                <tr class="fw-bold">
+                  <td colspan="6" class="text-end">OPENING TOTALS</td>
+                  <td class="text-end">{{ number_format($openingTotals['debit'] ?? 0, 2) }}</td>
+                  <td class="text-end">{{ number_format($openingTotals['credit'] ?? 0, 2) }}</td>
                 </tr>
-              @endforelse
+              @endif
+
+              {{-- =========================
+                   MOVEMENTS
+              ========================== --}}
+              @if($movementRows->count() > 0)
+                <tr class="table-light fw-bold">
+                  <td colspan="8" class="text-start">MOVEMENTS (All other sources)</td>
+                </tr>
+
+                @foreach($movementRows as $r)
+                  @php $g = $groupOf($r->main_account_type); @endphp
+                  <tr>
+                    <td>{{ $i++ }}</td>
+                    <td><span class="badge bg-primary">MOVEMENT</span></td>
+                    <td><span class="badge {{ $badgeClass($g) }}">{{ $g }}</span></td>
+                    <td class="text-start"><div class="fw-bold">{{ $r->main_account_code }} - {{ $r->main_account_name }}</div></td>
+                    <td>{{ $r->main_account_type }}</td>
+                    <td class="text-start"><div class="fw-bold">{{ $r->sub_account_code }} - {{ $r->sub_account_name }}</div></td>
+                    <td class="text-end">{{ number_format($r->tb_debit ?? 0, 2) }}</td>
+                    <td class="text-end">{{ number_format($r->tb_credit ?? 0, 2) }}</td>
+                  </tr>
+                @endforeach
+
+                <tr class="fw-bold">
+                  <td colspan="6" class="text-end">MOVEMENT TOTALS</td>
+                  <td class="text-end">{{ number_format($movementTotals['debit'] ?? 0, 2) }}</td>
+                  <td class="text-end">{{ number_format($movementTotals['credit'] ?? 0, 2) }}</td>
+                </tr>
+              @endif
+
+              @if($openingRows->count() === 0 && $movementRows->count() === 0)
+                <tr>
+                  <td colspan="8" class="text-muted">No records found for the selected cutoff.</td>
+                </tr>
+              @endif
             </tbody>
 
-            @if(!empty($rows) && count($rows) > 0)
-            <tfoot>
-              <tr class="fw-bold">
-                <td colspan="5" class="text-end">TOTALS</td>
-                <td class="text-end">{{ number_format($totals['debit'] ?? 0, 2) }}</td>
-                <td class="text-end">{{ number_format($totals['credit'] ?? 0, 2) }}</td>
-                <td class="text-end">{{ number_format($totals['closing_debit'] ?? 0, 2) }}</td>
-                <td class="text-end">{{ number_format($totals['closing_credit'] ?? 0, 2) }}</td>
-              </tr>
-            </tfoot>
+            {{-- GRAND TOTALS --}}
+            @if(($openingRows->count() + $movementRows->count()) > 0)
+              <tfoot>
+                <tr class="fw-bold table-secondary">
+                  <td colspan="6" class="text-end">GRAND TOTALS</td>
+                  <td class="text-end">{{ number_format($totals['debit'] ?? 0, 2) }}</td>
+                  <td class="text-end">{{ number_format($totals['credit'] ?? 0, 2) }}</td>
+                </tr>
+              </tfoot>
             @endif
 
           </table>
