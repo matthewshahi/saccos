@@ -12,40 +12,26 @@ use Barryvdh\DomPDF\Facade\Pdf;
 class FinalAccountsController extends Controller
 {
     /**
-     * Default timezone for period/date cutoffs.
+     * Default timezone for date cutoffs.
      */
     private const TZ = 'Africa/Nairobi';
 
     // ============================================================
-    // PUBLIC: TRIAL BALANCE
+    // PUBLIC: TRIAL BALANCE (STANDARD: AS AT ONLY)
     // ============================================================
 
     public function trialBalance(Request $request)
     {
         $ctx = $this->resolveContext($request, 'TB');
 
-        // Opening first, then movements
-        $openingRows  = $this->getTrialBalanceOpeningRows($ctx);
-        $movementRows = $this->getTrialBalanceMovementRows($ctx);
-
-        $openingTotals  = $this->computeTrialBalanceTotals($openingRows);
-        $movementTotals = $this->computeTrialBalanceTotals($movementRows);
-
-        $totals = [
-            'debit'  => ($openingTotals['debit'] ?? 0) + ($movementTotals['debit'] ?? 0),
-            'credit' => ($openingTotals['credit'] ?? 0) + ($movementTotals['credit'] ?? 0),
-            'diff'   => (($openingTotals['debit'] ?? 0) + ($movementTotals['debit'] ?? 0))
-                      - (($openingTotals['credit'] ?? 0) + ($movementTotals['credit'] ?? 0)),
-        ];
+        $rows   = $this->getTrialBalanceRows($ctx);
+        $totals = $this->computeTrialBalanceTotals($rows);
 
         return view('reports.final_accounts.trial_balance', [
-            'openingRows'    => $openingRows,
-            'movementRows'   => $movementRows,
-            'openingTotals'  => $openingTotals,
-            'movementTotals' => $movementTotals,
-            'totals'         => $totals,           // keep existing summary cards
-            'ctx'            => $ctx,
-            'notices'        => $ctx['notices'],
+            'rows'    => $rows,
+            'totals'  => $totals,
+            'ctx'     => $ctx,
+            'notices' => $ctx['notices'],
         ]);
     }
 
@@ -53,27 +39,14 @@ class FinalAccountsController extends Controller
     {
         $ctx = $this->resolveContext($request, 'TB');
 
-        $openingRows  = $this->getTrialBalanceOpeningRows($ctx);
-        $movementRows = $this->getTrialBalanceMovementRows($ctx);
-
-        $openingTotals  = $this->computeTrialBalanceTotals($openingRows);
-        $movementTotals = $this->computeTrialBalanceTotals($movementRows);
-
-        $totals = [
-            'debit'  => ($openingTotals['debit'] ?? 0) + ($movementTotals['debit'] ?? 0),
-            'credit' => ($openingTotals['credit'] ?? 0) + ($movementTotals['credit'] ?? 0),
-            'diff'   => (($openingTotals['debit'] ?? 0) + ($movementTotals['debit'] ?? 0))
-                      - (($openingTotals['credit'] ?? 0) + ($movementTotals['credit'] ?? 0)),
-        ];
+        $rows   = $this->getTrialBalanceRows($ctx);
+        $totals = $this->computeTrialBalanceTotals($rows);
 
         $pdf = Pdf::loadView('reports.final_accounts.trial_balance_pdf', [
-            'openingRows'    => $openingRows,
-            'movementRows'   => $movementRows,
-            'openingTotals'  => $openingTotals,
-            'movementTotals' => $movementTotals,
-            'totals'         => $totals,
-            'ctx'            => $ctx,
-            'notices'        => $ctx['notices'],
+            'rows'    => $rows,
+            'totals'  => $totals,
+            'ctx'     => $ctx,
+            'notices' => $ctx['notices'],
         ]);
 
         $suffix = ($ctx['mode'] === 'period')
@@ -87,32 +60,19 @@ class FinalAccountsController extends Controller
     {
         $ctx = $this->resolveContext($request, 'TB');
 
-        $openingRows  = $this->getTrialBalanceOpeningRows($ctx);
-        $movementRows = $this->getTrialBalanceMovementRows($ctx);
+        $rows   = $this->getTrialBalanceRows($ctx);
+        $totals = $this->computeTrialBalanceTotals($rows);
 
-        $openingTotals  = $this->computeTrialBalanceTotals($openingRows);
-        $movementTotals = $this->computeTrialBalanceTotals($movementRows);
-
-        $totals = [
-            'debit'  => ($openingTotals['debit'] ?? 0) + ($movementTotals['debit'] ?? 0),
-            'credit' => ($openingTotals['credit'] ?? 0) + ($movementTotals['credit'] ?? 0),
-            'diff'   => (($openingTotals['debit'] ?? 0) + ($movementTotals['debit'] ?? 0))
-                      - (($openingTotals['credit'] ?? 0) + ($movementTotals['credit'] ?? 0)),
-        ];
-
-        // ✅ TB standard export: TWO columns only (Dr/Cr)
+        // Standard TB: one balance per sub account (netted to Dr/Cr)
         $headings = [
-            'Section',
             'Main Code', 'Main Account', 'Main Type',
             'Sub Code', 'Sub Account',
             'Debit', 'Credit',
         ];
 
         $data = [];
-
-        foreach ($openingRows as $r) {
+        foreach ($rows as $r) {
             $data[] = [
-                'OPENING',
                 $r->main_account_code,
                 $r->main_account_name,
                 $r->main_account_type,
@@ -123,31 +83,8 @@ class FinalAccountsController extends Controller
             ];
         }
 
-        // Section total
-        $data[] = ['OPENING TOTALS', '', '', '', '', '',
-            (float) ($openingTotals['debit'] ?? 0),
-            (float) ($openingTotals['credit'] ?? 0),
-        ];
-
-        foreach ($movementRows as $r) {
-            $data[] = [
-                'MOVEMENT',
-                $r->main_account_code,
-                $r->main_account_name,
-                $r->main_account_type,
-                $r->sub_account_code,
-                $r->sub_account_name,
-                (float) ($r->tb_debit ?? 0),
-                (float) ($r->tb_credit ?? 0),
-            ];
-        }
-
-        $data[] = ['MOVEMENT TOTALS', '', '', '', '', '',
-            (float) ($movementTotals['debit'] ?? 0),
-            (float) ($movementTotals['credit'] ?? 0),
-        ];
-
-        $data[] = ['GRAND TOTALS', '', '', '', '', '',
+        $data[] = [
+            '', 'GRAND TOTALS', '', '', '',
             (float) ($totals['debit'] ?? 0),
             (float) ($totals['credit'] ?? 0),
         ];
@@ -169,14 +106,14 @@ class FinalAccountsController extends Controller
     }
 
     // ============================================================
-    // PUBLIC: PROFIT & LOSS
+    // PUBLIC: PROFIT & LOSS (STANDARD RANGE)
     // ============================================================
 
     public function profitLoss(Request $request)
     {
         $ctx = $this->resolveContext($request, 'PL');
 
-        $rows = $this->getProfitLossRows($ctx);
+        $rows   = $this->getProfitLossRows($ctx);
         $totals = $this->computeProfitLossTotals($rows);
 
         return view('reports.final_accounts.profit_loss', [
@@ -191,7 +128,7 @@ class FinalAccountsController extends Controller
     {
         $ctx = $this->resolveContext($request, 'PL');
 
-        $rows = $this->getProfitLossRows($ctx);
+        $rows   = $this->getProfitLossRows($ctx);
         $totals = $this->computeProfitLossTotals($rows);
 
         $pdf = Pdf::loadView('reports.final_accounts.profit_loss_pdf', [
@@ -212,10 +149,11 @@ class FinalAccountsController extends Controller
     {
         $ctx = $this->resolveContext($request, 'PL');
 
-        $rows = $this->getProfitLossRows($ctx);
+        $rows   = $this->getProfitLossRows($ctx);
         $totals = $this->computeProfitLossTotals($rows);
 
-        $headings = ['Type', 'Main Account', 'Debit', 'Credit', 'P&L Effect (Cr - Dr)'];
+        // Present expenses as positive (standard readable P&L)
+        $headings = ['Type', 'Main Account', 'Debit', 'Credit', 'Net (Cr - Dr)'];
 
         $data = [];
         foreach ($rows as $r) {
@@ -224,10 +162,12 @@ class FinalAccountsController extends Controller
                 $r->main_account_name,
                 (float) ($r->debit ?? 0),
                 (float) ($r->credit ?? 0),
-                (float) ($r->pnl_effect ?? 0),
+                (float) ($r->net_effect ?? 0),
             ];
         }
 
+        $data[] = ['', 'TOTAL INCOME', '', '', (float) ($totals['income_total'] ?? 0)];
+        $data[] = ['', 'TOTAL EXPENSES', '', '', (float) ($totals['expense_total'] ?? 0)];
         $data[] = ['', 'NET SURPLUS / (DEFICIT)', '', '', (float) ($totals['net_surplus'] ?? 0)];
 
         $export = new class($headings, $data) implements
@@ -247,14 +187,14 @@ class FinalAccountsController extends Controller
     }
 
     // ============================================================
-    // PUBLIC: BALANCE SHEET
+    // PUBLIC: BALANCE SHEET (STANDARD AS AT)
     // ============================================================
 
     public function balanceSheet(Request $request)
     {
         $ctx = $this->resolveContext($request, 'BS');
 
-        $rows = $this->getBalanceSheetRows($ctx);
+        $rows   = $this->getBalanceSheetRows($ctx);
         $totals = $this->computeBalanceSheetTotals($rows);
 
         return view('reports.final_accounts.balance_sheet', [
@@ -269,7 +209,7 @@ class FinalAccountsController extends Controller
     {
         $ctx = $this->resolveContext($request, 'BS');
 
-        $rows = $this->getBalanceSheetRows($ctx);
+        $rows   = $this->getBalanceSheetRows($ctx);
         $totals = $this->computeBalanceSheetTotals($rows);
 
         $pdf = Pdf::loadView('reports.final_accounts.balance_sheet_pdf', [
@@ -290,7 +230,7 @@ class FinalAccountsController extends Controller
     {
         $ctx = $this->resolveContext($request, 'BS');
 
-        $rows = $this->getBalanceSheetRows($ctx);
+        $rows   = $this->getBalanceSheetRows($ctx);
         $totals = $this->computeBalanceSheetTotals($rows);
 
         $headings = ['Group', 'Main Account', 'Debit', 'Credit', 'Balance (Dr - Cr)'];
@@ -336,8 +276,8 @@ class FinalAccountsController extends Controller
     {
         $notices = [];
 
-        $now = Carbon::now(self::TZ);
-        $todayEod = $now->copy()->endOfDay();
+        $now        = Carbon::now(self::TZ);
+        $todayEod   = $now->copy()->endOfDay();
         $todayPeriod = $todayEod->format('Ym');
 
         // Authoritative mode if supplied
@@ -381,6 +321,7 @@ class FinalAccountsController extends Controller
                 ];
             }
 
+            // Date mode: ALWAYS end-of-day (user provides date, we cut off at 23:59:59)
             $asAtDate = $this->parseDateOrNull($request->input('as_at_date', $request->input('date')));
             if (!$asAtDate) {
                 $asAtDate = $todayEod->copy();
@@ -405,7 +346,7 @@ class FinalAccountsController extends Controller
 
             if (!$from && !$to) {
                 $from = $todayPeriod;
-                $to = $todayPeriod;
+                $to   = $todayPeriod;
                 $notices[] = "Missing period range. Defaulted to {$todayPeriod}.";
             } else {
                 if (!$from) {
@@ -439,7 +380,7 @@ class FinalAccountsController extends Controller
 
         if (!$fromDate && !$toDate) {
             $fromDate = $todayEod->copy()->startOfDay();
-            $toDate = $todayEod->copy()->endOfDay();
+            $toDate   = $todayEod->copy()->endOfDay();
             $notices[] = "Missing date range. Defaulted to today ({$toDate->format('Y-m-d')}).";
         } else {
             if (!$fromDate) {
@@ -488,11 +429,14 @@ class FinalAccountsController extends Controller
         return $p;
     }
 
+    /**
+     * Parse user date and force TZ (then caller applies startOfDay/endOfDay).
+     */
     private function parseDateOrNull(?string $s): ?Carbon
     {
         if (!$s) return null;
         try {
-            return Carbon::parse($s, self::TZ);
+            return Carbon::parse($s)->setTimezone(self::TZ);
         } catch (\Throwable $e) {
             return null;
         }
@@ -521,10 +465,16 @@ class FinalAccountsController extends Controller
             ->join('sacco_main_account as ma', 'ma.main_account_id', '=', 'sa.sub_account_main_account');
     }
 
+    /**
+     * Strict "as at" cutoff.
+     * IMPORTANT: In period mode, require a valid 6-digit period. Do not coalesce NULL periods into ''.
+     */
     private function applyAsAtFilter($q, array $ctx)
     {
         if (($ctx['mode'] ?? '') === 'period') {
-            return $q->whereRaw("COALESCE(t.accounts_trans_period,'') <= ?", [$ctx['as_at_period']]);
+            // Safer: ignore rows with NULL/invalid period in period-mode.
+            return $q->whereNotNull('t.accounts_trans_period')
+                ->whereRaw("t.accounts_trans_period <= ?", [$ctx['as_at_period']]);
         }
 
         return $q->where('t.accounts_trans_dat_date', '<=', $ctx['as_at_date']->format('Y-m-d H:i:s'));
@@ -533,9 +483,10 @@ class FinalAccountsController extends Controller
     private function applyRangeFilter($q, array $ctx)
     {
         if (($ctx['mode'] ?? '') === 'period') {
-            return $q->whereRaw("COALESCE(t.accounts_trans_period,'') BETWEEN ? AND ?", [
-                $ctx['period_from'], $ctx['period_to'],
-            ]);
+            return $q->whereNotNull('t.accounts_trans_period')
+                ->whereRaw("t.accounts_trans_period BETWEEN ? AND ?", [
+                    $ctx['period_from'], $ctx['period_to'],
+                ]);
         }
 
         return $q->whereBetween('t.accounts_trans_dat_date', [
@@ -558,21 +509,8 @@ class FinalAccountsController extends Controller
     }
 
     // ============================================================
-    // TRIAL BALANCE (OPENING + MOVEMENTS)
+    // TRIAL BALANCE (STANDARD AS-AT)
     // ============================================================
-
-    private function applyOpeningFilter($q)
-    {
-        return $q->where('t.accounts_trans_source', '=', 'TB_IMPORT');
-    }
-
-    private function applyMovementFilter($q)
-    {
-        return $q->where(function ($w) {
-            $w->whereNull('t.accounts_trans_source')
-              ->orWhere('t.accounts_trans_source', '!=', 'TB_IMPORT');
-        });
-    }
 
     private function selectTrialBalanceNettedColumns($q)
     {
@@ -602,17 +540,9 @@ class FinalAccountsController extends Controller
             ->orderBy('sa.sub_account_code');
     }
 
-    private function getTrialBalanceOpeningRows(array $ctx)
+    private function getTrialBalanceRows(array $ctx)
     {
         $q = $this->applyAsAtFilter($this->baseJoinQuery(), $ctx);
-        $q = $this->applyOpeningFilter($q);
-        return $this->selectTrialBalanceNettedColumns($q)->get();
-    }
-
-    private function getTrialBalanceMovementRows(array $ctx)
-    {
-        $q = $this->applyAsAtFilter($this->baseJoinQuery(), $ctx);
-        $q = $this->applyMovementFilter($q);
         return $this->selectTrialBalanceNettedColumns($q)->get();
     }
 
@@ -634,7 +564,7 @@ class FinalAccountsController extends Controller
     }
 
     // ============================================================
-    // PROFIT & LOSS
+    // PROFIT & LOSS (RANGE)
     // ============================================================
 
     private function getProfitLossRows(array $ctx)
@@ -652,7 +582,8 @@ class FinalAccountsController extends Controller
                 'ma.main_account_type',
                 DB::raw('SUM(COALESCE(t.accounts_trans_debit,0))  AS debit'),
                 DB::raw('SUM(COALESCE(t.accounts_trans_credit,0)) AS credit'),
-                DB::raw('(SUM(COALESCE(t.accounts_trans_credit,0)) - SUM(COALESCE(t.accounts_trans_debit,0))) AS pnl_effect'),
+                // keep the signed effect too (useful)
+                DB::raw('(SUM(COALESCE(t.accounts_trans_credit,0)) - SUM(COALESCE(t.accounts_trans_debit,0))) AS net_effect'),
             ])
             ->groupBy('ma.main_account_id', 'ma.main_account_name', 'ma.main_account_type')
             ->orderBy('ma.main_account_type')
@@ -666,30 +597,43 @@ class FinalAccountsController extends Controller
         return $rows;
     }
 
+    /**
+     * Totals are presented as:
+     * - income_total: positive
+     * - expense_total: positive
+     * - net_surplus = income_total - expense_total
+     */
     private function computeProfitLossTotals($rows): array
     {
-        $income = 0.0;
-        $expense = 0.0;
-        $net = 0.0;
+        $incomeTotal  = 0.0;
+        $expenseTotal = 0.0;
 
         foreach ($rows as $r) {
-            $effect = (float) ($r->pnl_effect ?? 0);
-            $net += $effect;
+            $debit  = (float) ($r->debit ?? 0);
+            $credit = (float) ($r->credit ?? 0);
 
             $g = $r->main_group ?? $this->normMainGroup((string) $r->main_account_type);
-            if ($g === 'INCOME') $income += $effect;
-            if ($g === 'EXPENSE') $expense += $effect;
+
+            if ($g === 'INCOME') {
+                // Income normal: credit - debit
+                $incomeTotal += ($credit - $debit);
+            } elseif ($g === 'EXPENSE') {
+                // Expenses normal: debit - credit (positive)
+                $expenseTotal += ($debit - $credit);
+            }
         }
 
+        $net = $incomeTotal - $expenseTotal;
+
         return [
-            'income_total'  => $income,
-            'expense_total' => $expense,
+            'income_total'  => $incomeTotal,
+            'expense_total' => $expenseTotal,
             'net_surplus'   => $net,
         ];
     }
 
     // ============================================================
-    // BALANCE SHEET
+    // BALANCE SHEET (AS AT)
     // ============================================================
 
     private function getBalanceSheetRows(array $ctx)
@@ -724,19 +668,22 @@ class FinalAccountsController extends Controller
 
     private function computeBalanceSheetTotals($rows): array
     {
-        $assets = 0.0;
+        $assets      = 0.0;
         $liabilities = 0.0;
-        $capital = 0.0;
+        $capital     = 0.0;
 
         foreach ($rows as $r) {
             $bal = (float) ($r->balance ?? 0);
-            $g = $r->main_group ?? $this->normMainGroup((string) $r->main_account_type);
+            $g   = $r->main_group ?? $this->normMainGroup((string) $r->main_account_type);
 
             if ($g === 'ASSET') {
+                // Assets: usually positive under (Dr - Cr)
                 $assets += $bal;
             } elseif ($g === 'LIABILITY') {
+                // Liabilities: usually negative under (Dr - Cr); invert to positive
                 $liabilities += (-1 * $bal);
             } elseif ($g === 'CAPITAL') {
+                // Capital: usually negative under (Dr - Cr); invert to positive
                 $capital += (-1 * $bal);
             }
         }

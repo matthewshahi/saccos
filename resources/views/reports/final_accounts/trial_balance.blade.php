@@ -70,7 +70,7 @@
 
         <hr>
 
-        {{-- SUMMARY (Grand totals: Opening + Movements) --}}
+        {{-- SUMMARY (Grand totals: standard TB) --}}
         <div class="row">
           <div class="col-md-3">
             <div class="p-3 bg-light rounded">
@@ -148,10 +148,8 @@
           };
         };
 
-        // Expect controller to pass these:
-        // $openingRows, $movementRows, $openingTotals, $movementTotals
-        $openingRows = $openingRows ?? collect();
-        $movementRows = $movementRows ?? collect();
+        // Standard controller now passes: $rows (not opening/movement)
+        $rows = $rows ?? collect();
       @endphp
 
       <div class="card-body">
@@ -160,7 +158,6 @@
             <thead>
               <tr>
                 <th>#</th>
-                <th>Section</th>
                 <th>Group</th>
                 <th class="text-start">Main</th>
                 <th>Main Type</th>
@@ -173,76 +170,37 @@
             <tbody>
               @php $i=1; @endphp
 
-              {{-- =========================
-                   OPENING BALANCES
-              ========================== --}}
-              @if($openingRows->count() > 0)
-                <tr class="table-light fw-bold">
-                  <td colspan="8" class="text-start">OPENING BALANCES (TB_IMPORT)</td>
-                </tr>
-
-                @foreach($openingRows as $r)
-                  @php $g = $groupOf($r->main_account_type); @endphp
-                  <tr>
-                    <td>{{ $i++ }}</td>
-                    <td><span class="badge bg-dark">OPENING</span></td>
-                    <td><span class="badge {{ $badgeClass($g) }}">{{ $g }}</span></td>
-                    <td class="text-start"><div class="fw-bold">{{ $r->main_account_code }} - {{ $r->main_account_name }}</div></td>
-                    <td>{{ $r->main_account_type }}</td>
-                    <td class="text-start"><div class="fw-bold">{{ $r->sub_account_code }} - {{ $r->sub_account_name }}</div></td>
-                    <td class="text-end">{{ number_format($r->tb_debit ?? 0, 2) }}</td>
-                    <td class="text-end">{{ number_format($r->tb_credit ?? 0, 2) }}</td>
-                  </tr>
-                @endforeach
-
-                <tr class="fw-bold">
-                  <td colspan="6" class="text-end">OPENING TOTALS</td>
-                  <td class="text-end">{{ number_format($openingTotals['debit'] ?? 0, 2) }}</td>
-                  <td class="text-end">{{ number_format($openingTotals['credit'] ?? 0, 2) }}</td>
-                </tr>
-              @endif
-
-              {{-- =========================
-                   MOVEMENTS
-              ========================== --}}
-              @if($movementRows->count() > 0)
-                <tr class="table-light fw-bold">
-                  <td colspan="8" class="text-start">MOVEMENTS (All other sources)</td>
-                </tr>
-
-                @foreach($movementRows as $r)
-                  @php $g = $groupOf($r->main_account_type); @endphp
-                  <tr>
-                    <td>{{ $i++ }}</td>
-                    <td><span class="badge bg-primary">MOVEMENT</span></td>
-                    <td><span class="badge {{ $badgeClass($g) }}">{{ $g }}</span></td>
-                    <td class="text-start"><div class="fw-bold">{{ $r->main_account_code }} - {{ $r->main_account_name }}</div></td>
-                    <td>{{ $r->main_account_type }}</td>
-                    <td class="text-start"><div class="fw-bold">{{ $r->sub_account_code }} - {{ $r->sub_account_name }}</div></td>
-                    <td class="text-end">{{ number_format($r->tb_debit ?? 0, 2) }}</td>
-                    <td class="text-end">{{ number_format($r->tb_credit ?? 0, 2) }}</td>
-                  </tr>
-                @endforeach
-
-                <tr class="fw-bold">
-                  <td colspan="6" class="text-end">MOVEMENT TOTALS</td>
-                  <td class="text-end">{{ number_format($movementTotals['debit'] ?? 0, 2) }}</td>
-                  <td class="text-end">{{ number_format($movementTotals['credit'] ?? 0, 2) }}</td>
-                </tr>
-              @endif
-
-              @if($openingRows->count() === 0 && $movementRows->count() === 0)
+              @forelse($rows as $r)
+                @php $g = $groupOf($r->main_account_type); @endphp
                 <tr>
-                  <td colspan="8" class="text-muted">No records found for the selected cutoff.</td>
+                  <td>{{ $i++ }}</td>
+                  <td><span class="badge {{ $badgeClass($g) }}">{{ $g }}</span></td>
+
+                  <td class="text-start">
+                    <div class="fw-bold">{{ $r->main_account_code }} - {{ $r->main_account_name }}</div>
+                  </td>
+
+                  <td>{{ $r->main_account_type }}</td>
+
+                  <td class="text-start">
+                    <div class="fw-bold">{{ $r->sub_account_code }} - {{ $r->sub_account_name }}</div>
+                  </td>
+
+                  <td class="text-end">{{ number_format($r->tb_debit ?? 0, 2) }}</td>
+                  <td class="text-end">{{ number_format($r->tb_credit ?? 0, 2) }}</td>
                 </tr>
-              @endif
+              @empty
+                <tr>
+                  <td colspan="7" class="text-muted">No records found for the selected cutoff.</td>
+                </tr>
+              @endforelse
             </tbody>
 
             {{-- GRAND TOTALS --}}
-            @if(($openingRows->count() + $movementRows->count()) > 0)
+            @if($rows->count() > 0)
               <tfoot>
                 <tr class="fw-bold table-secondary">
-                  <td colspan="6" class="text-end">GRAND TOTALS</td>
+                  <td colspan="5" class="text-end">GRAND TOTALS</td>
                   <td class="text-end">{{ number_format($totals['debit'] ?? 0, 2) }}</td>
                   <td class="text-end">{{ number_format($totals['credit'] ?? 0, 2) }}</td>
                 </tr>
