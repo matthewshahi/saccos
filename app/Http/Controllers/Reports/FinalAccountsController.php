@@ -146,45 +146,55 @@ class FinalAccountsController extends Controller
     }
 
     public function profitLossExcel(Request $request)
-    {
-        $ctx = $this->resolveContext($request, 'PL');
+{
+    $ctx = $this->resolveContext($request, 'PL');
 
-        $rows   = $this->getProfitLossRows($ctx);
-        $totals = $this->computeProfitLossTotals($rows);
+    $rows   = $this->getProfitLossRows($ctx);
+    $totals = $this->computeProfitLossTotals($rows);
 
-        // Present expenses as positive (standard readable P&L)
-        $headings = ['Type', 'Main Account', 'Debit', 'Credit', 'Net (Cr - Dr)'];
+    // ✅ Match the WEB/PDF breakdown grain: SUB ACCOUNT lines (same as Blade)
+    $headings = [
+        'Type',
+        'Main Code', 'Main Account',
+        'Sub Code', 'Sub Account',
+        'Debit', 'Credit',
+        'Net (Cr - Dr)',
+    ];
 
-        $data = [];
-        foreach ($rows as $r) {
-            $data[] = [
-                $r->main_group,
-                $r->main_account_name,
-                (float) ($r->debit ?? 0),
-                (float) ($r->credit ?? 0),
-                (float) ($r->net_effect ?? 0),
-            ];
-        }
-
-        $data[] = ['', 'TOTAL INCOME', '', '', (float) ($totals['income_total'] ?? 0)];
-        $data[] = ['', 'TOTAL EXPENSES', '', '', (float) ($totals['expense_total'] ?? 0)];
-        $data[] = ['', 'NET SURPLUS / (DEFICIT)', '', '', (float) ($totals['net_surplus'] ?? 0)];
-
-        $export = new class($headings, $data) implements
-            \Maatwebsite\Excel\Concerns\FromArray,
-            \Maatwebsite\Excel\Concerns\WithHeadings
-        {
-            public function __construct(private array $headings, private array $data) {}
-            public function headings(): array { return $this->headings; }
-            public function array(): array { return $this->data; }
-        };
-
-        $suffix = $ctx['mode'] === 'period'
-            ? ($ctx['period_from'] . '_to_' . $ctx['period_to'])
-            : ($ctx['date_from']->format('Y-m-d') . '_to_' . $ctx['date_to']->format('Y-m-d'));
-
-        return Excel::download($export, "profit_loss_{$suffix}.xlsx");
+    $data = [];
+    foreach ($rows as $r) {
+        $data[] = [
+            $r->main_group,
+            $r->main_account_code,
+            $r->main_account_name,
+            $r->sub_account_code,
+            $r->sub_account_name,
+            (float) ($r->debit ?? 0),
+            (float) ($r->credit ?? 0),
+            (float) ($r->net_effect ?? 0),
+        ];
     }
+
+    // Totals
+    $data[] = ['', '', 'TOTAL INCOME', '', '', '', '', (float) ($totals['income_total'] ?? 0)];
+    $data[] = ['', '', 'TOTAL EXPENSES', '', '', '', '', (float) ($totals['expense_total'] ?? 0)];
+    $data[] = ['', '', 'NET SURPLUS / (DEFICIT)', '', '', '', '', (float) ($totals['net_surplus'] ?? 0)];
+
+    $export = new class($headings, $data) implements
+        \Maatwebsite\Excel\Concerns\FromArray,
+        \Maatwebsite\Excel\Concerns\WithHeadings
+    {
+        public function __construct(private array $headings, private array $data) {}
+        public function headings(): array { return $this->headings; }
+        public function array(): array { return $this->data; }
+    };
+
+    $suffix = $ctx['mode'] === 'period'
+        ? ($ctx['period_from'] . '_to_' . $ctx['period_to'])
+        : ($ctx['date_from']->format('Y-m-d') . '_to_' . $ctx['date_to']->format('Y-m-d'));
+
+    return Excel::download($export, "profit_loss_{$suffix}.xlsx");
+}
 
     // ============================================================
     // PUBLIC: BALANCE SHEET (STANDARD AS AT)
