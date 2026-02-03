@@ -465,7 +465,7 @@ $defaultLogoPath = '/image/logo.jpg'; // Default logo
                             <li class="item-name has-arrow">
                                 <a href="#">
                                     <i class="i-Pie-Chart text-20 me-2" style="color: #663399;"></i>
-                                    <span class="item-name text-15 text-muted">Final accounts (As At)</span>
+                                    <span class="item-name text-15 text-muted">Final accounts</span>
                                 </a>
                                 <ul class="mm-collapse">
                                     
@@ -497,7 +497,7 @@ $defaultLogoPath = '/image/logo.jpg'; // Default logo
                             <li class="item-name has-arrow">
                                 <a href="#">
                                     <i class="i-Pie-Chart text-20 me-2" style="color: #663399;"></i>
-                                    <span class="item-name text-15 text-muted">Final accounts</span>
+                                    <span class="item-name text-15 text-muted">Final accounts(1)</span>
                                 </a>
                                 <ul class="mm-collapse">
                                     <li class="item-name">
