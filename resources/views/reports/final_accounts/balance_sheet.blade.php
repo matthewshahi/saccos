@@ -37,20 +37,27 @@
             <div class="col-md-3">
               <label class="form-label fw-bold">Mode</label>
               <select name="mode" class="form-control">
-                <option value="period" {{ (request('mode','period')=='period') ? 'selected' : '' }}>As at Period (YYYYMM)</option>
-                <option value="date" {{ (request('mode')=='date') ? 'selected' : '' }}>As at Date</option>
+                <option value="period" {{ (request('mode', $ctx['mode'] ?? 'period')=='period') ? 'selected' : '' }}>As at Period (YYYYMM)</option>
+                <option value="date" {{ (request('mode', $ctx['mode'] ?? '')=='date') ? 'selected' : '' }}>As at Date</option>
               </select>
             </div>
 
             <div class="col-md-3">
               <label class="form-label fw-bold">As at Period</label>
-              <input type="text" name="as_at_period" value="{{ request('as_at_period', $ctx['as_at_period'] ?? '') }}" class="form-control" placeholder="YYYYMM">
+              <input type="text"
+                     name="as_at_period"
+                     value="{{ request('as_at_period', $ctx['as_at_period'] ?? '') }}"
+                     class="form-control"
+                     placeholder="YYYYMM">
               <small class="text-muted">Used when mode=period.</small>
             </div>
 
             <div class="col-md-3">
               <label class="form-label fw-bold">As at Date</label>
-              <input type="date" name="as_at_date" value="{{ request('as_at_date', isset($ctx['as_at_date']) && $ctx['as_at_date'] ? $ctx['as_at_date']->format('Y-m-d') : '') }}" class="form-control">
+              <input type="date"
+                     name="as_at_date"
+                     value="{{ request('as_at_date', isset($ctx['as_at_date']) && $ctx['as_at_date'] ? $ctx['as_at_date']->format('Y-m-d') : '') }}"
+                     class="form-control">
               <small class="text-muted">Used when mode=date. End-of-day is applied.</small>
             </div>
 
@@ -87,7 +94,7 @@
           <div class="col-md-3">
             <div class="p-3 bg-light rounded">
               <div class="text-muted">Balance Check (A - (L+C))</div>
-              <div class="fw-bold {{ (($totals['diff'] ?? 0) == 0) ? 'text-success' : 'text-danger' }}">
+              <div class="fw-bold {{ (abs((float)($totals['diff'] ?? 0)) < 0.005) ? 'text-success' : 'text-danger' }}">
                 {{ number_format($totals['diff'] ?? 0, 2) }}
               </div>
             </div>
@@ -98,12 +105,12 @@
     </div>
   </div>
 
-
   {{-- TABLE CARD --}}
   <div class="col-md-12">
     <div class="card o-hidden mb-4">
       <div class="card-header d-flex align-items-center">
         <h3 class="w-50 float-start card-title m-0">Balance Sheet Lines</h3>
+
         <div class="dropdown dropleft text-end w-50 float-end">
           <button class="btn bg-gray-100" id="dropdownMenuButton_bs2" type="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
             <i class="nav-icon i-Gear-2"></i>
@@ -114,6 +121,20 @@
           </div>
         </div>
       </div>
+
+      @php
+        $rows = $rows ?? collect();
+
+        $badgeClass = function($g){
+          $g = strtoupper(trim((string)$g));
+          return match ($g) {
+            'ASSET' => 'bg-info',
+            'LIABILITY' => 'bg-warning',
+            'CAPITAL' => 'bg-dark',
+            default => 'bg-secondary',
+          };
+        };
+      @endphp
 
       <div class="card-body">
         <div class="table-responsive">
@@ -128,15 +149,17 @@
                 <th class="text-end">Balance (Dr - Cr)</th>
               </tr>
             </thead>
+
             <tbody>
               @php $i=1; @endphp
+
               @forelse($rows as $r)
+                @php $g = strtoupper((string) ($r->main_group ?? '')); @endphp
                 <tr>
                   <td>{{ $i++ }}</td>
                   <td>
-                    <span class="badge
-                      {{ ($r->main_group=='ASSET') ? 'bg-info' : (($r->main_group=='LIABILITY') ? 'bg-warning' : 'bg-dark') }}">
-                      {{ $r->main_group }}
+                    <span class="badge {{ $badgeClass($g) }}">
+                      {{ $g ?: 'OTHER' }}
                     </span>
                   </td>
                   <td class="text-start fw-bold">{{ $r->main_account_name }}</td>
@@ -151,31 +174,31 @@
               @endforelse
             </tbody>
 
-            @if(!empty($rows) && count($rows) > 0)
-            <tfoot>
-              <tr class="fw-bold">
-                <td colspan="5" class="text-end">TOTAL ASSETS</td>
-                <td class="text-end">{{ number_format($totals['total_assets'] ?? 0, 2) }}</td>
-              </tr>
-              <tr class="fw-bold">
-                <td colspan="5" class="text-end">TOTAL LIABILITIES</td>
-                <td class="text-end">{{ number_format($totals['total_liabilities'] ?? 0, 2) }}</td>
-              </tr>
-              <tr class="fw-bold">
-                <td colspan="5" class="text-end">TOTAL CAPITAL</td>
-                <td class="text-end">{{ number_format($totals['total_capital'] ?? 0, 2) }}</td>
-              </tr>
-              <tr class="fw-bold">
-                <td colspan="5" class="text-end">LIABILITIES + CAPITAL</td>
-                <td class="text-end">{{ number_format($totals['liabilities_plus_capital'] ?? 0, 2) }}</td>
-              </tr>
-              <tr class="fw-bold">
-                <td colspan="5" class="text-end">BALANCE CHECK (A - (L+C))</td>
-                <td class="text-end {{ (($totals['diff'] ?? 0) == 0) ? 'text-success' : 'text-danger' }}">
-                  {{ number_format($totals['diff'] ?? 0, 2) }}
-                </td>
-              </tr>
-            </tfoot>
+            @if($rows->count() > 0)
+              <tfoot>
+                <tr class="fw-bold">
+                  <td colspan="5" class="text-end">TOTAL ASSETS</td>
+                  <td class="text-end">{{ number_format($totals['total_assets'] ?? 0, 2) }}</td>
+                </tr>
+                <tr class="fw-bold">
+                  <td colspan="5" class="text-end">TOTAL LIABILITIES</td>
+                  <td class="text-end">{{ number_format($totals['total_liabilities'] ?? 0, 2) }}</td>
+                </tr>
+                <tr class="fw-bold">
+                  <td colspan="5" class="text-end">TOTAL CAPITAL</td>
+                  <td class="text-end">{{ number_format($totals['total_capital'] ?? 0, 2) }}</td>
+                </tr>
+                <tr class="fw-bold">
+                  <td colspan="5" class="text-end">LIABILITIES + CAPITAL</td>
+                  <td class="text-end">{{ number_format($totals['liabilities_plus_capital'] ?? 0, 2) }}</td>
+                </tr>
+                <tr class="fw-bold">
+                  <td colspan="5" class="text-end">BALANCE CHECK (A - (L+C))</td>
+                  <td class="text-end {{ (abs((float)($totals['diff'] ?? 0)) < 0.005) ? 'text-success' : 'text-danger' }}">
+                    {{ number_format($totals['diff'] ?? 0, 2) }}
+                  </td>
+                </tr>
+              </tfoot>
             @endif
 
           </table>
