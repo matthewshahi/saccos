@@ -567,43 +567,57 @@ class FinalAccountsController extends Controller
     // PROFIT & LOSS (RANGE)
     // ============================================================
 
-    private function getProfitLossRows(array $ctx)
+ private function getProfitLossRows(array $ctx)
 {
     $q = $this->applyRangeFilter($this->baseJoinQuery(), $ctx);
 
     $q->where(function ($w) {
         $w->where('ma.main_account_type', 'like', 'INCOME%')
-          ->orWhere('ma.main_account_type', 'like', 'EXPENSE%')
-          ->orWhere('ma.main_account_type', 'like', 'TAX%'); // optional if you store taxation separately
+          ->orWhere('ma.main_account_type', 'like', 'EXPENSE%');
     });
 
     $rows = $q->select([
             'ma.main_account_id',
+            'ma.main_account_code',
             'ma.main_account_name',
             'ma.main_account_type',
 
-            // raw totals (optional to keep for audit)
+            'sa.sub_account_id',
+            'sa.sub_account_code',
+            'sa.sub_account_name',
+
             DB::raw('SUM(COALESCE(t.accounts_trans_debit,0))  AS raw_debit'),
             DB::raw('SUM(COALESCE(t.accounts_trans_credit,0)) AS raw_credit'),
 
             // net effect (Cr - Dr)
             DB::raw('(SUM(COALESCE(t.accounts_trans_credit,0)) - SUM(COALESCE(t.accounts_trans_debit,0))) AS net_effect'),
 
-            // ✅ netted presentation columns (only one side will be > 0)
+            // netted presentation columns (only one side will be > 0)
             DB::raw('GREATEST((SUM(COALESCE(t.accounts_trans_debit,0)) - SUM(COALESCE(t.accounts_trans_credit,0))), 0) AS debit'),
             DB::raw('GREATEST((SUM(COALESCE(t.accounts_trans_credit,0)) - SUM(COALESCE(t.accounts_trans_debit,0))), 0) AS credit'),
         ])
-        ->groupBy('ma.main_account_id', 'ma.main_account_name', 'ma.main_account_type')
+        ->groupBy(
+            'ma.main_account_id',
+            'ma.main_account_code',
+            'ma.main_account_name',
+            'ma.main_account_type',
+            'sa.sub_account_id',
+            'sa.sub_account_code',
+            'sa.sub_account_name'
+        )
         ->orderBy('ma.main_account_type')
-        ->orderBy('ma.main_account_name')
+        ->orderBy('ma.main_account_code')
+        ->orderBy('sa.sub_account_code')
         ->get();
 
     foreach ($rows as $r) {
-        $r->main_group = $this->normMainGroup((string) $r->main_account_type);
+        $r->main_group = $this->normMainGroup((string) $r->main_account_type); // INCOME/EXPENSE
     }
 
     return $rows;
 }
+
+
 
 
     /**

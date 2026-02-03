@@ -26,6 +26,33 @@
   .pl-badge{ font-weight:900; letter-spacing:.2px; border-radius:999px; padding:.35rem .6rem; white-space:nowrap; }
 </style>
 
+@php
+  $rows = $rows ?? collect();
+
+  $rangeLabel = '';
+  if (($ctx['mode'] ?? '') === 'period') {
+      $rangeLabel = ($ctx['period_from'] ?? '') . ' → ' . ($ctx['period_to'] ?? '');
+  } else {
+      $rangeLabel =
+          (isset($ctx['date_from']) && $ctx['date_from'] ? $ctx['date_from']->format('Y-m-d') : '') .
+          ' → ' .
+          (isset($ctx['date_to']) && $ctx['date_to'] ? $ctx['date_to']->format('Y-m-d') : '');
+  }
+
+  $incomeTotal  = (float) ($totals['income_total'] ?? 0);
+  $expenseTotal = (float) ($totals['expense_total'] ?? 0);
+  $netSurplus   = (float) ($totals['net_surplus'] ?? 0);
+
+  $badgeClass = function ($g) {
+      $g = strtoupper(trim((string) $g));
+      return match ($g) {
+          'INCOME'  => 'bg-success',
+          'EXPENSE' => 'bg-danger',
+          default   => 'bg-secondary',
+      };
+  };
+@endphp
+
 <div class="row pl-wrap">
 
   {{-- FILTER CARD --}}
@@ -36,17 +63,12 @@
           <h3 class="card-title m-0 pl-title">Profit &amp; Loss</h3>
           <span class="pl-chip">
             <i class="nav-icon i-Financial"></i>
-            @if(($ctx['mode'] ?? '') === 'period')
-              {{ ($ctx['period_from'] ?? '') . ' → ' . ($ctx['period_to'] ?? '') }}
-            @else
-              {{ (isset($ctx['date_from']) ? $ctx['date_from']->format('Y-m-d') : '') . ' → ' . (isset($ctx['date_to']) ? $ctx['date_to']->format('Y-m-d') : '') }}
-            @endif
+            {{ $rangeLabel }}
           </span>
         </div>
 
         <div class="dropdown dropleft text-end">
-          <button class="btn bg-gray-100" id="dropdownMenuButton_pl" type="button
-            button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+          <button class="btn bg-gray-100" id="dropdownMenuButton_pl" type="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
             <i class="nav-icon i-Gear-2"></i>
           </button>
           <div class="dropdown-menu" aria-labelledby="dropdownMenuButton_pl">
@@ -99,7 +121,7 @@
                   style="border-radius:0 12px 12px 0;"
                 >
               </div>
-              <div class="pl-subtle mt-1">Exactly 6 digits.</div>
+              <div class="pl-subtle mt-1">Used when mode=period.</div>
             </div>
 
             {{-- PERIOD TO --}}
@@ -120,7 +142,7 @@
                   style="border-radius:0 12px 12px 0;"
                 >
               </div>
-              <div class="pl-subtle mt-1">Exactly 6 digits.</div>
+              <div class="pl-subtle mt-1">Used when mode=period.</div>
             </div>
 
             {{-- RUN --}}
@@ -128,7 +150,7 @@
               <button class="btn pl-btn pl-btn-primary w-100 text-white" type="submit">
                 <i class="nav-icon i-Search-People me-2"></i> Run Report
               </button>
-              <div class="pl-subtle mt-1 text-center">Totals + lines.</div>
+              <div class="pl-subtle mt-1 text-center">Totals + breakdown.</div>
             </div>
 
             {{-- DATE FROM --}}
@@ -177,20 +199,19 @@
           <div class="col-12 col-md-4">
             <div class="pl-kpi good">
               <div class="k">Total Income</div>
-              <div class="v">{{ number_format($totals['income_total'] ?? 0, 2) }}</div>
+              <div class="v">{{ number_format($incomeTotal, 2) }}</div>
             </div>
           </div>
           <div class="col-12 col-md-4">
             <div class="pl-kpi bad">
               <div class="k">Total Expenses</div>
-              <div class="v">{{ number_format($totals['expense_total'] ?? 0, 2) }}</div>
+              <div class="v">{{ number_format($expenseTotal, 2) }}</div>
             </div>
           </div>
           <div class="col-12 col-md-4">
-            @php $ns = (float) ($totals['net_surplus'] ?? 0); @endphp
-            <div class="pl-kpi {{ $ns >= 0 ? 'good' : 'bad' }}">
+            <div class="pl-kpi {{ $netSurplus >= 0 ? 'good' : 'bad' }}">
               <div class="k">Net Surplus / (Deficit)</div>
-              <div class="v">{{ number_format($ns, 2) }}</div>
+              <div class="v">{{ number_format($netSurplus, 2) }}</div>
             </div>
           </div>
         </div>
@@ -203,7 +224,7 @@
   <div class="col-12">
     <div class="card pl-card mb-4">
       <div class="card-header d-flex align-items-center justify-content-between">
-        <h3 class="card-title m-0 pl-title">Profit &amp; Loss Lines</h3>
+        <h3 class="card-title m-0 pl-title">Profit &amp; Loss Breakdown</h3>
 
         <div class="dropdown dropleft text-end">
           <button class="btn bg-gray-100" id="dropdownMenuButton_pl2" type="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
@@ -216,10 +237,6 @@
         </div>
       </div>
 
-      @php
-        $rows = $rows ?? collect();
-      @endphp
-
       <div class="card-body">
         <div class="table-responsive">
           <table class="table table-sm pl-table text-center">
@@ -227,10 +244,10 @@
               <tr>
                 <th>#</th>
                 <th>Type</th>
-                <th class="text-start">Main Account</th>
+                <th class="text-start">Sub Account</th>
                 <th class="text-end">Debit</th>
                 <th class="text-end">Credit</th>
-                <th class="text-end">Net</th>
+                <th class="text-end">Net (Cr - Dr)</th>
               </tr>
             </thead>
 
@@ -242,25 +259,25 @@
                   $g = strtoupper((string) ($r->main_group ?? ''));
                   $g = $g ?: 'OTHER';
 
-                  $badge = match($g){
-                    'INCOME' => 'bg-success',
-                    'EXPENSE' => 'bg-danger',
-                    default => 'bg-secondary',
-                  };
-
-                  // Controller provides net_effect
                   $net = (float) ($r->net_effect ?? 0);
                 @endphp
 
                 <tr>
                   <td>{{ $i++ }}</td>
-                  <td><span class="badge pl-badge {{ $badge }}">{{ $g }}</span></td>
 
-                  <td class="text-start">
-                    <div class="pl-main fw-bold">{{ $r->main_account_name }}</div>
+                  <td>
+                    <span class="badge pl-badge {{ $badgeClass($g) }}">{{ $g }}</span>
                   </td>
 
-                  {{-- ✅ netted columns from your controller: only one side should be > 0 --}}
+                  <td class="text-start">
+                    <div class="fw-bold pl-main">
+                      {{ $r->sub_account_code ?? '' }} - {{ $r->sub_account_name ?? '' }}
+                    </div>
+                    <div class="pl-subtle">
+                      {{ $r->main_account_code ?? '' }} - {{ $r->main_account_name ?? '' }}
+                    </div>
+                  </td>
+
                   <td class="text-end" style="white-space:nowrap;">{{ number_format($r->debit ?? 0, 2) }}</td>
                   <td class="text-end" style="white-space:nowrap;">{{ number_format($r->credit ?? 0, 2) }}</td>
 
@@ -279,9 +296,17 @@
             @if($rows->count() > 0)
               <tfoot>
                 <tr class="fw-bold table-secondary">
+                  <td colspan="5" class="text-end">TOTAL INCOME</td>
+                  <td class="text-end text-success" style="white-space:nowrap;">{{ number_format($incomeTotal, 2) }}</td>
+                </tr>
+                <tr class="fw-bold table-secondary">
+                  <td colspan="5" class="text-end">TOTAL EXPENSES</td>
+                  <td class="text-end text-danger" style="white-space:nowrap;">{{ number_format($expenseTotal, 2) }}</td>
+                </tr>
+                <tr class="fw-bold table-secondary">
                   <td colspan="5" class="text-end">NET SURPLUS / (DEFICIT)</td>
-                  <td class="text-end {{ (($totals['net_surplus'] ?? 0) >= 0) ? 'text-success' : 'text-danger' }}" style="white-space:nowrap;">
-                    {{ number_format($totals['net_surplus'] ?? 0, 2) }}
+                  <td class="text-end {{ $netSurplus >= 0 ? 'text-success' : 'text-danger' }}" style="white-space:nowrap;">
+                    {{ number_format($netSurplus, 2) }}
                   </td>
                 </tr>
               </tfoot>
