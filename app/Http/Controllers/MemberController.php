@@ -93,7 +93,7 @@ public function storeJunior(Request $request)
         'member_total_share_capital' => 0,
         'member_tied_shares' => 0,
         'member_tied_shares_self' => 0,
-        'member_position' => 0,
+        'member_position' => 1,
 
         // Junior settings
         'member_is_junior' => 1,
