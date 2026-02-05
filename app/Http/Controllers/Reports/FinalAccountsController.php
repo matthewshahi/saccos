@@ -14,7 +14,7 @@ class FinalAccountsController extends Controller
     /**
      * Default timezone for date cutoffs.
      */
-   public const TZ = 'Africa/Nairobi';
+    public const TZ = 'Africa/Nairobi';
 
     // ============================================================
     // PUBLIC: TRIAL BALANCE (STANDARD: AS AT ONLY)
@@ -36,26 +36,26 @@ class FinalAccountsController extends Controller
     }
 
     public function trialBalancePdf(Request $request)
-{
-    $ctx = $this->resolveContext($request, 'TB');
+    {
+        $ctx = $this->resolveContext($request, 'TB');
 
-    $rows   = $this->getTrialBalanceRows($ctx);
-    $totals = $this->computeTrialBalanceTotals($rows);
+        $rows   = $this->getTrialBalanceRows($ctx);
+        $totals = $this->computeTrialBalanceTotals($rows);
 
-    $pdf = Pdf::loadView('reports.final_accounts.trial_balance_pdf', [
-        'rows'    => $rows,
-        'totals'  => $totals,
-        'ctx'     => $ctx,
-        'notices' => $ctx['notices'],
-        'tz'      => self::TZ, // pass timezone into the blade
-    ]);
+        $pdf = Pdf::loadView('reports.final_accounts.trial_balance_pdf', [
+            'rows'    => $rows,
+            'totals'  => $totals,
+            'ctx'     => $ctx,
+            'notices' => $ctx['notices'],
+            'tz'      => self::TZ, // pass timezone into the blade
+        ]);
 
-    $suffix = ($ctx['mode'] === 'period')
-        ? $ctx['as_at_period']
-        : $ctx['as_at_date']->format('Y-m-d');
+        $suffix = ($ctx['mode'] === 'period')
+            ? $ctx['as_at_period']
+            : $ctx['as_at_date']->format('Y-m-d');
 
-    return $pdf->download("trial_balance_{$suffix}.pdf");
-}
+        return $pdf->download("trial_balance_{$suffix}.pdf");
+    }
 
 
     public function trialBalanceExcel(Request $request)
@@ -67,9 +67,13 @@ class FinalAccountsController extends Controller
 
         // Standard TB: one balance per sub account (netted to Dr/Cr)
         $headings = [
-            'Main Code', 'Main Account', 'Main Type',
-            'Sub Code', 'Sub Account',
-            'Debit', 'Credit',
+            'Main Code',
+            'Main Account',
+            'Main Type',
+            'Sub Code',
+            'Sub Account',
+            'Debit',
+            'Credit',
         ];
 
         $data = [];
@@ -86,7 +90,11 @@ class FinalAccountsController extends Controller
         }
 
         $data[] = [
-            '', 'GRAND TOTALS', '', '', '',
+            '',
+            'GRAND TOTALS',
+            '',
+            '',
+            '',
             (float) ($totals['debit'] ?? 0),
             (float) ($totals['credit'] ?? 0),
         ];
@@ -96,8 +104,14 @@ class FinalAccountsController extends Controller
             \Maatwebsite\Excel\Concerns\WithHeadings
         {
             public function __construct(private array $headings, private array $data) {}
-            public function headings(): array { return $this->headings; }
-            public function array(): array { return $this->data; }
+            public function headings(): array
+            {
+                return $this->headings;
+            }
+            public function array(): array
+            {
+                return $this->data;
+            }
         };
 
         $suffix = ($ctx['mode'] === 'period')
@@ -148,55 +162,64 @@ class FinalAccountsController extends Controller
     }
 
     public function profitLossExcel(Request $request)
-{
-    $ctx = $this->resolveContext($request, 'PL');
-
-    $rows   = $this->getProfitLossRows($ctx);
-    $totals = $this->computeProfitLossTotals($rows);
-
-    // ✅ Match the WEB/PDF breakdown grain: SUB ACCOUNT lines (same as Blade)
-    $headings = [
-        'Type',
-        'Main Code', 'Main Account',
-        'Sub Code', 'Sub Account',
-        'Debit', 'Credit',
-        'Net (Cr - Dr)',
-    ];
-
-    $data = [];
-    foreach ($rows as $r) {
-        $data[] = [
-            $r->main_group,
-            $r->main_account_code,
-            $r->main_account_name,
-            $r->sub_account_code,
-            $r->sub_account_name,
-            (float) ($r->debit ?? 0),
-            (float) ($r->credit ?? 0),
-            (float) ($r->net_effect ?? 0),
-        ];
-    }
-
-    // Totals
-    $data[] = ['', '', 'TOTAL INCOME', '', '', '', '', (float) ($totals['income_total'] ?? 0)];
-    $data[] = ['', '', 'TOTAL EXPENSES', '', '', '', '', (float) ($totals['expense_total'] ?? 0)];
-    $data[] = ['', '', 'NET SURPLUS / (DEFICIT)', '', '', '', '', (float) ($totals['net_surplus'] ?? 0)];
-
-    $export = new class($headings, $data) implements
-        \Maatwebsite\Excel\Concerns\FromArray,
-        \Maatwebsite\Excel\Concerns\WithHeadings
     {
-        public function __construct(private array $headings, private array $data) {}
-        public function headings(): array { return $this->headings; }
-        public function array(): array { return $this->data; }
-    };
+        $ctx = $this->resolveContext($request, 'PL');
 
-    $suffix = $ctx['mode'] === 'period'
-        ? ($ctx['period_from'] . '_to_' . $ctx['period_to'])
-        : ($ctx['date_from']->format('Y-m-d') . '_to_' . $ctx['date_to']->format('Y-m-d'));
+        $rows   = $this->getProfitLossRows($ctx);
+        $totals = $this->computeProfitLossTotals($rows);
 
-    return Excel::download($export, "profit_loss_{$suffix}.xlsx");
-}
+        // ✅ Match the WEB/PDF breakdown grain: SUB ACCOUNT lines (same as Blade)
+        $headings = [
+            'Type',
+            'Main Code',
+            'Main Account',
+            'Sub Code',
+            'Sub Account',
+            'Debit',
+            'Credit',
+            'Net (Cr - Dr)',
+        ];
+
+        $data = [];
+        foreach ($rows as $r) {
+            $data[] = [
+                $r->main_group,
+                $r->main_account_code,
+                $r->main_account_name,
+                $r->sub_account_code,
+                $r->sub_account_name,
+                (float) ($r->debit ?? 0),
+                (float) ($r->credit ?? 0),
+                (float) ($r->net_effect ?? 0),
+            ];
+        }
+
+        // Totals
+        $data[] = ['', '', 'TOTAL INCOME', '', '', '', '', (float) ($totals['income_total'] ?? 0)];
+        $data[] = ['', '', 'TOTAL EXPENSES', '', '', '', '', (float) ($totals['expense_total'] ?? 0)];
+        $data[] = ['', '', 'NET SURPLUS / (DEFICIT)', '', '', '', '', (float) ($totals['net_surplus'] ?? 0)];
+
+        $export = new class($headings, $data) implements
+            \Maatwebsite\Excel\Concerns\FromArray,
+            \Maatwebsite\Excel\Concerns\WithHeadings
+        {
+            public function __construct(private array $headings, private array $data) {}
+            public function headings(): array
+            {
+                return $this->headings;
+            }
+            public function array(): array
+            {
+                return $this->data;
+            }
+        };
+
+        $suffix = $ctx['mode'] === 'period'
+            ? ($ctx['period_from'] . '_to_' . $ctx['period_to'])
+            : ($ctx['date_from']->format('Y-m-d') . '_to_' . $ctx['date_to']->format('Y-m-d'));
+
+        return Excel::download($export, "profit_loss_{$suffix}.xlsx");
+    }
 
     // ============================================================
     // PUBLIC: BALANCE SHEET (STANDARD AS AT)
@@ -245,32 +268,51 @@ class FinalAccountsController extends Controller
         $rows   = $this->getBalanceSheetRows($ctx);
         $totals = $this->computeBalanceSheetTotals($rows);
 
-        $headings = ['Group', 'Main Account', 'Debit', 'Credit', 'Balance (Dr - Cr)'];
+        // ✅ Match the actual grain: rows are SUB ACCOUNTS, not just main accounts
+        $headings = ['Group', 'Main Account', 'Sub Account', 'Debit', 'Credit', 'Balance (Dr - Cr)'];
 
         $data = [];
         foreach ($rows as $r) {
             $data[] = [
                 $r->main_group,
                 $r->main_account_name,
+                $r->sub_account_name,
                 (float) ($r->debit ?? 0),
                 (float) ($r->credit ?? 0),
-                (float) ($r->balance ?? 0),
+                (float) ($r->balance ?? 0), // signed Dr - Cr
             ];
         }
 
-        $data[] = ['ASSET', 'TOTAL ASSETS', '', '', (float) ($totals['total_assets'] ?? 0)];
-        $data[] = ['LIABILITY', 'TOTAL LIABILITIES', '', '', (float) ($totals['total_liabilities'] ?? 0)];
-        $data[] = ['CAPITAL', 'TOTAL CAPITAL', '', '', (float) ($totals['total_capital'] ?? 0)];
-        $data[] = ['', 'LIABILITIES + CAPITAL', '', '', (float) ($totals['liabilities_plus_capital'] ?? 0)];
-        $data[] = ['', 'BALANCE CHECK (ASSETS - (L+C))', '', '', (float) ($totals['diff'] ?? 0)];
+        // ✅ IMPORTANT:
+        // Your computeBalanceSheetTotals() returns liabilities/capital as POSITIVE magnitudes.
+        // But this Excel column is explicitly "Balance (Dr - Cr)" (SIGNED).
+        // Therefore liabilities/capital totals must be NEGATIVE in this column to reconcile.
+
+        $totalAssets   = (float) ($totals['total_assets'] ?? 0);                  // +ve
+        $totalLiab     = (float) ($totals['total_liabilities'] ?? 0);             // +ve magnitude
+        $totalCapital  = (float) ($totals['total_capital'] ?? 0);                 // +ve magnitude
+        $totalLC       = (float) ($totals['liabilities_plus_capital'] ?? 0);      // +ve magnitude
+        $diff          = (float) ($totals['diff'] ?? 0);                          // signed
+
+        $data[] = ['ASSET',     'TOTAL ASSETS',        '', '', '', $totalAssets];
+        $data[] = ['LIABILITY', 'TOTAL LIABILITIES',   '', '', '', -1 * $totalLiab];
+        $data[] = ['CAPITAL',   'TOTAL CAPITAL',       '', '', '', -1 * $totalCapital];
+        $data[] = ['',          'LIABILITIES + CAPITAL', '', '', '', -1 * $totalLC];
+        $data[] = ['',          'BALANCE CHECK (ASSETS - (L+C))', '', '', '', $diff];
 
         $export = new class($headings, $data) implements
             \Maatwebsite\Excel\Concerns\FromArray,
             \Maatwebsite\Excel\Concerns\WithHeadings
         {
             public function __construct(private array $headings, private array $data) {}
-            public function headings(): array { return $this->headings; }
-            public function array(): array { return $this->data; }
+            public function headings(): array
+            {
+                return $this->headings;
+            }
+            public function array(): array
+            {
+                return $this->data;
+            }
         };
 
         $suffix = ($ctx['mode'] === 'period')
@@ -279,6 +321,7 @@ class FinalAccountsController extends Controller
 
         return Excel::download($export, "balance_sheet_{$suffix}.xlsx");
     }
+
 
     // ============================================================
     // CONTEXT / FILTERS (RESPECTS mode=period/date)
@@ -497,7 +540,8 @@ class FinalAccountsController extends Controller
         if (($ctx['mode'] ?? '') === 'period') {
             return $q->whereNotNull('t.accounts_trans_period')
                 ->whereRaw("t.accounts_trans_period BETWEEN ? AND ?", [
-                    $ctx['period_from'], $ctx['period_to'],
+                    $ctx['period_from'],
+                    $ctx['period_to'],
                 ]);
         }
 
@@ -527,18 +571,18 @@ class FinalAccountsController extends Controller
     private function selectTrialBalanceNettedColumns($q)
     {
         return $q->select([
-                'ma.main_account_id',
-                'ma.main_account_code',
-                'ma.main_account_name',
-                'ma.main_account_type',
-                'sa.sub_account_id',
-                'sa.sub_account_code',
-                'sa.sub_account_name',
+            'ma.main_account_id',
+            'ma.main_account_code',
+            'ma.main_account_name',
+            'ma.main_account_type',
+            'sa.sub_account_id',
+            'sa.sub_account_code',
+            'sa.sub_account_name',
 
-                DB::raw('(SUM(COALESCE(t.accounts_trans_debit,0)) - SUM(COALESCE(t.accounts_trans_credit,0))) AS net'),
-                DB::raw('GREATEST((SUM(COALESCE(t.accounts_trans_debit,0)) - SUM(COALESCE(t.accounts_trans_credit,0))), 0) AS tb_debit'),
-                DB::raw('GREATEST((SUM(COALESCE(t.accounts_trans_credit,0)) - SUM(COALESCE(t.accounts_trans_debit,0))), 0) AS tb_credit'),
-            ])
+            DB::raw('(SUM(COALESCE(t.accounts_trans_debit,0)) - SUM(COALESCE(t.accounts_trans_credit,0))) AS net'),
+            DB::raw('GREATEST((SUM(COALESCE(t.accounts_trans_debit,0)) - SUM(COALESCE(t.accounts_trans_credit,0))), 0) AS tb_debit'),
+            DB::raw('GREATEST((SUM(COALESCE(t.accounts_trans_credit,0)) - SUM(COALESCE(t.accounts_trans_debit,0))), 0) AS tb_credit'),
+        ])
             ->groupBy(
                 'ma.main_account_id',
                 'ma.main_account_code',
@@ -579,16 +623,16 @@ class FinalAccountsController extends Controller
     // PROFIT & LOSS (RANGE)
     // ============================================================
 
- private function getProfitLossRows(array $ctx)
-{
-    $q = $this->applyRangeFilter($this->baseJoinQuery(), $ctx);
+    private function getProfitLossRows(array $ctx)
+    {
+        $q = $this->applyRangeFilter($this->baseJoinQuery(), $ctx);
 
-    $q->where(function ($w) {
-        $w->where('ma.main_account_type', 'like', 'INCOME%')
-          ->orWhere('ma.main_account_type', 'like', 'EXPENSE%');
-    });
+        $q->where(function ($w) {
+            $w->where('ma.main_account_type', 'like', 'INCOME%')
+                ->orWhere('ma.main_account_type', 'like', 'EXPENSE%');
+        });
 
-    $rows = $q->select([
+        $rows = $q->select([
             'ma.main_account_id',
             'ma.main_account_code',
             'ma.main_account_name',
@@ -608,26 +652,26 @@ class FinalAccountsController extends Controller
             DB::raw('GREATEST((SUM(COALESCE(t.accounts_trans_debit,0)) - SUM(COALESCE(t.accounts_trans_credit,0))), 0) AS debit'),
             DB::raw('GREATEST((SUM(COALESCE(t.accounts_trans_credit,0)) - SUM(COALESCE(t.accounts_trans_debit,0))), 0) AS credit'),
         ])
-        ->groupBy(
-            'ma.main_account_id',
-            'ma.main_account_code',
-            'ma.main_account_name',
-            'ma.main_account_type',
-            'sa.sub_account_id',
-            'sa.sub_account_code',
-            'sa.sub_account_name'
-        )
-        ->orderBy('ma.main_account_type')
-        ->orderBy('ma.main_account_code')
-        ->orderBy('sa.sub_account_code')
-        ->get();
+            ->groupBy(
+                'ma.main_account_id',
+                'ma.main_account_code',
+                'ma.main_account_name',
+                'ma.main_account_type',
+                'sa.sub_account_id',
+                'sa.sub_account_code',
+                'sa.sub_account_name'
+            )
+            ->orderBy('ma.main_account_type')
+            ->orderBy('ma.main_account_code')
+            ->orderBy('sa.sub_account_code')
+            ->get();
 
-    foreach ($rows as $r) {
-        $r->main_group = $this->normMainGroup((string) $r->main_account_type); // INCOME/EXPENSE
+        foreach ($rows as $r) {
+            $r->main_group = $this->normMainGroup((string) $r->main_account_type); // INCOME/EXPENSE
+        }
+
+        return $rows;
     }
-
-    return $rows;
-}
 
 
 
@@ -639,31 +683,31 @@ class FinalAccountsController extends Controller
      * - net_surplus = income_total - expense_total
      */
     private function computeProfitLossTotals($rows): array
-{
-    $income = 0.0;
-    $expense = 0.0;
+    {
+        $income = 0.0;
+        $expense = 0.0;
 
-    foreach ($rows as $r) {
-        $g = $r->main_group ?? $this->normMainGroup((string) $r->main_account_type);
+        foreach ($rows as $r) {
+            $g = $r->main_group ?? $this->normMainGroup((string) $r->main_account_type);
 
-        $net = (float) ($r->net_effect ?? 0); // Cr - Dr (SIGNED)
+            $net = (float) ($r->net_effect ?? 0); // Cr - Dr (SIGNED)
 
-        if ($g === 'INCOME') {
-            $income += $net;           // income net_effect should be positive; reversals reduce it
-        } elseif ($g === 'EXPENSE') {
-            $expense += (-1 * $net);   // expenses net_effect is usually negative, so flip to positive
+            if ($g === 'INCOME') {
+                $income += $net;           // income net_effect should be positive; reversals reduce it
+            } elseif ($g === 'EXPENSE') {
+                $expense += (-1 * $net);   // expenses net_effect is usually negative, so flip to positive
+            }
         }
+
+        // Safety: if data is messy and some expense nets positive, this still behaves sensibly.
+        if ($expense < 0) $expense = abs($expense);
+
+        return [
+            'income_total'  => $income,
+            'expense_total' => $expense,
+            'net_surplus'   => $income - $expense,
+        ];
     }
-
-    // Safety: if data is messy and some expense nets positive, this still behaves sensibly.
-    if ($expense < 0) $expense = abs($expense);
-
-    return [
-        'income_total'  => $income,
-        'expense_total' => $expense,
-        'net_surplus'   => $income - $expense,
-    ];
-}
 
 
     // ============================================================
@@ -671,16 +715,16 @@ class FinalAccountsController extends Controller
     // ============================================================
 
     private function getBalanceSheetRows(array $ctx)
-{
-    $q = $this->applyAsAtFilter($this->baseJoinQuery(), $ctx);
+    {
+        $q = $this->applyAsAtFilter($this->baseJoinQuery(), $ctx);
 
-    $q->where(function ($w) {
-        $w->where('ma.main_account_type', 'like', 'ASSET%')
-          ->orWhere('ma.main_account_type', 'like', 'LIABILIT%')
-          ->orWhere('ma.main_account_type', 'like', 'CAPITAL%');
-    });
+        $q->where(function ($w) {
+            $w->where('ma.main_account_type', 'like', 'ASSET%')
+                ->orWhere('ma.main_account_type', 'like', 'LIABILIT%')
+                ->orWhere('ma.main_account_type', 'like', 'CAPITAL%');
+        });
 
-    $rows = $q->select([
+        $rows = $q->select([
             'ma.main_account_id',
             'ma.main_account_code',
             'ma.main_account_name',
@@ -693,61 +737,83 @@ class FinalAccountsController extends Controller
             DB::raw('SUM(COALESCE(t.accounts_trans_debit,0))  AS raw_debit'),
             DB::raw('SUM(COALESCE(t.accounts_trans_credit,0)) AS raw_credit'),
 
+            // ✅ authoritative signed balance (Dr - Cr)
             DB::raw('(SUM(COALESCE(t.accounts_trans_debit,0)) - SUM(COALESCE(t.accounts_trans_credit,0))) AS balance'),
+
+            // ✅ display-only netted columns
             DB::raw('GREATEST((SUM(COALESCE(t.accounts_trans_debit,0)) - SUM(COALESCE(t.accounts_trans_credit,0))), 0) AS debit'),
             DB::raw('GREATEST((SUM(COALESCE(t.accounts_trans_credit,0)) - SUM(COALESCE(t.accounts_trans_debit,0))), 0) AS credit'),
         ])
-        ->groupBy(
-            'ma.main_account_id',
-            'ma.main_account_code',
-            'ma.main_account_name',
-            'ma.main_account_type',
-            'sa.sub_account_id',
-            'sa.sub_account_code',
-            'sa.sub_account_name'
-        )
-        ->orderBy('ma.main_account_type')
-        ->orderBy('ma.main_account_code')
-        ->orderBy('sa.sub_account_code')
-        ->get();
+            ->groupBy(
+                'ma.main_account_id',
+                'ma.main_account_code',
+                'ma.main_account_name',
+                'ma.main_account_type',
+                'sa.sub_account_id',
+                'sa.sub_account_code',
+                'sa.sub_account_name'
+            )
+            // ✅ fix ordering: Assets → Liabilities → Capital (not alphabetic)
+            ->orderByRaw("
+            CASE
+                WHEN UPPER(ma.main_account_type) LIKE 'ASSET%' THEN 1
+                WHEN UPPER(ma.main_account_type) LIKE 'LIABILIT%' THEN 2
+                WHEN UPPER(ma.main_account_type) LIKE 'CAPITAL%' THEN 3
+                ELSE 9
+            END
+        ")
+            ->orderBy('ma.main_account_code')
+            ->orderBy('sa.sub_account_code')
+            ->get();
 
-    foreach ($rows as $r) {
-        $r->main_group = $this->normMainGroup((string) $r->main_account_type);
-    }
-
-    return $rows;
-}
-
-private function computeBalanceSheetTotals($rows): array
-{
-    $assets = 0.0;
-    $liabilities = 0.0;
-    $capital = 0.0;
-
-    foreach ($rows as $r) {
-        $g = $r->main_group ?? $this->normMainGroup((string) $r->main_account_type);
-
-        $dr = (float) ($r->debit ?? 0);   // net Dr
-        $cr = (float) ($r->credit ?? 0);  // net Cr
-
-        if ($g === 'ASSET') {
-            $assets += $dr;              // assets normally net to Dr
-        } elseif ($g === 'LIABILITY') {
-            $liabilities += $cr;         // liabilities normally net to Cr
-        } elseif ($g === 'CAPITAL') {
-            $capital += $cr;             // capital normally net to Cr
+        foreach ($rows as $r) {
+            $r->main_group = $this->normMainGroup((string) $r->main_account_type);
         }
+
+        return $rows;
     }
 
-    $lc = $liabilities + $capital;
 
-    return [
-        'total_assets'             => $assets,
-        'total_liabilities'        => $liabilities,
-        'total_capital'            => $capital,
-        'liabilities_plus_capital' => $lc,
-        'diff'                     => $assets - $lc,
-    ];
-}
+    private function computeBalanceSheetTotals($rows): array
+    {
+        $assets = 0.0;
+        $liabilities = 0.0;
+        $capital = 0.0;
 
+        foreach ($rows as $r) {
+            $g = $r->main_group ?? $this->normMainGroup((string) $r->main_account_type);
+
+            // ✅ Use SIGNED balance (Dr - Cr), not the netted display columns.
+            // This ensures contra balances and reversals are included correctly.
+            $bal = (float) ($r->balance ?? 0);
+
+            if ($g === 'ASSET') {
+                // Assets normally net positive (Dr), but contra assets will be negative and MUST reduce assets.
+                $assets += $bal;
+            } elseif ($g === 'LIABILITY') {
+                // Liabilities normally net negative (Cr). We want totals shown as positive.
+                // So add the opposite sign.
+                $liabilities += (-1 * $bal);
+            } elseif ($g === 'CAPITAL') {
+                // Capital normally net negative (Cr). Show as positive.
+                $capital += (-1 * $bal);
+            }
+        }
+
+        // Guard against tiny floating-point noise
+        $assets      = round($assets, 2);
+        $liabilities = round($liabilities, 2);
+        $capital     = round($capital, 2);
+
+        $lc   = round($liabilities + $capital, 2);
+        $diff = round($assets - $lc, 2);
+
+        return [
+            'total_assets'             => $assets,
+            'total_liabilities'        => $liabilities,
+            'total_capital'            => $capital,
+            'liabilities_plus_capital' => $lc,
+            'diff'                     => $diff,
+        ];
+    }
 }
