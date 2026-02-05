@@ -5,8 +5,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta http-equiv="X-UA-Compatible" content="ie=edge" />
-    <title>{{ $defaultCompanyName }} | v<?php echo (date('Y')) ?></title>
-    <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Cormorant+Garamond:wght@700&display=swap" rel="stylesheet">
+    <title>{{ $defaultCompanyName }} | v<?php echo date('Y'); ?></title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Cormorant+Garamond:wght@700&display=swap"
+        rel="stylesheet">
 
     <link rel="stylesheet" href="{{ asset('dist-assets/css/themes/lite-purple.css?123') }}" />
     <link rel="stylesheet" href="{{ asset('dist-assets/css/plugins/perfect-scrollbar.css') }}" />
@@ -18,48 +20,66 @@
     <link rel="stylesheet" href="{{ asset('dist-assets/css/logo.css?x=4') }}" />
 
     <!-- Google tag (gtag.js) -->
-    @if(env('GA_ANALYTICS'))
-    <script async src="https://www.googletagmanager.com/gtag/js?id={{ env('GA_ANALYTICS') }}"></script>
-    <script>
-        window.dataLayer = window.dataLayer || [];
+    @if (env('GA_ANALYTICS'))
+        <script async src="https://www.googletagmanager.com/gtag/js?id={{ env('GA_ANALYTICS') }}"></script>
+        <script>
+            window.dataLayer = window.dataLayer || [];
 
-        function gtag() {
-            dataLayer.push(arguments);
-        }
-        gtag('js', new Date());
+            function gtag() {
+                dataLayer.push(arguments);
+            }
+            gtag('js', new Date());
 
-        gtag('config', "{{ env('GA_ANALYTICS') }}");
-    </script>
+            gtag('config', "{{ env('GA_ANALYTICS') }}");
+        </script>
     @endif
-<meta name="csrf-token" content="{{ csrf_token() }}">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
 
 </head>
 
 <body class="text-start">
-@include('partials.period_alert')
-@include('partials.password_change')
+    @include('partials.period_alert')
+    @include('partials.password_change')
 
 
-@php $isLoginRoute = Route::currentRouteName() === 'login'; @endphp
-<div class="app-admin-wrap {{ $isLoginRoute ? '' : 'layout-sidebar-vertical sidebar-full' }}">
+    @php $isLoginRoute = Route::currentRouteName() === 'login'; @endphp
+    <div class="app-admin-wrap {{ $isLoginRoute ? '' : 'layout-sidebar-vertical sidebar-full' }}">
 
-         
+
 
         @php
-        $isLoginRoute = Route::currentRouteName() === 'login';
+            $isLoginRoute = Route::currentRouteName() === 'login';
         @endphp
 
-        @if (!$isLoginRoute)
+        @php $isLoginRoute = Route::currentRouteName() === 'login'; @endphp
+<div class="app-admin-wrap {{ $isLoginRoute ? '' : 'layout-sidebar-vertical sidebar-full' }}">
+
+    @if (!$isLoginRoute)
         @include('partials.header')
 
-        @if (Auth::check() && Auth::user()->member_position == 2)
-        @include('partials.menu')
-        @elseif (Auth::check() && Auth::user()->member_position == 1)
-        @include('partials.menu_members')
+        @php
+            $viewAsMember = request()->query('view_as_member') === 'y';
+            $pos = Auth::check() ? (int) Auth::user()->member_position : null;
+        @endphp
+
+        @if (Auth::check())
+            {{-- FORCE member menu when ?view_as_member=y for member_position 1 or 2 --}}
+            @if ($viewAsMember && in_array($pos, [1, 2], true))
+                @include('partials.menu_members')
+
+            {{-- Normal logic --}}
+            @elseif ($pos === 2)
+                @include('partials.menu')
+            @elseif ($pos === 1)
+                @include('partials.menu_members')
+            @else
+                @include('partials.menu_public')
+            @endif
         @else
-        @include('partials.menu_public')
+            @include('partials.menu_public')
         @endif
-        @endif
+    @endif
+
 
         <div class="main-content-wrap mobile-menu-content bg-off-white m-0" style="padding: 3px;">
 
