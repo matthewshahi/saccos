@@ -679,7 +679,7 @@ $defaultLogoPath = '/image/logo.jpg'; // Default logo
 
 
                             <li class="item-name">
-                                <a href="{{ url('/dashboard/member_dashboard') }}{{ request()->query('view_as_member') === 'y' ? '?view_as_member=y' : '' }}">
+                                <a href="{{ url('/dashboard/member_dashboard') }}?view_as_member=y">
     <span class="text-muted">View as a Member</span>
 </a>
 
