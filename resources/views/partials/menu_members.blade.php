@@ -6,7 +6,7 @@
 
 <div class="sidebar-panel bg-white">
     <div class="gull-brand pe-3 text-center mt-4 mb-2 d-flex justify-content-center align-items-center">
-        <a href="{{ url('/') }}{{ $vam }}" style="text-decoration: none;">
+        <a href="{{ url('/') }}" style="text-decoration: none;">
             @php
                 // Extract the domain name
                 $currentDomain = parse_url(url('/'), PHP_URL_HOST);
