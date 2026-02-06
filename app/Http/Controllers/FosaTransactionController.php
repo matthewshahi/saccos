@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use App\Exports\FosaTransactionsExport;
 use Maatwebsite\Excel\Facades\Excel;
+use Carbon\Carbon;
 
 
 
@@ -375,6 +376,18 @@ public function updateType(Request $request, $id)
     if (($rec->fosa_end_month_proc ?? 'N') === 'Y') {
         return back()->with('error', 'This transaction is locked (end-month processed).');
     }
+
+    
+     if (empty($rec->fosa_transdate)) {
+        return back()->with('error', 'This transaction has no transaction date; cannot validate edit window.');
+    }
+
+    $daysOld = Carbon::parse($rec->fosa_transdate)->diffInDays(now());
+
+    if ($daysOld > 60) {
+        return back()->with('error', "This transaction is too old to edit ({$daysOld} days old). Allowed window is 60 days.");
+    }
+
 
     $newTypeId = (int) $request->fosa_type_id;
     $oldTypeId = (int) ($rec->fosa_type_id ?? 0);
