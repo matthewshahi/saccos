@@ -123,9 +123,60 @@
                               <dd class="col-sm-7">{{ $rec->fosa_description }}</dd>
 
                               <dt class="col-sm-5">FOSA Type</dt>
-                              <dd class="col-sm-7">
-                                <span class="badge bg-info text-dark">{{ $rec->fosa_type_name ?? 'N/A' }}</span>
-                              </dd>
+<dd class="col-sm-7">
+  <div class="d-flex flex-column gap-2">
+
+    {{-- Current type (keep this) --}}
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <span class="badge bg-info text-dark">
+        {{ $rec->fosa_type_name ?? 'N/A' }}
+      </span>
+
+      {{-- Toggle edit --}}
+      <button type="button"
+              class="btn btn-link p-0 small text-decoration-none"
+              data-bs-toggle="collapse"
+              data-bs-target="#editFosaType{{ $rec->fosa_id }}">
+        Change
+      </button>
+    </div>
+
+    {{-- Inline editor (collapsed by default) --}}
+    <div class="collapse" id="editFosaType{{ $rec->fosa_id }}">
+      <form method="POST" action="{{ route('fosa.transactions.updateType', $rec->fosa_id) }}"
+            class="d-flex gap-2 align-items-center flex-wrap">
+        @csrf
+        @method('PUT')
+
+        <select name="fosa_type_id" class="form-select form-select-sm" style="min-width: 220px;" required>
+          @foreach($fosaTypes as $t)
+            <option value="{{ $t->type_id }}"
+              {{ (int)$t->type_id === (int)$rec->fosa_type_id ? 'selected' : '' }}>
+              {{ $t->type_name }}
+            </option>
+          @endforeach
+        </select>
+
+        <button type="submit" class="btn btn-sm btn-primary">
+          Save
+        </button>
+
+        <button type="button"
+                class="btn btn-sm btn-light"
+                data-bs-toggle="collapse"
+                data-bs-target="#editFosaType{{ $rec->fosa_id }}">
+          Cancel
+        </button>
+      </form>
+
+      <div class="form-text mt-1">
+        Changing type updates classification only (amount/doc no remain the same).
+      </div>
+    </div>
+
+  </div>
+</dd>
+
 
                               <dt class="col-sm-5">Period</dt>
                               <dd class="col-sm-7">{{ $rec->fosa_period }}</dd>

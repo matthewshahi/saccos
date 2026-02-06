@@ -585,6 +585,10 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
 
             Route::get('/transactions/import/preview/{csv}', [FosaImportController::class, 'showPreview'])
                 ->name('fosa.transactions.import.preview.show');
+
+            Route::put('/transactions/{id}/type', [FosaTransactionController::class, 'updateType'])
+    ->name('fosa.transactions.updateType');
+
         });
 
     Route::post('/transactions/import/process', [FosaImportController::class, 'process'])

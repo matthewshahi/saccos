@@ -68,7 +68,13 @@ class FosaTransactionController extends Controller
     // ✅ fetch a capped set, then paginate locally
     $records = $query->limit(300)->paginate(25)->appends(['search' => $search]);
 
-    return view('fosa.transactions.index', compact('records', 'search'));
+    $fosaTypes = DB::table('sacco_fosa_types')
+    ->where('type_active', 'Y')
+    ->orderBy('type_name')
+    ->get();
+
+return view('fosa.transactions.index', compact('records', 'search', 'fosaTypes'));
+
 }
     public function create()
     {
@@ -348,5 +354,78 @@ public function export(Request $request)
 
     return Excel::download(new FosaTransactionsExport($search), $fileName);
 }
+public function updateType(Request $request, $id)
+{
+    $request->validate([
+        'fosa_type_id'  => 'required|exists:sacco_fosa_types,type_id',
+        'change_reason' => 'nullable|string|max:255',
+        'change_notes'  => 'nullable|string',
+    ]);
+
+    // prevent edits after end-month processing (recommended safeguard)
+    $rec = DB::table('sacco_fosas')
+        ->select('fosa_id', 'fosa_end_month_proc', 'fosa_type_id', 'fosa_description')
+        ->where('fosa_id', $id)
+        ->first();
+
+    if (!$rec) {
+        return back()->with('error', 'Transaction not found.');
+    }
+
+    if (($rec->fosa_end_month_proc ?? 'N') === 'Y') {
+        return back()->with('error', 'This transaction is locked (end-month processed).');
+    }
+
+    $newTypeId = (int) $request->fosa_type_id;
+    $oldTypeId = (int) ($rec->fosa_type_id ?? 0);
+
+    // No change
+    if ($oldTypeId === $newTypeId) {
+        return back()->with('success', 'No change applied (same FOSA Type).');
+    }
+
+    // optional: update description suffix to reflect new type
+    $typeName = DB::table('sacco_fosa_types')
+        ->where('type_id', $newTypeId)
+        ->value('type_name');
+
+    // If your description is always "... (TypeName)" you can normalize it:
+    $newDescription = $rec->fosa_description;
+    if ($typeName) {
+        // remove last "(...)" if present and re-append
+        $newDescription = preg_replace('/\s*\([^)]*\)\s*$/', '', (string) $rec->fosa_description);
+        $newDescription = trim($newDescription) . " ({$typeName})";
+    }
+
+    DB::beginTransaction();
+    try {
+        // Update transaction type
+        DB::table('sacco_fosas')
+            ->where('fosa_id', $id)
+            ->update([
+                'fosa_type_id'     => $newTypeId,
+                'fosa_description' => $newDescription,
+            ]);
+
+        // Audit log
+        DB::table('sacco_fosa_transaction_type_changes')->insert([
+            'fosa_id'       => $id,
+            'from_type_id'  => $rec->fosa_type_id, // keep nullable
+            'to_type_id'    => $newTypeId,
+            'change_reason' => $request->input('change_reason'),
+            'change_notes'  => $request->input('change_notes'),
+            'changed_by'    => Auth::id(),
+            'changed_ip'    => $request->ip(),
+            'changed_at'    => now(),
+        ]);
+
+        DB::commit();
+        return back()->with('success', 'FOSA Type updated and audit logged.');
+    } catch (\Exception $e) {
+        DB::rollBack();
+        return back()->with('error', 'Update failed: ' . $e->getMessage());
+    }
+}
+
 
 }
