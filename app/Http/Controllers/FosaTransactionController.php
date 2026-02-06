@@ -355,17 +355,16 @@ public function export(Request $request)
 
     return Excel::download(new FosaTransactionsExport($search), $fileName);
 }
+
 public function updateType(Request $request, $id)
 {
     $request->validate([
-        'fosa_type_id'  => 'required|exists:sacco_fosa_types,type_id',
-        'change_reason' => 'nullable|string|max:255',
-        'change_notes'  => 'nullable|string',
+        'fosa_type_id' => 'required|exists:sacco_fosa_types,type_id',
     ]);
 
-    // prevent edits after end-month processing (recommended safeguard)
+    // Fetch current transaction (real fields from your table)
     $rec = DB::table('sacco_fosas')
-        ->select('fosa_id', 'fosa_end_month_proc', 'fosa_type_id', 'fosa_description')
+        ->select('fosa_id', 'fosa_end_month_proc', 'fosa_type_id', 'fosa_description', 'fosa_transdate', 'fosa_date_paid')
         ->where('fosa_id', $id)
         ->first();
 
@@ -373,21 +372,21 @@ public function updateType(Request $request, $id)
         return back()->with('error', 'Transaction not found.');
     }
 
+    // Lock safeguard (end-month processed)
     if (($rec->fosa_end_month_proc ?? 'N') === 'Y') {
         return back()->with('error', 'This transaction is locked (end-month processed).');
     }
 
-    
-     if (empty($rec->fosa_transdate)) {
+    // Edit window: allow ONLY within last 600 days (prefer transdate, fallback to date_paid)
+    $txnDate = $rec->fosa_transdate ?: $rec->fosa_date_paid;
+    if (empty($txnDate)) {
         return back()->with('error', 'This transaction has no transaction date; cannot validate edit window.');
     }
 
-    $daysOld = Carbon::parse($rec->fosa_transdate)->diffInDays(now());
-
-    if ($daysOld > 60) {
-        return back()->with('error', "This transaction is too old to edit ({$daysOld} days old). Allowed window is 60 days.");
+    $daysOld = \Carbon\Carbon::parse($txnDate)->diffInDays(\Carbon\Carbon::now());
+    if ($daysOld > 600) {
+        return back()->with('error', "This transaction is too old to edit ({$daysOld} days old). Allowed window is 600 days.");
     }
-
 
     $newTypeId = (int) $request->fosa_type_id;
     $oldTypeId = (int) ($rec->fosa_type_id ?? 0);
@@ -397,16 +396,15 @@ public function updateType(Request $request, $id)
         return back()->with('success', 'No change applied (same FOSA Type).');
     }
 
-    // optional: update description suffix to reflect new type
+    // Get new type name (real table)
     $typeName = DB::table('sacco_fosa_types')
         ->where('type_id', $newTypeId)
         ->value('type_name');
 
-    // If your description is always "... (TypeName)" you can normalize it:
-    $newDescription = $rec->fosa_description;
-    if ($typeName) {
-        // remove last "(...)" if present and re-append
-        $newDescription = preg_replace('/\s*\([^)]*\)\s*$/', '', (string) $rec->fosa_description);
+    // Update description suffix to reflect new type (keep your existing description content)
+    $newDescription = (string) ($rec->fosa_description ?? '');
+    if (!empty($typeName)) {
+        $newDescription = preg_replace('/\s*\([^)]*\)\s*$/', '', $newDescription);
         $newDescription = trim($newDescription) . " ({$typeName})";
     }
 
@@ -420,25 +418,22 @@ public function updateType(Request $request, $id)
                 'fosa_description' => $newDescription,
             ]);
 
-        // Audit log
+        // Audit log (real audit table)
         DB::table('sacco_fosa_transaction_type_changes')->insert([
-            'fosa_id'       => $id,
-            'from_type_id'  => $rec->fosa_type_id, // keep nullable
-            'to_type_id'    => $newTypeId,
-            'change_reason' => $request->input('change_reason'),
-            'change_notes'  => $request->input('change_notes'),
-            'changed_by'    => Auth::id(),
-            'changed_ip'    => $request->ip(),
-            'changed_at'    => now(),
+            'fosa_id'      => $id,
+            'from_type_id' => $rec->fosa_type_id,
+            'to_type_id'   => $newTypeId,
+            'changed_by'   => Auth::id(),
+            'changed_ip'   => $request->ip(),
+            'changed_at'   => now(),
         ]);
 
         DB::commit();
-        return back()->with('success', 'FOSA Type updated and audit logged.');
+        return back()->with('success', 'FOSA Type updated successfully.');
     } catch (\Exception $e) {
         DB::rollBack();
         return back()->with('error', 'Update failed: ' . $e->getMessage());
     }
 }
-
 
 }
