@@ -169,6 +169,13 @@ $date_paid    = trim($date_paid, " \t\n\r\0\x0B\"'");
 $fosa_paid_by = trim($fosa_paid_by, " \t\n\r\0\x0B\"'");
 $fosa_type    = trim($fosa_type, " \t\n\r\0\x0B\"'");
 
+// ✅ ADD THIS RIGHT HERE (before validations)
+// Normalize amount: remove commas and odd spaces
+$amount = str_replace([',', ' '], '', $amount);
+// remove non-breaking spaces too
+$amount = preg_replace('/\x{00A0}|\x{202F}|\x{2009}/u', '', $amount);
+
+ 
 
                 // --- Row validations
                 if (!is_numeric($amount) || $amount <= 0) {
