@@ -20,6 +20,7 @@
 
 <div class="container">
     <div class="row">
+        {{-- Filters --}}
         <div class="col-md-12">
             <div class="card mb-4">
                 <div class="card-body">
@@ -55,8 +56,13 @@
                                     placeholder="e.g., 202312" value="{{ request('end_period') }}">
                             </div>
 
-                            <div class="col-md-12">
+                            <div class="col-md-12 d-flex align-items-center gap-2">
                                 <button class="btn btn-primary">Search</button>
+
+                                {{-- Optional quick clear --}}
+                                <a class="btn btn-outline-secondary" href="{{ route('reports.loans.issued') }}">
+                                    Clear
+                                </a>
                             </div>
                         </div>
                     </form>
@@ -64,11 +70,42 @@
             </div>
         </div>
 
-        <div class="col-md-12 mb-4">
-            <div class="card text-start">
-                <div class="card-body">
+        {{-- Table --}}
+        <div class="col-md-12">
+            <div class="card o-hidden mb-4">
+                <div class="card-header d-flex align-items-center border-0">
+                    <h3 class="w-50 float-start card-title m-0">Loans Issued</h3>
+
+                    <div class="w-50 float-end d-flex justify-content-end align-items-center gap-2">
+                        {{-- Direct download button --}}
+                        <a class="btn btn-success btn-sm"
+                           href="{{ route('reports.loans.issued.download', request()->except('page')) }}">
+                            Download Excel
+                        </a>
+
+                        {{-- Gear dropdown --}}
+                        <div class="dropdown dropleft text-end">
+                            <button class="btn bg-gray-100" id="dropdownMenuButton1" type="button"
+                                data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                <i class="nav-icon i-Gear-2"></i>
+                            </button>
+
+                            <div class="dropdown-menu" aria-labelledby="dropdownMenuButton1">
+                                <a class="dropdown-item"
+                                   href="{{ route('reports.loans.issued.download', request()->except('page')) }}">
+                                    Download Excel
+                                </a>
+                                <a class="dropdown-item" href="{{ route('reports.loans.issued') }}">
+                                    Clear Filters
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
                     <div class="table-responsive">
-                        <table class="table table-striped table-hover">
+                        <table class="table table-striped table-hover align-middle" id="loans_issued_table">
                             <thead>
                                 <tr>
                                     <th scope="col">#</th>
@@ -145,8 +182,10 @@
                         </table>
                     </div>
                 </div>
+
             </div>
         </div>
+
     </div>
 </div>
 @endsection

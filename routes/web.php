@@ -54,6 +54,7 @@ use App\Http\Controllers\MemberFinancialPositionController;
 use App\Http\Controllers\FosaTransferController;
 use App\Http\Controllers\Reports\FinalAccountsController;
 use App\Http\Controllers\Reports\LedgerController;
+ 
 
 use App\Http\Controllers\KassMigrationController;
 use App\Http\Controllers\KasMemberImportController;
@@ -905,7 +906,7 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
     Route::get('/reports/members/status', [HomeController::class, 'reportsMembersStatus'])->name('reports.members.status')->middleware('check_user_rights:list_member_statement');
     Route::get('/reports/loans/issued', [HomeController::class, 'reportsLoansIssued'])->name('reports.loans.issued')->middleware('check_user_rights:rpt_loans_issued');
     Route::get('/reports/loans/issued/data', [HomeController::class, 'getLoansIssued'])->name('reports.loans.issued.data')->middleware('check_user_rights:rpt_loans_issued');
-    Route::get('/reports/loans/issued/download', [HomeController::class, 'downloadLoansIssuedReport'])->name('reports.loans.issued.download')->middleware('check_user_rights:rpt_loans_issued');
+    Route::get('/reports/loans/issued/download', action: [HomeController::class, 'downloadLoansIssuedReport'])->name('reports.loans.issued.download')->middleware('check_user_rights:rpt_loans_issued');
     Route::get('/reports/loans/repayments', [HomeController::class, 'reportsLoansRepayments'])->name('reports.loans.repayments')->middleware('check_user_rights:rpt_reports');
     Route::get('/reports/loans/repayments/data', [HomeController::class, 'getLoansRepayments'])->name('reports.loans.repayments.data')->middleware('check_user_rights:rpt_loans_issued');
     Route::get('/reports/loans/repayments/download', [HomeController::class, 'downloadLoansRepaymentsReport'])->name('reports.loans.repayments.download')->middleware('check_user_rights:rpt_loans_issued');

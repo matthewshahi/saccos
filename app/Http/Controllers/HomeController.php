@@ -13,7 +13,8 @@ use Illuminate\Support\Facades\Hash;
 use Carbon\Carbon;
 use DateTime;
 use Illuminate\Support\Facades\Route;
-
+use Maatwebsite\Excel\Facades\Excel;
+use App\Exports\LoansIssuedExport;
 
 class HomeController extends Controller
 {
@@ -6685,82 +6686,58 @@ public function reportsLoansIssued(Request $request)
     }
 
     public function downloadLoansIssuedReport(Request $request)
-    {
-        $search = $request->input('search', '');
+{
+    $searchName        = $request->input('search_name');
+    $searchSaccoId     = $request->input('search_sacco_id');
+    $searchCompanyName = $request->input('search_company_name');
+    $startPeriod       = $request->input('start_period'); // YYYYMM
+    $endPeriod         = $request->input('end_period');   // YYYYMM
 
-        $query = DB::table('sacco_loans')
-            ->join('sacco_members', 'sacco_loans.loan_member', '=', 'sacco_members.member_id')
-            ->join('sacco_department', 'sacco_members.member_dept', '=', 'sacco_department.department_id')
-            ->join('sacco_company', 'sacco_department.department_company_id', '=', 'sacco_company.company_id')
-            ->join('sacco_loan_types', 'sacco_loans.loan_loan_type', '=', 'sacco_loan_types.loan_type_id')
-            ->select(
-                'sacco_loans.loan_id',
-                'sacco_loans.loan_amount',
-                'sacco_loans.loan_loan_paid',
-                'sacco_loans.loan_on as loan_issued_date',
-                'sacco_loans.loan_stoped as loan_status',
-                'sacco_members.member_name',
-                'sacco_members.member_phone_no',
-                'sacco_members.member_national_id',
-                'sacco_members.member_kra_pin',
-                'sacco_loan_types.loan_type_name',
-                'sacco_company.company_name',
-                'sacco_loans.loan_taken_period'
-            );
+    // IMPORTANT: build query WITHOUT ->get() or paginate()
+    $query = DB::table('sacco_loans as l')
+        ->join('sacco_members as m', 'l.loan_member', '=', 'm.member_id')
+        ->leftJoin('sacco_department as d', 'm.member_dept', '=', 'd.department_id')
+        ->leftJoin('sacco_company as c', 'd.department_company_id', '=', 'c.company_id')
+        ->select(
+            'l.loan_id',
+            'l.loan_amount',
+            'l.loan_taken_period',
+            'l.loan_start_deduction_period',
+            'l.loan_on',
+            'l.loan_description',
+            'l.loan_doc_no',
+            'l.loan_stoped',
+            'l.loan_payment_period',
+            'l.loan_loan_paid',
+            'l.loan_insurance',
+            'm.member_name',
+            'm.member_sacco_id',
+            'c.company_name'
+        )
+        ->when($searchName, function ($q) use ($searchName) {
+            return $q->where('m.member_name', 'like', "%{$searchName}%");
+        })
+        ->when($searchSaccoId, function ($q) use ($searchSaccoId) {
+            return $q->where('m.member_sacco_id', 'like', "%{$searchSaccoId}%");
+        })
+        ->when($searchCompanyName, function ($q) use ($searchCompanyName) {
+            return $q->where('c.company_name', 'like', "%{$searchCompanyName}%");
+        })
+        ->when($startPeriod && $endPeriod, function ($q) use ($startPeriod, $endPeriod) {
+            return $q->whereBetween('l.loan_taken_period', [$startPeriod, $endPeriod]);
+        })
+        ->when($startPeriod && !$endPeriod, function ($q) use ($startPeriod) {
+            return $q->where('l.loan_taken_period', '>=', $startPeriod);
+        })
+        ->when($endPeriod && !$startPeriod, function ($q) use ($endPeriod) {
+            return $q->where('l.loan_taken_period', '<=', $endPeriod);
+        })
+        ->orderBy('l.loan_taken_period', 'desc')
+        ->orderBy('l.loan_on', 'desc');
 
-        if (!empty($search)) {
-            $query->where(function ($q) use ($search) {
-                $q->where('sacco_members.member_name', 'like', "%$search%")
-                    ->orWhere('sacco_members.member_phone_no', 'like', "%$search%")
-                    ->orWhere('sacco_members.member_national_id', 'like', "%$search%")
-                    ->orWhere('sacco_loan_types.loan_type_name', 'like', "%$search%")
-                    ->orWhere('sacco_company.company_name', 'like', "%$search%");
-            });
-        }
+    return Excel::download(new LoansIssuedExport($query), 'loans_issued.xlsx');
+}
 
-        $issuedLoans = $query->get();
-
-        $filename = 'issued_loans_report_' . date('Ymd') . '.csv';
-        $handle = fopen($filename, 'w+');
-        fputcsv($handle, [
-            'Loan ID',
-            'Member Name',
-            'Phone Number',
-            'National ID',
-            'KRA PIN',
-            'Company',
-            'Loan Type',
-            'Loan Amount',
-            'Loan Paid',
-            'Loan Balance',
-            'Loan Taken Period',
-            'Issued Date',
-            'Status'
-        ]);
-
-        foreach ($issuedLoans as $loan) {
-            $loanBalance = $loan->loan_amount - $loan->loan_loan_paid;
-            fputcsv($handle, [
-                $loan->loan_id,
-                $loan->member_name,
-                $loan->member_phone_no,
-                $loan->member_national_id,
-                $loan->member_kra_pin,
-                $loan->company_name,
-                $loan->loan_type_name,
-                number_format($loan->loan_amount, 2),
-                number_format($loan->loan_loan_paid, 2),
-                number_format($loanBalance, 2),
-                $loan->loan_taken_period,
-                \Carbon\Carbon::parse($loan->loan_issued_date)->format('d-m-Y'),
-                $loan->loan_status == 'N' ? 'Active' : 'Stopped'
-            ]);
-        }
-
-        fclose($handle);
-
-        return response()->download($filename)->deleteFileAfterSend(true);
-    }
 
 
 
