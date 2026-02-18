@@ -25,28 +25,58 @@ class LoansIssuedExport implements FromQuery, WithHeadings, WithMapping, ShouldA
     public function headings(): array
     {
         return [
-            'Loan ID','Member Name','Member Sacco ID','Company','Loan Amount','Taken Period (YYYYMM)',
-            'Start Deduction Period','Loan Date','Doc No','Description','Stopped','Payment Period','Loan Paid','Insurance',
+            // Member
+            'Member Name',
+            'Sacco ID',
+            'National ID',
+            'Company',
+
+            // Member balances
+            'Total Savings',
+            'Other Contributions',
+            'Capital Contributions',
+
+            // Loan
+            'Loan ID',
+            'Loan Amount',
+            'Insurance',
+            'Loan Paid',
+            'Period (Months)',
+            'Taken Period (YYYYMM)',
+            'Start Deduction Period',
+            'Issued On',
+            'Doc No',
+            'Description',
+            'Stopped',
         ];
     }
 
     public function map($row): array
     {
         return [
-            $row->loan_id ?? '',
+            // Member
             $row->member_name ?? '',
             $row->member_sacco_id ?? '',
+            $row->member_national_id ?? '',
             $row->company_name ?? '',
+
+            // Member balances
+            (float)($row->member_total_share ?? 0),
+            (float)($row->member_total_fosa ?? 0),
+            (float)($row->member_total_share_capital ?? 0),
+
+            // Loan
+            $row->loan_id ?? '',
             (float)($row->loan_amount ?? 0),
+            (float)($row->loan_insurance ?? 0),
+            (float)($row->loan_loan_paid ?? 0),
+            $row->loan_payment_period ?? '',
             $row->loan_taken_period ?? '',
             $row->loan_start_deduction_period ?? '',
             $row->loan_on ?? '',
             $row->loan_doc_no ?? '',
             $row->loan_description ?? '',
             $row->loan_stoped ?? '',
-            $row->loan_payment_period ?? '',
-            (float)($row->loan_loan_paid ?? 0),
-            (float)($row->loan_insurance ?? 0),
         ];
     }
 }

@@ -6690,8 +6690,7 @@ public function reportsLoansIssued(Request $request)
 
         return response()->json(['data' => $issuedLoans]);
     }
-
-    public function downloadLoansIssuedReport(Request $request)
+public function downloadLoansIssuedReport(Request $request)
 {
     $searchName        = $request->input('search_name');
     $searchSaccoId     = $request->input('search_sacco_id');
@@ -6705,19 +6704,28 @@ public function reportsLoansIssued(Request $request)
         ->leftJoin('sacco_department as d', 'm.member_dept', '=', 'd.department_id')
         ->leftJoin('sacco_company as c', 'd.department_company_id', '=', 'c.company_id')
         ->select(
+            // Loan
             'l.loan_id',
             'l.loan_amount',
+            'l.loan_insurance',
+            'l.loan_loan_paid',
+            'l.loan_payment_period',
             'l.loan_taken_period',
             'l.loan_start_deduction_period',
-            'l.loan_on',
-            'l.loan_description',
             'l.loan_doc_no',
+            'l.loan_description',
             'l.loan_stoped',
-            'l.loan_payment_period',
-            'l.loan_loan_paid',
-            'l.loan_insurance',
+            'l.loan_on',
+
+            // Member
             'm.member_name',
             'm.member_sacco_id',
+            'm.member_national_id',
+            'm.member_total_share',
+            'm.member_total_fosa',
+            'm.member_total_share_capital',
+
+            // Company
             'c.company_name'
         )
         ->when($searchName, function ($q) use ($searchName) {
@@ -6729,6 +6737,7 @@ public function reportsLoansIssued(Request $request)
         ->when($searchCompanyName, function ($q) use ($searchCompanyName) {
             return $q->where('c.company_name', 'like', "%{$searchCompanyName}%");
         })
+        // ✅ FILTER BY loan_taken_period
         ->when($startPeriod && $endPeriod, function ($q) use ($startPeriod, $endPeriod) {
             return $q->whereBetween('l.loan_taken_period', [$startPeriod, $endPeriod]);
         })
