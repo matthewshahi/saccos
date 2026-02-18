@@ -71,39 +71,40 @@
         </div>
 
         {{-- Table --}}
-        <div class="col-md-12">
-            <div class="card o-hidden mb-4">
-                <div class="card-header d-flex align-items-center border-0">
-                    <h3 class="w-50 float-start card-title m-0">Loans Issued</h3>
+        <div class="col-md-12 mb-4">
+            <div class="card text-start">
+                <div class="card-body">
 
-                    <div class="w-50 float-end d-flex justify-content-end align-items-center gap-2">
-                        {{-- Direct download button --}}
-                        <a class="btn btn-success btn-sm"
-                           href="{{ route('reports.loans.issued.download', request()->except('page')) }}">
-                            Download Excel
-                        </a>
+                    {{-- ✅ Header actions (no wrapping, inserted here) --}}
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h4 class="m-0">Loans Issued</h4>
 
-                        {{-- Gear dropdown --}}
-                        <div class="dropdown dropleft text-end">
-                            <button class="btn bg-gray-100" id="dropdownMenuButton1" type="button"
-                                data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                                <i class="nav-icon i-Gear-2"></i>
-                            </button>
+                        <div class="d-flex align-items-center gap-2">
+                            <a class="btn btn-success btn-sm"
+                               href="{{ route('reports.loans.issued.download', request()->except('page')) }}">
+                                Download Excel
+                            </a>
 
-                            <div class="dropdown-menu" aria-labelledby="dropdownMenuButton1">
-                                <a class="dropdown-item"
-                                   href="{{ route('reports.loans.issued.download', request()->except('page')) }}">
-                                    Download Excel
-                                </a>
-                                <a class="dropdown-item" href="{{ route('reports.loans.issued') }}">
-                                    Clear Filters
-                                </a>
+                            <div class="dropdown dropleft text-end">
+                                <button class="btn bg-gray-100" id="dropdownMenuButton1" type="button"
+                                    data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                    <i class="nav-icon i-Gear-2"></i>
+                                </button>
+
+                                <div class="dropdown-menu" aria-labelledby="dropdownMenuButton1">
+                                    <a class="dropdown-item"
+                                       href="{{ route('reports.loans.issued.download', request()->except('page')) }}">
+                                        Download Excel
+                                    </a>
+                                    <a class="dropdown-item" href="{{ route('reports.loans.issued') }}">
+                                        Clear Filters
+                                    </a>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
+                    {{-- ✅ End header actions --}}
 
-                <div>
                     <div class="table-responsive">
                         <table class="table table-striped table-hover align-middle" id="loans_issued_table">
                             <thead>
@@ -181,8 +182,8 @@
                             </tbody>
                         </table>
                     </div>
-                </div>
 
+                </div>
             </div>
         </div>
 
