@@ -6578,18 +6578,15 @@ class HomeController extends Controller
 
 
 
-
-
-    public function reportsLoansIssued(Request $request)
+public function reportsLoansIssued(Request $request)
 {
     // Retrieve search filters from the request
-    $searchName = $request->input('search_name');
-    $searchSaccoId = $request->input('search_sacco_id');
+    $searchName        = $request->input('search_name');
+    $searchSaccoId     = $request->input('search_sacco_id');
     $searchCompanyName = $request->input('search_company_name');
-    $startPeriod = $request->input('start_period');
-    $endPeriod = $request->input('end_period');
+    $startPeriod       = $request->input('start_period'); // YYYYMM
+    $endPeriod         = $request->input('end_period');   // YYYYMM
 
-    // Query to fetch loan issued data
     $loansIssued = DB::table('sacco_loans as l')
         ->join('sacco_members as m', 'l.loan_member', '=', 'm.member_id')
         ->leftJoin('sacco_department as d', 'm.member_dept', '=', 'd.department_id')
@@ -6601,7 +6598,7 @@ class HomeController extends Controller
             'l.loan_start_deduction_period',
             'l.loan_on',
 
-            // ✅ extra fields you requested
+            // extra fields
             'l.loan_description',
             'l.loan_doc_no',
             'l.loan_stoped',
@@ -6613,26 +6610,30 @@ class HomeController extends Controller
             'm.member_sacco_id',
             'c.company_name'
         )
-        ->when($searchName, function ($query, $searchName) {
-            return $query->where('m.member_name', 'like', "%$searchName%");
+        ->when($searchName, function ($query) use ($searchName) {
+            return $query->where('m.member_name', 'like', "%{$searchName}%");
         })
-        ->when($searchSaccoId, function ($query, $searchSaccoId) {
-            return $query->where('m.member_sacco_id', 'like', "%$searchSaccoId%");
+        ->when($searchSaccoId, function ($query) use ($searchSaccoId) {
+            return $query->where('m.member_sacco_id', 'like', "%{$searchSaccoId}%");
         })
-        ->when($searchCompanyName, function ($query, $searchCompanyName) {
-            return $query->where('c.company_name', 'like', "%$searchCompanyName%");
+        ->when($searchCompanyName, function ($query) use ($searchCompanyName) {
+            return $query->where('c.company_name', 'like', "%{$searchCompanyName}%");
         })
-        ->when($startPeriod, function ($query, $startPeriod) {
-            return $query->where('l.loan_start_deduction_period', '>=', $startPeriod);
+        // ✅ FILTER BY loan_taken_period
+        ->when($startPeriod && $endPeriod, function ($query) use ($startPeriod, $endPeriod) {
+            return $query->whereBetween('l.loan_taken_period', [$startPeriod, $endPeriod]);
         })
-        ->when($endPeriod, function ($query, $endPeriod) {
-            return $query->where('l.loan_start_deduction_period', '<=', $endPeriod);
+        ->when($startPeriod && !$endPeriod, function ($query) use ($startPeriod) {
+            return $query->where('l.loan_taken_period', '>=', $startPeriod);
         })
-        ->orderBy('l.loan_start_deduction_period', 'desc')
-        ->orderBy('l.loan_on')
+        ->when($endPeriod && !$startPeriod, function ($query) use ($endPeriod) {
+            return $query->where('l.loan_taken_period', '<=', $endPeriod);
+        })
+        // ✅ ORDER BY loan_taken_period (not start_deduction_period)
+        ->orderBy('l.loan_taken_period', 'desc')
+        ->orderBy('l.loan_on', 'desc')
         ->get();
 
-    // Return the data to the view
     return view('reports.loans.issued', ['loansIssued' => $loansIssued]);
 }
 
