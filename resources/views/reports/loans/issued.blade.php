@@ -75,7 +75,6 @@
             <div class="card text-start">
                 <div class="card-body">
 
-                    {{-- ✅ Header actions (no wrapping, inserted here) --}}
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <h4 class="m-0">Loans Issued</h4>
 
@@ -103,7 +102,6 @@
                             </div>
                         </div>
                     </div>
-                    {{-- ✅ End header actions --}}
 
                     <div class="table-responsive">
                         <table class="table table-striped table-hover align-middle" id="loans_issued_table">
@@ -111,12 +109,18 @@
                                 <tr>
                                     <th scope="col">#</th>
 
-                                    {{-- Identity --}}
+                                    {{-- Member --}}
                                     <th scope="col">Member Name</th>
                                     <th scope="col">Sacco ID</th>
+                                    <th scope="col">National ID</th>
                                     <th scope="col">Company</th>
 
-                                    {{-- Loan core --}}
+                                    {{-- Member balances --}}
+                                    <th scope="col" class="text-end">Total Savings</th>
+                                    <th scope="col" class="text-end">Other Contributions</th>
+                                    <th scope="col" class="text-end">Capital Contributions</th>
+
+                                    {{-- Loan --}}
                                     <th scope="col" class="text-end">Loan Amount</th>
                                     <th scope="col" class="text-end">Insurance</th>
                                     <th scope="col" class="text-end">Loan Paid</th>
@@ -126,11 +130,11 @@
                                     <th scope="col">Taken Period</th>
                                     <th scope="col">Start Deduction</th>
 
-                                    {{-- References / description --}}
+                                    {{-- References --}}
                                     <th scope="col">Doc No</th>
                                     <th scope="col">Description</th>
 
-                                    {{-- Status / audit --}}
+                                    {{-- Status --}}
                                     <th scope="col">Stopped</th>
                                     <th scope="col">Issued On</th>
                                 </tr>
@@ -140,12 +144,18 @@
                                     <tr>
                                         <td>{{ $index + 1 }}</td>
 
-                                        {{-- Identity --}}
+                                        {{-- Member --}}
                                         <td class="fw-semibold">{{ $loan->member_name }}</td>
                                         <td>{{ $loan->member_sacco_id }}</td>
+                                        <td>{{ $loan->member_national_id ?? '-' }}</td>
                                         <td>{{ $loan->company_name ?? '-' }}</td>
 
-                                        {{-- Loan core --}}
+                                        {{-- Member balances --}}
+                                        <td class="text-end">{{ number_format((float)($loan->member_total_share ?? 0), 2) }}</td>
+                                        <td class="text-end">{{ number_format((float)($loan->member_total_fosa ?? 0), 2) }}</td>
+                                        <td class="text-end">{{ number_format((float)($loan->member_total_share_capital ?? 0), 2) }}</td>
+
+                                        {{-- Loan --}}
                                         <td class="text-end">{{ number_format((float)($loan->loan_amount ?? 0), 2) }}</td>
                                         <td class="text-end">{{ number_format((float)($loan->loan_insurance ?? 0), 2) }}</td>
                                         <td class="text-end">{{ number_format((float)($loan->loan_loan_paid ?? 0), 2) }}</td>
@@ -155,13 +165,13 @@
                                         <td>{{ $loan->loan_taken_period ?? '-' }}</td>
                                         <td>{{ $loan->loan_start_deduction_period ?? '-' }}</td>
 
-                                        {{-- References / description --}}
+                                        {{-- References --}}
                                         <td>{{ $loan->loan_doc_no ?? '-' }}</td>
                                         <td style="min-width: 220px;">
                                             {{ $loan->loan_description ?? '-' }}
                                         </td>
 
-                                        {{-- Status / audit --}}
+                                        {{-- Status --}}
                                         <td>
                                             @php $stopped = strtoupper((string)($loan->loan_stoped ?? 'N')); @endphp
                                             <span class="badge {{ $stopped === 'Y' ? 'bg-danger' : 'bg-success' }}">
@@ -174,7 +184,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="14" class="text-center text-muted py-4">
+                                        <td colspan="18" class="text-center text-muted py-4">
                                             No loan records found for the selected filters.
                                         </td>
                                     </tr>

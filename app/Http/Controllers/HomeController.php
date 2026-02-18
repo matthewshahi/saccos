@@ -6578,7 +6578,6 @@ class HomeController extends Controller
 
 
 
-
 public function reportsLoansIssued(Request $request)
 {
     // Retrieve search filters from the request
@@ -6609,6 +6608,13 @@ public function reportsLoansIssued(Request $request)
 
             'm.member_name',
             'm.member_sacco_id',
+
+            // ✅ NEW: National ID + member totals
+            'm.member_national_id',
+            'm.member_total_share',
+            'm.member_total_fosa',
+            'm.member_total_share_capital',
+
             'c.company_name'
         )
         ->when($searchName, function ($query) use ($searchName) {
