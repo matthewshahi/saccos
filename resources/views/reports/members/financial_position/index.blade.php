@@ -4,12 +4,24 @@
 
 @section('styles')
 <style>
-    /* Prevent wrapping + make wide tables usable */
+    /* ✅ Card overflow fix: o-hidden clips horizontal scrollbar */
+    .mfp-card { overflow: visible !important; }
+
+    /* ✅ Horizontal + vertical scrolling container */
     .mfp-table-wrap {
-        overflow-x: auto;
-        overflow-y: auto;
+        width: 100%;
+        max-width: 100%;
+        overflow-x: auto;   /* horizontal */
+        overflow-y: auto;   /* vertical */
         max-height: 70vh;
+        padding-bottom: 10px; /* make scrollbar easier to grab */
         -webkit-overflow-scrolling: touch;
+    }
+
+    /* ✅ Force table to grow wide so horizontal scroll appears */
+    .mfp-table {
+        width: max-content;
+        min-width: 100%;
     }
 
     .mfp-table th,
@@ -56,7 +68,8 @@
     <div class="row">
         <div class="col-12">
 
-            <div class="card o-hidden mb-4">
+            {{-- ✅ removed "o-hidden" and added "mfp-card" --}}
+            <div class="card mb-4 mfp-card">
 
                 {{-- HEADER --}}
                 <div class="card-header d-flex align-items-center justify-content-between">
@@ -76,55 +89,54 @@
                 <div class="card-body">
 
                     {{-- FILTER BAR --}}
-                   <form id="filterForm" class="row gx-3 gy-2 align-items-center" onsubmit="return false;">
+                    <form id="filterForm" class="row gx-3 gy-2 align-items-center" onsubmit="return false;">
 
-    <!-- PERIOD -->
-    <div class="col-md-2">
-        <label class="form-label mb-1 fw-semibold">
-            Period (YYYYMM)
-        </label>
+                        <!-- PERIOD -->
+                        <div class="col-md-2">
+                            <label class="form-label mb-1 fw-semibold">
+                                Period (YYYYMM)
+                            </label>
 
-        <input
-            type="text"
-            id="period"
-            name="period"
-            class="form-control"
-            value="{{ $periodValue }}"
-            placeholder="YYYYMM"
-            maxlength="6"
-            autocomplete="off">
+                            <input
+                                type="text"
+                                id="period"
+                                name="period"
+                                class="form-control"
+                                value="{{ $periodValue }}"
+                                placeholder="YYYYMM"
+                                maxlength="6"
+                                autocomplete="off">
 
-        <small class="text-muted">Example: 202601</small>
-    </div>
+                            <small class="text-muted">Example: 202601</small>
+                        </div>
 
-    <!-- SEARCH -->
-    <div class="col-md-5">
-        <label class="form-label mb-1 fw-semibold">
-            Search
-        </label>
+                        <!-- SEARCH -->
+                        <div class="col-md-5">
+                            <label class="form-label mb-1 fw-semibold">
+                                Search
+                            </label>
 
-        <input
-            type="text"
-            id="pms_srch"
-            name="pms_srch"
-            class="form-control"
-            placeholder="Name, Sacco ID, National ID, Email, Company, Department..."
-            autocomplete="off">
-    </div>
+                            <input
+                                type="text"
+                                id="pms_srch"
+                                name="pms_srch"
+                                class="form-control"
+                                placeholder="Name, Sacco ID, National ID, Email, Company, Department..."
+                                autocomplete="off">
+                        </div>
 
-    <!-- ACTIONS -->
-    <div class="col-md-5 d-flex justify-content-end align-items-center">
-        <button type="button" id="loadReport" class="btn btn-primary">
-            Load Report
-        </button>
+                        <!-- ACTIONS -->
+                        <div class="col-md-5 d-flex justify-content-end align-items-center">
+                            <button type="button" id="loadReport" class="btn btn-primary">
+                                Load Report
+                            </button>
 
-        <button type="button" id="clearBtn" class="btn btn-outline-secondary ms-2">
-            Clear
-        </button>
-    </div>
+                            <button type="button" id="clearBtn" class="btn btn-outline-secondary ms-2">
+                                Clear
+                            </button>
+                        </div>
 
-</form>
-
+                    </form>
 
                     <hr class="my-4">
 
@@ -258,6 +270,7 @@
                     <th>Sacco ID</th>
                     <th>National ID</th>
                     <th>Gender</th>
+                    <th>Active</th>
                     <th class="text-end">Savings</th>
                     <th class="text-end">FOSA</th>
                     <th class="text-end">CAPITAL</th>
@@ -295,6 +308,7 @@
                         <td>${escHtml(row.member_sacco_id)}</td>
                         <td>${escHtml(row.member_national_id)}</td>
                         <td>${escHtml(row.member_gender)}</td>
+                        <td>${escHtml(row.member_active)}</td>
                         <td class="text-end">${money(savings)}</td>
                         <td class="text-end">${money(fosa)}</td>
                         <td class="text-end">${money(capital)}</td>
@@ -320,7 +334,7 @@
                 // TOTALS FOOTER
                 // =========================
                 let foot = `<tr>
-                    <th colspan="5" class="text-end">TOTALS</th>
+                    <th colspan="6" class="text-end">TOTALS</th>
                     <th class="text-end">${money(totalSavings)}</th>
                     <th class="text-end">${money(totalFosa)}</th>
                     <th class="text-end">${money(totalCapital)}</th>

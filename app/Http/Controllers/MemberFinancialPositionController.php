@@ -46,6 +46,7 @@ class MemberFinancialPositionController extends Controller
         /*
         |--------------------------------------------------------------------------
         | MEMBERS + DEPARTMENT + COMPANY + POSITION
+        |  - REMOVED member_active filter to pick all members
         |--------------------------------------------------------------------------
         */
         $membersQuery = DB::table('sacco_members')
@@ -67,12 +68,11 @@ class MemberFinancialPositionController extends Controller
                 '=',
                 'sacco_position.position_id'
             )
-            ->where('member_deleted', '<>', 'Y')
-            ->where('member_active', '=', 'Y');
+            ->where('member_deleted', '<>', 'Y');
 
         /*
         |--------------------------------------------------------------------------
-        | SEARCH FILTER (NOW ACTUALLY WORKING)
+        | SEARCH FILTER
         |--------------------------------------------------------------------------
         */
         if ($pms_srch !== '') {
@@ -93,6 +93,7 @@ class MemberFinancialPositionController extends Controller
                 'member_sacco_id',
                 'member_national_id',
                 'member_gender',
+                DB::raw("sacco_members.member_active as member_active"),
                 'department_name',
                 'company_name',
                 'position_name'
@@ -107,6 +108,9 @@ class MemberFinancialPositionController extends Controller
         $rows = [];
 
         foreach ($members as $m) {
+
+            // ACTIVE STATUS (Yes/No)
+            $active = (strtoupper(trim((string)($m->member_active ?? ''))) === 'Y') ? 'Yes' : 'No';
 
             // SAVINGS
             $savings = DB::table('sacco_shares')
@@ -161,6 +165,7 @@ class MemberFinancialPositionController extends Controller
                 'member_sacco_id'    => $m->member_sacco_id,
                 'member_national_id' => $m->member_national_id,
                 'member_gender'      => $m->member_gender,
+                'member_active'      => $active, // Yes/No
                 'company'            => $m->company_name,
                 'department'         => $m->department_name,
                 'position'           => $m->position_name,
@@ -207,6 +212,7 @@ class MemberFinancialPositionController extends Controller
                 'Sacco ID',
                 'National ID',
                 'Gender',
+                'Active',     // ✅ added
                 'Company',
                 'Department',
                 'Savings',
@@ -230,6 +236,7 @@ class MemberFinancialPositionController extends Controller
                     $r['member_sacco_id'],
                     $r['member_national_id'],
                     $r['member_gender'],
+                    $r['member_active'], // ✅ Yes/No
                     $r['company'],
                     $r['department'],
                     $r['savings'],
