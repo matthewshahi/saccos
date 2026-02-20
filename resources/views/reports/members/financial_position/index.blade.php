@@ -4,21 +4,20 @@
 
 @section('styles')
 <style>
-    /* ✅ Card overflow fix: o-hidden clips horizontal scrollbar */
+    /* ✅ Card overflow fix: o-hidden clips scrollbars */
     .mfp-card { overflow: visible !important; }
 
-    /* ✅ Horizontal + vertical scrolling container */
+    /* ✅ Main table viewport (vertical + horizontal scroll) */
     .mfp-table-wrap {
         width: 100%;
         max-width: 100%;
         overflow-x: auto;   /* horizontal */
         overflow-y: auto;   /* vertical */
         max-height: 70vh;
-        padding-bottom: 10px; /* make scrollbar easier to grab */
         -webkit-overflow-scrolling: touch;
     }
 
-    /* ✅ Force table to grow wide so horizontal scroll appears */
+    /* ✅ Force table to grow wide so horizontal scroll exists */
     .mfp-table {
         width: max-content;
         min-width: 100%;
@@ -45,6 +44,22 @@
         background: #fff;
         border-top: 2px solid #dee2e6;
         font-weight: 700;
+    }
+
+    /* ✅ Dedicated horizontal scroller (always visible under the table) */
+    .mfp-hscroll {
+        width: 100%;
+        max-width: 100%;
+        overflow-x: auto;
+        overflow-y: hidden;
+        height: 16px;                /* scrollbar track height */
+        margin-top: 8px;
+        background: #fff;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+    }
+    .mfp-hscroll-inner {
+        height: 1px;                 /* just to create scrollable width */
     }
 </style>
 @endsection
@@ -158,6 +173,11 @@
                         </table>
                     </div>
 
+                    {{-- ✅ ALWAYS-VISIBLE HORIZONTAL SCROLLER (synced with tableWrapper) --}}
+                    <div id="hScroll" class="mfp-hscroll d-none" aria-label="Horizontal scroller">
+                        <div id="hScrollInner" class="mfp-hscroll-inner"></div>
+                    </div>
+
                 </div>
             </div>
 
@@ -186,6 +206,10 @@
 
     const exportBtn = document.getElementById('exportBtn');
 
+    // ✅ horizontal scroller elements
+    const hScroll      = document.getElementById('hScroll');
+    const hScrollInner = document.getElementById('hScrollInner');
+
     function escHtml(s) {
         return String(s ?? '')
             .replace(/&/g, '&amp;')
@@ -212,6 +236,51 @@
         exportBtn.classList.add('disabled');
         exportBtn.setAttribute('aria-disabled', 'true');
         exportBtn.href = '#';
+
+        // hide scroller
+        hScroll.classList.add('d-none');
+        hScroll.scrollLeft = 0;
+        tableWrap.scrollLeft = 0;
+        hScrollInner.style.width = '0px';
+    }
+
+    function setupHorizontalScroller() {
+        const table = tableWrap.querySelector('table');
+        if (!table) return;
+
+        // set scroller width to table scrollWidth (so scrollbar exists)
+        const setWidth = () => {
+            // scrollWidth can change after DOM paint; read from table itself
+            const w = table.scrollWidth || 0;
+            hScrollInner.style.width = w + 'px';
+        };
+
+        setWidth();
+        hScroll.classList.remove('d-none');
+
+        // bind once
+        if (!tableWrap.dataset.hsync) {
+            tableWrap.dataset.hsync = '1';
+
+            // when table scrolls, scroller follows
+            tableWrap.addEventListener('scroll', function () {
+                hScroll.scrollLeft = tableWrap.scrollLeft;
+            }, { passive: true });
+
+            // when scroller scrolls, table follows
+            hScroll.addEventListener('scroll', function () {
+                tableWrap.scrollLeft = hScroll.scrollLeft;
+            }, { passive: true });
+
+            // recompute on resize
+            window.addEventListener('resize', function () {
+                setWidth();
+            });
+        }
+
+        // also recompute after a tick (helps when fonts/layout settle)
+        setTimeout(setWidth, 0);
+        setTimeout(setWidth, 80);
     }
 
     clearBtn.addEventListener('click', function () {
@@ -349,6 +418,9 @@
                 tfoot.innerHTML = foot;
 
                 tableWrap.classList.remove('d-none');
+
+                // ✅ show and sync the always-visible horizontal scroller
+                setupHorizontalScroller();
 
                 // =========================
                 // EXPORT LINK
