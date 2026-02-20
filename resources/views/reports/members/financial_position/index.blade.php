@@ -8,28 +8,31 @@
     .mfp-card { overflow: visible !important; }
 
     /* ✅ Main table viewport (vertical + horizontal scroll) */
-    .mfp-table-wrap {
+    .mfp-table-wrap{
         width: 100%;
         max-width: 100%;
         overflow-x: auto;   /* horizontal */
         overflow-y: auto;   /* vertical */
         max-height: 70vh;
         -webkit-overflow-scrolling: touch;
+
+        /* keep gutter so the scrollbar area doesn’t “jump” */
+        scrollbar-gutter: stable both-edges;
     }
 
     /* ✅ Force table to grow wide so horizontal scroll exists */
-    .mfp-table {
+    .mfp-table{
         width: max-content;
         min-width: 100%;
     }
 
     .mfp-table th,
-    .mfp-table td {
+    .mfp-table td{
         white-space: nowrap;
         vertical-align: middle;
     }
 
-    .mfp-table thead th {
+    .mfp-table thead th{
         position: sticky;
         top: 0;
         z-index: 2;
@@ -37,7 +40,7 @@
     }
 
     .mfp-table tfoot th,
-    .mfp-table tfoot td {
+    .mfp-table tfoot td{
         position: sticky;
         bottom: 0;
         z-index: 2;
@@ -47,19 +50,22 @@
     }
 
     /* ✅ Dedicated horizontal scroller (always visible under the table) */
-    .mfp-hscroll {
+    .mfp-hscroll{
         width: 100%;
         max-width: 100%;
         overflow-x: auto;
         overflow-y: hidden;
-        height: 16px;                /* scrollbar track height */
-        margin-top: 8px;
+        height: 18px;                 /* a bit easier to grab than 16px */
+        margin-top: 10px;
         background: #fff;
         border: 1px solid #dee2e6;
         border-radius: 6px;
+
+        scrollbar-gutter: stable both-edges;
     }
-    .mfp-hscroll-inner {
-        height: 1px;                 /* just to create scrollable width */
+
+    .mfp-hscroll-inner{
+        height: 1px; /* only to create scrollable width */
     }
 </style>
 @endsection
@@ -79,24 +85,16 @@
 @endphp
 
 <div class="container-fluid">
-
     <div class="row">
         <div class="col-12">
 
-            {{-- ✅ removed "o-hidden" and added "mfp-card" --}}
             <div class="card mb-4 mfp-card">
 
                 {{-- HEADER --}}
                 <div class="card-header d-flex align-items-center justify-content-between">
-                    <h3 class="card-title mb-0">
-                        Member Financial Position (As At)
-                    </h3>
+                    <h3 class="card-title mb-0">Member Financial Position (As At)</h3>
 
-                    <a
-                        href="#"
-                        id="exportBtn"
-                        class="btn btn-sm btn-outline-success disabled"
-                        aria-disabled="true">
+                    <a href="#" id="exportBtn" class="btn btn-sm btn-outline-success disabled" aria-disabled="true">
                         Export CSV
                     </a>
                 </div>
@@ -106,12 +104,8 @@
                     {{-- FILTER BAR --}}
                     <form id="filterForm" class="row gx-3 gy-2 align-items-center" onsubmit="return false;">
 
-                        <!-- PERIOD -->
                         <div class="col-md-2">
-                            <label class="form-label mb-1 fw-semibold">
-                                Period (YYYYMM)
-                            </label>
-
+                            <label class="form-label mb-1 fw-semibold">Period (YYYYMM)</label>
                             <input
                                 type="text"
                                 id="period"
@@ -121,16 +115,11 @@
                                 placeholder="YYYYMM"
                                 maxlength="6"
                                 autocomplete="off">
-
                             <small class="text-muted">Example: 202601</small>
                         </div>
 
-                        <!-- SEARCH -->
                         <div class="col-md-5">
-                            <label class="form-label mb-1 fw-semibold">
-                                Search
-                            </label>
-
+                            <label class="form-label mb-1 fw-semibold">Search</label>
                             <input
                                 type="text"
                                 id="pms_srch"
@@ -140,15 +129,9 @@
                                 autocomplete="off">
                         </div>
 
-                        <!-- ACTIONS -->
                         <div class="col-md-5 d-flex justify-content-end align-items-center">
-                            <button type="button" id="loadReport" class="btn btn-primary">
-                                Load Report
-                            </button>
-
-                            <button type="button" id="clearBtn" class="btn btn-outline-secondary ms-2">
-                                Clear
-                            </button>
+                            <button type="button" id="loadReport" class="btn btn-primary">Load Report</button>
+                            <button type="button" id="clearBtn" class="btn btn-outline-secondary ms-2">Clear</button>
                         </div>
 
                     </form>
@@ -156,13 +139,8 @@
                     <hr class="my-4">
 
                     {{-- STATES --}}
-                    <div id="loading" class="text-center text-muted d-none">
-                        Loading report, please wait…
-                    </div>
-
-                    <div id="emptyState" class="text-center text-muted d-none">
-                        No data found for the selected period.
-                    </div>
+                    <div id="loading" class="text-center text-muted d-none">Loading report, please wait…</div>
+                    <div id="emptyState" class="text-center text-muted d-none">No data found for the selected period.</div>
 
                     {{-- TABLE --}}
                     <div id="tableWrapper" class="mfp-table-wrap d-none">
@@ -173,7 +151,7 @@
                         </table>
                     </div>
 
-                    {{-- ✅ ALWAYS-VISIBLE HORIZONTAL SCROLLER (synced with tableWrapper) --}}
+                    {{-- ✅ ALWAYS-VISIBLE HORIZONTAL SCROLLER --}}
                     <div id="hScroll" class="mfp-hscroll d-none" aria-label="Horizontal scroller">
                         <div id="hScrollInner" class="mfp-hscroll-inner"></div>
                     </div>
@@ -183,32 +161,32 @@
 
         </div>
     </div>
-
 </div>
 @endsection
-
 
 @section('scripts')
 <script>
 (function () {
-    const loadBtn   = document.getElementById('loadReport');
-    const clearBtn  = document.getElementById('clearBtn');
-    const periodInp = document.getElementById('period');
-    const searchInp = document.getElementById('pms_srch');
+    const loadBtn    = document.getElementById('loadReport');
+    const clearBtn   = document.getElementById('clearBtn');
+    const periodInp  = document.getElementById('period');
+    const searchInp  = document.getElementById('pms_srch');
 
-    const loading   = document.getElementById('loading');
-    const tableWrap = document.getElementById('tableWrapper');
-    const emptyState= document.getElementById('emptyState');
+    const loading    = document.getElementById('loading');
+    const tableWrap  = document.getElementById('tableWrapper');
+    const emptyState = document.getElementById('emptyState');
 
-    const thead     = document.getElementById('reportHead');
-    const tbody     = document.getElementById('reportBody');
-    const tfoot     = document.getElementById('reportFoot');
+    const thead      = document.getElementById('reportHead');
+    const tbody      = document.getElementById('reportBody');
+    const tfoot      = document.getElementById('reportFoot');
 
-    const exportBtn = document.getElementById('exportBtn');
+    const exportBtn  = document.getElementById('exportBtn');
 
-    // ✅ horizontal scroller elements
     const hScroll      = document.getElementById('hScroll');
     const hScrollInner = document.getElementById('hScrollInner');
+
+    let syncing = false;
+    let ro = null;
 
     function escHtml(s) {
         return String(s ?? '')
@@ -237,21 +215,23 @@
         exportBtn.setAttribute('aria-disabled', 'true');
         exportBtn.href = '#';
 
-        // hide scroller
         hScroll.classList.add('d-none');
         hScroll.scrollLeft = 0;
         tableWrap.scrollLeft = 0;
         hScrollInner.style.width = '0px';
     }
 
-    function setupHorizontalScroller() {
-        const table = tableWrap.querySelector('table');
-        if (!table) return;
+    function syncScroll(from, to) {
+        if (syncing) return;
+        syncing = true;
+        to.scrollLeft = from.scrollLeft;
+        requestAnimationFrame(() => { syncing = false; });
+    }
 
-        // set scroller width to table scrollWidth (so scrollbar exists)
+    function setupHorizontalScroller() {
+        // ✅ use WRAPPER scrollWidth (most reliable) rather than table.scrollWidth
         const setWidth = () => {
-            // scrollWidth can change after DOM paint; read from table itself
-            const w = table.scrollWidth || 0;
+            const w = Math.max(tableWrap.scrollWidth || 0, tableWrap.clientWidth || 0);
             hScrollInner.style.width = w + 'px';
         };
 
@@ -262,25 +242,29 @@
         if (!tableWrap.dataset.hsync) {
             tableWrap.dataset.hsync = '1';
 
-            // when table scrolls, scroller follows
             tableWrap.addEventListener('scroll', function () {
-                hScroll.scrollLeft = tableWrap.scrollLeft;
+                syncScroll(tableWrap, hScroll);
             }, { passive: true });
 
-            // when scroller scrolls, table follows
             hScroll.addEventListener('scroll', function () {
-                tableWrap.scrollLeft = hScroll.scrollLeft;
+                syncScroll(hScroll, tableWrap);
             }, { passive: true });
 
-            // recompute on resize
-            window.addEventListener('resize', function () {
-                setWidth();
-            });
+            window.addEventListener('resize', setWidth);
+
+            // ✅ keep width correct when table content changes (best-effort)
+            if (window.ResizeObserver) {
+                ro = new ResizeObserver(() => setWidth());
+                ro.observe(tableWrap);
+                const table = tableWrap.querySelector('table');
+                if (table) ro.observe(table);
+            }
         }
 
-        // also recompute after a tick (helps when fonts/layout settle)
-        setTimeout(setWidth, 0);
-        setTimeout(setWidth, 80);
+        // after paint
+        requestAnimationFrame(setWidth);
+        setTimeout(setWidth, 60);
+        setTimeout(setWidth, 180);
     }
 
     clearBtn.addEventListener('click', function () {
@@ -289,7 +273,6 @@
         resetUI();
     });
 
-    // Optional: Enter key triggers load
     [periodInp, searchInp].forEach(el => {
         el.addEventListener('keydown', function (e) {
             if (e.key === 'Enter') {
@@ -313,6 +296,8 @@
 
         const url = new URL(`{{ route('reports.members.financial_position.data') }}`, window.location.origin);
         url.searchParams.set('period', period);
+        url.searchParams.set('page', '1');
+        url.searchParams.set('per_page', '5000'); // ✅ use your controller’s 5000
         if (pms_srch.length) url.searchParams.set('pms_srch', pms_srch);
 
         fetch(url.toString(), { headers: { 'Accept': 'application/json' } })
@@ -326,13 +311,9 @@
                 }
 
                 const data = resp.data;
-                const loanCols = (data[0].loans || []).map(l => ({
-                    name: l.loan_type_name
-                }));
+                const loanCols = (data[0].loans || []).map(l => ({ name: l.loan_type_name }));
 
-                // =========================
-                // TABLE HEADER
-                // =========================
+                // HEADER
                 let head = `<tr>
                     <th>#</th>
                     <th class="text-start">Names</th>
@@ -344,20 +325,15 @@
                     <th class="text-end">FOSA</th>
                     <th class="text-end">CAPITAL</th>
                 `;
-
                 loanCols.forEach(c => {
                     head += `<th class="text-end">${escHtml(c.name)} Taken</th>`;
                     head += `<th class="text-end">${escHtml(c.name)} Bal</th>`;
                 });
-
                 head += `</tr>`;
                 thead.innerHTML = head;
 
-                // =========================
-                // TABLE BODY + TOTALS
-                // =========================
+                // BODY + TOTALS
                 let rows = '';
-
                 let totalSavings = 0, totalFosa = 0, totalCapital = 0;
                 const totalLoanTaken = new Array(loanCols.length).fill(0);
                 const totalLoanBal   = new Array(loanCols.length).fill(0);
@@ -387,8 +363,8 @@
                         const taken = Number(l.taken || 0);
                         const bal   = Number(l.balance || 0);
 
-                        if (typeof totalLoanTaken[idx] !== 'undefined') totalLoanTaken[idx] += taken;
-                        if (typeof totalLoanBal[idx] !== 'undefined')   totalLoanBal[idx]   += bal;
+                        totalLoanTaken[idx] += taken;
+                        totalLoanBal[idx]   += bal;
 
                         rows += `<td class="text-end">${money(taken)}</td>`;
                         rows += `<td class="text-end">${money(bal)}</td>`;
@@ -399,32 +375,26 @@
 
                 tbody.innerHTML = rows;
 
-                // =========================
-                // TOTALS FOOTER
-                // =========================
+                // FOOTER
                 let foot = `<tr>
                     <th colspan="6" class="text-end">TOTALS</th>
                     <th class="text-end">${money(totalSavings)}</th>
                     <th class="text-end">${money(totalFosa)}</th>
                     <th class="text-end">${money(totalCapital)}</th>
                 `;
-
                 loanCols.forEach((c, idx) => {
                     foot += `<th class="text-end">${money(totalLoanTaken[idx] || 0)}</th>`;
                     foot += `<th class="text-end">${money(totalLoanBal[idx] || 0)}</th>`;
                 });
-
                 foot += `</tr>`;
                 tfoot.innerHTML = foot;
 
                 tableWrap.classList.remove('d-none');
 
-                // ✅ show and sync the always-visible horizontal scroller
+                // ✅ show & sync always-visible horizontal scroller
                 setupHorizontalScroller();
 
-                // =========================
                 // EXPORT LINK
-                // =========================
                 const exportUrl = new URL(`{{ route('reports.members.financial_position.export') }}`, window.location.origin);
                 exportUrl.searchParams.set('period', period);
                 if (pms_srch.length) exportUrl.searchParams.set('pms_srch', pms_srch);

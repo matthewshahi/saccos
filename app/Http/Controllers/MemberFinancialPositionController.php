@@ -13,7 +13,6 @@ class MemberFinancialPositionController extends Controller
     public function index()
     {
         $currentPeriod = date('Ym');
-
         return view('reports.members.financial_position.index', compact('currentPeriod'));
     }
 
@@ -129,32 +128,32 @@ class MemberFinancialPositionController extends Controller
     }
 
     /**
-     * Report data (AJAX) - PAGINATED (don’t try to return 100k rows in one JSON)
-     * GET /.../data?period=YYYYMM&pms_srch=&page=1&per_page=200
+     * Report data (AJAX)
+     * ✅ Updated: allow up to 5000 per request (no 1000 cap)
+     * GET /.../data?period=YYYYMM&pms_srch=&page=1&per_page=5000
      */
     public function data(Request $request)
     {
         $period   = $request->get('period', date('Ym'));
         $pms_srch = trim((string) $request->get('pms_srch', ''));
 
-        // paging
+        // paging (UI should request per_page=5000 if you want “all” in fewer calls)
         $page    = max(1, (int) $request->get('page', 1));
-        $perPage = (int) $request->get('per_page', 200);
-        if ($perPage < 1) $perPage = 200;
-        if ($perPage > 1000) $perPage = 1000;
+        $perPage = (int) $request->get('per_page', 5000);
+        if ($perPage < 1) $perPage = 5000;
+
+        // ✅ cap at 5000 (safe). If you truly want uncapped, remove the next line.
+        if ($perPage > 5000) $perPage = 5000;
 
         if (!preg_match('/^\d{6}$/', $period)) {
             return response()->json(['error' => 'Invalid period'], 422);
         }
 
         $loanTypes = $this->loanTypes();
+        $base      = $this->membersBaseQuery($pms_srch);
 
-        $base = $this->membersBaseQuery($pms_srch);
-
-        // total count (for UI pagination later)
         $total = (clone $base)->distinct('sacco_members.member_id')->count('sacco_members.member_id');
 
-        // fetch just one page
         $members = (clone $base)
             ->select([
                 DB::raw('sacco_members.member_id as member_id'),
@@ -173,8 +172,7 @@ class MemberFinancialPositionController extends Controller
             ->get();
 
         $memberIds = $members->pluck('member_id')->map(fn ($v) => (int) $v)->all();
-
-        $agg = $this->aggregatesForMembers($memberIds, $period);
+        $agg       = $this->aggregatesForMembers($memberIds, $period);
 
         $rows = [];
         foreach ($members as $m) {
@@ -230,6 +228,7 @@ class MemberFinancialPositionController extends Controller
 
     /**
      * CSV EXPORT - STREAM + CHUNK (handles 100k+ safely)
+     * ✅ Updated chunk size to 5000 (optional)
      */
     public function export(Request $request)
     {
@@ -241,14 +240,12 @@ class MemberFinancialPositionController extends Controller
         }
 
         $loanTypes = $this->loanTypes();
-
-        $filename = "member_financial_position_{$period}.csv";
+        $filename  = "member_financial_position_{$period}.csv";
 
         return response()->stream(function () use ($period, $pms_srch, $loanTypes) {
 
             $out = fopen('php://output', 'w');
 
-            // Header
             $header = [
                 'Name',
                 'Sacco ID',
@@ -270,8 +267,8 @@ class MemberFinancialPositionController extends Controller
 
             fputcsv($out, $header);
 
-            // Chunk members safely
-            $chunkSize = 1000;
+            // ✅ chunk size set to 5000
+            $chunkSize = 5000;
 
             $membersQuery = $this->membersBaseQuery($pms_srch)
                 ->select([
@@ -287,12 +284,9 @@ class MemberFinancialPositionController extends Controller
                 ])
                 ->orderBy('sacco_members.member_id');
 
-            // ✅ chunkById avoids loading all rows at once
             $membersQuery->chunkById($chunkSize, function ($chunk) use ($out, $period, $loanTypes) {
 
                 $memberIds = $chunk->pluck('member_id')->map(fn ($v) => (int) $v)->all();
-
-                // bulk aggregates for this chunk only
                 $agg = $this->aggregatesForMembers($memberIds, $period);
 
                 foreach ($chunk as $m) {
@@ -331,7 +325,6 @@ class MemberFinancialPositionController extends Controller
                     fputcsv($out, $line);
                 }
 
-                // push to client progressively
                 if (function_exists('flush')) flush();
             }, 'sacco_members.member_id', 'member_id');
 
