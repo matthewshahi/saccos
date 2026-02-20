@@ -8,7 +8,7 @@
     .mfp-card { overflow: visible !important; }
 
     /* ✅ Main table viewport (vertical + horizontal scroll) */
-    .mfp-table-wrap{
+    .mfp-table-wrap {
         width: 100%;
         max-width: 100%;
         overflow-x: auto;   /* horizontal */
@@ -18,18 +18,18 @@
     }
 
     /* ✅ Force table to grow wide so horizontal scroll exists */
-    .mfp-table{
+    .mfp-table {
         width: max-content;
         min-width: 100%;
     }
 
     .mfp-table th,
-    .mfp-table td{
+    .mfp-table td {
         white-space: nowrap;
         vertical-align: middle;
     }
 
-    .mfp-table thead th{
+    .mfp-table thead th {
         position: sticky;
         top: 0;
         z-index: 2;
@@ -37,7 +37,7 @@
     }
 
     .mfp-table tfoot th,
-    .mfp-table tfoot td{
+    .mfp-table tfoot td {
         position: sticky;
         bottom: 0;
         z-index: 2;
@@ -47,19 +47,19 @@
     }
 
     /* ✅ Dedicated horizontal scroller (always visible under the table) */
-    .mfp-hscroll{
+    .mfp-hscroll {
         width: 100%;
         max-width: 100%;
         overflow-x: auto;
         overflow-y: hidden;
-        height: 18px;                 /* give the scrollbar room */
+        height: 16px;                /* scrollbar track height */
         margin-top: 8px;
         background: #fff;
         border: 1px solid #dee2e6;
         border-radius: 6px;
     }
-    .mfp-hscroll-inner{
-        height: 1px;                  /* just to create scrollable width */
+    .mfp-hscroll-inner {
+        height: 1px;                 /* just to create scrollable width */
     }
 </style>
 @endsection
@@ -79,6 +79,7 @@
 @endphp
 
 <div class="container-fluid">
+
     <div class="row">
         <div class="col-12">
 
@@ -87,12 +88,15 @@
 
                 {{-- HEADER --}}
                 <div class="card-header d-flex align-items-center justify-content-between">
-                    <h3 class="card-title mb-0">Member Financial Position (As At)</h3>
+                    <h3 class="card-title mb-0">
+                        Member Financial Position (As At)
+                    </h3>
 
-                    <a href="#"
-                       id="exportBtn"
-                       class="btn btn-sm btn-outline-success disabled"
-                       aria-disabled="true">
+                    <a
+                        href="#"
+                        id="exportBtn"
+                        class="btn btn-sm btn-outline-success disabled"
+                        aria-disabled="true">
                         Export CSV
                     </a>
                 </div>
@@ -104,33 +108,47 @@
 
                         <!-- PERIOD -->
                         <div class="col-md-2">
-                            <label class="form-label mb-1 fw-semibold">Period (YYYYMM)</label>
-                            <input type="text"
-                                   id="period"
-                                   name="period"
-                                   class="form-control"
-                                   value="{{ $periodValue }}"
-                                   placeholder="YYYYMM"
-                                   maxlength="6"
-                                   autocomplete="off">
+                            <label class="form-label mb-1 fw-semibold">
+                                Period (YYYYMM)
+                            </label>
+
+                            <input
+                                type="text"
+                                id="period"
+                                name="period"
+                                class="form-control"
+                                value="{{ $periodValue }}"
+                                placeholder="YYYYMM"
+                                maxlength="6"
+                                autocomplete="off">
+
                             <small class="text-muted">Example: 202601</small>
                         </div>
 
                         <!-- SEARCH -->
                         <div class="col-md-5">
-                            <label class="form-label mb-1 fw-semibold">Search</label>
-                            <input type="text"
-                                   id="pms_srch"
-                                   name="pms_srch"
-                                   class="form-control"
-                                   placeholder="Name, Sacco ID, National ID, Email, Company, Department..."
-                                   autocomplete="off">
+                            <label class="form-label mb-1 fw-semibold">
+                                Search
+                            </label>
+
+                            <input
+                                type="text"
+                                id="pms_srch"
+                                name="pms_srch"
+                                class="form-control"
+                                placeholder="Name, Sacco ID, National ID, Email, Company, Department..."
+                                autocomplete="off">
                         </div>
 
                         <!-- ACTIONS -->
                         <div class="col-md-5 d-flex justify-content-end align-items-center">
-                            <button type="button" id="loadReport" class="btn btn-primary">Load Report</button>
-                            <button type="button" id="clearBtn" class="btn btn-outline-secondary ms-2">Clear</button>
+                            <button type="button" id="loadReport" class="btn btn-primary">
+                                Load Report
+                            </button>
+
+                            <button type="button" id="clearBtn" class="btn btn-outline-secondary ms-2">
+                                Clear
+                            </button>
                         </div>
 
                     </form>
@@ -165,8 +183,10 @@
 
         </div>
     </div>
+
 </div>
 @endsection
+
 
 @section('scripts')
 <script>
@@ -176,25 +196,19 @@
     const periodInp = document.getElementById('period');
     const searchInp = document.getElementById('pms_srch');
 
-    const loading    = document.getElementById('loading');
-    const tableWrap  = document.getElementById('tableWrapper');
-    const emptyState = document.getElementById('emptyState');
+    const loading   = document.getElementById('loading');
+    const tableWrap = document.getElementById('tableWrapper');
+    const emptyState= document.getElementById('emptyState');
 
-    const thead = document.getElementById('reportHead');
-    const tbody = document.getElementById('reportBody');
-    const tfoot = document.getElementById('reportFoot');
+    const thead     = document.getElementById('reportHead');
+    const tbody     = document.getElementById('reportBody');
+    const tfoot     = document.getElementById('reportFoot');
 
     const exportBtn = document.getElementById('exportBtn');
 
     // ✅ horizontal scroller elements
     const hScroll      = document.getElementById('hScroll');
     const hScrollInner = document.getElementById('hScrollInner');
-
-    // ✅ prevent ping-pong scrolling
-    let syncing = false;
-
-    // ✅ keep one observer
-    let ro = null;
 
     function escHtml(s) {
         return String(s ?? '')
@@ -223,77 +237,50 @@
         exportBtn.setAttribute('aria-disabled', 'true');
         exportBtn.href = '#';
 
-        // scroller reset
+        // hide scroller
         hScroll.classList.add('d-none');
         hScroll.scrollLeft = 0;
         tableWrap.scrollLeft = 0;
         hScrollInner.style.width = '0px';
-
-        // cleanup observer (optional but safe)
-        if (ro) { try { ro.disconnect(); } catch(e) {} ro = null; }
     }
 
     function setupHorizontalScroller() {
         const table = tableWrap.querySelector('table');
         if (!table) return;
 
-        // ✅ compute width from the scroll container (most reliable)
-        const update = () => {
-            // must be visible before these values are valid
-            const contentW = tableWrap.scrollWidth || 0;
-            const viewW    = tableWrap.clientWidth || 0;
-
-            // create the scrollbar width
-            hScrollInner.style.width = contentW + 'px';
-
-            // show bar only if overflow exists
-            if (contentW > (viewW + 1)) {
-                hScroll.classList.remove('d-none');
-            } else {
-                // still keep it hidden if there's no overflow
-                hScroll.classList.add('d-none');
-            }
-
-            // align both positions
-            if (!syncing) {
-                hScroll.scrollLeft = tableWrap.scrollLeft;
-            }
+        // set scroller width to table scrollWidth (so scrollbar exists)
+        const setWidth = () => {
+            // scrollWidth can change after DOM paint; read from table itself
+            const w = table.scrollWidth || 0;
+            hScrollInner.style.width = w + 'px';
         };
 
-        // ✅ bind once
+        setWidth();
+        hScroll.classList.remove('d-none');
+
+        // bind once
         if (!tableWrap.dataset.hsync) {
             tableWrap.dataset.hsync = '1';
 
+            // when table scrolls, scroller follows
             tableWrap.addEventListener('scroll', function () {
-                if (syncing) return;
-                syncing = true;
                 hScroll.scrollLeft = tableWrap.scrollLeft;
-                syncing = false;
             }, { passive: true });
 
+            // when scroller scrolls, table follows
             hScroll.addEventListener('scroll', function () {
-                if (syncing) return;
-                syncing = true;
                 tableWrap.scrollLeft = hScroll.scrollLeft;
-                syncing = false;
             }, { passive: true });
 
+            // recompute on resize
             window.addEventListener('resize', function () {
-                // layout changes affect widths
-                requestAnimationFrame(update);
+                setWidth();
             });
         }
 
-        // ✅ observe table size changes (columns/fonts/load)
-        if (window.ResizeObserver) {
-            ro = new ResizeObserver(() => update());
-            ro.observe(table);
-        }
-
-        // ✅ run updates after layout paints (fixes "width=0" issues)
-        requestAnimationFrame(update);
-        setTimeout(update, 0);
-        setTimeout(update, 120);
+        // also recompute after a tick (helps when fonts/layout settle)
+        setTimeout(setWidth, 0);
+        setTimeout(setWidth, 80);
     }
 
     clearBtn.addEventListener('click', function () {
@@ -339,7 +326,9 @@
                 }
 
                 const data = resp.data;
-                const loanCols = (data[0].loans || []).map(l => ({ name: l.loan_type_name }));
+                const loanCols = (data[0].loans || []).map(l => ({
+                    name: l.loan_type_name
+                }));
 
                 // =========================
                 // TABLE HEADER
@@ -398,8 +387,8 @@
                         const taken = Number(l.taken || 0);
                         const bal   = Number(l.balance || 0);
 
-                        totalLoanTaken[idx] += taken;
-                        totalLoanBal[idx]   += bal;
+                        if (typeof totalLoanTaken[idx] !== 'undefined') totalLoanTaken[idx] += taken;
+                        if (typeof totalLoanBal[idx] !== 'undefined')   totalLoanBal[idx]   += bal;
 
                         rows += `<td class="text-end">${money(taken)}</td>`;
                         rows += `<td class="text-end">${money(bal)}</td>`;
@@ -428,7 +417,6 @@
                 foot += `</tr>`;
                 tfoot.innerHTML = foot;
 
-                // show table first, then compute widths
                 tableWrap.classList.remove('d-none');
 
                 // ✅ show and sync the always-visible horizontal scroller
