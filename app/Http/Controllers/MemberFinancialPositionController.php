@@ -67,8 +67,8 @@ class MemberFinancialPositionController extends Controller
                 '=',
                 'sacco_position.position_id'
             )
-            ->where('member_deleted', '<>', 'Y');
-           // ->where('member_active', '=', 'Y');
+            ->where('member_deleted', '<>', 'Y')
+            ->where('member_active', '=', 'Y');
 
         /*
         |--------------------------------------------------------------------------
