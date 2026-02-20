@@ -258,7 +258,6 @@
                     <th>Sacco ID</th>
                     <th>National ID</th>
                     <th>Gender</th>
-                    <th>Active</th>
                     <th class="text-end">Savings</th>
                     <th class="text-end">FOSA</th>
                     <th class="text-end">CAPITAL</th>
@@ -296,7 +295,6 @@
                         <td>${escHtml(row.member_sacco_id)}</td>
                         <td>${escHtml(row.member_national_id)}</td>
                         <td>${escHtml(row.member_gender)}</td>
-                        <td>${escHtml(row.member_active)}</td>
                         <td class="text-end">${money(savings)}</td>
                         <td class="text-end">${money(fosa)}</td>
                         <td class="text-end">${money(capital)}</td>
@@ -322,7 +320,7 @@
                 // TOTALS FOOTER
                 // =========================
                 let foot = `<tr>
-                    <th colspan="6" class="text-end">TOTALS</th>
+                    <th colspan="5" class="text-end">TOTALS</th>
                     <th class="text-end">${money(totalSavings)}</th>
                     <th class="text-end">${money(totalFosa)}</th>
                     <th class="text-end">${money(totalCapital)}</th>
