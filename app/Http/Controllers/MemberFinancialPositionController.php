@@ -55,77 +55,83 @@ class MemberFinancialPositionController extends Controller
      * Bulk aggregates for a set of member IDs (FAST)
      */
     protected function aggregatesForMembers(array $memberIds, string $period)
-    {
-        if (empty($memberIds)) {
-            return [
-                'savings'   => [],
-                'fosa'      => [],
-                'capital'   => [],
-                'loanTaken' => [], // [member_id][loan_type_id] => amount
-                'loanPaid'  => [], // [member_id][loan_type_id] => amount
-            ];
-        }
-
-        // Savings
-        $savings = DB::table('sacco_shares')
-            ->select('share_member_id', DB::raw('SUM(share_amount_paying) as total'))
-            ->whereIn('share_member_id', $memberIds)
-            ->where('share_period', '<=', $period)
-            ->groupBy('share_member_id')
-            ->pluck('total', 'share_member_id')
-            ->toArray();
-
-        // FOSA
-        $fosa = DB::table('sacco_fosas')
-            ->select('fosa_member_id', DB::raw('SUM(fosa_amount_paying) as total'))
-            ->whereIn('fosa_member_id', $memberIds)
-            ->where('fosa_period', '<=', $period)
-            ->groupBy('fosa_member_id')
-            ->pluck('total', 'fosa_member_id')
-            ->toArray();
-
-        // Capital shares
-        $capital = DB::table('sacco_capital_shares')
-            ->select('share_capitalmember_id', DB::raw('SUM(share_capitalamount_paying) as total'))
-            ->whereIn('share_capitalmember_id', $memberIds)
-            ->where('share_capitalperiod', '<=', $period)
-            ->groupBy('share_capitalmember_id')
-            ->pluck('total', 'share_capitalmember_id')
-            ->toArray();
-
-        // Loans taken (sum loan_amount by member + loan_type)
-        $loanTakenRows = DB::table('sacco_loans')
-            ->select('loan_member', 'loan_loan_type', DB::raw('SUM(loan_amount) as total'))
-            ->whereIn('loan_member', $memberIds)
-            ->where('loan_taken_period', '<=', $period)
-            ->groupBy('loan_member', 'loan_loan_type')
-            ->get();
-
-        $loanTaken = [];
-        foreach ($loanTakenRows as $r) {
-            $mid = (int) $r->loan_member;
-            $tid = (int) $r->loan_loan_type;
-            $loanTaken[$mid][$tid] = (float) ($r->total ?? 0);
-        }
-
-        // Loans paid (sum payments by member + loan_type) via join
-        $loanPaidRows = DB::table('sacco_loan_payments as p')
-            ->join('sacco_loans as l', 'p.loan_payments_loan_id', '=', 'l.loan_id')
-            ->select('l.loan_member', 'l.loan_loan_type', DB::raw('SUM(p.loan_payments_amount) as total'))
-            ->whereIn('l.loan_member', $memberIds)
-            ->where('p.loan_payments_period', '<=', $period)
-            ->groupBy('l.loan_member', 'l.loan_loan_type')
-            ->get();
-
-        $loanPaid = [];
-        foreach ($loanPaidRows as $r) {
-            $mid = (int) $r->loan_member;
-            $tid = (int) $r->loan_loan_type;
-            $loanPaid[$mid][$tid] = (float) ($r->total ?? 0);
-        }
-
-        return compact('savings', 'fosa', 'capital', 'loanTaken', 'loanPaid');
+{
+    if (empty($memberIds)) {
+        return [
+            'savings'   => [],
+            'fosa'      => [],
+            'capital'   => [],
+            'loanTaken' => [],
+            'loanPaid'  => [],
+        ];
     }
+
+    $periodInt = (int) $period;
+
+    // Savings
+    $savings = DB::table('sacco_shares')
+        ->select('share_member_id', DB::raw('SUM(COALESCE(share_amount_paying,0)) as total'))
+        ->whereIn('share_member_id', $memberIds)
+        ->where('share_period', '<=', $periodInt)
+        ->groupBy('share_member_id')
+        ->pluck('total', 'share_member_id')
+        ->toArray();
+
+    // FOSA
+    $fosa = DB::table('sacco_fosas')
+        ->select('fosa_member_id', DB::raw('SUM(COALESCE(fosa_amount_paying,0)) as total'))
+        ->whereIn('fosa_member_id', $memberIds)
+        ->where('fosa_period', '<=', $periodInt)
+        ->groupBy('fosa_member_id')
+        ->pluck('total', 'fosa_member_id')
+        ->toArray();
+
+    // Capital
+    $capital = DB::table('sacco_capital_shares')
+        ->select('share_capitalmember_id', DB::raw('SUM(COALESCE(share_capitalamount_paying,0)) as total'))
+        ->whereIn('share_capitalmember_id', $memberIds)
+        ->where('share_capitalperiod', '<=', $periodInt)
+        ->groupBy('share_capitalmember_id')
+        ->pluck('total', 'share_capitalmember_id')
+        ->toArray();
+
+    // Loans taken (within cutoff)
+    $loanTakenRows = DB::table('sacco_loans')
+        ->select('loan_member', 'loan_loan_type', DB::raw('SUM(COALESCE(loan_amount,0)) as total'))
+        ->whereIn('loan_member', $memberIds)
+        ->whereNotNull('loan_loan_type')
+        ->where('loan_taken_period', '<=', $periodInt)
+        ->groupBy('loan_member', 'loan_loan_type')
+        ->get();
+
+    $loanTaken = [];
+    foreach ($loanTakenRows as $r) {
+        $mid = (int) $r->loan_member;
+        $tid = (int) $r->loan_loan_type;
+        $loanTaken[$mid][$tid] = (float) ($r->total ?? 0);
+    }
+
+    // Loans paid (within cutoff), allow negative + overpay
+    // LOCKED to loans taken within cutoff
+    $loanPaidRows = DB::table('sacco_loan_payments as p')
+        ->join('sacco_loans as l', 'p.loan_payments_loan_id', '=', 'l.loan_id')
+        ->select('l.loan_member', 'l.loan_loan_type', DB::raw('SUM(COALESCE(p.loan_payments_amount,0)) as total'))
+        ->whereIn('l.loan_member', $memberIds)
+        ->whereNotNull('l.loan_loan_type')
+        ->where('l.loan_taken_period', '<=', $periodInt)      // lock to loans in cutoff
+        ->where('p.loan_payments_period', '<=', $periodInt)   // payments in cutoff
+        ->groupBy('l.loan_member', 'l.loan_loan_type')
+        ->get();
+
+    $loanPaid = [];
+    foreach ($loanPaidRows as $r) {
+        $mid = (int) $r->loan_member;
+        $tid = (int) $r->loan_loan_type;
+        $loanPaid[$mid][$tid] = (float) ($r->total ?? 0);
+    }
+
+    return compact('savings', 'fosa', 'capital', 'loanTaken', 'loanPaid');
+}
 
     /**
      * Report data (AJAX)
