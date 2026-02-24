@@ -13,11 +13,9 @@ class PublicRegistrationApiController extends Controller
 {
     /**
      * GET /api/public/registration/meta
-     * Returns: paybillNumber, membershipFee, minContribution, kinTypes
      */
     public function meta(Request $request)
     {
-        // Fetch sacco_defaults in a single query
         $saccoDefaults = DB::table('sacco_defaults')
             ->whereIn('default_name', [
                 'member_ship_fee',
@@ -25,69 +23,61 @@ class PublicRegistrationApiController extends Controller
             ])
             ->pluck('default_value', 'default_name');
 
-        // Fetch paybill number from mpesa_configs
         $paybillNumber = DB::table('mpesa_configs')
             ->where('api_type', 'c2b')
             ->orderBy('id')
             ->value('shortcode');
 
-        // Fetch kin types ordered alphabetically
         $kinTypes = DB::table('sacco_kin_type')
             ->where('kin_type_deleted', 'N')
             ->orderBy('kin_type_name', 'asc')
             ->get(['kin_type_id', 'kin_type_name']);
 
         return response()->json([
-            'paybillNumber'   => (string) ($paybillNumber ?? ''),
-            'membershipFee'   => (int) ($saccoDefaults['member_ship_fee'] ?? 1000),
-            'minContribution' => (int) ($saccoDefaults['min_share_contribution'] ?? 0),
-            'kinTypes'        => $kinTypes->map(function ($k) {
-                return [
-                    'id'   => (int) $k->kin_type_id,
-                    'name' => (string) $k->kin_type_name,
-                ];
-            })->values(),
+            'paybillNumber'   => (string)($paybillNumber ?? ''),
+            'membershipFee'   => (int)($saccoDefaults['member_ship_fee'] ?? 1000),
+            'minContribution' => (int)($saccoDefaults['min_share_contribution'] ?? 0),
+            'kinTypes'        => $kinTypes->map(fn ($k) => [
+                'id'   => (int)$k->kin_type_id,
+                'name' => (string)$k->kin_type_name,
+            ])->values(),
         ], 200);
     }
 
     /**
      * POST /api/public/registration/submit
-     * Accepts JSON payload from mobile (no login).
+     * Accepts JSON from mobile.
      *
-     * Security:
-     * - Use throttle middleware on the route
-     * - Duplicate checks against sacco_members_new_applications + sacco_members
+     * NOTE:
+     * - Table column is `dob` (date)
+     * - Table has `terms` (tinyint) - must be accepted
+     * - Table `physical_location` is NOT NULL, so we store '' if missing
+     * - Files upload is not handled in this JSON v1 endpoint
      */
     public function submit(Request $request)
     {
-        // Fetch valid kin relationships
         $validKinRelationships = DB::table('sacco_kin_type')
             ->where('kin_type_deleted', 'N')
             ->pluck('kin_type_name')
             ->toArray();
 
-        // Validation rules (aligned to your desktop controller, minus recaptcha + files)
         $validator = Validator::make($request->all(), [
-            // Personal Details
-            'first_name'    => 'required|string|max:50',
-            'last_name'     => 'required|string|max:50',
-            'birth_date'    => 'required|date|before:today',
-            'national_id'   => 'required|string|max:20',
-            'kra_pin_no'    => 'required|string|max:20',
-            'gender'        => 'nullable|in:Male,Female',
-            'marital_status'=> 'nullable|in:Single,Married,Divorced,Widowed',
+            // Personal
+            'first_name'   => 'required|string|max:255',
+            'last_name'    => 'required|string|max:255',
 
-            // Additional Information
-            'occupation'                    => 'nullable|string|max:255',
-            'dependents'                    => 'nullable|integer|min:0',
-            'preferred_monthly_contribution'=> 'nullable|numeric',
-            'reason_for_joining'            => 'nullable|string|max:1000',
+            // App sends birth_date; DB column is dob
+            'birth_date'   => 'required|date|before:today',
 
-            // Contact Details
+            'national_id'  => 'required|string|max:255',
+            'kra_pin_no'   => 'nullable|string|max:20',
+
+            'gender'       => 'nullable|in:Male,Female',
+            'marital_status' => 'nullable|in:Single,Married,Divorced,Widowed',
+
+            // Contact
             'email' => [
-                'required',
-                'email',
-                'max:100',
+                'required','email','max:255',
                 'unique:sacco_members_new_applications,email',
                 function ($attribute, $value, $fail) {
                     $existsInMembers = DB::table('sacco_members')
@@ -98,12 +88,20 @@ class PublicRegistrationApiController extends Controller
                     }
                 },
             ],
+
+            // Your table does NOT have a unique index on phone,
+            // but we still enforce uniqueness at validation level (good security).
             'phone' => [
-                'required',
-                'string',
-                'max:15',
-                'unique:sacco_members_new_applications,phone',
+                'required','string','max:255',
                 function ($attribute, $value, $fail) {
+                    $existsInApps = DB::table('sacco_members_new_applications')
+                        ->where('phone', $value)
+                        ->where('deleted', 'N')
+                        ->exists();
+                    if ($existsInApps) {
+                        $fail('This phone number already has a pending application.');
+                    }
+
                     $existsInMembers = DB::table('sacco_members')
                         ->where('member_phone_no', $value)
                         ->exists();
@@ -112,9 +110,17 @@ class PublicRegistrationApiController extends Controller
                     }
                 },
             ],
-            'physical_location' => 'nullable|string|max:100',
 
-            // Next of Kin (optional, up to 3)
+            // DB column is NOT NULL, but app can treat it optional; we store '' if missing
+            'physical_location' => 'nullable|string|max:255',
+
+            // Additional
+            'occupation' => 'nullable|string|max:255',
+            'dependents' => 'nullable|string|max:5',
+            'preferred_monthly_contribution' => 'nullable|numeric',
+            'reason_for_joining' => 'nullable|string',
+
+            // Next of Kin (optional up to 3)
             'next_of_kin' => 'nullable|array|max:3',
             'next_of_kin.*.name' => 'nullable|string|max:100',
             'next_of_kin.*.relationship' => [
@@ -130,11 +136,11 @@ class PublicRegistrationApiController extends Controller
             'next_of_kin.*.id_or_cert_no' => 'nullable|string|max:30',
             'next_of_kin.*.share_percent' => 'nullable|numeric|min:0|max:100',
 
-            // Terms
+            // Consent (must be accepted)
             'certification_statement' => 'accepted',
-            'terms'                   => 'accepted',
+            'terms' => 'accepted',
 
-            // Optional device fingerprint (accepted but not stored unless you add columns)
+            // Optional device fields (not stored unless you add columns later)
             'device_id'   => 'nullable|string|max:100',
             'device_name' => 'nullable|string|max:60',
         ]);
@@ -147,19 +153,18 @@ class PublicRegistrationApiController extends Controller
             ], 422);
         }
 
-        // Normalize + validate Next of Kin share total (<= 100)
+        // Normalize Next of Kin rows + enforce share total <= 100
         $nextOfKin = $request->input('next_of_kin', []);
         if (!is_array($nextOfKin)) $nextOfKin = [];
 
-        // Keep only kin rows that have at least one field filled
         $nextOfKinFiltered = collect($nextOfKin)->map(function ($row) {
             $row = is_array($row) ? $row : [];
             return [
-                'name'         => trim((string)($row['name'] ?? '')),
-                'relationship' => trim((string)($row['relationship'] ?? '')),
-                'phone'        => trim((string)($row['phone'] ?? '')),
-                'id_or_cert_no'=> trim((string)($row['id_or_cert_no'] ?? '')),
-                'share_percent'=> trim((string)($row['share_percent'] ?? '')),
+                'name'          => trim((string)($row['name'] ?? '')),
+                'relationship'  => trim((string)($row['relationship'] ?? '')),
+                'phone'         => trim((string)($row['phone'] ?? '')),
+                'id_or_cert_no' => trim((string)($row['id_or_cert_no'] ?? '')),
+                'share_percent' => trim((string)($row['share_percent'] ?? '')),
             ];
         })->filter(function ($row) {
             return $row['name'] !== '' ||
@@ -183,101 +188,107 @@ class PublicRegistrationApiController extends Controller
             ], 422);
         }
 
-        // Fetch payment meta (for response)
+        // Payment meta for response
         $saccoDefaults = DB::table('sacco_defaults')
             ->whereIn('default_name', ['member_ship_fee'])
             ->pluck('default_value', 'default_name');
 
-        $membershipFee = (int) ($saccoDefaults['member_ship_fee'] ?? 1000);
+        $membershipFee = (int)($saccoDefaults['member_ship_fee'] ?? 1000);
 
         $paybillNumber = DB::table('mpesa_configs')
             ->where('api_type', 'c2b')
             ->orderBy('id')
             ->value('shortcode');
 
-        // Prepare insert (aligned with your desktop controller)
-        $birthDate = Carbon::parse($request->birth_date)->format('Y-m-d');
+        // Map request birth_date -> DB dob
+        $dob = Carbon::parse($request->birth_date)->format('Y-m-d');
 
         $nationalIdRaw = trim((string)$request->national_id);
         $accountNumber = 'REG' . $nationalIdRaw;
 
-        // Store kin arrays in the same JSON-column style you already use
-        $kinNames   = $nextOfKinFiltered->pluck('name')->all();
-        $kinRel     = $nextOfKinFiltered->pluck('relationship')->all();
-        $kinPhones  = $nextOfKinFiltered->pluck('phone')->all();
-        $kinIds     = $nextOfKinFiltered->pluck('id_or_cert_no')->all();
-        $kinShares  = $nextOfKinFiltered->pluck('share_percent')->all();
+        $kinNames  = $nextOfKinFiltered->pluck('name')->all();
+        $kinRel    = $nextOfKinFiltered->pluck('relationship')->all();
+        $kinPhones = $nextOfKinFiltered->pluck('phone')->all();
+        $kinIds    = $nextOfKinFiltered->pluck('id_or_cert_no')->all();
+        $kinShares = $nextOfKinFiltered->pluck('share_percent')->all();
 
-        $emailKeyUnique = (string) Str::uuid();
+        $emailKeyUnique = (string)Str::uuid();
 
         DB::beginTransaction();
-
         try {
             $id = DB::table('sacco_members_new_applications')->insertGetId([
-                'first_name' => strtoupper($request->first_name),
-                'last_name'  => strtoupper($request->last_name),
-                'birth_date' => $birthDate,
-                'national_id'=> strtoupper($request->national_id),
-                'kra_pin_no' => strtoupper($request->kra_pin_no),
+                'first_name'   => strtoupper($request->first_name),
+                'last_name'    => strtoupper($request->last_name),
+                'dob'          => $dob,
+                'national_id'  => strtoupper($request->national_id),
+                'kra_pin_no'   => strtoupper((string)($request->kra_pin_no ?? '')),
 
-                'gender'        => $request->gender,
-                'marital_status'=> $request->marital_status,
+                // consent flags
+                'terms' => 1,
+
+                'email' => strtolower($request->email),
+                'phone' => $request->phone,
+
+                // NOT NULL in DB
+                'physical_location' => strtoupper((string)($request->physical_location ?? '')),
 
                 'occupation' => $request->occupation,
+                'marital_status' => $request->marital_status,
+                'gender' => $request->gender,
                 'dependents' => $request->dependents,
 
                 'preferred_monthly_contribution' =>
                     is_numeric($request->preferred_monthly_contribution)
                         ? $request->preferred_monthly_contribution
-                        : 0,
+                        : null,
 
-                'reason_for_joining' => strtoupper($request->reason_for_joining ?? ''),
+                'reason_for_joining' => $request->reason_for_joining,
 
-                'email' => strtolower($request->email),
-                'phone' => $request->phone,
-                'physical_location' => strtoupper($request->physical_location ?? ''),
-
-                // files are not handled in this mobile v1 API
-                'passport_photo' => null,
-                'signature' => null,
-                'id_copy_front' => null,
-                'id_copy_back' => null,
-                'payslips_bank_statements' => null,
-
-                // bank details optional (mobile not collecting now)
-                'bank_name' => '',
-                'bank_branch' => '',
-                'bank_account_number' => null,
-
+                // JSON Kin columns
                 'next_of_kin_name' => json_encode($kinNames),
                 'next_of_kin_relationship' => json_encode($kinRel),
                 'next_of_kin_phone' => json_encode($kinPhones),
                 'next_of_kin_id_or_cert_no' => json_encode($kinIds),
                 'kin_share_percent' => json_encode($kinShares),
 
-                'certification_statement' => 1,
-                'email_key_unique' => $emailKeyUnique,
+                // docs are later
+                'passport_photo' => null,
+                'signature' => null,
+                'id_copy_front' => null,
+                'id_copy_back' => null,
+                'payslips_bank_statements' => null,
 
+                // bank (later)
+                'bank_name' => null,
+                'bank_branch' => null,
+                'bank_account_number' => null,
+
+                // your DB uses varchar here
+                'certification_statement' => '1',
+
+                // defaults exist in table
+                'email_sent' => 'N',
+                'exported'   => 'N',
+                'deleted'    => 'N',
+
+                'email_key_unique' => $emailKeyUnique,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
 
             DB::commit();
 
-            // ✅ Return JSON response for the app
             return response()->json([
-                'status'         => 'ok',
-                'message'        => 'Application received. Pay the registration fee to complete your application.',
-                'applicationId'  => (int) $id,
-                'emailKeyUnique' => $emailKeyUnique,
+                'status'        => 'ok',
+                'message'       => 'Application received. Pay the registration fee to complete your application.',
+                'applicationId' => (int)$id,
+                'emailKeyUnique'=> $emailKeyUnique,
 
                 // Payment instructions
-                'paybillNumber'  => (string) ($paybillNumber ?? ''),
-                'amount'         => $membershipFee,
-                'accountNumber'  => $accountNumber,
-
-                // Helpful echoes
-                'reference'      => $accountNumber,
+                'paybillNumber' => (string)($paybillNumber ?? ''),
+                'amount'        => $membershipFee,
+                'accountNumber' => $accountNumber,
+                'reference'     => $accountNumber,
             ], 201);
 
         } catch (\Throwable $e) {
