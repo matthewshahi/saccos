@@ -1,4 +1,5 @@
 <?php
+
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\MpesaTheController;
@@ -7,6 +8,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\MemberDashboardController;
 use App\Http\Controllers\Api\LoanApplicationController;
 use App\Http\Controllers\Api\MpesaApiTheController;
+use App\Http\Controllers\Api\PublicRegistrationApiController;
 
 // Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 //     return $request->user();
@@ -26,7 +28,7 @@ Route::prefix('mobile')->group(function () {
         ->name('mpesa.pay.confirmation')
         ->middleware('safaricom.ip'); // Apply IP filtering middleware
 
-      // ✅ Fix: Point to PaymentInquiryController
+    // ✅ Fix: Point to PaymentInquiryController
     Route::post('/status/result', [PaymentInquiryController::class, 'handleTransactionStatusResult'])
         ->name('mpesa.status.result')
         ->middleware('safaricom.ip');
@@ -53,7 +55,7 @@ Route::middleware(['auth.api'])->group(function () {
 
     // ✅ Loans (NEW)
     Route::get('/auth/loans', [MemberDashboardController::class, 'loans']);
-     Route::get('/auth/profile', [MemberDashboardController::class, 'profile']);
+    Route::get('/auth/profile', [MemberDashboardController::class, 'profile']);
 });
 
 
@@ -111,8 +113,9 @@ Route::middleware(['auth.api'])
         | Route::get('/', [LoanApplicationController::class, 'index']);
         */
 
-         Route::post('/apply', [LoanApplicationController::class, 'apply']);
+        Route::post('/apply', [LoanApplicationController::class, 'apply']);
     });
+
 
 Route::middleware(['auth.api'])->group(function () {
 
@@ -120,8 +123,15 @@ Route::middleware(['auth.api'])->group(function () {
         '/auth/payments/stkpush',
         [MpesaApiTheController::class, 'initiateStkPushFromApp']
     );
-
 });
 
 
+Route::prefix('public/registration')->group(function () {
+    // ✅ Meta needed by mobile UI (paybill, fee, kin types)
+    Route::get('/meta', [PublicRegistrationApiController::class, 'meta'])
+        ->middleware('throttle:60,1');
 
+    // ✅ Submit membership application (JSON only, no login)
+    Route::post('/submit', [PublicRegistrationApiController::class, 'submit'])
+        ->middleware('throttle:5,1');
+});
