@@ -22,18 +22,18 @@ class MemberFinancialPositionController extends Controller
     protected function membersBaseQuery(string $pms_srch = '')
     {
         $q = DB::table('sacco_members')
-            ->join('sacco_department', 'sacco_members.member_dept', '=', 'sacco_department.department_id')
-            ->join('sacco_company', 'sacco_department.department_company_id', '=', 'sacco_company.company_id')
-            ->join('sacco_position', 'sacco_members.member_position', '=', 'sacco_position.position_id')
-            ->where('sacco_members.member_deleted', '<>', 'Y');
+            ->leftJoin('sacco_department', 'sacco_members.member_dept', '=', 'sacco_department.department_id')
+            ->leftJoin('sacco_company', 'sacco_department.department_company_id', '=', 'sacco_company.company_id')
+            ->leftJoin('sacco_position', 'sacco_members.member_position', '=', 'sacco_position.position_id');
+        // ✅ removed: ->where('sacco_members.member_deleted', '<>', 'Y');
 
         if ($pms_srch !== '') {
             $q->where(function ($qq) use ($pms_srch) {
                 $qq->where('sacco_members.member_name', 'like', "%{$pms_srch}%")
-                   ->orWhere('sacco_members.member_sacco_id', 'like', "%{$pms_srch}%")
-                   ->orWhere('sacco_members.member_national_id', 'like', "%{$pms_srch}%")
-                   ->orWhere('sacco_company.company_name', 'like', "%{$pms_srch}%")
-                   ->orWhere('sacco_department.department_name', 'like', "%{$pms_srch}%");
+                    ->orWhere('sacco_members.member_sacco_id', 'like', "%{$pms_srch}%")
+                    ->orWhere('sacco_members.member_national_id', 'like', "%{$pms_srch}%")
+                    ->orWhere('sacco_company.company_name', 'like', "%{$pms_srch}%")
+                    ->orWhere('sacco_department.department_name', 'like', "%{$pms_srch}%");
             });
         }
 
@@ -46,7 +46,7 @@ class MemberFinancialPositionController extends Controller
     protected function loanTypes()
     {
         return DB::table('sacco_loan_types')
-            ->where('loan_type_deleted', '<>', 'Y')
+            // ✅ removed: ->where('loan_type_deleted', '<>', 'Y')
             ->orderBy('loan_type_name')
             ->get();
     }
@@ -55,83 +55,101 @@ class MemberFinancialPositionController extends Controller
      * Bulk aggregates for a set of member IDs (FAST)
      */
     protected function aggregatesForMembers(array $memberIds, string $period)
-{
-    if (empty($memberIds)) {
-        return [
-            'savings'   => [],
-            'fosa'      => [],
-            'capital'   => [],
-            'loanTaken' => [],
-            'loanPaid'  => [],
-        ];
+    {
+        if (empty($memberIds)) {
+            return [
+                'savings'   => [],
+                'fosa'      => [],
+                'capital'   => [],
+                'loanTaken' => [], // [member_id][loan_type_id] => amount
+                'loanPaid'  => [], // [member_id][loan_type_id] => amount
+            ];
+        }
+
+        $periodInt = (int) $period;
+
+        // -------------------------
+        // Savings
+        // -------------------------
+        $savings = DB::table('sacco_shares')
+            ->select('share_member_id', DB::raw('SUM(COALESCE(share_amount_paying,0)) as total'))
+            ->whereIn('share_member_id', $memberIds)
+            ->where('share_period', '<=', $periodInt)
+            ->groupBy('share_member_id')
+            ->pluck('total', 'share_member_id')
+            ->toArray();
+
+        // -------------------------
+        // FOSA
+        // -------------------------
+        $fosa = DB::table('sacco_fosas')
+            ->select('fosa_member_id', DB::raw('SUM(COALESCE(fosa_amount_paying,0)) as total'))
+            ->whereIn('fosa_member_id', $memberIds)
+            ->where('fosa_period', '<=', $periodInt)
+            ->groupBy('fosa_member_id')
+            ->pluck('total', 'fosa_member_id')
+            ->toArray();
+
+        // -------------------------
+        // Capital
+        // -------------------------
+        $capital = DB::table('sacco_capital_shares')
+            ->select('share_capitalmember_id', DB::raw('SUM(COALESCE(share_capitalamount_paying,0)) as total'))
+            ->whereIn('share_capitalmember_id', $memberIds)
+            ->where('share_capitalperiod', '<=', $periodInt)
+            ->groupBy('share_capitalmember_id')
+            ->pluck('total', 'share_capitalmember_id')
+            ->toArray();
+
+        // =====================================================
+        // LOANS (NO DOUBLE COUNTING)
+        // 1) Build per-loan rows: taken + paid_upto (as-at period)
+        // 2) Roll up per member + loan_type
+        // =====================================================
+
+        // Step 1: per-loan paid (exactly like your audit SQL)
+        $perLoan = DB::table('sacco_loans as l')
+            ->leftJoin('sacco_loan_payments as p', function ($join) use ($periodInt) {
+                $join->on('p.loan_payments_loan_id', '=', 'l.loan_id')
+                    ->where('p.loan_payments_period', '<=', $periodInt);
+            })
+            ->select([
+                'l.loan_id',
+                'l.loan_member',
+                'l.loan_loan_type',
+                DB::raw('COALESCE(l.loan_amount,0) as taken'),
+                DB::raw('COALESCE(SUM(COALESCE(p.loan_payments_amount,0)),0) as paid_upto'),
+            ])
+            ->whereIn('l.loan_member', $memberIds)
+            ->whereNotNull('l.loan_loan_type')
+            ->where('l.loan_taken_period', '<=', $periodInt)
+            ->groupBy('l.loan_id', 'l.loan_member', 'l.loan_loan_type', 'l.loan_amount');
+
+        // Step 2: roll up per member + loan type (still no inflation)
+        $loanAggRows = DB::query()
+            ->fromSub($perLoan, 'x')
+            ->select([
+                'x.loan_member',
+                'x.loan_loan_type',
+                DB::raw('SUM(x.taken) as taken_total'),
+                DB::raw('SUM(x.paid_upto) as paid_total'),
+            ])
+            ->groupBy('x.loan_member', 'x.loan_loan_type')
+            ->get();
+
+        $loanTaken = [];
+        $loanPaid  = [];
+
+        foreach ($loanAggRows as $r) {
+            $mid = (int) $r->loan_member;
+            $tid = (int) $r->loan_loan_type;
+
+            $loanTaken[$mid][$tid] = (float) ($r->taken_total ?? 0);
+            $loanPaid[$mid][$tid]  = (float) ($r->paid_total ?? 0);
+        }
+
+        return compact('savings', 'fosa', 'capital', 'loanTaken', 'loanPaid');
     }
-
-    $periodInt = (int) $period;
-
-    // Savings
-    $savings = DB::table('sacco_shares')
-        ->select('share_member_id', DB::raw('SUM(COALESCE(share_amount_paying,0)) as total'))
-        ->whereIn('share_member_id', $memberIds)
-        ->where('share_period', '<=', $periodInt)
-        ->groupBy('share_member_id')
-        ->pluck('total', 'share_member_id')
-        ->toArray();
-
-    // FOSA
-    $fosa = DB::table('sacco_fosas')
-        ->select('fosa_member_id', DB::raw('SUM(COALESCE(fosa_amount_paying,0)) as total'))
-        ->whereIn('fosa_member_id', $memberIds)
-        ->where('fosa_period', '<=', $periodInt)
-        ->groupBy('fosa_member_id')
-        ->pluck('total', 'fosa_member_id')
-        ->toArray();
-
-    // Capital
-    $capital = DB::table('sacco_capital_shares')
-        ->select('share_capitalmember_id', DB::raw('SUM(COALESCE(share_capitalamount_paying,0)) as total'))
-        ->whereIn('share_capitalmember_id', $memberIds)
-        ->where('share_capitalperiod', '<=', $periodInt)
-        ->groupBy('share_capitalmember_id')
-        ->pluck('total', 'share_capitalmember_id')
-        ->toArray();
-
-    // Loans taken (within cutoff)
-    $loanTakenRows = DB::table('sacco_loans')
-        ->select('loan_member', 'loan_loan_type', DB::raw('SUM(COALESCE(loan_amount,0)) as total'))
-        ->whereIn('loan_member', $memberIds)
-        ->whereNotNull('loan_loan_type')
-        ->where('loan_taken_period', '<=', $periodInt)
-        ->groupBy('loan_member', 'loan_loan_type')
-        ->get();
-
-    $loanTaken = [];
-    foreach ($loanTakenRows as $r) {
-        $mid = (int) $r->loan_member;
-        $tid = (int) $r->loan_loan_type;
-        $loanTaken[$mid][$tid] = (float) ($r->total ?? 0);
-    }
-
-    // Loans paid (within cutoff), allow negative + overpay
-    // LOCKED to loans taken within cutoff
-    $loanPaidRows = DB::table('sacco_loan_payments as p')
-        ->join('sacco_loans as l', 'p.loan_payments_loan_id', '=', 'l.loan_id')
-        ->select('l.loan_member', 'l.loan_loan_type', DB::raw('SUM(COALESCE(p.loan_payments_amount,0)) as total'))
-        ->whereIn('l.loan_member', $memberIds)
-        ->whereNotNull('l.loan_loan_type')
-        ->where('l.loan_taken_period', '<=', $periodInt)      // lock to loans in cutoff
-        ->where('p.loan_payments_period', '<=', $periodInt)   // payments in cutoff
-        ->groupBy('l.loan_member', 'l.loan_loan_type')
-        ->get();
-
-    $loanPaid = [];
-    foreach ($loanPaidRows as $r) {
-        $mid = (int) $r->loan_member;
-        $tid = (int) $r->loan_loan_type;
-        $loanPaid[$mid][$tid] = (float) ($r->total ?? 0);
-    }
-
-    return compact('savings', 'fosa', 'capital', 'loanTaken', 'loanPaid');
-}
 
     /**
      * Report data (AJAX)
@@ -177,7 +195,7 @@ class MemberFinancialPositionController extends Controller
             ->limit($perPage)
             ->get();
 
-        $memberIds = $members->pluck('member_id')->map(fn ($v) => (int) $v)->all();
+        $memberIds = $members->pluck('member_id')->map(fn($v) => (int) $v)->all();
         $agg       = $this->aggregatesForMembers($memberIds, $period);
 
         $rows = [];
@@ -292,7 +310,7 @@ class MemberFinancialPositionController extends Controller
 
             $membersQuery->chunkById($chunkSize, function ($chunk) use ($out, $period, $loanTypes) {
 
-                $memberIds = $chunk->pluck('member_id')->map(fn ($v) => (int) $v)->all();
+                $memberIds = $chunk->pluck('member_id')->map(fn($v) => (int) $v)->all();
                 $agg = $this->aggregatesForMembers($memberIds, $period);
 
                 foreach ($chunk as $m) {
@@ -335,7 +353,6 @@ class MemberFinancialPositionController extends Controller
             }, 'sacco_members.member_id', 'member_id');
 
             fclose($out);
-
         }, 200, [
             'Content-Type'        => 'text/csv',
             'Content-Disposition' => "attachment; filename={$filename}",
