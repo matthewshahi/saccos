@@ -28,10 +28,12 @@ class PublicRegistrationApiController extends Controller
             ->orderBy('id')
             ->value('shortcode');
 
-        $kinTypes = DB::table('sacco_kin_type')
-            ->where('kin_type_deleted', 'N')
-            ->orderBy('kin_type_name', 'asc')
-            ->get(['kin_type_id', 'kin_type_name']);
+    $kinTypes = DB::table('sacco_kin_type')
+    ->where('kin_type_deleted', 'N')
+    ->selectRaw('MIN(kin_type_id) as kin_type_id, kin_type_name')
+    ->groupBy('kin_type_name')
+    ->orderBy('kin_type_name', 'asc')
+    ->get();
 
         return response()->json([
             'paybillNumber'   => (string)($paybillNumber ?? ''),

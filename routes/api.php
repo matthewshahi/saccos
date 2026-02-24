@@ -126,12 +126,11 @@ Route::middleware(['auth.api'])->group(function () {
 });
 
 
+// ✅ PUBLIC: Registration (no login)
 Route::prefix('public/registration')->group(function () {
-    // ✅ Meta needed by mobile UI (paybill, fee, kin types)
     Route::get('/meta', [PublicRegistrationApiController::class, 'meta'])
         ->middleware('throttle:60,1');
 
-    // ✅ Submit membership application (JSON only, no login)
     Route::post('/submit', [PublicRegistrationApiController::class, 'submit'])
-        ->middleware('throttle:5,1');
+        ->middleware('throttle:3,1'); // recommended tighter limit
 });
