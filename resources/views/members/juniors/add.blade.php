@@ -119,12 +119,12 @@
                         <td>{{ $junior->member_gender == 'M' ? 'Male' : 'Female' }}</td>
                         <td>{{ $junior->member_national_id }}</td>
                         <td>
-                            @if($junior->member_active == 'Y')
-                                <span class="badge badge-success">Active</span>
-                            @else
-                                <span class="badge badge-warning">Pending</span>
-                            @endif
-                        </td>
+  @if($junior->member_active === 'Y')
+    <span class="badge bg-success text-white px-3 py-2">Active</span>
+  @else
+    <span class="badge bg-warning text-dark px-3 py-2">Pending</span>
+  @endif
+</td>
                     </tr>
                     @endforeach
                 </tbody>
