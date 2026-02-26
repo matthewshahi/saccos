@@ -78,36 +78,36 @@ class MemberDashboardController extends Controller
         $operators = [];
 
 
-if (config('sacco.transport_sacco') === 'Y') {
+        if (config('sacco.transport_sacco') === 'Y') {
 
-    $operators = DB::table('sacco_matatus_operators')
-        ->leftJoin(
-            'sacco_matatus_operator_vehicle_assignments',
-            'sacco_matatus_operators.id',
-            '=',
-            'sacco_matatus_operator_vehicle_assignments.v_assignment_operator_id'
-        )
-        ->leftJoin(
-            'sacco_matatus_vehicles',
-            'sacco_matatus_operator_vehicle_assignments.v_assignment_vehicle_id',
-            '=',
-            'sacco_matatus_vehicles.id'
-        )
-        ->where('sacco_matatus_operators.status', 'active')
-        ->where('sacco_matatus_vehicles.vehicles_member_id', Auth::user()->id)   // 🔥 KEY FILTER
-        ->select(
-            'sacco_matatus_operators.id AS operator_id',
-            'sacco_matatus_operators.full_name',
-            'sacco_matatus_operators.phone',
-            'sacco_matatus_operators.operator_type',
-            'sacco_matatus_operator_vehicle_assignments.v_assignment_start_date',
-            'sacco_matatus_operator_vehicle_assignments.v_assignment_end_date',
-            'sacco_matatus_vehicles.vehicles_registration_number AS vehicle_reg_no',
-            'sacco_matatus_vehicles.id AS vehicle_id'
-        )
-        ->orderBy('sacco_matatus_operators.full_name')
-        ->get();
-}
+            $operators = DB::table('sacco_matatus_operators')
+                ->leftJoin(
+                    'sacco_matatus_operator_vehicle_assignments',
+                    'sacco_matatus_operators.id',
+                    '=',
+                    'sacco_matatus_operator_vehicle_assignments.v_assignment_operator_id'
+                )
+                ->leftJoin(
+                    'sacco_matatus_vehicles',
+                    'sacco_matatus_operator_vehicle_assignments.v_assignment_vehicle_id',
+                    '=',
+                    'sacco_matatus_vehicles.id'
+                )
+                ->where('sacco_matatus_operators.status', 'active')
+                ->where('sacco_matatus_vehicles.vehicles_member_id', Auth::user()->id)   // 🔥 KEY FILTER
+                ->select(
+                    'sacco_matatus_operators.id AS operator_id',
+                    'sacco_matatus_operators.full_name',
+                    'sacco_matatus_operators.phone',
+                    'sacco_matatus_operators.operator_type',
+                    'sacco_matatus_operator_vehicle_assignments.v_assignment_start_date',
+                    'sacco_matatus_operator_vehicle_assignments.v_assignment_end_date',
+                    'sacco_matatus_vehicles.vehicles_registration_number AS vehicle_reg_no',
+                    'sacco_matatus_vehicles.id AS vehicle_id'
+                )
+                ->orderBy('sacco_matatus_operators.full_name')
+                ->get();
+        }
 
 
 
@@ -186,43 +186,43 @@ if (config('sacco.transport_sacco') === 'Y') {
         return view('members.capital_listings', compact('data'));
     }
     public function fosaListings()
-{
-    $memberId = Auth::user()->id;
+    {
+        $memberId = Auth::user()->id;
 
-    // Fetch contributions + join fosa types
-    $fosaContributions = DB::table('sacco_fosas')
-        ->leftJoin('sacco_fosa_types', 'sacco_fosas.fosa_type_id', '=', 'sacco_fosa_types.type_id')
-        ->select(
-            'sacco_fosas.*',
-            'sacco_fosa_types.type_name',
-            'sacco_fosa_types.type_prefix'
-        )
-        ->where('fosa_member_id', $memberId)
-        ->orderBy('fosa_type_id')
-        ->orderBy('fosa_period')
-        ->orderBy('fosa_date_paid')
-        ->get();
+        // Fetch contributions + join fosa types
+        $fosaContributions = DB::table('sacco_fosas')
+            ->leftJoin('sacco_fosa_types', 'sacco_fosas.fosa_type_id', '=', 'sacco_fosa_types.type_id')
+            ->select(
+                'sacco_fosas.*',
+                'sacco_fosa_types.type_name',
+                'sacco_fosa_types.type_prefix'
+            )
+            ->where('fosa_member_id', $memberId)
+            ->orderBy('fosa_type_id')
+            ->orderBy('fosa_period')
+            ->orderBy('fosa_date_paid')
+            ->get();
 
-    // GROUPING BY TYPE
-    $fosaGrouped = $fosaContributions->groupBy(function ($row) {
-        return $row->type_name ?: 'UNSPECIFIED';
-    });
+        // GROUPING BY TYPE
+        $fosaGrouped = $fosaContributions->groupBy(function ($row) {
+            return $row->type_name ?: 'UNSPECIFIED';
+        });
 
-    // Running balance PER GROUP
-    foreach ($fosaGrouped as $type => $rows) {
-        $running = 0;
-        foreach ($rows as $r) {
-            $running += $r->fosa_amount_paying;
-            $r->running_balance = $running;
+        // Running balance PER GROUP
+        foreach ($fosaGrouped as $type => $rows) {
+            $running = 0;
+            foreach ($rows as $r) {
+                $running += $r->fosa_amount_paying;
+                $r->running_balance = $running;
+            }
         }
-    }
 
-    return view('members.fosa_listings', [
-        'data' => [
-            'fosaGrouped' => $fosaGrouped,
-        ],
-    ]);
-}
+        return view('members.fosa_listings', [
+            'data' => [
+                'fosaGrouped' => $fosaGrouped,
+            ],
+        ]);
+    }
 
 
     public function loansTaken()

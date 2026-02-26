@@ -52,43 +52,43 @@
         @endphp
 
         @php $isLoginRoute = Route::currentRouteName() === 'login'; @endphp
-<div class="app-admin-wrap {{ $isLoginRoute ? '' : 'layout-sidebar-vertical sidebar-full' }}">
+        <div class="app-admin-wrap {{ $isLoginRoute ? '' : 'layout-sidebar-vertical sidebar-full' }}">
 
-    @if (!$isLoginRoute)
-        @include('partials.header')
+            @if (!$isLoginRoute)
+                @include('partials.header')
 
-        @php
-            $viewAsMember = request()->query('view_as_member') === 'y';
-            $pos = Auth::check() ? (int) Auth::user()->member_position : null;
-        @endphp
+                @php
+                    $viewAsMember = request()->query('view_as_member') === 'y';
+                    $pos = Auth::check() ? (int) Auth::user()->member_position : null;
+                @endphp
 
-        @if (Auth::check())
-            {{-- FORCE member menu when ?view_as_member=y for member_position 1 or 2 --}}
-            @if ($viewAsMember && in_array($pos, [1, 2], true))
-                @include('partials.menu_members')
+                @if (Auth::check())
+                    {{-- FORCE member menu when ?view_as_member=y for member_position 1 or 2 --}}
+                    @if ($viewAsMember && in_array($pos, [1, 2], true))
+                        @include('partials.menu_members')
 
-            {{-- Normal logic --}}
-            @elseif ($pos === 2)
-                @include('partials.menu')
-            @elseif ($pos === 1)
-                @include('partials.menu_members')
-            @else
-                @include('partials.menu_public')
+                        {{-- Normal logic --}}
+                    @elseif ($pos === 2)
+                        @include('partials.menu')
+                    @elseif ($pos === 1)
+                        @include('partials.menu_members')
+                    @else
+                        @include('partials.menu_public')
+                    @endif
+                @else
+                    @include('partials.menu_public')
+                @endif
             @endif
-        @else
-            @include('partials.menu_public')
-        @endif
-    @endif
 
 
-        <div class="main-content-wrap mobile-menu-content bg-off-white m-0" style="padding: 3px;">
+            <div class="main-content-wrap mobile-menu-content bg-off-white m-0" style="padding: 3px;">
 
-            <div class="main-content pt-4">
-                @yield('content')
+                <div class="main-content pt-4">
+                    @yield('content')
+                </div>
+                @include('partials.footer')
             </div>
-            @include('partials.footer')
         </div>
-    </div>
 
 
 </body>
