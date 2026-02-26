@@ -1,27 +1,34 @@
 @php
-    // Preserve member-view mode across sidebar navigation
-    $viewAsMember = request()->query('view_as_member') === 'y';
-    $vam = $viewAsMember ? '?view_as_member=y' : '';
+    // Preserve member-view mode + junior-account context across sidebar navigation (no duplicates)
+    $qs = [];
+
+    if (request()->query('view_as_member') === 'y') {
+        $qs['view_as_member'] = 'y';
+    }
+
+    $jaccount = request()->query('jaccount');
+    if ($jaccount !== null && $jaccount !== '') {
+        // keep it as-is (or cast to int if you prefer)
+        $qs['jaccount'] = $jaccount;
+    }
+
+    // Final query string to append (empty if none)
+    $vam = !empty($qs) ? ('?' . http_build_query($qs)) : '';
 @endphp
 
 <div class="sidebar-panel bg-white">
     <div class="gull-brand pe-3 text-center mt-4 mb-2 d-flex justify-content-center align-items-center">
         <a href="{{ url('/') }}" style="text-decoration: none;">
             @php
-                // Extract the domain name
                 $currentDomain = parse_url(url('/'), PHP_URL_HOST);
-
-                // Check if it's localhost or 127.0.0.1
                 if ($currentDomain === '127.0.0.1' || $currentDomain === 'localhost') {
-                    $currentDomain = 'default'; // Use 'default' as a placeholder
+                    $currentDomain = 'default';
                 }
-
-                // Construct logo paths
-                $domainLogoPath = '/image/' . $currentDomain . '.jpg'; // Domain-specific logo
-                $defaultLogoPath = '/image/logo.jpg'; // Default logo
+                $domainLogoPath = '/image/' . $currentDomain . '.jpg';
+                $defaultLogoPath = '/image/logo.jpg';
             @endphp
 
-            @if (file_exists(public_path($domainLogoPath))) <!-- Check if the domain-specific logo exists -->
+            @if (file_exists(public_path($domainLogoPath)))
                 <img src="{{ asset($domainLogoPath) }}" alt="Logo" style="height: 50px;">
             @else
                 <span style="margin-left: 10px; font-size: 33px; color: rebeccapurple; font-weight: 900; font-family: 'Montserrat', sans-serif; background: linear-gradient(to right, rebeccapurple, indigo); -webkit-background-clip: text; color: transparent; text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);">
@@ -136,7 +143,7 @@
                         </a>
                     </li>
 
-                    {{-- Logout: do NOT append view_as_member --}}
+                    {{-- Logout: do NOT append query params --}}
                     <li class="Ul_li--hover">
                         <a href="{{ url('/logout') }}"
                            onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
