@@ -66,7 +66,7 @@
                         <li class="Ul_li--hover">
                             <a href="{{ url('/members/juniors/create') }}{{ $vam }}">
                                 <i class="i-Files text-20 me-2 text-muted"></i>
-                                <span class="item-name text-15 text-muted">Add Junior Account</span>
+                                <span class="item-name text-15 text-muted">Junior Account</span>
                             </a>
                         </li>
                     @endif
