@@ -8,7 +8,6 @@
 
     $jaccount = request()->query('jaccount');
     if ($jaccount !== null && $jaccount !== '') {
-        // keep it as-is (or cast to int if you prefer)
         $qs['jaccount'] = $jaccount;
     }
 
@@ -18,7 +17,7 @@
 
 <div class="sidebar-panel bg-white">
     <div class="gull-brand pe-3 text-center mt-4 mb-2 d-flex justify-content-center align-items-center">
-        <a href="{{ url('/') }}" style="text-decoration: none;">
+        <a href="{{ url('/') }}{{ $vam }}" style="text-decoration: none;">
             @php
                 $currentDomain = parse_url(url('/'), PHP_URL_HOST);
                 if ($currentDomain === '127.0.0.1' || $currentDomain === 'localhost') {
@@ -63,14 +62,14 @@
 
                     <li class="menu-section-title text-muted mt-3 mb-1">Junior Accounts</li>
 
-                   @if(!request()->filled('jaccount'))
-<li class="Ul_li--hover">
-    <a href="{{ url('/members/juniors/create') }}{{ $vam }}">
-        <i class="i-Files text-20 me-2 text-muted"></i>
-        <span class="item-name text-15 text-muted">Add Junior Account</span>
-    </a>
-</li>
-@endif
+                    @if(!request()->filled('jaccount'))
+                        <li class="Ul_li--hover">
+                            <a href="{{ url('/members/juniors/create') }}{{ $vam }}">
+                                <i class="i-Files text-20 me-2 text-muted"></i>
+                                <span class="item-name text-15 text-muted">Add Junior Account</span>
+                            </a>
+                        </li>
+                    @endif
 
                     <!-- Reports Section -->
                     <li class="menu-section-title text-muted mt-3 mb-1">Reports</li>
@@ -145,9 +144,9 @@
                         </a>
                     </li>
 
-                    {{-- Logout: do NOT append query params --}}
+                    {{-- Logout --}}
                     <li class="Ul_li--hover">
-                        <a href="{{ url('/logout') }}"
+                        <a href="{{ url('/logout') }}{{ $vam }}"
                            onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
                             <i class="i-Arrow-Back text-20 me-2 text-muted"></i>
                             <span class="item-name text-15 text-muted">Logout</span>
