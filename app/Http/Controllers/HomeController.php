@@ -44,24 +44,28 @@ class HomeController extends Controller
 
     public function redirectBasedOnAuth()
     {
+        if (!auth()->check()) {
+            return redirect('/register');
+        }
 
-        if (auth()->check()) {
-            $user = auth()->user();
+        $user = auth()->user();
 
+        // If logged in AND viewing as member, always go to member dashboard (retain query string)
+        if (request()->query('view_as_member') === 'y') {
+            $qs = request()->getQueryString(); // keeps view_as_member=y (and jaccount if present)
+            return redirect()->to('/dashboard/member_dashboard' . ($qs ? ('?' . $qs) : ''));
+        }
 
-            if ($user->member_position == 2) {
-                return redirect('/dashboard');
-            } elseif ($user->member_position == 1) {
-                return redirect('/dashboard/member_dashboard');
-            } else {
-                return redirect('/register');
-            }
+        if ($user->member_position == 2) {
+            return redirect('/dashboard');
+        }
+
+        if ($user->member_position == 1) {
+            return redirect('/dashboard/member_dashboard');
         }
 
         return redirect('/register');
-        // return view('home'); 
     }
-
     public function member_statement_self()
     {
         dd("56789 what need sto go here");
