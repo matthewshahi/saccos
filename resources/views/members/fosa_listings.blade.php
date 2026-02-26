@@ -2,6 +2,7 @@
 
 @section('content')
 @include("member_name")
+@include("dashboard.junior-context-banner")
 
 <div class="row">
     <div class="col-md-12">
