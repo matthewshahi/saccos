@@ -10,7 +10,7 @@ class MemberDashboardController extends Controller
     /**
      * Resolve the "effective" member id for dashboard context.
      *
-     * Default: logged-in member.
+     * Default: logged-in member (guardian).
      * If ?view_as_member=y&jaccount=123 is present:
      *   - ONLY allow if jaccount is a junior account
      *   - AND it belongs to the logged-in guardian.
@@ -54,6 +54,19 @@ class MemberDashboardController extends Controller
 
         if (!$member) {
             abort(404, 'Member not found');
+        }
+
+        // Junior context (for blade clarity / avoiding misreporting)
+        $isViewingJunior = ($memberId !== $guardianId);
+        $juniorContext = null;
+
+        if ($isViewingJunior) {
+            $juniorContext = [
+                'member_id'       => $member->member_id,
+                'member_name'     => $member->member_name,
+                'member_sacco_id' => $member->member_sacco_id,
+                'member_active'   => $member->member_active,
+            ];
         }
 
         // Last 6 share payments (effective member)
@@ -150,10 +163,11 @@ class MemberDashboardController extends Controller
             'paymentOptions' => $paymentOptions,
             'operators'      => $operators,
 
-            // Optional: view context hints (harmless if unused by blade)
+            // Context for blade
             'effective_member_id' => $memberId,
             'guardian_member_id'  => $guardianId,
-            'is_viewing_junior'   => ($memberId !== $guardianId),
+            'is_viewing_junior'   => $isViewingJunior,
+            'junior'              => $juniorContext,
         ];
 
         return view('dashboard.member_dashboard', compact('data'));
