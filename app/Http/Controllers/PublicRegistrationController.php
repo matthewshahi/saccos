@@ -645,7 +645,7 @@ class PublicRegistrationController extends Controller
                 'notif_message'         => $message,
 
                 // job will pick these
-                'notif_status'          => 'queued',
+                'notif_status'          => 'unread',
                 'notif_sent_at'         => null,
                 'notif_read_at'         => null,
 
