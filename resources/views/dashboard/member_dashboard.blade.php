@@ -3,8 +3,7 @@
 @section('content')
 
 @include("member_name")
-
- 
+@include("dashboard.junior-context-banner")
 @include('dashboard.payment_options')
  
 
