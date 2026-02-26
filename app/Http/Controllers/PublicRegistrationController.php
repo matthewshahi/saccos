@@ -164,11 +164,11 @@ class PublicRegistrationController extends Controller
             'physical_location' => 'nullable|string|max:100',
 
             // File Uploads (All Optional)
-'passport_photo'          => 'nullable|mimes:jpeg,jpg,pdf|max:1024',
-'signature'               => 'nullable|mimes:jpeg,jpg,pdf|max:1024',
-'id_copy_front'           => 'nullable|mimes:jpeg,jpg,pdf|max:1024',
-'id_copy_back'            => 'nullable|mimes:jpeg,jpg,pdf|max:1024',
-'payslips_bank_statements'=> 'nullable|mimes:jpeg,jpg,pdf|max:1024',
+            'passport_photo'          => 'nullable|mimes:jpeg,jpg,pdf|max:1024',
+            'signature'               => 'nullable|mimes:jpeg,jpg,pdf|max:1024',
+            'id_copy_front'           => 'nullable|mimes:jpeg,jpg,pdf|max:1024',
+            'id_copy_back'            => 'nullable|mimes:jpeg,jpg,pdf|max:1024',
+            'payslips_bank_statements' => 'nullable|mimes:jpeg,jpg,pdf|max:1024',
 
 
 
@@ -235,51 +235,51 @@ class PublicRegistrationController extends Controller
         }
 
         // reCAPTCHA Validation
-      // ==============================
-// reCAPTCHA v3 VERIFICATION
-// ==============================
+        // ==============================
+        // reCAPTCHA v3 VERIFICATION
+        // ==============================
 
-$recaptchaToken = $request->input('recaptcha_token');
+        $recaptchaToken = $request->input('recaptcha_token');
 
-if (!$recaptchaToken) {
-    return back()->withErrors([
-        'captcha' => 'Captcha verification failed. Please refresh and try again.'
-    ])->withInput();
-}
+        if (!$recaptchaToken) {
+            return back()->withErrors([
+                'captcha' => 'Captcha verification failed. Please refresh and try again.'
+            ])->withInput();
+        }
 
-$recaptchaResponse = Http::asForm()->post(
-    'https://www.google.com/recaptcha/api/siteverify',
-    [
-        'secret'   => env('RECAPTCHA_SECRET_KEY'),
-        'response' => $recaptchaToken,
-        'remoteip' => $request->ip(),
-    ]
-);
+        $recaptchaResponse = Http::asForm()->post(
+            'https://www.google.com/recaptcha/api/siteverify',
+            [
+                'secret'   => env('RECAPTCHA_SECRET_KEY'),
+                'response' => $recaptchaToken,
+                'remoteip' => $request->ip(),
+            ]
+        );
 
-$recaptcha = $recaptchaResponse->json();
+        $recaptcha = $recaptchaResponse->json();
 
-// Log for debugging (optional):
-// logger()->info('Recaptcha response', $recaptcha);
+        // Log for debugging (optional):
+        // logger()->info('Recaptcha response', $recaptcha);
 
-if (!($recaptcha['success'] ?? false)) {
-    return back()->withErrors([
-        'captcha' => 'Captcha verification failed.'
-    ])->withInput();
-}
+        if (!($recaptcha['success'] ?? false)) {
+            return back()->withErrors([
+                'captcha' => 'Captcha verification failed.'
+            ])->withInput();
+        }
 
-// Action check — MUST MATCH your JS action "register"
-if (($recaptcha['action'] ?? '') !== 'register') {
-    return back()->withErrors([
-        'captcha' => 'Captcha action mismatch.'
-    ])->withInput();
-}
+        // Action check — MUST MATCH your JS action "register"
+        if (($recaptcha['action'] ?? '') !== 'register') {
+            return back()->withErrors([
+                'captcha' => 'Captcha action mismatch.'
+            ])->withInput();
+        }
 
-// Score check (Google recommends 0.5 threshold)
-if (($recaptcha['score'] ?? 0) < 0.5) {
-    return back()->withErrors([
-        'captcha' => 'Suspicious activity detected. Please try again.'
-    ])->withInput();
-}
+        // Score check (Google recommends 0.5 threshold)
+        if (($recaptcha['score'] ?? 0) < 0.5) {
+            return back()->withErrors([
+                'captcha' => 'Suspicious activity detected. Please try again.'
+            ])->withInput();
+        }
 
 
         // File Upload Handling
@@ -383,6 +383,20 @@ if (($recaptcha['score'] ?? 0) < 0.5) {
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+
+        $appliedAt = now();
+
+        $applicantName = strtoupper(trim($request->first_name . ' ' . $request->last_name));
+        $nationalId    = strtoupper(trim($request->national_id));
+        $phone         = $request->phone;
+
+        $this->queueNewApplicationAlertsToOfficersMinimal(
+            $applicantName,
+            $nationalId,
+            $phone,
+            $appliedAt,
+            $request
+        );
 
         return redirect()->route('register.form')->with('success', 'Registration successful! Please check your email for further instructions.');
     }
@@ -591,5 +605,70 @@ if (($recaptcha['score'] ?? 0) < 0.5) {
         ]);
 
         return redirect()->route('register.form')->with('success', 'Your documents and bank details have been uploaded successfully!');
+    }
+    private function queueNewApplicationAlertsToOfficersMinimal(
+        string $applicantName,
+        string $nationalId,
+        string $phone,
+        \Carbon\CarbonInterface $appliedAt,
+        Request $request
+    ): int {
+
+        $recipients = DB::table('sacco_members')
+            ->select('member_id', 'member_name', 'member_email', 'member_phone_no')
+            ->where('member_deleted', 'N')
+            ->where('member_active', 'Y')
+            ->where('member_position', '2') // position=2 officers
+            ->whereNotNull('member_email')
+            ->where('member_email', '<>', '')
+            ->orderBy('member_id', 'asc')
+            ->get();
+
+        if ($recipients->isEmpty()) return 0;
+
+        $subject = 'New SACCO Membership Application';
+
+        $message =
+            "New application received:\n" .
+            "Name: {$applicantName}\n" .
+            "National ID: {$nationalId}\n" .
+            "Telephone: {$phone}\n" .
+            "Applied At: " . $appliedAt->format('Y-m-d H:i:s');
+
+        $rows = [];
+        foreach ($recipients as $r) {
+            $rows[] = [
+                'notif_recipient_name'  => $r->member_name,
+                'notif_recipient_email' => $r->member_email,
+                'notif_recipient_phone' => $r->member_phone_no,
+                'notif_subject'         => $subject,
+                'notif_message'         => $message,
+
+                // job will pick these
+                'notif_status'          => 'queued',
+                'notif_sent_at'         => null,
+                'notif_read_at'         => null,
+
+                // recipient officer id
+                'notif_member_id'       => (int) $r->member_id,
+
+                'notif_related_doc'     => "new_application_national_id:{$nationalId}",
+                'notif_type'            => 'email',
+
+                'notif_created_by'      => null,
+                'notif_ip'              => $request->ip(),
+                'notif_meta'            => json_encode([
+                    'national_id' => $nationalId,
+                    'name'        => $applicantName,
+                    'phone'       => $phone,
+                    'applied_at'  => $appliedAt->toDateTimeString(),
+                ]),
+                'notif_created_at'      => $appliedAt,
+            ];
+        }
+
+        DB::table('sacco_system_notifications')->insert($rows);
+
+        return count($rows);
     }
 }
