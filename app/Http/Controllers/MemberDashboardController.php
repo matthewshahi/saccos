@@ -41,6 +41,47 @@ class MemberDashboardController extends Controller
         return $isValidJunior ? $juniorId : $guardianId;
     }
 
+    /**
+     * Context payload for ALL blades (so you can mark "Viewing Junior Account" everywhere).
+     */
+    private function buildJuniorViewContext(int $effectiveMemberId): array
+    {
+        $guardianId = (int) Auth::user()->id;
+
+        $isViewingJunior = ($effectiveMemberId !== $guardianId);
+        $juniorContext = null;
+
+        if ($isViewingJunior) {
+            $junior = DB::table('sacco_members')
+                ->select('member_id', 'member_name', 'member_sacco_id', 'member_active')
+                ->where('member_id', $effectiveMemberId)
+                ->where('member_is_junior', 1)
+                ->where('member_guardian_id', $guardianId)
+                ->where('member_deleted', 'N')
+                ->first();
+
+            if ($junior) {
+                $juniorContext = [
+                    'member_id'       => $junior->member_id,
+                    'member_name'     => $junior->member_name,
+                    'member_sacco_id' => $junior->member_sacco_id,
+                    'member_active'   => $junior->member_active,
+                ];
+            } else {
+                // Safety fallback: if something changes, do not treat as junior view.
+                $isViewingJunior = false;
+                $effectiveMemberId = $guardianId;
+            }
+        }
+
+        return [
+            'effective_member_id' => $effectiveMemberId,
+            'guardian_member_id'  => $guardianId,
+            'is_viewing_junior'   => $isViewingJunior,
+            'junior'              => $juniorContext,
+        ];
+    }
+
     public function index()
     {
         $memberId   = $this->resolveEffectiveMemberId();
@@ -54,19 +95,6 @@ class MemberDashboardController extends Controller
 
         if (!$member) {
             abort(404, 'Member not found');
-        }
-
-        // Junior context (for blade clarity / avoiding misreporting)
-        $isViewingJunior = ($memberId !== $guardianId);
-        $juniorContext = null;
-
-        if ($isViewingJunior) {
-            $juniorContext = [
-                'member_id'       => $member->member_id,
-                'member_name'     => $member->member_name,
-                'member_sacco_id' => $member->member_sacco_id,
-                'member_active'   => $member->member_active,
-            ];
         }
 
         // Last 6 share payments (effective member)
@@ -162,13 +190,10 @@ class MemberDashboardController extends Controller
             'amounts'        => $amounts,
             'paymentOptions' => $paymentOptions,
             'operators'      => $operators,
-
-            // Context for blade
-            'effective_member_id' => $memberId,
-            'guardian_member_id'  => $guardianId,
-            'is_viewing_junior'   => $isViewingJunior,
-            'junior'              => $juniorContext,
         ];
+
+        // ✅ Always include junior context if available
+        $data = array_merge($data, $this->buildJuniorViewContext($memberId));
 
         return view('dashboard.member_dashboard', compact('data'));
     }
@@ -191,6 +216,7 @@ class MemberDashboardController extends Controller
             ->orderBy('share_period', 'asc')
             ->get();
 
+        // Calculate running balance
         $runningBalance = 0;
         foreach ($shares as $share) {
             $runningBalance += $share->share_amount_paying;
@@ -198,6 +224,9 @@ class MemberDashboardController extends Controller
         }
 
         $data = ['shares' => $shares];
+
+        // ✅ Always include junior context if available
+        $data = array_merge($data, $this->buildJuniorViewContext($memberId));
 
         return view('members.share_listings', compact('data'));
     }
@@ -220,6 +249,7 @@ class MemberDashboardController extends Controller
             ->orderBy('share_capitalperiod', 'asc')
             ->get();
 
+        // Calculate running balance
         $runningBalance = 0;
         foreach ($capitalShares as $capital) {
             $runningBalance += $capital->share_capitalamount_paying;
@@ -228,6 +258,9 @@ class MemberDashboardController extends Controller
 
         $data = ['capitalShares' => $capitalShares];
 
+        // ✅ Always include junior context if available
+        $data = array_merge($data, $this->buildJuniorViewContext($memberId));
+
         return view('members.capital_listings', compact('data'));
     }
 
@@ -235,6 +268,7 @@ class MemberDashboardController extends Controller
     {
         $memberId = $this->resolveEffectiveMemberId();
 
+        // Fetch contributions + join fosa types
         $fosaContributions = DB::table('sacco_fosas')
             ->leftJoin('sacco_fosa_types', 'sacco_fosas.fosa_type_id', '=', 'sacco_fosa_types.type_id')
             ->select(
@@ -248,10 +282,12 @@ class MemberDashboardController extends Controller
             ->orderBy('fosa_date_paid')
             ->get();
 
+        // GROUPING BY TYPE
         $fosaGrouped = $fosaContributions->groupBy(function ($row) {
             return $row->type_name ?: 'UNSPECIFIED';
         });
 
+        // Running balance PER GROUP
         foreach ($fosaGrouped as $type => $rows) {
             $running = 0;
             foreach ($rows as $r) {
@@ -260,17 +296,21 @@ class MemberDashboardController extends Controller
             }
         }
 
-        return view('members.fosa_listings', [
-            'data' => [
-                'fosaGrouped' => $fosaGrouped,
-            ],
-        ]);
+        $data = [
+            'fosaGrouped' => $fosaGrouped,
+        ];
+
+        // ✅ Always include junior context if available
+        $data = array_merge($data, $this->buildJuniorViewContext($memberId));
+
+        return view('members.fosa_listings', ['data' => $data]);
     }
 
     public function loansTaken()
     {
         $memberId = $this->resolveEffectiveMemberId();
 
+        // Fetch loans for the effective member
         $loans = DB::table('sacco_loans')
             ->join('sacco_loan_types', 'sacco_loans.loan_loan_type', '=', 'sacco_loan_types.loan_type_id')
             ->join('sacco_loan_category', 'sacco_loans.loan_loan_category', '=', 'sacco_loan_category.loan_category_id')
@@ -291,6 +331,7 @@ class MemberDashboardController extends Controller
             ->orderBy('loan_taken_period', 'desc')
             ->get();
 
+        // Fetch loan repayments for those loans
         $repayments = DB::table('sacco_loan_payments')
             ->whereIn('loan_payments_loan_id', $loans->pluck('loan_id'))
             ->select(
@@ -305,6 +346,7 @@ class MemberDashboardController extends Controller
             ->orderBy('loan_payments_period', 'asc')
             ->get();
 
+        // Group repayments by loan ID and calculate balances
         $repaymentsByLoan = $repayments->groupBy('loan_payments_loan_id');
         foreach ($loans as $loan) {
             $loan->repayments = $repaymentsByLoan[$loan->loan_id] ?? [];
@@ -317,6 +359,9 @@ class MemberDashboardController extends Controller
         }
 
         $data = ['loans' => $loans];
+
+        // ✅ Always include junior context if available
+        $data = array_merge($data, $this->buildJuniorViewContext($memberId));
 
         return view('members.loans_taken', compact('data'));
     }
