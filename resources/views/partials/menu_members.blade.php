@@ -63,12 +63,14 @@
 
                     <li class="menu-section-title text-muted mt-3 mb-1">Junior Accounts</li>
 
-                    <li class="Ul_li--hover">
-                        <a href="{{ url('/members/juniors/create') }}{{ $vam }}">
-                            <i class="i-Files text-20 me-2 text-muted"></i>
-                            <span class="item-name text-15 text-muted">Add Junior Account</span>
-                        </a>
-                    </li>
+                   @if(!request()->filled('jaccount'))
+<li class="Ul_li--hover">
+    <a href="{{ url('/members/juniors/create') }}{{ $vam }}">
+        <i class="i-Files text-20 me-2 text-muted"></i>
+        <span class="item-name text-15 text-muted">Add Junior Account</span>
+    </a>
+</li>
+@endif
 
                     <!-- Reports Section -->
                     <li class="menu-section-title text-muted mt-3 mb-1">Reports</li>
