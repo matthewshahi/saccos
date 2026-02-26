@@ -405,30 +405,74 @@ class HomeController extends Controller
 
     public function membersList(Request $request)
     {
-        DB::table('sacco_loans')
-            ->whereNull('loan_loan_paid')
-            ->update(['loan_loan_paid' => 0]);
+        DB::table('sacco_loans')->whereNull('loan_loan_paid')->update(['loan_loan_paid' => 0]);
+        DB::table('sacco_loans')->whereNull('loan_start_deduction_period')->update(['loan_start_deduction_period' => '00000']);
 
-        DB::table('sacco_loans')
-            ->whereNull('loan_start_deduction_period')
-            ->update(['loan_start_deduction_period' => '00000']);
-
-        $orderby = $request->input('orderby', 'member_name');
+        $orderby    = $request->input('orderby', 'member_name');
         $sort_order = 'asc';
-        $search = $request->input('pms_srch', '');
+        $search     = $request->input('pms_srch', '');
 
-        $members = $this->getMembers($orderby, $sort_order, $search);
+        // NEW optional filters from the dropdowns
+        $memberActive  = $request->input('member_active', '');     // Y/N or ''
+        $isJunior      = $request->input('member_is_junior', '');  // 0/1 or ''
+        $memberDeleted = $request->input('member_deleted', '');    // Y/N or ''
 
-        $data = [
-            'members' => $members,
-            'orderby' => $orderby,
+        // Convert '' to null (so it truly does not filter)
+        $memberActive  = ($memberActive === '' ? null : $memberActive);
+        $isJunior      = ($isJunior === '' ? null : $isJunior);
+        $memberDeleted = ($memberDeleted === '' ? null : $memberDeleted);
+
+        $members = $this->getMembersListFiltered($orderby, $sort_order, $search, null, $memberActive, $isJunior, $memberDeleted);
+
+        return view('members.list', [
+            'members'    => $members,
+            'orderby'    => $orderby,
             'sort_order' => $sort_order,
-            'pms_srch' => $search,
-        ];
-
-        return view('members.list', $data);
+            'pms_srch'   => $search,
+        ]);
     }
+    private function getMembersListFiltered($orderby = 'member_name', $sort_order = 'asc', $search = '', $limit = null, $memberActive = null, $isJunior = null, $memberDeleted = null)
+    {
+        if (is_null($limit)) {
+            $limit = $this->recordLimit;
+        }
 
+        $query = DB::table('sacco_members')
+            ->join('sacco_department', 'sacco_members.member_dept', '=', 'sacco_department.department_id')
+            ->join('sacco_company', 'sacco_department.department_company_id', '=', 'sacco_company.company_id')
+            ->join('sacco_position', 'sacco_members.member_position', '=', 'sacco_position.position_id')
+            ->where(function ($query) use ($search) {
+                if (!empty($search)) {
+                    $search = '%' . $search . '%';
+                    $query->where('department_name', 'like', $search)
+                        ->orWhere('position_name', 'like', $search)
+                        ->orWhere('company_name', 'like', $search)
+                        ->orWhere('member_name', 'like', $search)
+                        ->orWhere('member_sacco_id', 'like', $search)
+                        ->orWhere('member_national_id', 'like', $search)
+                        ->orWhere('member_email', 'like', $search)
+                        ->orWhere('member_phone_no', 'like', $search);
+                }
+            });
+
+        // OPTIONAL filters (only apply if provided)
+        if (!is_null($memberActive) && $memberActive !== '') {
+            $query->where('sacco_members.member_active', '=', $memberActive); // Y/N
+        }
+
+        if (!is_null($isJunior) && $isJunior !== '') {
+            $query->where('sacco_members.member_is_junior', '=', (int) $isJunior); // 0/1
+        }
+
+        if (!is_null($memberDeleted) && $memberDeleted !== '') {
+            $query->where('sacco_members.member_deleted', '=', $memberDeleted); // Y/N
+        }
+
+        return $query->orderBy($orderby, $sort_order)
+            ->select('*')
+            ->limit($limit)
+            ->get();
+    }
     public function membersActive($status, Request $request)
     {
         $orderby = $request->input('orderby', 'member_name');
@@ -3717,7 +3761,7 @@ class HomeController extends Controller
 
 
         // Check if the current route matches 'loans.application.submit'
-      if ($request->route() && $request->route()->getName() === 'loans.application.submit') {
+        if ($request->route() && $request->route()->getName() === 'loans.application.submit') {
 
             // Check if the member ID matches the logged-in user
             if ($request->input('batch_trans_member_id') != $logged_in_user) {
@@ -4001,7 +4045,7 @@ class HomeController extends Controller
             ]);
         }
 
-        
+
 
         if ($context === 'api') {
             return response()->json([
@@ -6578,71 +6622,71 @@ class HomeController extends Controller
 
 
 
-public function reportsLoansIssued(Request $request)
-{
-    // Retrieve search filters from the request
-    $searchName        = $request->input('search_name');
-    $searchSaccoId     = $request->input('search_sacco_id');
-    $searchCompanyName = $request->input('search_company_name');
-    $startPeriod       = $request->input('start_period'); // YYYYMM
-    $endPeriod         = $request->input('end_period');   // YYYYMM
+    public function reportsLoansIssued(Request $request)
+    {
+        // Retrieve search filters from the request
+        $searchName        = $request->input('search_name');
+        $searchSaccoId     = $request->input('search_sacco_id');
+        $searchCompanyName = $request->input('search_company_name');
+        $startPeriod       = $request->input('start_period'); // YYYYMM
+        $endPeriod         = $request->input('end_period');   // YYYYMM
 
-    $loansIssued = DB::table('sacco_loans as l')
-        ->join('sacco_members as m', 'l.loan_member', '=', 'm.member_id')
-        ->leftJoin('sacco_department as d', 'm.member_dept', '=', 'd.department_id')
-        ->leftJoin('sacco_company as c', 'd.department_company_id', '=', 'c.company_id')
-        ->select(
-            'l.loan_id',
-            'l.loan_amount',
-            'l.loan_taken_period',
-            'l.loan_start_deduction_period',
-            'l.loan_on',
+        $loansIssued = DB::table('sacco_loans as l')
+            ->join('sacco_members as m', 'l.loan_member', '=', 'm.member_id')
+            ->leftJoin('sacco_department as d', 'm.member_dept', '=', 'd.department_id')
+            ->leftJoin('sacco_company as c', 'd.department_company_id', '=', 'c.company_id')
+            ->select(
+                'l.loan_id',
+                'l.loan_amount',
+                'l.loan_taken_period',
+                'l.loan_start_deduction_period',
+                'l.loan_on',
 
-            // extra fields
-            'l.loan_description',
-            'l.loan_doc_no',
-            'l.loan_stoped',
-            'l.loan_payment_period',
-            'l.loan_loan_paid',
-            'l.loan_insurance',
+                // extra fields
+                'l.loan_description',
+                'l.loan_doc_no',
+                'l.loan_stoped',
+                'l.loan_payment_period',
+                'l.loan_loan_paid',
+                'l.loan_insurance',
 
-            'm.member_name',
-            'm.member_sacco_id',
+                'm.member_name',
+                'm.member_sacco_id',
 
-            // ✅ NEW: National ID + member totals
-            'm.member_national_id',
-            'm.member_total_share',
-            'm.member_total_fosa',
-            'm.member_total_share_capital',
+                // ✅ NEW: National ID + member totals
+                'm.member_national_id',
+                'm.member_total_share',
+                'm.member_total_fosa',
+                'm.member_total_share_capital',
 
-            'c.company_name'
-        )
-        ->when($searchName, function ($query) use ($searchName) {
-            return $query->where('m.member_name', 'like', "%{$searchName}%");
-        })
-        ->when($searchSaccoId, function ($query) use ($searchSaccoId) {
-            return $query->where('m.member_sacco_id', 'like', "%{$searchSaccoId}%");
-        })
-        ->when($searchCompanyName, function ($query) use ($searchCompanyName) {
-            return $query->where('c.company_name', 'like', "%{$searchCompanyName}%");
-        })
-        // ✅ FILTER BY loan_taken_period
-        ->when($startPeriod && $endPeriod, function ($query) use ($startPeriod, $endPeriod) {
-            return $query->whereBetween('l.loan_taken_period', [$startPeriod, $endPeriod]);
-        })
-        ->when($startPeriod && !$endPeriod, function ($query) use ($startPeriod) {
-            return $query->where('l.loan_taken_period', '>=', $startPeriod);
-        })
-        ->when($endPeriod && !$startPeriod, function ($query) use ($endPeriod) {
-            return $query->where('l.loan_taken_period', '<=', $endPeriod);
-        })
-        // ✅ ORDER BY loan_taken_period (not start_deduction_period)
-        ->orderBy('l.loan_taken_period', 'desc')
-        ->orderBy('l.loan_on', 'desc')
-        ->get();
+                'c.company_name'
+            )
+            ->when($searchName, function ($query) use ($searchName) {
+                return $query->where('m.member_name', 'like', "%{$searchName}%");
+            })
+            ->when($searchSaccoId, function ($query) use ($searchSaccoId) {
+                return $query->where('m.member_sacco_id', 'like', "%{$searchSaccoId}%");
+            })
+            ->when($searchCompanyName, function ($query) use ($searchCompanyName) {
+                return $query->where('c.company_name', 'like', "%{$searchCompanyName}%");
+            })
+            // ✅ FILTER BY loan_taken_period
+            ->when($startPeriod && $endPeriod, function ($query) use ($startPeriod, $endPeriod) {
+                return $query->whereBetween('l.loan_taken_period', [$startPeriod, $endPeriod]);
+            })
+            ->when($startPeriod && !$endPeriod, function ($query) use ($startPeriod) {
+                return $query->where('l.loan_taken_period', '>=', $startPeriod);
+            })
+            ->when($endPeriod && !$startPeriod, function ($query) use ($endPeriod) {
+                return $query->where('l.loan_taken_period', '<=', $endPeriod);
+            })
+            // ✅ ORDER BY loan_taken_period (not start_deduction_period)
+            ->orderBy('l.loan_taken_period', 'desc')
+            ->orderBy('l.loan_on', 'desc')
+            ->get();
 
-    return view('reports.loans.issued', ['loansIssued' => $loansIssued]);
-}
+        return view('reports.loans.issued', ['loansIssued' => $loansIssued]);
+    }
 
 
 
@@ -6690,68 +6734,68 @@ public function reportsLoansIssued(Request $request)
 
         return response()->json(['data' => $issuedLoans]);
     }
-public function downloadLoansIssuedReport(Request $request)
-{
-    $searchName        = $request->input('search_name');
-    $searchSaccoId     = $request->input('search_sacco_id');
-    $searchCompanyName = $request->input('search_company_name');
-    $startPeriod       = $request->input('start_period'); // YYYYMM
-    $endPeriod         = $request->input('end_period');   // YYYYMM
+    public function downloadLoansIssuedReport(Request $request)
+    {
+        $searchName        = $request->input('search_name');
+        $searchSaccoId     = $request->input('search_sacco_id');
+        $searchCompanyName = $request->input('search_company_name');
+        $startPeriod       = $request->input('start_period'); // YYYYMM
+        $endPeriod         = $request->input('end_period');   // YYYYMM
 
-    // IMPORTANT: build query WITHOUT ->get() or paginate()
-    $query = DB::table('sacco_loans as l')
-        ->join('sacco_members as m', 'l.loan_member', '=', 'm.member_id')
-        ->leftJoin('sacco_department as d', 'm.member_dept', '=', 'd.department_id')
-        ->leftJoin('sacco_company as c', 'd.department_company_id', '=', 'c.company_id')
-        ->select(
-            // Loan
-            'l.loan_id',
-            'l.loan_amount',
-            'l.loan_insurance',
-            'l.loan_loan_paid',
-            'l.loan_payment_period',
-            'l.loan_taken_period',
-            'l.loan_start_deduction_period',
-            'l.loan_doc_no',
-            'l.loan_description',
-            'l.loan_stoped',
-            'l.loan_on',
+        // IMPORTANT: build query WITHOUT ->get() or paginate()
+        $query = DB::table('sacco_loans as l')
+            ->join('sacco_members as m', 'l.loan_member', '=', 'm.member_id')
+            ->leftJoin('sacco_department as d', 'm.member_dept', '=', 'd.department_id')
+            ->leftJoin('sacco_company as c', 'd.department_company_id', '=', 'c.company_id')
+            ->select(
+                // Loan
+                'l.loan_id',
+                'l.loan_amount',
+                'l.loan_insurance',
+                'l.loan_loan_paid',
+                'l.loan_payment_period',
+                'l.loan_taken_period',
+                'l.loan_start_deduction_period',
+                'l.loan_doc_no',
+                'l.loan_description',
+                'l.loan_stoped',
+                'l.loan_on',
 
-            // Member
-            'm.member_name',
-            'm.member_sacco_id',
-            'm.member_national_id',
-            'm.member_total_share',
-            'm.member_total_fosa',
-            'm.member_total_share_capital',
+                // Member
+                'm.member_name',
+                'm.member_sacco_id',
+                'm.member_national_id',
+                'm.member_total_share',
+                'm.member_total_fosa',
+                'm.member_total_share_capital',
 
-            // Company
-            'c.company_name'
-        )
-        ->when($searchName, function ($q) use ($searchName) {
-            return $q->where('m.member_name', 'like', "%{$searchName}%");
-        })
-        ->when($searchSaccoId, function ($q) use ($searchSaccoId) {
-            return $q->where('m.member_sacco_id', 'like', "%{$searchSaccoId}%");
-        })
-        ->when($searchCompanyName, function ($q) use ($searchCompanyName) {
-            return $q->where('c.company_name', 'like', "%{$searchCompanyName}%");
-        })
-        // ✅ FILTER BY loan_taken_period
-        ->when($startPeriod && $endPeriod, function ($q) use ($startPeriod, $endPeriod) {
-            return $q->whereBetween('l.loan_taken_period', [$startPeriod, $endPeriod]);
-        })
-        ->when($startPeriod && !$endPeriod, function ($q) use ($startPeriod) {
-            return $q->where('l.loan_taken_period', '>=', $startPeriod);
-        })
-        ->when($endPeriod && !$startPeriod, function ($q) use ($endPeriod) {
-            return $q->where('l.loan_taken_period', '<=', $endPeriod);
-        })
-        ->orderBy('l.loan_taken_period', 'desc')
-        ->orderBy('l.loan_on', 'desc');
+                // Company
+                'c.company_name'
+            )
+            ->when($searchName, function ($q) use ($searchName) {
+                return $q->where('m.member_name', 'like', "%{$searchName}%");
+            })
+            ->when($searchSaccoId, function ($q) use ($searchSaccoId) {
+                return $q->where('m.member_sacco_id', 'like', "%{$searchSaccoId}%");
+            })
+            ->when($searchCompanyName, function ($q) use ($searchCompanyName) {
+                return $q->where('c.company_name', 'like', "%{$searchCompanyName}%");
+            })
+            // ✅ FILTER BY loan_taken_period
+            ->when($startPeriod && $endPeriod, function ($q) use ($startPeriod, $endPeriod) {
+                return $q->whereBetween('l.loan_taken_period', [$startPeriod, $endPeriod]);
+            })
+            ->when($startPeriod && !$endPeriod, function ($q) use ($startPeriod) {
+                return $q->where('l.loan_taken_period', '>=', $startPeriod);
+            })
+            ->when($endPeriod && !$startPeriod, function ($q) use ($endPeriod) {
+                return $q->where('l.loan_taken_period', '<=', $endPeriod);
+            })
+            ->orderBy('l.loan_taken_period', 'desc')
+            ->orderBy('l.loan_on', 'desc');
 
-    return Excel::download(new LoansIssuedExport($query), 'loans_issued.xlsx');
-}
+        return Excel::download(new LoansIssuedExport($query), 'loans_issued.xlsx');
+    }
 
 
 
