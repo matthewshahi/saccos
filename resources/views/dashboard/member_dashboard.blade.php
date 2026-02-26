@@ -4,7 +4,7 @@
 
 @include("member_name")
 
-@include('partials.junior-context-banner', ['data' => $data ?? null])
+@include('dashboard.junior-context-banner', ['data' => $data ?? null])
 @include('dashboard.payment_options')
  
 
