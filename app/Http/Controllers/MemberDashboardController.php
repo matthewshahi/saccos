@@ -7,59 +7,92 @@ use Illuminate\Support\Facades\DB;
 
 class MemberDashboardController extends Controller
 {
+    /**
+     * Resolve the "effective" member id for dashboard context.
+     *
+     * Default: logged-in member.
+     * If ?view_as_member=y&jaccount=123 is present:
+     *   - ONLY allow if jaccount is a junior account
+     *   - AND it belongs to the logged-in guardian.
+     * Otherwise fallback to logged-in member id.
+     */
+    private function resolveEffectiveMemberId(): int
+    {
+        $guardianId = (int) Auth::user()->id;
+
+        if (request()->query('view_as_member') !== 'y') {
+            return $guardianId;
+        }
+
+        $jaccount = request()->query('jaccount');
+        if ($jaccount === null || $jaccount === '') {
+            return $guardianId;
+        }
+
+        $juniorId = (int) $jaccount;
+
+        $isValidJunior = DB::table('sacco_members')
+            ->where('member_id', $juniorId)
+            ->where('member_is_junior', 1)
+            ->where('member_guardian_id', $guardianId)
+            ->where('member_deleted', 'N')
+            ->exists();
+
+        return $isValidJunior ? $juniorId : $guardianId;
+    }
+
     public function index()
     {
+        $memberId   = $this->resolveEffectiveMemberId();
+        $guardianId = (int) Auth::user()->id;
 
-
-        // Fetch the logged-in member's data
+        // Fetch the effective member's data (guardian OR junior)
         $member = DB::table('sacco_members')
-
-            ->where('member_id', Auth::user()->id)
+            ->where('member_id', $memberId)
             ->where('member_active', 'Y')
             ->first();
 
-        // Check if the member data exists
         if (!$member) {
             abort(404, 'Member not found');
         }
 
-        // Fetch the last 6 share payments for the logged-in member
+        // Last 6 share payments (effective member)
         $shares = DB::table('sacco_shares')
             ->select('share_period', 'share_amount_paying')
-            ->where('share_member_id', Auth::user()->id)
+            ->where('share_member_id', $memberId)
             ->orderBy('share_period', 'desc')
             ->orderBy('share_date_paid', 'desc')
             ->limit(6)
             ->get()
-            ->reverse(); // Reverse the order to display oldest to latest
+            ->reverse();
 
-        // Extract periods and amounts for the chart
         $labels = $shares->pluck('share_period')->map(function ($period) {
-            return substr($period, 0, 4) . '-' . substr($period, 4); // Format YYYYMM as YYYY-MM
+            return substr($period, 0, 4) . '-' . substr($period, 4);
         });
         $amounts = $shares->pluck('share_amount_paying');
 
+        // Pending loans (effective member)
         $pendingLoans = DB::table('sacco_loans')
             ->join('sacco_loan_types', 'sacco_loans.loan_loan_type', '=', 'sacco_loan_types.loan_type_id')
             ->select(
                 'sacco_loans.loan_id',
-                'sacco_loan_types.loan_type_name', // Fetch the loan type name
+                'sacco_loan_types.loan_type_name',
                 'sacco_loans.loan_amount',
                 'sacco_loans.loan_loan_paid',
                 'sacco_loans.loan_taken_period',
-                DB::raw('loan_amount - loan_loan_paid AS loan_balance') // Calculate loan balance
+                DB::raw('loan_amount - loan_loan_paid AS loan_balance')
             )
-            ->where('loan_member', Auth::user()->id)
-            ->whereRaw('loan_amount - loan_loan_paid > 1') // Exclude fully paid loans
+            ->where('loan_member', $memberId)
+            ->whereRaw('loan_amount - loan_loan_paid > 1')
             ->orderBy('loan_taken_period', 'desc')
             ->limit(6)
             ->get();
 
-        // Fetch the next of kin for the logged-in member
+        // Next of kin (effective member)
         $nextOfKin = DB::table('sacco_next_of_kin')
             ->join('sacco_kin_type', 'sacco_next_of_kin.kin_relationship', '=', 'sacco_kin_type.kin_type_id')
-            ->where('kin_member_id', Auth::user()->id)
-            ->where('kin_deleted', 'N') // Ensure only active records
+            ->where('kin_member_id', $memberId)
+            ->where('kin_deleted', 'N')
             ->select(
                 'sacco_next_of_kin.kin_names',
                 'sacco_next_of_kin.kin_address',
@@ -77,9 +110,8 @@ class MemberDashboardController extends Controller
 
         $operators = [];
 
-
+        // Transport operators remain tied to the logged-in guardian (asset owner), not the junior
         if (config('sacco.transport_sacco') === 'Y') {
-
             $operators = DB::table('sacco_matatus_operators')
                 ->leftJoin(
                     'sacco_matatus_operator_vehicle_assignments',
@@ -94,7 +126,7 @@ class MemberDashboardController extends Controller
                     'sacco_matatus_vehicles.id'
                 )
                 ->where('sacco_matatus_operators.status', 'active')
-                ->where('sacco_matatus_vehicles.vehicles_member_id', Auth::user()->id)   // 🔥 KEY FILTER
+                ->where('sacco_matatus_vehicles.vehicles_member_id', $guardianId)
                 ->select(
                     'sacco_matatus_operators.id AS operator_id',
                     'sacco_matatus_operators.full_name',
@@ -109,26 +141,28 @@ class MemberDashboardController extends Controller
                 ->get();
         }
 
-
-
-
-
-        // Package all data for the view
         $data = [
-            'member'        => $member,
-            'pendingLoans'  => $pendingLoans,
-            'nextOfKin'     => $nextOfKin,
-            'labels'        => $labels,
-            'amounts'       => $amounts,
+            'member'         => $member,
+            'pendingLoans'   => $pendingLoans,
+            'nextOfKin'      => $nextOfKin,
+            'labels'         => $labels,
+            'amounts'        => $amounts,
             'paymentOptions' => $paymentOptions,
-            'operators' => $operators,
-        ];
+            'operators'      => $operators,
 
+            // Optional: view context hints (harmless if unused by blade)
+            'effective_member_id' => $memberId,
+            'guardian_member_id'  => $guardianId,
+            'is_viewing_junior'   => ($memberId !== $guardianId),
+        ];
 
         return view('dashboard.member_dashboard', compact('data'));
     }
+
     public function shareListings()
     {
+        $memberId = $this->resolveEffectiveMemberId();
+
         $shares = DB::table('sacco_shares')
             ->select(
                 'share_id',
@@ -139,25 +173,25 @@ class MemberDashboardController extends Controller
                 'share_doc_no',
                 'share_date_paid'
             )
-            ->where('share_member_id', Auth::user()->id)
+            ->where('share_member_id', $memberId)
             ->orderBy('share_period', 'asc')
             ->get();
 
-        // Calculate running balance
         $runningBalance = 0;
         foreach ($shares as $share) {
             $runningBalance += $share->share_amount_paying;
-            $share->running_balance = $runningBalance; // Add running balance to each record
+            $share->running_balance = $runningBalance;
         }
 
-        $data = [
-            'shares' => $shares,
-        ];
+        $data = ['shares' => $shares];
 
         return view('members.share_listings', compact('data'));
     }
+
     public function capitalListings()
     {
+        $memberId = $this->resolveEffectiveMemberId();
+
         $capitalShares = DB::table('sacco_capital_shares')
             ->select(
                 'share_capitalid',
@@ -168,28 +202,25 @@ class MemberDashboardController extends Controller
                 'share_capitaldoc_no',
                 'share_capitaldate_paid'
             )
-            ->where('share_capitalmember_id', Auth::user()->id)
+            ->where('share_capitalmember_id', $memberId)
             ->orderBy('share_capitalperiod', 'asc')
             ->get();
 
-        // Calculate running balance
         $runningBalance = 0;
         foreach ($capitalShares as $capital) {
             $runningBalance += $capital->share_capitalamount_paying;
-            $capital->running_balance = $runningBalance; // Add running balance to each record
+            $capital->running_balance = $runningBalance;
         }
 
-        $data = [
-            'capitalShares' => $capitalShares,
-        ];
+        $data = ['capitalShares' => $capitalShares];
 
         return view('members.capital_listings', compact('data'));
     }
+
     public function fosaListings()
     {
-        $memberId = Auth::user()->id;
+        $memberId = $this->resolveEffectiveMemberId();
 
-        // Fetch contributions + join fosa types
         $fosaContributions = DB::table('sacco_fosas')
             ->leftJoin('sacco_fosa_types', 'sacco_fosas.fosa_type_id', '=', 'sacco_fosa_types.type_id')
             ->select(
@@ -203,12 +234,10 @@ class MemberDashboardController extends Controller
             ->orderBy('fosa_date_paid')
             ->get();
 
-        // GROUPING BY TYPE
         $fosaGrouped = $fosaContributions->groupBy(function ($row) {
             return $row->type_name ?: 'UNSPECIFIED';
         });
 
-        // Running balance PER GROUP
         foreach ($fosaGrouped as $type => $rows) {
             $running = 0;
             foreach ($rows as $r) {
@@ -224,10 +253,10 @@ class MemberDashboardController extends Controller
         ]);
     }
 
-
     public function loansTaken()
     {
-        // Fetch outstanding loans for the logged-in member
+        $memberId = $this->resolveEffectiveMemberId();
+
         $loans = DB::table('sacco_loans')
             ->join('sacco_loan_types', 'sacco_loans.loan_loan_type', '=', 'sacco_loan_types.loan_type_id')
             ->join('sacco_loan_category', 'sacco_loans.loan_loan_category', '=', 'sacco_loan_category.loan_category_id')
@@ -242,14 +271,12 @@ class MemberDashboardController extends Controller
                 'sacco_loans.loan_taken_period',
                 'sacco_loans.loan_doc_no',
                 'sacco_loans.loan_description',
-                DB::raw('loan_amount - loan_loan_paid AS loan_balance') // Calculate loan balance
+                DB::raw('loan_amount - loan_loan_paid AS loan_balance')
             )
-            ->where('loan_member', Auth::user()->id)
-            // ->whereRaw('loan_amount - loan_loan_paid > 1') // Only outstanding loans
+            ->where('loan_member', $memberId)
             ->orderBy('loan_taken_period', 'desc')
             ->get();
 
-        // Fetch loan repayments for each loan
         $repayments = DB::table('sacco_loan_payments')
             ->whereIn('loan_payments_loan_id', $loans->pluck('loan_id'))
             ->select(
@@ -264,23 +291,18 @@ class MemberDashboardController extends Controller
             ->orderBy('loan_payments_period', 'asc')
             ->get();
 
-        // Group repayments by loan ID and dynamically calculate balances
         $repaymentsByLoan = $repayments->groupBy('loan_payments_loan_id');
         foreach ($loans as $loan) {
             $loan->repayments = $repaymentsByLoan[$loan->loan_id] ?? [];
-            $runningBalance = $loan->loan_amount; // Start with the loan amount
+            $runningBalance = $loan->loan_amount;
 
             foreach ($loan->repayments as $repayment) {
-                // Subtract principal immediately from the initial balance
                 $runningBalance -= $repayment->loan_payments_amount;
-                $repayment->outstanding_balance = $runningBalance; // Set the current balance
+                $repayment->outstanding_balance = $runningBalance;
             }
         }
 
-        // Prepare data for the view
-        $data = [
-            'loans' => $loans,
-        ];
+        $data = ['loans' => $loans];
 
         return view('members.loans_taken', compact('data'));
     }
