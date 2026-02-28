@@ -44,7 +44,7 @@ class LoanApplicationController extends Controller
         */
         $loanTypes = DB::table('sacco_loan_types')
             ->where('loan_type_deleted', 'N')
-            ->where('loan_type_guaranteable_percent', 0)
+            // ->where('loan_type_guaranteable_percent', 0)
             ->orderBy('loan_type_name')
             ->get()
             ->map(function ($t) {
