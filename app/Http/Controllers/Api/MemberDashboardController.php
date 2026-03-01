@@ -358,7 +358,7 @@ foreach ($duesItems as $it) {
     }
 
     return $items;
-}
+} 
 private function getQuickPayments(int $memberId): array
     {
         // Savings & Capital (static)
