@@ -10,8 +10,8 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
 
-    use Illuminate\Support\Facades\Validator;
- 
+use Illuminate\Support\Facades\Validator;
+
 class LoanApplicationController extends Controller
 {
     /**
@@ -44,7 +44,7 @@ class LoanApplicationController extends Controller
         */
         $loanTypes = DB::table('sacco_loan_types')
             ->where('loan_type_deleted', 'N')
-           // ->where('loan_type_guaranteable_percent', 0)
+            // ->where('loan_type_guaranteable_percent', 0)
             ->orderBy('loan_type_name')
             ->get()
             ->map(function ($t) {
@@ -70,7 +70,7 @@ class LoanApplicationController extends Controller
                     'insurable'            => $t->loan_type_insurable === 'Y',
                     'share_factor'         => (int) $t->loan_type_share_factor,
 
-                    'loan_type_guaranteable_percent'=>$t->loan_type_guaranteable_percent,
+                    'loan_type_guaranteable_percent' => $t->loan_type_guaranteable_percent,
                 ];
             })
             ->values();
@@ -205,9 +205,7 @@ class LoanApplicationController extends Controller
      * Fully server-authoritative. No client trust.
      */
 
-
-
-public function apply(Request $request)
+  public function apply(Request $request)
 {
     // 1) Auth
     $member = $request->user();
@@ -220,10 +218,24 @@ public function apply(Request $request)
 
     $memberId = (int) $member->member_id;
 
+    // Helpers (do NOT reveal names)
+    $maskKeepLast3 = function ($v) {
+        $s = trim((string)$v);
+        if ($s === '') return $s;
+        if (mb_strlen($s) <= 3) return '***';
+        return str_repeat('*', mb_strlen($s) - 3) . mb_substr($s, -3);
+    };
+
+    $safeGuarantorLabel = function (string $saccoId, string $nationalId) use ($maskKeepLast3) {
+        $sid = strtoupper(trim($saccoId));
+        $nid = trim($nationalId);
+        return "SACCO ID {$sid}, National ID " . $maskKeepLast3($nid);
+    };
+
     // 2) Force JSON validation (no redirects)
     $validator = Validator::make($request->all(), [
         'loan_type_id'      => 'required|integer',
-        'loan_category_id'  => 'nullable|integer',   // you reference it later
+        'loan_category_id'  => 'nullable|integer',
         'amount'            => 'required|numeric|min:1',
         'duration_months'   => 'required|integer|min:1',
         'reason'            => 'nullable|string|max:255',
@@ -233,7 +245,9 @@ public function apply(Request $request)
         'designation'       => 'nullable|string|max:100',
         'employment_terms'  => 'nullable|string|max:100',
 
-        // IMPORTANT: do this instead of manual FILTER_VALIDATE_BOOLEAN
+        // guarantors array from mobile app (deep validation below)
+        'guarantors'        => 'nullable|array',
+
         'agree'             => 'required|accepted',
     ], [
         'agree.accepted' => 'You must agree to the terms and conditions before submitting a loan application.',
@@ -249,9 +263,147 @@ public function apply(Request $request)
 
     $validated = $validator->validated();
 
-    // 3) Stable payload hash (avoid float weirdness by normalizing)
+    // ------------------------------------------------------------
+    // Validate + normalize guarantors BEFORE throttling/saving
+    // ------------------------------------------------------------
+    $loanType = DB::table('sacco_loan_types')
+        ->select('loan_type_id', 'loan_type_guaranteable_percent')
+        ->where('loan_type_id', (int) $validated['loan_type_id'])
+        ->first();
+
+    if (!$loanType) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Invalid loan type.',
+        ], 422);
+    }
+
+    $guarantePercent = (int) ($loanType->loan_type_guaranteable_percent ?? 0);
+
+    $rawGuarantors = $request->input('guarantors', []);
+    if (!is_array($rawGuarantors)) $rawGuarantors = [];
+
+    // Optional cap (keeps you aligned with legacy max if set)
+    $maxGuarantors = DB::table('sacco_defaults')
+        ->where('default_name', 'maximum_no_of_guarantors')
+        ->value('default_value');
+    $maxGuarantors = is_numeric($maxGuarantors) ? (int) $maxGuarantors : 0;
+
+    if ($maxGuarantors > 0 && count($rawGuarantors) > $maxGuarantors) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Guarantor validation failed.',
+            'errors'  => [
+                'guarantors' => "Too many guarantors submitted. Maximum allowed is {$maxGuarantors}.",
+            ],
+        ], 422);
+    }
+
+    // Legacy-required structures
+    $legacyGuarantorNames   = [];  // ["NAME - (SACCO_ID)", ...] (internal only)
+    $legacyGuarantorAmounts = [];  // [1000, 5000, ...]
+    $legacyToSafeLabel      = [];  // map legacy label => safe label (no names)
+    $hashGuarantors         = [];  // for payload hash (no names)
+
+    if ($guarantePercent > 0) {
+        $gErrors = [];
+        $totalGuaranteed = 0.0;
+
+        foreach (array_values($rawGuarantors) as $idx => $g) {
+            if (!is_array($g)) {
+                $gErrors["guarantors.$idx"] = "Guarantor row " . ($idx + 1) . " is invalid.";
+                continue;
+            }
+
+            // support both keys: member_no OR member_sacco_id
+            $saccoId    = strtoupper(trim((string)($g['member_sacco_id'] ?? $g['member_no'] ?? '')));
+            $nationalId = trim((string)($g['national_id'] ?? $g['member_national_id'] ?? ''));
+            $amountRaw  = $g['amount'] ?? null;
+
+            // allow blank rows
+            $allBlank = ($saccoId === '' && $nationalId === '' && ($amountRaw === null || $amountRaw === ''));
+            if ($allBlank) continue;
+
+            if ($saccoId === '') {
+                $gErrors["guarantors.$idx.member_no"] =
+                    "Guarantor row " . ($idx + 1) . ": Member Number (SACCO ID) is required.";
+                continue;
+            }
+
+            if ($nationalId === '') {
+                $gErrors["guarantors.$idx.national_id"] =
+                    "Guarantor row " . ($idx + 1) . ": National ID is required.";
+                continue;
+            }
+
+            $amount = is_numeric($amountRaw)
+                ? (float) $amountRaw
+                : (float) str_replace(',', '', (string) $amountRaw);
+
+            if (!is_numeric($amount) || $amount <= 0) {
+                $gErrors["guarantors.$idx.amount"] =
+                    "Guarantor row " . ($idx + 1) . ": Amount must be greater than zero.";
+                continue;
+            }
+
+            // validate member exists by sacco_id + national_id
+            $gMember = DB::table('sacco_members')
+                ->select('member_id', 'member_name', 'member_sacco_id', 'member_national_id')
+                ->where('member_sacco_id', $saccoId)
+                ->where('member_national_id', $nationalId)
+                ->where('member_active', 'Y')
+                ->where('member_deleted', '<>', 'Y')
+                ->first();
+
+            if (!$gMember) {
+                $gErrors["guarantors.$idx"] =
+                    "Guarantor row " . ($idx + 1) . ": No active member found for " .
+                    $safeGuarantorLabel($saccoId, $nationalId) . ".";
+                continue;
+            }
+
+            // Legacy internal label (do not expose to user)
+            $legacyLabel = $gMember->member_name . ' - (' . $gMember->member_sacco_id . ')';
+            $safeLabel   = $safeGuarantorLabel($gMember->member_sacco_id, $gMember->member_national_id);
+
+            $legacyGuarantorNames[]   = $legacyLabel;
+            $legacyGuarantorAmounts[] = $amount;
+            $legacyToSafeLabel[$legacyLabel] = $safeLabel;
+
+            // Include guarantors in hash WITHOUT names
+            $hashGuarantors[] = [
+                'member_sacco_id'    => strtoupper((string)$gMember->member_sacco_id),
+                'member_national_id' => (string)$gMember->member_national_id,
+                'amount'             => (string) number_format($amount, 2, '.', ''),
+            ];
+
+            $totalGuaranteed += $amount;
+        }
+
+        if (count($legacyGuarantorNames) === 0) {
+            $gErrors["guarantors"] = "Guarantors are required for this loan type.";
+        }
+
+        $loanAmount = (float) $validated['amount'];
+        $requiredGuaranteed = $loanAmount * $guarantePercent / 100;
+
+        if ($requiredGuaranteed > 0 && $totalGuaranteed + 0.000001 < $requiredGuaranteed) {
+            $gErrors["guarantors_total"] =
+                "Total guaranteed amount is insufficient. Required: {$requiredGuaranteed}, provided: {$totalGuaranteed}.";
+        }
+
+        if (!empty($gErrors)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Guarantor validation failed.',
+                'errors'  => $gErrors,
+            ], 422);
+        }
+    }
+
+    // 3) Payload hash (include guarantors so duplicates are correct)
     $hashSource = [
-        'member_id'        => $memberId,
+        'member_id'         => $memberId,
         'loan_type_id'      => (int) $validated['loan_type_id'],
         'loan_category_id'  => (int) ($validated['loan_category_id'] ?? 1),
         'amount'            => (string) number_format((float) $validated['amount'], 2, '.', ''),
@@ -261,12 +413,13 @@ public function apply(Request $request)
         'payroll_number'    => trim((string) ($validated['payroll_number'] ?? '')),
         'designation'       => trim((string) ($validated['designation'] ?? '')),
         'employment_terms'  => trim((string) ($validated['employment_terms'] ?? '')),
+        'guarantors'        => $hashGuarantors,
         'agree'             => 1,
     ];
 
     $payloadHash = hash('sha256', json_encode($hashSource));
 
-    // 4) Duplicates
+    // 4) Duplicates / cooldown (only applies to SUCCESSFUL submissions we saved)
     $existsExact = DB::table('sacco_mobile_app_loan_applications')
         ->where('mobile_app_payload_hash', $payloadHash)
         ->exists();
@@ -292,107 +445,100 @@ public function apply(Request $request)
         ], 429);
     }
 
-    // 5) Save + forward safely
-    return DB::transaction(function () use ($request, $member, $memberId, $validated, $payloadHash) {
+    // 5) Forward to legacy FIRST (do NOT save mobile_app table unless legacy succeeds)
+    $legacyBase = [
+        'batch_trans_member_id'            => $memberId,
+        'batch_trans_member_name'          => $member->member_name,
+        'batch_trans_loan_type'            => (int) $validated['loan_type_id'],
+        'batch_trans_loan_category'        => (int) ($validated['loan_category_id'] ?? 1),
+        'batch_trans_loan_amount'          => (float) $validated['amount'],
+        'batch_trans_loan_duration'        => (int) $validated['duration_months'],
+        'batch_trans_description'          => $validated['reason'] ?? null,
+        'batch_trans_loan_to_top_up'       => $validated['topup_loan_id'] ?? null,
+        'batch_trans_payroll_number'       => $validated['payroll_number'] ?? null,
+        'batch_trans_present_designation'  => $validated['designation'] ?? null,
+        'batch_trans_terms_of_employment'  => $validated['employment_terms'] ?? null,
+        'context'                          => 'api',
+    ];
 
-        DB::table('sacco_mobile_app_loan_applications')->insert([
-            'mobile_app_member_id'         => $memberId,
-            'mobile_app_loan_type_id'      => (int) $validated['loan_type_id'],
-            'mobile_app_amount'            => (float) $validated['amount'],
-            'mobile_app_duration_months'   => (int) $validated['duration_months'],
-            'mobile_app_reason'            => $validated['reason'] ?? null,
-            'mobile_app_topup_loan_id'     => $validated['topup_loan_id'] ?? null,
+    if (!empty($legacyGuarantorNames)) {
+        $legacyBase['guarantors_guarantor_name']   = $legacyGuarantorNames;
+        $legacyBase['guarantors_amount_guaranteed'] = $legacyGuarantorAmounts;
+    }
 
-            'mobile_app_payroll_number'    => $validated['payroll_number'] ?? null,
-            'mobile_app_designation'       => $validated['designation'] ?? null,
-            'mobile_app_employment_terms'  => $validated['employment_terms'] ?? null,
+    $legacyRequest = Request::create('/api/legacy/submit-loan', 'POST', $legacyBase);
+    $legacyRequest->setUserResolver(fn () => $request->user());
+    $legacyRequest->headers->set('Accept', 'application/json');
+    $legacyRequest->headers->set('X-Requested-With', 'XMLHttpRequest');
 
-            'mobile_app_agree'             => 1,
-            'mobile_app_payload_hash'      => $payloadHash,
-            'mobile_app_submitted_at'      => now(),
-            'mobile_app_status'            => 'pending',
+    $legacyResponse = app(\App\Http\Controllers\HomeController::class)
+        ->submitLoanApplication($legacyRequest);
 
-            'mobile_app_submitted_ip'      => $request->ip(),
-            'mobile_app_submitted_by'      => 'mobile_app',
-        ]);
+    // Normalize legacy response (expected to be JSON)
+    if ($legacyResponse instanceof \Illuminate\Http\JsonResponse) {
+        $status = $legacyResponse->status();
+        $data   = $legacyResponse->getData(true);
 
-        // Forward to legacy (make it look like an AJAX/JSON request)
-        $legacyRequest = Request::create('/legacy/submit-loan', 'POST', [
-            'batch_trans_member_id'            => $memberId,
-            'batch_trans_member_name'          => $member->member_name,
-            'batch_trans_loan_type'            => (int) $validated['loan_type_id'],
-            'batch_trans_loan_category'        => (int) ($validated['loan_category_id'] ?? 1),
-            'batch_trans_loan_amount'          => (float) $validated['amount'],
-            'batch_trans_loan_duration'        => (int) $validated['duration_months'],
-            'batch_trans_description'          => $validated['reason'] ?? null,
-            'batch_trans_loan_to_top_up'       => $validated['topup_loan_id'] ?? null,
-            'batch_trans_payroll_number'       => $validated['payroll_number'] ?? null,
-            'batch_trans_present_designation'  => $validated['designation'] ?? null,
-            'batch_trans_terms_of_employment'  => $validated['employment_terms'] ?? null,
-        ]);
+        // sanitize any legacy strings that include names ("NAME - (SACCO_ID)")
+        if (!empty($legacyToSafeLabel)) {
+            if (isset($data['message']) && is_string($data['message'])) {
+                foreach ($legacyToSafeLabel as $legacyLabel => $safeLabel) {
+                    $data['message'] = str_replace($legacyLabel, $safeLabel, $data['message']);
+                }
+            }
 
-        // --------------------------------------------------
-// Force API context for legacy handler
-// --------------------------------------------------
-$legacyRequest = Request::create(
-    '/api/legacy/submit-loan', // MUST match api/*
-    'POST',
-    array_merge(
-        $legacyRequest->request->all() ?? [],
-        [
-            'context' => 'api', // explicit override (belt + braces)
-        ]
-    )
-);
+            if (isset($data['errors']) && is_array($data['errors'])) {
+                array_walk_recursive($data['errors'], function (&$val) use ($legacyToSafeLabel) {
+                    if (!is_string($val)) return;
+                    foreach ($legacyToSafeLabel as $legacyLabel => $safeLabel) {
+                        $val = str_replace($legacyLabel, $safeLabel, $val);
+                    }
+                });
+            }
+        }
 
-// Bind authenticated user
-$legacyRequest->setUserResolver(fn () => $request->user());
+        // If legacy FAILED, do NOT save into sacco_mobile_app_loan_applications
+        if ($status < 200 || $status >= 300) {
+            return response()->json($data, $status);
+        }
 
-// Force API headers
-$legacyRequest->headers->set('Accept', 'application/json');
-$legacyRequest->headers->set('X-Requested-With', 'XMLHttpRequest');
+        // Legacy SUCCESS => NOW save to sacco_mobile_app_loan_applications (this is the only “logging” left)
+        try {
+            DB::table('sacco_mobile_app_loan_applications')->insert([
+                'mobile_app_member_id'         => $memberId,
+                'mobile_app_loan_type_id'      => (int) $validated['loan_type_id'],
+                'mobile_app_amount'            => (float) $validated['amount'],
+                'mobile_app_duration_months'   => (int) $validated['duration_months'],
+                'mobile_app_reason'            => $validated['reason'] ?? null,
+                'mobile_app_topup_loan_id'     => $validated['topup_loan_id'] ?? null,
 
-// --------------------------------------------------
-// 🔎 Diagnostics — REMOVE after confirmation
-// --------------------------------------------------
-Log::info('Forwarding loan application to legacy handler', [
-    'legacy_path'   => $legacyRequest->path(),
-    'is_api_path'   => $legacyRequest->is('api/*'),
-    'context_param' => $legacyRequest->get('context'),
-    'expects_json'  => $legacyRequest->expectsJson(),
-    'member_id'     => optional($request->user())->member_id,
-]);
+                'mobile_app_payroll_number'    => $validated['payroll_number'] ?? null,
+                'mobile_app_designation'       => $validated['designation'] ?? null,
+                'mobile_app_employment_terms'  => $validated['employment_terms'] ?? null,
 
-// Execute legacy handler
-$legacyResponse = app(\App\Http\Controllers\HomeController::class)
-    ->submitLoanApplication($legacyRequest);
+                'mobile_app_agree'             => 1,
+                'mobile_app_payload_hash'      => $payloadHash,
+                'mobile_app_submitted_at'      => now(),
+                'mobile_app_status'            => 'pending',
 
-// --------------------------------------------------
-// 🔎 Capture legacy response shape
-// --------------------------------------------------
-Log::info('Legacy loan submission response', [
-    'response_type' => is_object($legacyResponse)
-        ? get_class($legacyResponse)
-        : gettype($legacyResponse),
-    'status'        => method_exists($legacyResponse, 'status')
-        ? $legacyResponse->status()
-        : null,
-]);
+                'mobile_app_submitted_ip'      => $request->ip(),
+                'mobile_app_submitted_by'      => 'mobile_app',
+            ]);
+        } catch (\Throwable $e) {
+            // Do not break a successful loan submission; just record internally.
+            Log::error('MOBILE LOAN APPLY: failed to insert audit row after legacy success', [
+                'member_id' => $memberId,
+                'error'     => $e->getMessage(),
+            ]);
+        }
 
-// --------------------------------------------------
-// Normalize response for API
-// --------------------------------------------------
-if ($legacyResponse instanceof \Illuminate\Http\JsonResponse) {
-    return $legacyResponse;
+        return response()->json($data, $status);
+    }
+
+    // Fallback (should not happen if Accept JSON is respected)
+    return response()->json([
+        'success' => false,
+        'message' => 'Unexpected legacy response. Please try again or contact support.',
+    ], 500);
 }
-
-
-        // Otherwise normalize to API response
-        return response()->json([
-            'success' => true,
-            'message' => 'Your loan application has been received and saved for further processing.',
-        ], 201);
-    });
-}
-
 }

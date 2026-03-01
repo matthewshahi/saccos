@@ -54,7 +54,7 @@ use App\Http\Controllers\MemberFinancialPositionController;
 use App\Http\Controllers\FosaTransferController;
 use App\Http\Controllers\Reports\FinalAccountsController;
 use App\Http\Controllers\Reports\LedgerController;
- 
+
 
 use App\Http\Controllers\KassMigrationController;
 use App\Http\Controllers\KasMemberImportController;
@@ -536,6 +536,8 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
             Route::get('/create', [FosaTypeController::class, 'create'])->name('fosa.create');
             Route::post('/store', [FosaTypeController::class, 'store'])->name('fosa.store');
             Route::post('/{id}/toggle', [FosaTypeController::class, 'toggle'])->name('fosa.toggle');
+            Route::get('/{id}/edit', [FosaTypeController::class, 'edit'])->name('fosa.edit');
+Route::post('/{id}/update', [FosaTypeController::class, 'update'])->name('fosa.update');
         });
 
 
@@ -588,8 +590,7 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
                 ->name('fosa.transactions.import.preview.show');
 
             Route::put('/transactions/{id}/type', [FosaTransactionController::class, 'updateType'])
-    ->name('fosa.transactions.updateType');
-
+                ->name('fosa.transactions.updateType');
         });
 
     Route::post('/transactions/import/process', [FosaImportController::class, 'process'])
@@ -1101,79 +1102,91 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
         )->name('fosa.transfers.ledger_search')->middleware('check_user_rights:trasfer_fosa');
     });
 
- 
-     // =========================
+
+    // =========================
     // TRIAL BALANCE
     // =========================
-    Route::get('/reports/final-accounts/trial-balance',
+    Route::get(
+        '/reports/final-accounts/trial-balance',
         [FinalAccountsController::class, 'trialBalance']
     )->name('reports.final_accounts.trial_balance')
-     ->middleware('check_user_rights:rpt_trial_balance');
+        ->middleware('check_user_rights:rpt_trial_balance');
 
-    Route::get('/reports/final-accounts/trial-balance/pdf',
+    Route::get(
+        '/reports/final-accounts/trial-balance/pdf',
         [FinalAccountsController::class, 'trialBalancePdf']
     )->name('reports.final_accounts.trial_balance.pdf')
-     ->middleware('check_user_rights:rpt_trial_balance');
+        ->middleware('check_user_rights:rpt_trial_balance');
 
-    Route::get('/reports/final-accounts/trial-balance/excel',
+    Route::get(
+        '/reports/final-accounts/trial-balance/excel',
         [FinalAccountsController::class, 'trialBalanceExcel']
     )->name('reports.final_accounts.trial_balance.excel')
-     ->middleware('check_user_rights:rpt_trial_balance');
+        ->middleware('check_user_rights:rpt_trial_balance');
 
 
     // =========================
     // PROFIT & LOSS
     // =========================
-    Route::get('/reports/final-accounts/profit-loss',
+    Route::get(
+        '/reports/final-accounts/profit-loss',
         [FinalAccountsController::class, 'profitLoss']
     )->name('reports.final_accounts.profit_loss')
-     ->middleware('check_user_rights:rpt_profit_loss');
+        ->middleware('check_user_rights:rpt_profit_loss');
 
-    Route::get('/reports/final-accounts/profit-loss/pdf',
+    Route::get(
+        '/reports/final-accounts/profit-loss/pdf',
         [FinalAccountsController::class, 'profitLossPdf']
     )->name('reports.final_accounts.profit_loss.pdf')
-     ->middleware('check_user_rights:rpt_profit_loss');
+        ->middleware('check_user_rights:rpt_profit_loss');
 
-    Route::get('/reports/final-accounts/profit-loss/excel',
+    Route::get(
+        '/reports/final-accounts/profit-loss/excel',
         [FinalAccountsController::class, 'profitLossExcel']
     )->name('reports.final_accounts.profit_loss.excel')
-     ->middleware('check_user_rights:rpt_profit_loss');
+        ->middleware('check_user_rights:rpt_profit_loss');
 
 
     // =========================
     // BALANCE SHEET
     // =========================
-    Route::get('/reports/final-accounts/balance-sheet',
+    Route::get(
+        '/reports/final-accounts/balance-sheet',
         [FinalAccountsController::class, 'balanceSheet']
     )->name('reports.final_accounts.balance_sheet')
-     ->middleware('check_user_rights:rpt_balance_sheet');
+        ->middleware('check_user_rights:rpt_balance_sheet');
 
-    Route::get('/reports/final-accounts/balance-sheet/pdf',
+    Route::get(
+        '/reports/final-accounts/balance-sheet/pdf',
         [FinalAccountsController::class, 'balanceSheetPdf']
     )->name('reports.final_accounts.balance_sheet.pdf')
-     ->middleware('check_user_rights:rpt_balance_sheet');
+        ->middleware('check_user_rights:rpt_balance_sheet');
 
-    Route::get('/reports/final-accounts/balance-sheet/excel',
+    Route::get(
+        '/reports/final-accounts/balance-sheet/excel',
         [FinalAccountsController::class, 'balanceSheetExcel']
     )->name('reports.final_accounts.balance_sheet.excel')
-     ->middleware('check_user_rights:rpt_balance_sheet');
+        ->middleware('check_user_rights:rpt_balance_sheet');
 
 
     // =========================
     // LEDGERS (DRILL-DOWN)
     // =========================
-    Route::get('/reports/ledgers/sub-account/{sub_account_id}',
-        [LedgerController::class, 'subAccountLedger']
-    )->name('reports.ledgers.sub_account')
-     ->middleware('check_user_rights:rpt_general_ledger');
+    // Route::get(
+    //     '/reports/ledgers/sub-account/{sub_account_id}',
+    //     [LedgerController::class, 'subAccountLedger']
+    // )->name('reports.ledgers.sub_account')
+    //     ->middleware('check_user_rights:rpt_general_ledger');
 
-    Route::get('/reports/ledgers/sub-account/{sub_account_id}/pdf',
-        [LedgerController::class, 'subAccountLedgerPdf']
-    )->name('reports.ledgers.sub_account.pdf')
-     ->middleware('check_user_rights:rpt_general_ledger');
+    // Route::get(
+    //     '/reports/ledgers/sub-account/{sub_account_id}/pdf',
+    //     [LedgerController::class, 'subAccountLedgerPdf']
+    // )->name('reports.ledgers.sub_account.pdf')
+    //     ->middleware('check_user_rights:rpt_general_ledger');
 
-    Route::get('/reports/ledgers/sub-account/{sub_account_id}/excel',
-        [LedgerController::class, 'subAccountLedgerExcel']
-    )->name('reports.ledgers.sub_account.excel')
-     ->middleware('check_user_rights:rpt_general_ledger');
+    // Route::get(
+    //     '/reports/ledgers/sub-account/{sub_account_id}/excel',
+    //     [LedgerController::class, 'subAccountLedgerExcel']
+    // )->name('reports.ledgers.sub_account.excel')
+    //     ->middleware('check_user_rights:rpt_general_ledger');
 });
