@@ -198,7 +198,13 @@ Route::prefix('kass-migration')->group(function () {
 
 // use App\Http\Controllers\ReportsShareController;
 
-// Route::get('/members/update-totals', [\App\Http\Controllers\MemberTotalsController::class, 'recalculateAll'])->name('members.recalculate.totals');
+Route::get('/members/update-totals', action: [\App\Http\Controllers\MemberTotalsController::class, 'recalculateAll'])->name(name: 'members.recalculate.totals');
+
+// routes/web.php (or your admin routes file)
+Route::get(
+    '/members/import-reconciliations',
+    action: [\App\Http\Controllers\MemberShareCapReconciliation::class, 'importReconciliations']
+)->name(name: 'members.import.reconciliations');
 
 // // Route::get('/members/import-transactions', [MemberImportController::class, 'showImportTransactionsForm'])->name('members.import.transactions.form');
 // // Route::post('/members/import-transactions', [MemberImportController::class, 'importSavingsAndShares'])->name('members.import.transactions');
