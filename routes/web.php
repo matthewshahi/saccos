@@ -716,6 +716,14 @@ Route::post('/{id}/update', [FosaTypeController::class, 'update'])->name('fosa.u
     Route::post('/institutions/store', [HomeController::class, 'storeInstitution'])->name('institutions.store')->middleware('check_user_rights:add_company');
     Route::get('/institutions/list', [HomeController::class, 'listInstitutions'])->name('institutions.list')->middleware('check_user_rights:edit_company');
 
+    Route::get('/institutions/edit/{id}', [HomeController::class, 'editInstitution'])
+    ->name('institutions.edit')
+    ->middleware('check_user_rights:edit_company');
+
+Route::post('/institutions/update/{id}', [HomeController::class, 'updateInstitution'])
+    ->name('institutions.update')
+    ->middleware('check_user_rights:edit_company');
+    
     Route::get('/modify/member/shares', [HomeController::class, 'modifyShares'])->name('modify.member.shares')->middleware('check_user_rights:modify_member_shares_journal');
     Route::post('/modify/member/shares', [HomeController::class, 'modifyShares'])->middleware('check_user_rights:modify_member_shares_journal');
     Route::get('/search/accounts', [HomeController::class, 'searchAccounts'])->name('search.accounts')->middleware('check_user_rights:modify_member_shares_journal');

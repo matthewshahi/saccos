@@ -807,26 +807,139 @@ class HomeController extends Controller
     }
 
     public function listInstitutions()
-    {
-        $institutions = DB::table('sacco_company')
-            ->leftJoin('sacco_sub_account', 'sacco_company.company_account', '=', 'sacco_sub_account.sub_account_id')
-            ->leftJoin('sacco_main_account', 'sacco_sub_account.sub_account_main_account', '=', 'sacco_main_account.main_account_id')
-            ->leftJoin('sacco_department', 'sacco_company.company_id', '=', 'sacco_department.department_company_id')
-            ->where('sacco_company.company_deleted', '<>', 'Y')
-            ->select(
-                'sacco_company.company_name',
-                'sacco_company.company_details',
-                'sacco_main_account.main_account_code',
-                'sacco_sub_account.sub_account_code',
-                'sacco_sub_account.sub_account_name',
-                'sacco_department.department_name'
-            )
-            ->orderBy('sacco_company.company_name')
-            ->get();
+{
+    $institutions = DB::table('sacco_company')
+        ->leftJoin('sacco_sub_account', 'sacco_company.company_account', '=', 'sacco_sub_account.sub_account_id')
+        ->leftJoin('sacco_main_account', 'sacco_sub_account.sub_account_main_account', '=', 'sacco_main_account.main_account_id')
+        ->leftJoin('sacco_department', function ($join) {
+            $join->on('sacco_company.company_id', '=', 'sacco_department.department_company_id')
+                 ->where('sacco_department.department_deleted', '<>', 'Y');
+        })
+        ->where('sacco_company.company_deleted', '<>', 'Y')
+        ->select(
+            'sacco_company.company_id',
+            'sacco_company.company_name',
+            'sacco_company.company_details',
+            'sacco_company.company_account',
+            'sacco_main_account.main_account_code',
+            'sacco_sub_account.sub_account_code',
+            'sacco_sub_account.sub_account_name',
+            DB::raw("GROUP_CONCAT(DISTINCT sacco_department.department_name ORDER BY sacco_department.department_name SEPARATOR ', ') as department_name")
+        )
+        ->groupBy(
+            'sacco_company.company_id',
+            'sacco_company.company_name',
+            'sacco_company.company_details',
+            'sacco_company.company_account',
+            'sacco_main_account.main_account_code',
+            'sacco_sub_account.sub_account_code',
+            'sacco_sub_account.sub_account_name'
+        )
+        ->orderBy('sacco_company.company_name')
+        ->get();
 
-        return view('institutions.list', ['data' => ['institutions' => $institutions]]);
+    return view('institutions.list', ['data' => ['institutions' => $institutions]]);
+}
+public function editInstitution($id)
+{
+    $institution = DB::table('sacco_company')
+        ->where('company_id', $id)
+        ->where('company_deleted', '<>', 'Y')
+        ->first();
+
+    if (!$institution) {
+        return redirect()->route('institutions.list')->with('error', 'Institution not found.');
     }
 
+    $departments = DB::table('sacco_department')
+        ->where('department_company_id', $id)
+        ->where('department_deleted', '<>', 'Y')
+        ->orderBy('department_name')
+        ->get();
+
+    $accounts = $this->getAccounts();
+
+    return view('institutions.edit', [
+        'data' => [
+            'institution' => $institution,
+            'departments' => $departments,
+            'accounts' => $accounts,
+        ]
+    ]);
+}
+
+public function updateInstitution(Request $request, $id)
+{
+    $institution = DB::table('sacco_company')
+        ->where('company_id', $id)
+        ->where('company_deleted', '<>', 'Y')
+        ->first();
+
+    if (!$institution) {
+        return redirect()->route('institutions.list')->with('error', 'Institution not found.');
+    }
+
+    $validator = Validator::make($request->all(), [
+        'company_name' => 'required|string|max:255|unique:sacco_company,company_name,' . $id . ',company_id',
+        'company_details' => 'nullable|string|max:1000',
+        'sub_account_id' => 'required|integer|exists:sacco_sub_account,sub_account_id',
+        'existing_departments' => 'nullable|array',
+        'existing_departments.*' => 'nullable|string|max:255',
+        'new_department_name' => 'nullable|string|max:255',
+    ]);
+
+    if ($validator->fails()) {
+        return redirect()->back()->withErrors($validator)->withInput();
+    }
+
+    DB::table('sacco_company')
+        ->where('company_id', $id)
+        ->update([
+            'company_name' => strtoupper($request->input('company_name')),
+            'company_details' => $request->input('company_details'),
+            'company_account' => $request->input('sub_account_id'),
+            'company_transdate' => now(),
+        ]);
+
+    if ($request->has('existing_departments')) {
+        foreach ($request->input('existing_departments') as $departmentId => $departmentName) {
+            if (!empty(trim($departmentName))) {
+                DB::table('sacco_department')
+                    ->where('department_id', $departmentId)
+                    ->where('department_company_id', $id)
+                    ->update([
+                        'department_name' => strtoupper(trim($departmentName)),
+                        'department_user_id' => auth()->id(),
+                        'department_ip' => $request->ip(),
+                        'department_transdate' => now(),
+                    ]);
+            }
+        }
+    }
+
+    if ($request->filled('new_department_name')) {
+        $newDepartmentName = strtoupper(trim($request->input('new_department_name')));
+
+        $exists = DB::table('sacco_department')
+            ->where('department_company_id', $id)
+            ->where('department_deleted', '<>', 'Y')
+            ->whereRaw('UPPER(department_name) = ?', [$newDepartmentName])
+            ->exists();
+
+        if (!$exists) {
+            DB::table('sacco_department')->insert([
+                'department_name' => $newDepartmentName,
+                'department_company_id' => $id,
+                'department_deleted' => 'N',
+                'department_user_id' => auth()->id(),
+                'department_ip' => $request->ip(),
+                'department_transdate' => now(),
+            ]);
+        }
+    }
+
+    return redirect()->route('institutions.list')->with('success', 'Institution updated successfully.');
+}
     public function editNextOfKin($id)
     {
         $member = DB::table('sacco_members')

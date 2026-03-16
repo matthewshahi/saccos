@@ -23,6 +23,19 @@
         <div class="col-md-12 mb-4">
             <div class="card text-start">
                 <div class="card-body">
+
+                    @if(session('success'))
+                        <div class="alert alert-success">
+                            {{ session('success') }}
+                        </div>
+                    @endif
+
+                    @if(session('error'))
+                        <div class="alert alert-danger">
+                            {{ session('error') }}
+                        </div>
+                    @endif
+
                     <div class="table-responsive">
                         <table class="display table table-striped table-bordered institutions-list-table" id="multicolumn_ordering_table" style="width: 100%">
                             <thead>
@@ -31,15 +44,27 @@
                                     <th>Account Number</th>
                                     <th>Company Details</th>
                                     <th>Department Name</th>
+                                    <th>Action</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @foreach($data['institutions'] as $institution)
                                     <tr>
                                         <td>{{ $institution->company_name }}</td>
-                                        <td>{{ $institution->main_account_code }}/{{ $institution->sub_account_code }} - {{ $institution->sub_account_name }}</td>
+                                        <td>
+                                            @if($institution->main_account_code && $institution->sub_account_code)
+                                                {{ $institution->main_account_code }}/{{ $institution->sub_account_code }} - {{ $institution->sub_account_name }}
+                                            @else
+                                                -
+                                            @endif
+                                        </td>
                                         <td>{{ $institution->company_details }}</td>
-                                        <td>{{ $institution->department_name }}</td>
+                                        <td>{{ $institution->department_name ?: '-' }}</td>
+                                        <td>
+                                            <a href="{{ route('institutions.edit', $institution->company_id) }}" class="btn btn-sm btn-primary">
+                                                Edit
+                                            </a>
+                                        </td>
                                     </tr>
                                 @endforeach
                             </tbody>
@@ -49,6 +74,7 @@
                                     <th>Account Number</th>
                                     <th>Company Details</th>
                                     <th>Department Name</th>
+                                    <th>Action</th>
                                 </tr>
                             </tfoot>
                         </table>
