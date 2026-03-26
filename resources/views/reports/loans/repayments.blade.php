@@ -12,7 +12,7 @@
 
     .repayment-report-table {
         width: max-content;
-        min-width: 1700px;
+        min-width: 1900px;
         border-collapse: collapse;
     }
 
@@ -141,7 +141,7 @@
 
         <div class="card o-hidden mb-4">
             <div class="card-header d-flex align-items-center">
-                <h3 class="w-50 float-start card-title m-0">Loan Repayment Records</h3>
+                <h3 class="w-50 float-start card-title m-0">Loan Repayment Entries</h3>
             </div>
             <div class="card-body">
 
@@ -156,14 +156,20 @@
                                 <th>Company Name</th>
                                 <th>Loan Type</th>
                                 <th>Loan Category</th>
+
                                 <th class="text-end">Loan Amount</th>
-                                <th class="text-end">Amount Repaid So Far</th>
-                                <th class="text-end">Loan Balance</th>
+                                <th class="text-end">Monthly Repayment</th>
+
+                                <th class="text-end">Repayment Amount</th>
+                                <th>Repayment Period</th>
+                                <th>Repayment Date</th>
+                                <th>Receipt / Doc No.</th>
+
+                                <th class="text-end">Total Repaid So Far</th>
+                                <th class="text-end">Current Loan Balance</th>
                                 <th class="text-end">Insurance</th>
                                 <th class="text-end">Commission</th>
-                                <th class="text-end">Monthly Repayment</th>
-                                <th>Payment Period</th>
-                                <th>Last Paid On</th>
+                                <th>Loan Scheduled End Period</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -182,6 +188,26 @@
                                     </td>
 
                                     <td class="text-end">
+                                        {{ number_format((float) ($repayment->loan_monthly_repayment_amount ?? 0), 2) }}
+                                    </td>
+
+                                    <td class="text-end">
+                                        {{ number_format((float) ($repayment->repayment_amount ?? 0), 2) }}
+                                    </td>
+
+                                    <td>{{ $repayment->loan_payments_period ?? '-' }}</td>
+
+                                    <td>
+                                        @if(!empty($repayment->loan_payments_paid_on))
+                                            {{ \Carbon\Carbon::parse($repayment->loan_payments_paid_on)->format('d-m-Y') }}
+                                        @else
+                                            -
+                                        @endif
+                                    </td>
+
+                                    <td>{{ $repayment->loan_payments_docno ?? '-' }}</td>
+
+                                    <td class="text-end">
                                         {{ number_format((float) ($repayment->loan_loan_paid ?? 0), 2) }}
                                     </td>
 
@@ -197,24 +223,12 @@
                                         {{ number_format((float) ($repayment->loan_commision ?? 0), 2) }}
                                     </td>
 
-                                    <td class="text-end">
-                                        {{ number_format((float) ($repayment->loan_monthly_repayment_amount ?? 0), 2) }}
-                                    </td>
-
-                                    <td>{{ $repayment->last_payment_period ?? '-' }}</td>
-
-                                    <td>
-                                        @if(!empty($repayment->last_paid_on))
-                                            {{ \Carbon\Carbon::parse($repayment->last_paid_on)->format('d-m-Y') }}
-                                        @else
-                                            -
-                                        @endif
-                                    </td>
+                                    <td>{{ $repayment->loan_payment_period ?? '-' }}</td>
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="15" class="text-center text-muted">
-                                        No loan repayment records found for the selected filters.
+                                    <td colspan="18" class="text-center text-muted">
+                                        No loan repayment entries found for the selected filters.
                                     </td>
                                 </tr>
                             @endforelse
