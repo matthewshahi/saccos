@@ -54,6 +54,7 @@ use App\Http\Controllers\MemberFinancialPositionController;
 use App\Http\Controllers\FosaTransferController;
 use App\Http\Controllers\Reports\FinalAccountsController;
 use App\Http\Controllers\Reports\LedgerController;
+use App\Http\Controllers\LoanDeductionTypeController;
 
 
 use App\Http\Controllers\KassMigrationController;
@@ -201,10 +202,10 @@ Route::prefix('kass-migration')->group(function () {
 Route::get('/members/update-totals', action: [\App\Http\Controllers\MemberTotalsController::class, 'recalculateAll'])->name(name: 'members.recalculate.totals');
 
 // routes/web.php (or your admin routes file)
-Route::get(
-    '/members/import-reconciliations',
-    action: [\App\Http\Controllers\MemberShareCapReconciliation::class, 'importReconciliations']
-)->name(name: 'members.import.reconciliations');
+// Route::get(
+//     '/members/import-reconciliations',
+//     action: [\App\Http\Controllers\MemberShareCapReconciliation::class, 'importReconciliations']
+// )->name(name: 'members.import.reconciliations');
 
 // // Route::get('/members/import-transactions', [MemberImportController::class, 'showImportTransactionsForm'])->name('members.import.transactions.form');
 // // Route::post('/members/import-transactions', [MemberImportController::class, 'importSavingsAndShares'])->name('members.import.transactions');
@@ -306,7 +307,6 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/loans/add-guarantor/{id}', [LoanApplicationSelfServiceController::class, 'addGuarantor'])->name('loans.add.guarantor');
     Route::get('/search/guarantors', [LoanApplicationSelfServiceController::class, 'search'])->name('search.guarantors');
 
-
     Route::get('/search/members', [HomeController::class, 'searchMembers'])->name('search.members');
 
 
@@ -378,6 +378,10 @@ Route::prefix('mobile')->group(function () {
 
 
 Route::middleware(['auth', 'check_member_position'])->group(function () {
+
+Route::post('/loans/selfservice/{id}/adjust-charges', [LoanApplicationSelfServiceController::class, 'saveAdjustedCharges'])
+    ->name('loans.selfservice.adjust.charges.save')->middleware('check_user_rights:adjust_loan_charges');
+
 
     // Show manual recovery form
     Route::get(
@@ -802,6 +806,10 @@ Route::post('/institutions/update/{id}', [HomeController::class, 'updateInstitut
     Route::get('admin/loans/pending/approval', [LoanApplicationSelfServiceController::class, 'listLoansPendingApproval'])
         ->name('loans.pending.approval')
         ->middleware('check_user_rights:end_month_processing_loans');
+    
+    Route::patch('admin/loans/pending/approval/{id}/doc-no', [LoanApplicationSelfServiceController::class, 'updatePendingLoanDocNo'])
+    ->name('loans.pending.approval.docno.update')
+    ->middleware('check_user_rights:end_month_processing_loans');
 
     Route::post(
         'admin/loans/approve/{loanId}',
@@ -849,6 +857,30 @@ Route::post('/institutions/update/{id}', [HomeController::class, 'updateInstitut
     Route::get('/loans/types/add', [HomeController::class, 'createLoanType'])->name('loans.types.add')->middleware('check_user_rights:add_loan_type');
     Route::post('/loans/types/store', [HomeController::class, 'storeLoanType'])->name('loans.types.store')->middleware('check_user_rights:add_loan_type');
     Route::delete('/loans/types/delete/{id}', [HomeController::class, 'deleteLoanType'])->name('loans.types.delete')->middleware('check_user_rights:add_loan_type');
+
+    Route::get('/loans/deduction-types', [LoanDeductionTypeController::class, 'index'])
+    ->name('loans.deduction-types')
+    ->middleware('check_user_rights:list_loan_deduction_types');
+
+Route::get('/loans/deduction-types/add', [LoanDeductionTypeController::class, 'create'])
+    ->name('loans.deduction-types.add')
+    ->middleware('check_user_rights:add_loan_deduction_type');
+
+Route::post('/loans/deduction-types/store', [LoanDeductionTypeController::class, 'store'])
+    ->name('loans.deduction-types.store')
+    ->middleware('check_user_rights:add_loan_deduction_type');
+
+Route::get('/loans/deduction-types/edit/{id}', [LoanDeductionTypeController::class, 'edit'])
+    ->name('loans.deduction-types.edit')
+    ->middleware('check_user_rights:add_loan_deduction_type');
+
+Route::put('/loans/deduction-types/update/{id}', [LoanDeductionTypeController::class, 'update'])
+    ->name('loans.deduction-types.update')
+    ->middleware('check_user_rights:add_loan_deduction_type');
+
+Route::delete('/loans/deduction-types/delete/{id}', [LoanDeductionTypeController::class, 'destroy'])
+    ->name('loans.deduction-types.delete')
+    ->middleware('check_user_rights:add_loan_deduction_type');
 
     Route::get('/loans/categories', [HomeController::class, 'loansCategories'])->name('loans.categories')->middleware('check_user_rights:add_loan_type');
     Route::get('/loans/categories/create', [HomeController::class, 'createLoanCategory'])->name('loans.categories.create')->middleware('check_user_rights:add_loan_type');
@@ -1033,6 +1065,9 @@ Route::post('/institutions/update/{id}', [HomeController::class, 'updateInstitut
     Route::get('/admin/defaults', [HomeController::class, 'adminDefaults'])->name('admin.defaults')->middleware('check_user_rights:add_default');
     Route::post('/admin/defaults/update', [HomeController::class, 'updateDefaults'])->name('admin.defaults.update')->middleware('check_user_rights:add_default');
     Route::post('/admin/defaults/store', [HomeController::class, 'storeDefault'])->name('admin.defaults.store')->middleware('check_user_rights:add_default');
+    Route::delete('/admin/defaults/{id}', [HomeController::class, 'destroyDefault'])
+    ->name('admin.defaults.destroy')
+    ->middleware('check_user_rights:add_default');
     Route::get('/admin/budget', [HomeController::class, 'adminBudget'])->name('admin.budget')->middleware('check_user_rights:list_budgets');
     Route::post('/admin/budget/store', [HomeController::class, 'adminBudget_store'])->name('admin.budget.store')->middleware('check_user_rights:add_budget');
     Route::get('/admin/year-end', [HomeController::class, 'adminYearEnd'])->name('admin.year-end')->middleware('check_user_rights:proc_end_year');
