@@ -7346,7 +7346,6 @@ public function createLoanType()
     }
 
 
-
 public function reportsLoansRepayments(Request $request)
 {
     $startPeriod    = trim($request->input('startPeriod', date('Ym', strtotime('-3 months'))));
@@ -7366,8 +7365,16 @@ public function reportsLoansRepayments(Request $request)
         ->leftJoin('sacco_company as c', 'd.department_company_id', '=', 'c.company_id')
         ->leftJoin('sacco_loan_types as lt', 'l.loan_loan_type', '=', 'lt.loan_type_id')
         ->leftJoin('sacco_loan_category as lc', 'l.loan_loan_category', '=', 'lc.loan_category_id')
-        ->select([
-            'lp.*',
+        ->select(
+            'lp.loan_payments_id',
+            'lp.loan_payments_amount',
+            'lp.loan_payments_interest',
+            'lp.loan_payments_description',
+            'lp.loan_payments_docno',
+            'lp.loan_payments_paid_in_by',
+            'lp.loan_payments_period',
+            'lp.loan_payments_paid_on',
+            'lp.loan_payments_loan_id',
 
             'm.member_name',
             'm.member_phone_no',
@@ -7375,31 +7382,8 @@ public function reportsLoansRepayments(Request $request)
 
             'c.company_name',
             'lt.loan_type_name',
-            'lc.loan_category_name',
-
-            'l.loan_id',
-            'l.loan_amount',
-            'l.loan_insurance',
-            'l.loan_commision',
-            'l.loan_monthly_repayment_amount',
-            'l.loan_payment_period',
-            'l.loan_loan_paid',
-
-            DB::raw('(COALESCE(l.loan_amount, 0) - COALESCE(l.loan_loan_paid, 0)) as loan_balance'),
-
-            /*
-             |--------------------------------------------------------------
-             | IMPORTANT
-             | Replace the line below with the REAL repayment amount column
-             | from sacco_loan_payments once you confirm its exact name.
-             | Example possibilities could be:
-             | lp.loan_payments_amount
-             | lp.loan_payments_principal
-             | lp.loan_payment_amount
-             |--------------------------------------------------------------
-             */
-            DB::raw('NULL as repayment_amount')
-        ])
+            'lc.loan_category_name'
+        )
         ->whereBetween('lp.loan_payments_period', [$startPeriod, $endPeriod]);
 
     if ($searchName !== '') {
@@ -7415,8 +7399,8 @@ public function reportsLoansRepayments(Request $request)
     }
 
     $loanRepayments = $query
-        ->orderBy('lp.loan_payments_period', 'desc')
         ->orderBy('lp.loan_payments_paid_on', 'desc')
+        ->orderBy('lp.loan_payments_period', 'desc')
         ->orderBy('lp.loan_payments_id', 'desc')
         ->get();
 
@@ -7429,7 +7413,6 @@ public function reportsLoansRepayments(Request $request)
         'loanRepayments'
     ));
 }
-
 
 
     // public function reportsLoansRepayments(Request $request)

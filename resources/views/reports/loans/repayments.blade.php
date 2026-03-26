@@ -12,7 +12,7 @@
 
     .repayment-report-table {
         width: max-content;
-        min-width: 1900px;
+        min-width: 1500px;
         border-collapse: collapse;
     }
 
@@ -156,20 +156,13 @@
                                 <th>Company Name</th>
                                 <th>Loan Type</th>
                                 <th>Loan Category</th>
-
-                                <th class="text-end">Loan Amount</th>
-                                <th class="text-end">Monthly Repayment</th>
-
                                 <th class="text-end">Repayment Amount</th>
-                                <th>Repayment Period</th>
-                                <th>Repayment Date</th>
+                                <th class="text-end">Interest</th>
+                                <th>Description</th>
                                 <th>Receipt / Doc No.</th>
-
-                                <th class="text-end">Total Repaid So Far</th>
-                                <th class="text-end">Current Loan Balance</th>
-                                <th class="text-end">Insurance</th>
-                                <th class="text-end">Commission</th>
-                                <th>Loan Scheduled End Period</th>
+                                <th>Paid In By</th>
+                                <th>Repayment Period</th>
+                                <th>Paid On</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -184,17 +177,16 @@
                                     <td>{{ $repayment->loan_category_name ?? '-' }}</td>
 
                                     <td class="text-end">
-                                        {{ number_format((float) ($repayment->loan_amount ?? 0), 2) }}
+                                        {{ number_format((float) ($repayment->loan_payments_amount ?? 0), 2) }}
                                     </td>
 
                                     <td class="text-end">
-                                        {{ number_format((float) ($repayment->loan_monthly_repayment_amount ?? 0), 2) }}
+                                        {{ number_format((float) ($repayment->loan_payments_interest ?? 0), 2) }}
                                     </td>
 
-                                    <td class="text-end">
-                                        {{ number_format((float) ($repayment->repayment_amount ?? 0), 2) }}
-                                    </td>
-
+                                    <td>{{ $repayment->loan_payments_description ?? '-' }}</td>
+                                    <td>{{ $repayment->loan_payments_docno ?? '-' }}</td>
+                                    <td>{{ $repayment->loan_payments_paid_in_by ?? '-' }}</td>
                                     <td>{{ $repayment->loan_payments_period ?? '-' }}</td>
 
                                     <td>
@@ -204,30 +196,10 @@
                                             -
                                         @endif
                                     </td>
-
-                                    <td>{{ $repayment->loan_payments_docno ?? '-' }}</td>
-
-                                    <td class="text-end">
-                                        {{ number_format((float) ($repayment->loan_loan_paid ?? 0), 2) }}
-                                    </td>
-
-                                    <td class="text-end">
-                                        {{ number_format((float) ($repayment->loan_balance ?? 0), 2) }}
-                                    </td>
-
-                                    <td class="text-end">
-                                        {{ number_format((float) ($repayment->loan_insurance ?? 0), 2) }}
-                                    </td>
-
-                                    <td class="text-end">
-                                        {{ number_format((float) ($repayment->loan_commision ?? 0), 2) }}
-                                    </td>
-
-                                    <td>{{ $repayment->loan_payment_period ?? '-' }}</td>
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="18" class="text-center text-muted">
+                                    <td colspan="14" class="text-center text-muted">
                                         No loan repayment entries found for the selected filters.
                                     </td>
                                 </tr>
