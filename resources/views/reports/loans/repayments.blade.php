@@ -12,7 +12,7 @@
 
     .repayment-report-table {
         width: max-content;
-        min-width: 1800px;
+        min-width: 1700px;
         border-collapse: collapse;
     }
 
@@ -21,6 +21,10 @@
         white-space: nowrap !important;
         word-break: keep-all !important;
         vertical-align: middle;
+    }
+
+    .repayment-report-table th {
+        font-weight: 600;
     }
 </style>
 
@@ -55,7 +59,6 @@
                 <h3 class="w-50 float-start card-title m-0">Search Loan Repayments</h3>
             </div>
             <div class="card-body">
-
                 <form method="GET" action="{{ url()->current() }}">
                     <div class="row">
 
@@ -133,7 +136,6 @@
 
                     </div>
                 </form>
-
             </div>
         </div>
 
@@ -161,8 +163,7 @@
                                 <th class="text-end">Commission</th>
                                 <th class="text-end">Monthly Repayment</th>
                                 <th>Payment Period</th>
-                                <th>Paid On</th>
-                                <th>Document No.</th>
+                                <th>Last Paid On</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -176,25 +177,43 @@
                                     <td>{{ $repayment->loan_type_name ?? '-' }}</td>
                                     <td>{{ $repayment->loan_category_name ?? '-' }}</td>
 
-                                    <td class="text-end">{{ number_format((float) ($repayment->loan_amount ?? 0), 2) }}</td>
-                                    <td class="text-end">{{ number_format((float) ($repayment->loan_loan_paid ?? 0), 2) }}</td>
-                                    <td class="text-end">{{ number_format((float) ($repayment->loan_balance ?? 0), 2) }}</td>
-                                    <td class="text-end">{{ number_format((float) ($repayment->loan_insurance ?? 0), 2) }}</td>
-                                    <td class="text-end">{{ number_format((float) ($repayment->loan_commision ?? 0), 2) }}</td>
-                                    <td class="text-end">{{ number_format((float) ($repayment->loan_monthly_repayment_amount ?? 0), 2) }}</td>
-                                    <td>{{ $repayment->loan_payments_period ?? '-' }}</td>
+                                    <td class="text-end">
+                                        {{ number_format((float) ($repayment->loan_amount ?? 0), 2) }}
+                                    </td>
+
+                                    <td class="text-end">
+                                        {{ number_format((float) ($repayment->loan_loan_paid ?? 0), 2) }}
+                                    </td>
+
+                                    <td class="text-end">
+                                        {{ number_format((float) ($repayment->loan_balance ?? 0), 2) }}
+                                    </td>
+
+                                    <td class="text-end">
+                                        {{ number_format((float) ($repayment->loan_insurance ?? 0), 2) }}
+                                    </td>
+
+                                    <td class="text-end">
+                                        {{ number_format((float) ($repayment->loan_commision ?? 0), 2) }}
+                                    </td>
+
+                                    <td class="text-end">
+                                        {{ number_format((float) ($repayment->loan_monthly_repayment_amount ?? 0), 2) }}
+                                    </td>
+
+                                    <td>{{ $repayment->last_payment_period ?? '-' }}</td>
+
                                     <td>
-                                        @if(!empty($repayment->loan_payments_paid_on))
-                                            {{ \Carbon\Carbon::parse($repayment->loan_payments_paid_on)->format('d-m-Y') }}
+                                        @if(!empty($repayment->last_paid_on))
+                                            {{ \Carbon\Carbon::parse($repayment->last_paid_on)->format('d-m-Y') }}
                                         @else
                                             -
                                         @endif
                                     </td>
-                                    <td>{{ $repayment->loan_payments_docno ?? '-' }}</td>
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="16" class="text-center text-muted">
+                                    <td colspan="15" class="text-center text-muted">
                                         No loan repayment records found for the selected filters.
                                     </td>
                                 </tr>
