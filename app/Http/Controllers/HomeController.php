@@ -7349,44 +7349,81 @@ public function createLoanType()
 
 
     public function reportsLoansRepayments(Request $request)
-    {
-        $startPeriod = $request->input('startPeriod', date('Ym', strtotime('-3 months')));
-        $endPeriod = $request->input('endPeriod', date('Ym'));
-        $searchName = $request->input('searchName', '');
-        $searchCompany = $request->input('searchCompany', '');
-        $searchLoanType = $request->input('searchLoanType', '');
+{
+    $startPeriod     = trim($request->input('startPeriod', date('Ym', strtotime('-3 months'))));
+    $endPeriod       = trim($request->input('endPeriod', date('Ym')));
+    $searchName      = trim($request->input('searchName', ''));
+    $searchCompany   = trim($request->input('searchCompany', ''));
+    $searchLoanType  = trim($request->input('searchLoanType', ''));
 
-        $query = DB::table('sacco_loan_payments')
-            ->join('sacco_loans', 'sacco_loan_payments.loan_payments_loan_id', '=', 'sacco_loans.loan_id')
-            ->join('sacco_members', 'sacco_loans.loan_member', '=', 'sacco_members.member_id')
-            ->join('sacco_department', 'sacco_members.member_dept', '=', 'sacco_department.department_id')
-            ->join('sacco_company', 'sacco_department.department_company_id', '=', 'sacco_company.company_id')
-            ->join('sacco_loan_types', 'sacco_loans.loan_loan_type', '=', 'sacco_loan_types.loan_type_id')
-            ->join('sacco_loan_category', 'sacco_loans.loan_loan_category', '=', 'sacco_loan_category.loan_category_id') // Fixed join condition
-            ->select('*'); // Select all fields
-
-        // Apply search filters if any
-        if (!empty($searchName) || !empty($searchCompany) || !empty($searchLoanType)) {
-            if (!empty($searchName)) {
-                $query->where('sacco_members.member_name', 'like', '%' . $searchName . '%');
-            }
-            if (!empty($searchCompany)) {
-                $query->where('sacco_company.company_name', 'like', '%' . $searchCompany . '%');
-            }
-            if (!empty($searchLoanType)) {
-                $query->where('sacco_loan_types.loan_type_name', 'like', '%' . $searchLoanType . '%');
-            }
-        } else {
-            // Default to the last 3 months if no search filters are applied
-            $query->whereBetween('sacco_loan_payments.loan_payments_period', [$startPeriod, $endPeriod]);
-        }
-
-        $loanRepayments = $query->orderBy('sacco_loan_payments.loan_payments_period', 'desc')
-            ->orderBy('sacco_loan_payments.loan_payments_id', 'desc')
-            ->get();
-
-        return view('reports.loans.repayments', compact('startPeriod', 'endPeriod', 'searchName', 'searchCompany', 'searchLoanType', 'loanRepayments'));
+    // Optional safety
+    if ($startPeriod > $endPeriod) {
+        [$startPeriod, $endPeriod] = [$endPeriod, $startPeriod];
     }
+
+    $query = DB::table('sacco_loan_payments as lp')
+        ->join('sacco_loans as l', 'lp.loan_payments_loan_id', '=', 'l.loan_id')
+        ->join('sacco_members as m', 'l.loan_member', '=', 'm.member_id')
+        ->leftJoin('sacco_department as d', 'm.member_dept', '=', 'd.department_id')
+        ->leftJoin('sacco_company as c', 'd.department_company_id', '=', 'c.company_id')
+        ->leftJoin('sacco_loan_types as lt', 'l.loan_loan_type', '=', 'lt.loan_type_id')
+        ->leftJoin('sacco_loan_category as lc', 'l.loan_loan_category', '=', 'lc.loan_category_id')
+        ->select([
+            'lp.loan_payments_id',
+            'lp.loan_payments_period',
+            'lp.loan_payments_paid_on',
+            'lp.loan_payments_docno',
+            'lp.loan_payments_loan_id',
+
+            // Replace this with the real repayment amount column from sacco_loan_payments
+            // for example: 'lp.loan_payments_amount as payment_amount',
+            // or: 'lp.loan_payments_principal as payment_amount',
+            // depending on your actual table structure.
+
+            'm.member_name',
+            'm.member_phone_no',
+            'm.member_sacco_id',
+            'c.company_name',
+            'lt.loan_type_name',
+            'lc.loan_category_name',
+
+            'l.loan_amount',
+            'l.loan_insurance',
+            'l.loan_commision',
+            'l.loan_monthly_repayment_amount',
+            'l.loan_payment_period',
+            'l.loan_loan_paid',
+
+            DB::raw('(COALESCE(l.loan_amount, 0) - COALESCE(l.loan_loan_paid, 0)) as current_balance'),
+        ])
+        ->whereBetween('lp.loan_payments_period', [$startPeriod, $endPeriod]);
+
+    if ($searchName !== '') {
+        $query->where('m.member_name', 'like', '%' . $searchName . '%');
+    }
+
+    if ($searchCompany !== '') {
+        $query->where('c.company_name', 'like', '%' . $searchCompany . '%');
+    }
+
+    if ($searchLoanType !== '') {
+        $query->where('lt.loan_type_name', 'like', '%' . $searchLoanType . '%');
+    }
+
+    $loanRepayments = $query
+        ->orderBy('lp.loan_payments_period', 'desc')
+        ->orderBy('lp.loan_payments_id', 'desc')
+        ->get();
+
+    return view('reports.loans.repayments', compact(
+        'startPeriod',
+        'endPeriod',
+        'searchName',
+        'searchCompany',
+        'searchLoanType',
+        'loanRepayments'
+    ));
+}
 
 
 
