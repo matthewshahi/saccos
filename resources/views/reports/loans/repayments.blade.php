@@ -120,85 +120,65 @@
             </div>
             <div class="card-body">
 
-                <div class="table-responsive">
-                    <table class="table table-bordered table-striped table-sm">
-                        <thead>
-                            <tr>
-                                <th>#</th>
-                                <th>Member Name</th>
-                                <th>Phone</th>
-                                <th>Sacco ID</th>
-                                <th>Company Name</th>
-                                <th>Loan Type</th>
-                                <th>Loan Category</th>
-                                <th class="text-end">Loan Amount</th>
-                                <th class="text-end">Amount Repaid So Far</th>
-                                <th class="text-end">Loan Balance</th>
-                                <th class="text-end">Insurance</th>
-                                <th class="text-end">Commission</th>
-                                <th class="text-end">Monthly Repayment</th>
-                                <th>Payment Period</th>
-                                <th>Paid On</th>
-                                <th>Document No.</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @forelse($loanRepayments as $key => $repayment)
-                                <tr>
-                                    <td>{{ $key + 1 }}</td>
-                                    <td>{{ $repayment->member_name ?? '-' }}</td>
-                                    <td>{{ $repayment->member_phone_no ?? '-' }}</td>
-                                    <td>{{ $repayment->member_sacco_id ?? '-' }}</td>
-                                    <td>{{ $repayment->company_name ?? '-' }}</td>
-                                    <td>{{ $repayment->loan_type_name ?? '-' }}</td>
-                                    <td>{{ $repayment->loan_category_name ?? '-' }}</td>
+               <div class="table-responsive" style="overflow-x: auto; overflow-y: visible; -webkit-overflow-scrolling: touch;">
+    <table class="table table-bordered table-striped table-sm mb-0 repayment-report-table">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Member Name</th>
+                <th>Phone</th>
+                <th>Sacco ID</th>
+                <th>Company Name</th>
+                <th>Loan Type</th>
+                <th>Loan Category</th>
+                <th class="text-end">Loan Amount</th>
+                <th class="text-end">Amount Repaid So Far</th>
+                <th class="text-end">Loan Balance</th>
+                <th class="text-end">Insurance</th>
+                <th class="text-end">Commission</th>
+                <th class="text-end">Monthly Repayment</th>
+                <th>Payment Period</th>
+                <th>Paid On</th>
+                <th>Document No.</th>
+            </tr>
+        </thead>
+        <tbody>
+            @forelse($loanRepayments as $key => $repayment)
+                <tr>
+                    <td>{{ $key + 1 }}</td>
+                    <td>{{ $repayment->member_name ?? '-' }}</td>
+                    <td>{{ $repayment->member_phone_no ?? '-' }}</td>
+                    <td>{{ $repayment->member_sacco_id ?? '-' }}</td>
+                    <td>{{ $repayment->company_name ?? '-' }}</td>
+                    <td>{{ $repayment->loan_type_name ?? '-' }}</td>
+                    <td>{{ $repayment->loan_category_name ?? '-' }}</td>
 
-                                    <td class="text-end">
-                                        {{ number_format((float) ($repayment->loan_amount ?? 0), 2) }}
-                                    </td>
-
-                                    <td class="text-end">
-                                        {{ number_format((float) ($repayment->loan_loan_paid ?? 0), 2) }}
-                                    </td>
-
-                                    <td class="text-end">
-                                        {{ number_format((float) ($repayment->loan_balance ?? 0), 2) }}
-                                    </td>
-
-                                    <td class="text-end">
-                                        {{ number_format((float) ($repayment->loan_insurance ?? 0), 2) }}
-                                    </td>
-
-                                    <td class="text-end">
-                                        {{ number_format((float) ($repayment->loan_commision ?? 0), 2) }}
-                                    </td>
-
-                                    <td class="text-end">
-                                        {{ number_format((float) ($repayment->loan_monthly_repayment_amount ?? 0), 2) }}
-                                    </td>
-
-                                    <td>{{ $repayment->loan_payments_period ?? '-' }}</td>
-
-                                    <td>
-                                        @if(!empty($repayment->loan_payments_paid_on))
-                                            {{ \Carbon\Carbon::parse($repayment->loan_payments_paid_on)->format('d-m-Y') }}
-                                        @else
-                                            -
-                                        @endif
-                                    </td>
-
-                                    <td>{{ $repayment->loan_payments_docno ?? '-' }}</td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="16" class="text-center text-muted">
-                                        No loan repayment records found for the selected filters.
-                                    </td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
+                    <td class="text-end">{{ number_format((float) ($repayment->loan_amount ?? 0), 2) }}</td>
+                    <td class="text-end">{{ number_format((float) ($repayment->loan_loan_paid ?? 0), 2) }}</td>
+                    <td class="text-end">{{ number_format((float) ($repayment->loan_balance ?? 0), 2) }}</td>
+                    <td class="text-end">{{ number_format((float) ($repayment->loan_insurance ?? 0), 2) }}</td>
+                    <td class="text-end">{{ number_format((float) ($repayment->loan_commision ?? 0), 2) }}</td>
+                    <td class="text-end">{{ number_format((float) ($repayment->loan_monthly_repayment_amount ?? 0), 2) }}</td>
+                    <td>{{ $repayment->loan_payments_period ?? '-' }}</td>
+                    <td>
+                        @if(!empty($repayment->loan_payments_paid_on))
+                            {{ \Carbon\Carbon::parse($repayment->loan_payments_paid_on)->format('d-m-Y') }}
+                        @else
+                            -
+                        @endif
+                    </td>
+                    <td>{{ $repayment->loan_payments_docno ?? '-' }}</td>
+                </tr>
+            @empty
+                <tr>
+                    <td colspan="16" class="text-center text-muted">
+                        No loan repayment records found for the selected filters.
+                    </td>
+                </tr>
+            @endforelse
+        </tbody>
+    </table>
+</div>
 
             </div>
         </div>
