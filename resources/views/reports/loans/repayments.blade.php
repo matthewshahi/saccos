@@ -12,7 +12,7 @@
 
     .repayment-report-table {
         width: max-content;
-        min-width: 1500px;
+        min-width: 1600px;
         border-collapse: collapse;
     }
 
@@ -156,7 +156,7 @@
                                 <th>Company Name</th>
                                 <th>Loan Type</th>
                                 <th>Loan Category</th>
-                                <th class="text-end">Repayment Amount</th>
+                                <th class="text-end">Amount Paid</th>
                                 <th class="text-end">Interest</th>
                                 <th>Description</th>
                                 <th>Receipt / Doc No.</th>

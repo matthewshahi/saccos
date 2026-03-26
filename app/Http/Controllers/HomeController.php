@@ -7345,7 +7345,6 @@ public function createLoanType()
         return Excel::download(new LoansIssuedExport($query), 'loans_issued.xlsx');
     }
 
-
 public function reportsLoansRepayments(Request $request)
 {
     $startPeriod    = trim($request->input('startPeriod', date('Ym', strtotime('-3 months'))));
