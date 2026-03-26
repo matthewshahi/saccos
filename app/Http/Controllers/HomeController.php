@@ -7348,18 +7348,13 @@ public function createLoanType()
 
 
 
-    public function reportsLoansRepayments(Request $request)
+   public function reportsLoansRepayments(Request $request)
 {
-    $startPeriod     = trim($request->input('startPeriod', date('Ym', strtotime('-3 months'))));
-    $endPeriod       = trim($request->input('endPeriod', date('Ym')));
-    $searchName      = trim($request->input('searchName', ''));
-    $searchCompany   = trim($request->input('searchCompany', ''));
-    $searchLoanType  = trim($request->input('searchLoanType', ''));
-
-    // Optional safety
-    if ($startPeriod > $endPeriod) {
-        [$startPeriod, $endPeriod] = [$endPeriod, $startPeriod];
-    }
+    $startPeriod    = $request->input('startPeriod', date('Ym', strtotime('-3 months')));
+    $endPeriod      = $request->input('endPeriod', date('Ym'));
+    $searchName     = trim($request->input('searchName', ''));
+    $searchCompany  = trim($request->input('searchCompany', ''));
+    $searchLoanType = trim($request->input('searchLoanType', ''));
 
     $query = DB::table('sacco_loan_payments as lp')
         ->join('sacco_loans as l', 'lp.loan_payments_loan_id', '=', 'l.loan_id')
@@ -7368,35 +7363,27 @@ public function createLoanType()
         ->leftJoin('sacco_company as c', 'd.department_company_id', '=', 'c.company_id')
         ->leftJoin('sacco_loan_types as lt', 'l.loan_loan_type', '=', 'lt.loan_type_id')
         ->leftJoin('sacco_loan_category as lc', 'l.loan_loan_category', '=', 'lc.loan_category_id')
-        ->select([
-            'lp.loan_payments_id',
-            'lp.loan_payments_period',
-            'lp.loan_payments_paid_on',
-            'lp.loan_payments_docno',
-            'lp.loan_payments_loan_id',
-
-            // Replace this with the real repayment amount column from sacco_loan_payments
-            // for example: 'lp.loan_payments_amount as payment_amount',
-            // or: 'lp.loan_payments_principal as payment_amount',
-            // depending on your actual table structure.
-
+        ->select(
+            'lp.*',
+            'l.loan_id',
+            'l.loan_amount',
+            'l.loan_loan_paid',
+            'l.loan_insurance',
+            'l.loan_commision',
+            'l.loan_monthly_repayment_amount',
+            'l.loan_payment_period',
+            'm.member_id',
             'm.member_name',
             'm.member_phone_no',
             'm.member_sacco_id',
             'c.company_name',
             'lt.loan_type_name',
             'lc.loan_category_name',
+            DB::raw('(COALESCE(l.loan_amount,0) - COALESCE(l.loan_loan_paid,0)) as loan_balance')
+        );
 
-            'l.loan_amount',
-            'l.loan_insurance',
-            'l.loan_commision',
-            'l.loan_monthly_repayment_amount',
-            'l.loan_payment_period',
-            'l.loan_loan_paid',
-
-            DB::raw('(COALESCE(l.loan_amount, 0) - COALESCE(l.loan_loan_paid, 0)) as current_balance'),
-        ])
-        ->whereBetween('lp.loan_payments_period', [$startPeriod, $endPeriod]);
+    // Keep period filter always
+    $query->whereBetween('lp.loan_payments_period', [$startPeriod, $endPeriod]);
 
     if ($searchName !== '') {
         $query->where('m.member_name', 'like', '%' . $searchName . '%');
