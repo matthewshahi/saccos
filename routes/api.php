@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\MemberDashboardController;
 use App\Http\Controllers\Api\LoanApplicationController;
 use App\Http\Controllers\Api\MpesaApiTheController;
 use App\Http\Controllers\Api\PublicRegistrationApiController;
+use App\Http\Controllers\Api\GuaranteeRequestController;
 
 // Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 //     return $request->user();
@@ -58,7 +59,29 @@ Route::middleware(['auth.api'])->group(function () {
     Route::get('/auth/profile', [MemberDashboardController::class, 'profile']);
 });
 
+Route::middleware(['auth.api', 'throttle:30,1'])
+    ->prefix('auth/guarantee-requests')
+    ->group(function () {
 
+        // Pending requests for the logged-in guarantor
+        Route::get('/', [GuaranteeRequestController::class, 'index']);
+
+        // Small summary for dashboard alert/badge
+        Route::get('/summary', [GuaranteeRequestController::class, 'summary']);
+
+        // Optional single request details
+        Route::get('/{id}', [GuaranteeRequestController::class, 'show'])
+            ->whereNumber('id');
+
+        // Approve request
+        Route::post('/{id}/approve', [GuaranteeRequestController::class, 'approve'])
+            ->whereNumber('id');
+
+        // Decline request
+        Route::post('/{id}/decline', [GuaranteeRequestController::class, 'decline'])
+            ->whereNumber('id');
+    });
+    
 Route::middleware(['auth.api'])
     ->prefix('auth/loan-applications')
     ->group(function () {

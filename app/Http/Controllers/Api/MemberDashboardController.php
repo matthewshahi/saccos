@@ -145,12 +145,7 @@ foreach ($duesItems as $it) {
         return response()->json([
             'member' => [
                 'name'          => $row->member_name,
-                'member_number' => 'SACCO / ' . str_pad(
-                    (string) $row->member_sacco_id,
-                    5,
-                    '0',
-                    STR_PAD_LEFT
-                ),
+                'member_number' => 'SACCO / ' . (string) $row->member_sacco_id,
                 'status' => $row->member_active === 'Y'
                     ? 'Active'
                     : 'Inactive',
