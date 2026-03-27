@@ -25,7 +25,8 @@ class MemberDashboardController extends Controller
         }
 
         $memberId  = $member->member_id;
-        $nowPeriod = (int) date('Ym');
+        // $nowPeriod = (int) date('Ym');
+        $nowPeriod = date('Ym');
 
         /*
     |--------------------------------------------------------------------------
@@ -108,7 +109,9 @@ class MemberDashboardController extends Controller
                 continue;
             }
 
-            $monthsBehind = $nowPeriod - (int) $loan->last_period;
+            // $monthsBehind = $nowPeriod - (int) $loan->last_period;
+
+            $monthsBehind = $this->diffPeriodsInMonths($loan->last_period, $nowPeriod);
 
             if ($monthsBehind >= 2) {
                 $attention[] = [
@@ -177,7 +180,40 @@ foreach ($duesItems as $it) {
      * Builds all payable payment codes for the member
      * --------------------------------------------------------------------------
      */
-    
+
+    private function periodToYearMonth(?string $period): ?array
+{
+    $period = trim((string) $period);
+
+    if (!preg_match('/^\d{6}$/', $period)) {
+        return null;
+    }
+
+    $year  = (int) substr($period, 0, 4);
+    $month = (int) substr($period, 4, 2);
+
+    if ($month < 1 || $month > 12) {
+        return null;
+    }
+
+    return [$year, $month];
+}
+
+private function diffPeriodsInMonths($fromPeriod, $toPeriod): int
+{
+    $from = $this->periodToYearMonth((string) $fromPeriod);
+    $to   = $this->periodToYearMonth((string) $toPeriod);
+
+    if (!$from || !$to) {
+        return 0;
+    }
+
+    [$fromYear, $fromMonth] = $from;
+    [$toYear, $toMonth]     = $to;
+
+    return max(0, (($toYear - $fromYear) * 12) + ($toMonth - $fromMonth));
+}
+
     private function getExpectedFosaDues($memberRow): array
 {
     $memberId = (int) $memberRow->member_id;

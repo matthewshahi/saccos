@@ -13,6 +13,23 @@ use App\Services\AuthTokenService;
 class AuthController extends Controller
 {
     /**
+     * Resolve the SACCO claim for JWT payload.
+     * Keep backward fallback to sacco_id in case some environments still expose it.
+     */
+    private function resolveSaccoClaim(Member $member): int
+    {
+        if (isset($member->member_sacco_id) && is_numeric($member->member_sacco_id)) {
+            return (int) $member->member_sacco_id;
+        }
+
+        if (isset($member->sacco_id) && is_numeric($member->sacco_id)) {
+            return (int) $member->sacco_id;
+        }
+
+        return 0;
+    }
+
+    /**
      * ---------------------------------------------------------
      * LOGIN (Member email OR phone + legacy MD5 password)
      * ---------------------------------------------------------
@@ -53,7 +70,7 @@ class AuthController extends Controller
         $refreshToken = $tokens->generateRefreshToken();
         $accessToken  = $tokens->createAccessToken(
             $member,
-            $member->sacco_id ?? 0
+            $this->resolveSaccoClaim($member)
         );
 
         // 📱 Create new device session
@@ -119,9 +136,9 @@ class AuthController extends Controller
 
         // 🔑 Issue new tokens
         $newRefreshToken = $tokens->generateRefreshToken();
-        $accessToken    = $tokens->createAccessToken(
+        $accessToken     = $tokens->createAccessToken(
             $member,
-            $member->sacco_id ?? 0
+            $this->resolveSaccoClaim($member)
         );
 
         // 📱 Create new session
