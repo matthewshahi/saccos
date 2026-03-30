@@ -1253,192 +1253,192 @@ DB::table('sacco_loan_batch_trans')
             ->with('error', 'Something went wrong while updating. Please try again.');
     }
 }
-private function calculateLoanFinancialsForTransaction(
-    float $requestedLoanAmount,
-    float $amountForEmi,
-    int $durationMonths,
-    $loanType,
-    $member,
-    float $commission = 0
-): array {
-    $requestedLoanAmount = round($requestedLoanAmount, 2);
-    $amountForEmi = round($amountForEmi, 2);
-    $commission = round($commission, 2);
+// private function calculateLoanFinancialsForTransaction(
+//     float $requestedLoanAmount,
+//     float $amountForEmi,
+//     int $durationMonths,
+//     $loanType,
+//     $member,
+//     float $commission = 0
+// ): array {
+//     $requestedLoanAmount = round($requestedLoanAmount, 2);
+//     $amountForEmi = round($amountForEmi, 2);
+//     $commission = round($commission, 2);
 
-    $commissionEffect = strtoupper(trim((string) ($loanType->loan_type_commission_effect ?? 'ADD_TO_LOAN')));
-    if (!in_array($commissionEffect, ['ADD_TO_LOAN', 'DEDUCT_FROM_DISBURSEMENT'], true)) {
-        $commissionEffect = 'ADD_TO_LOAN';
-    }
+//     $commissionEffect = strtoupper(trim((string) ($loanType->loan_type_commission_effect ?? 'ADD_TO_LOAN')));
+//     if (!in_array($commissionEffect, ['ADD_TO_LOAN', 'DEDUCT_FROM_DISBURSEMENT'], true)) {
+//         $commissionEffect = 'ADD_TO_LOAN';
+//     }
 
-    $insuranceEffect = strtoupper(trim((string) ($loanType->loan_type_insurance_effect ?? 'ADD_TO_LOAN')));
-    if (!in_array($insuranceEffect, ['ADD_TO_LOAN', 'DEDUCT_FROM_DISBURSEMENT'], true)) {
-        $insuranceEffect = 'ADD_TO_LOAN';
-    }
+//     $insuranceEffect = strtoupper(trim((string) ($loanType->loan_type_insurance_effect ?? 'ADD_TO_LOAN')));
+//     if (!in_array($insuranceEffect, ['ADD_TO_LOAN', 'DEDUCT_FROM_DISBURSEMENT'], true)) {
+//         $insuranceEffect = 'ADD_TO_LOAN';
+//     }
 
-    $isInsurable = strtoupper(trim((string) ($loanType->loan_type_insurable ?? 'N'))) === 'Y';
+//     $isInsurable = strtoupper(trim((string) ($loanType->loan_type_insurable ?? 'N'))) === 'Y';
 
-    $calcFunction = DB::table('sacco_defaults')
-        ->where('default_name', 'loan_interest_insurance')
-        ->value('default_value');
+//     $calcFunction = DB::table('sacco_defaults')
+//         ->where('default_name', 'loan_interest_insurance')
+//         ->value('default_value');
 
-    if (!$calcFunction || !method_exists($this, $calcFunction)) {
-        $calcFunction = 'default_calc_loan_interest_insurance';
-    }
+//     if (!$calcFunction || !method_exists($this, $calcFunction)) {
+//         $calcFunction = 'default_calc_loan_interest_insurance';
+//     }
 
-    switch ($calcFunction) {
-        case 'calc_loan_interest_insurance_adom':
-            $baseInsu = ((5.03 * $durationMonths + 3.03) * $requestedLoanAmount) / 6000;
-            $baseInsu = max($baseInsu, 100);
+//     switch ($calcFunction) {
+//         case 'calc_loan_interest_insurance_adom':
+//             $baseInsu = ((5.03 * $durationMonths + 3.03) * $requestedLoanAmount) / 6000;
+//             $baseInsu = max($baseInsu, 100);
 
-            $phcf = $baseInsu * 0.0025;
-            $insurance = $baseInsu + $phcf;
+//             $phcf = $baseInsu * 0.0025;
+//             $insurance = $baseInsu + $phcf;
 
-            if (!$isInsurable) {
-                $insurance = 0;
-            }
+//             if (!$isInsurable) {
+//                 $insurance = 0;
+//             }
 
-            $commissionForEmi = ($commissionEffect === 'ADD_TO_LOAN') ? $commission : 0;
-            $insuranceForEmi = ($insuranceEffect === 'ADD_TO_LOAN') ? $insurance : 0;
-            $loanPlusExtras = $amountForEmi + $commissionForEmi + $insuranceForEmi;
+//             $commissionForEmi = ($commissionEffect === 'ADD_TO_LOAN') ? $commission : 0;
+//             $insuranceForEmi = ($insuranceEffect === 'ADD_TO_LOAN') ? $insurance : 0;
+//             $loanPlusExtras = $amountForEmi + $commissionForEmi + $insuranceForEmi;
 
-            if (strtoupper($loanType->loan_type_interest_type ?? '') === 'FIXED INTEREST') {
-                $expectedInterest = round($loanPlusExtras * ((float) $loanType->loan_type_interest / 100), 0);
-                $monthlyPayment = ceil(($loanPlusExtras + $expectedInterest) / $durationMonths);
-                $monthlyPrincipal = $loanPlusExtras / $durationMonths;
-            } else {
-                $rate = ((float) $loanType->loan_type_interest) / 12 / 100;
+//             if (strtoupper($loanType->loan_type_interest_type ?? '') === 'FIXED INTEREST') {
+//                 $expectedInterest = round($loanPlusExtras * ((float) $loanType->loan_type_interest / 100), 0);
+//                 $monthlyPayment = ceil(($loanPlusExtras + $expectedInterest) / $durationMonths);
+//                 $monthlyPrincipal = $loanPlusExtras / $durationMonths;
+//             } else {
+//                 $rate = ((float) $loanType->loan_type_interest) / 12 / 100;
 
-                if ($rate > 0) {
-                    $monthlyPayment = ($loanPlusExtras * $rate) * pow(1 + $rate, $durationMonths) / (pow(1 + $rate, $durationMonths) - 1);
-                } else {
-                    $monthlyPayment = $loanPlusExtras / $durationMonths;
-                }
+//                 if ($rate > 0) {
+//                     $monthlyPayment = ($loanPlusExtras * $rate) * pow(1 + $rate, $durationMonths) / (pow(1 + $rate, $durationMonths) - 1);
+//                 } else {
+//                     $monthlyPayment = $loanPlusExtras / $durationMonths;
+//                 }
 
-                $expectedInterest = ($monthlyPayment * $durationMonths) - $loanPlusExtras;
-                $monthlyPrincipal = $monthlyPayment - ($loanPlusExtras * $rate);
+//                 $expectedInterest = ($monthlyPayment * $durationMonths) - $loanPlusExtras;
+//                 $monthlyPrincipal = $monthlyPayment - ($loanPlusExtras * $rate);
 
-                $monthlyPayment = ceil($monthlyPayment);
-                $monthlyPrincipal = ceil($monthlyPrincipal);
-            }
+//                 $monthlyPayment = ceil($monthlyPayment);
+//                 $monthlyPrincipal = ceil($monthlyPrincipal);
+//             }
 
-            return [
-                'monthly_payment'           => round($monthlyPayment, 2),
-                'monthly_payment_principal' => round($monthlyPrincipal, 2),
-                'expected_interest'         => round($expectedInterest, 2),
-                'insurance'                 => round($insurance, 2),
-            ];
+//             return [
+//                 'monthly_payment'           => round($monthlyPayment, 2),
+//                 'monthly_payment_principal' => round($monthlyPrincipal, 2),
+//                 'expected_interest'         => round($expectedInterest, 2),
+//                 'insurance'                 => round($insurance, 2),
+//             ];
 
-        case 'calc_loan_interest_insurance_yes':
-            $annualRate = (float) $loanType->loan_type_interest;
-            $monthlyRate = $annualRate / 12 / 100;
+//         case 'calc_loan_interest_insurance_yes':
+//             $annualRate = (float) $loanType->loan_type_interest;
+//             $monthlyRate = $annualRate / 12 / 100;
 
-            $insurance = $isInsurable
-                ? round($requestedLoanAmount * 0.01, 2)
-                : 0.0;
+//             $insurance = $isInsurable
+//                 ? round($requestedLoanAmount * 0.01, 2)
+//                 : 0.0;
 
-            $commissionForEmi = ($commissionEffect === 'ADD_TO_LOAN') ? $commission : 0;
-            $insuranceForEmi = ($insuranceEffect === 'ADD_TO_LOAN') ? $insurance : 0;
-            $loanPlusExtras = $amountForEmi + $commissionForEmi + $insuranceForEmi;
+//             $commissionForEmi = ($commissionEffect === 'ADD_TO_LOAN') ? $commission : 0;
+//             $insuranceForEmi = ($insuranceEffect === 'ADD_TO_LOAN') ? $insurance : 0;
+//             $loanPlusExtras = $amountForEmi + $commissionForEmi + $insuranceForEmi;
 
-            if ($monthlyRate > 0) {
-                $monthlyPayment = $loanPlusExtras * $monthlyRate * pow(1 + $monthlyRate, $durationMonths)
-                    / (pow(1 + $monthlyRate, $durationMonths) - 1);
-            } else {
-                $monthlyPayment = $loanPlusExtras / $durationMonths;
-            }
+//             if ($monthlyRate > 0) {
+//                 $monthlyPayment = $loanPlusExtras * $monthlyRate * pow(1 + $monthlyRate, $durationMonths)
+//                     / (pow(1 + $monthlyRate, $durationMonths) - 1);
+//             } else {
+//                 $monthlyPayment = $loanPlusExtras / $durationMonths;
+//             }
 
-            $expectedInterest = ($monthlyPayment * $durationMonths) - $loanPlusExtras;
+//             $expectedInterest = ($monthlyPayment * $durationMonths) - $loanPlusExtras;
 
-            return [
-                'monthly_payment'           => round($monthlyPayment, 2),
-                'monthly_payment_principal' => round($amountForEmi / $durationMonths, 2),
-                'expected_interest'         => round($expectedInterest, 2),
-                'insurance'                 => round($insurance, 2),
-            ];
+//             return [
+//                 'monthly_payment'           => round($monthlyPayment, 2),
+//                 'monthly_payment_principal' => round($amountForEmi / $durationMonths, 2),
+//                 'expected_interest'         => round($expectedInterest, 2),
+//                 'insurance'                 => round($insurance, 2),
+//             ];
 
-        case 'calc_loan_interest_insurance_dhl':
-            $interestType = strtoupper(trim($loanType->loan_type_interest_type ?? 'FIXED INTEREST'));
-            $annualRate   = (float) ($loanType->loan_type_interest ?? 0);
+//         case 'calc_loan_interest_insurance_dhl':
+//             $interestType = strtoupper(trim($loanType->loan_type_interest_type ?? 'FIXED INTEREST'));
+//             $annualRate   = (float) ($loanType->loan_type_interest ?? 0);
 
-            $insurance = $isInsurable
-                ? round($requestedLoanAmount * 0.01, 2)
-                : 0.0;
+//             $insurance = $isInsurable
+//                 ? round($requestedLoanAmount * 0.01, 2)
+//                 : 0.0;
 
-            $commissionForEmi = ($commissionEffect === 'ADD_TO_LOAN') ? $commission : 0;
-            $insuranceForEmi = ($insuranceEffect === 'ADD_TO_LOAN') ? $insurance : 0;
-            $loanAmountWithInsu = $amountForEmi + $commissionForEmi + $insuranceForEmi;
+//             $commissionForEmi = ($commissionEffect === 'ADD_TO_LOAN') ? $commission : 0;
+//             $insuranceForEmi = ($insuranceEffect === 'ADD_TO_LOAN') ? $insurance : 0;
+//             $loanAmountWithInsu = $amountForEmi + $commissionForEmi + $insuranceForEmi;
 
-            if ($interestType === 'FIXED INTEREST') {
-                $expectedInterest = round($loanAmountWithInsu * $annualRate / 100, 2);
-                $monthlyPayment = ceil(($loanAmountWithInsu + $expectedInterest) / $durationMonths);
-                $monthlyPrincipal = ceil($loanAmountWithInsu / $durationMonths);
-            } else {
-                $interestPercent = $annualRate / 12 / 100;
-                $monthlyPayment = ($loanAmountWithInsu / $durationMonths) + ($loanAmountWithInsu * $interestPercent);
-                $monthlyPayment = ceil($monthlyPayment);
+//             if ($interestType === 'FIXED INTEREST') {
+//                 $expectedInterest = round($loanAmountWithInsu * $annualRate / 100, 2);
+//                 $monthlyPayment = ceil(($loanAmountWithInsu + $expectedInterest) / $durationMonths);
+//                 $monthlyPrincipal = ceil($loanAmountWithInsu / $durationMonths);
+//             } else {
+//                 $interestPercent = $annualRate / 12 / 100;
+//                 $monthlyPayment = ($loanAmountWithInsu / $durationMonths) + ($loanAmountWithInsu * $interestPercent);
+//                 $monthlyPayment = ceil($monthlyPayment);
 
-                $expectedInterest = $loanAmountWithInsu * $interestPercent;
-                $monthlyPrincipal = $monthlyPayment - ($loanAmountWithInsu * $interestPercent);
-                $monthlyPrincipal = ceil($monthlyPrincipal);
-            }
+//                 $expectedInterest = $loanAmountWithInsu * $interestPercent;
+//                 $monthlyPrincipal = $monthlyPayment - ($loanAmountWithInsu * $interestPercent);
+//                 $monthlyPrincipal = ceil($monthlyPrincipal);
+//             }
 
-            return [
-                'monthly_payment'           => round($monthlyPayment, 2),
-                'monthly_payment_principal' => round($monthlyPrincipal, 2),
-                'expected_interest'         => round($expectedInterest, 2),
-                'insurance'                 => round($insurance, 2),
-            ];
+//             return [
+//                 'monthly_payment'           => round($monthlyPayment, 2),
+//                 'monthly_payment_principal' => round($monthlyPrincipal, 2),
+//                 'expected_interest'         => round($expectedInterest, 2),
+//                 'insurance'                 => round($insurance, 2),
+//             ];
 
-        case 'default_calc_loan_interest_insurance':
-        default:
-            $interestType = strtoupper(trim($loanType->loan_type_interest_type ?? 'REDUCING BALANCE'));
-            $annualRate = (float) $loanType->loan_type_interest;
-            $monthlyRate = $annualRate / 12 / 100;
+//         case 'default_calc_loan_interest_insurance':
+//         default:
+//             $interestType = strtoupper(trim($loanType->loan_type_interest_type ?? 'REDUCING BALANCE'));
+//             $annualRate = (float) $loanType->loan_type_interest;
+//             $monthlyRate = $annualRate / 12 / 100;
 
-            $insurance = $isInsurable
-                ? round($requestedLoanAmount * 0.01, 2)
-                : 0.0;
+//             $insurance = $isInsurable
+//                 ? round($requestedLoanAmount * 0.01, 2)
+//                 : 0.0;
 
-            $commissionForEmi = ($commissionEffect === 'ADD_TO_LOAN') ? $commission : 0;
-            $insuranceForEmi = ($insuranceEffect === 'ADD_TO_LOAN') ? $insurance : 0;
-            $loanPlusExtras = $amountForEmi + $commissionForEmi + $insuranceForEmi;
+//             $commissionForEmi = ($commissionEffect === 'ADD_TO_LOAN') ? $commission : 0;
+//             $insuranceForEmi = ($insuranceEffect === 'ADD_TO_LOAN') ? $insurance : 0;
+//             $loanPlusExtras = $amountForEmi + $commissionForEmi + $insuranceForEmi;
 
-            $monthlyPayment = 0;
-            $expectedInterest = 0;
+//             $monthlyPayment = 0;
+//             $expectedInterest = 0;
 
-            switch ($interestType) {
-                case 'FIXED INTEREST':
-                    $expectedInterest = ($amountForEmi * $annualRate * ($durationMonths / 12)) / 100;
-                    $totalPayable = $loanPlusExtras + $expectedInterest;
-                    $monthlyPayment = $totalPayable / $durationMonths;
-                    break;
+//             switch ($interestType) {
+//                 case 'FIXED INTEREST':
+//                     $expectedInterest = ($amountForEmi * $annualRate * ($durationMonths / 12)) / 100;
+//                     $totalPayable = $loanPlusExtras + $expectedInterest;
+//                     $monthlyPayment = $totalPayable / $durationMonths;
+//                     break;
 
-                case 'COMPOUND INTEREST':
-                    $totalPayable = $loanPlusExtras * pow(1 + $monthlyRate, $durationMonths);
-                    $expectedInterest = $totalPayable - $loanPlusExtras;
-                    $monthlyPayment = $totalPayable / $durationMonths;
-                    break;
+//                 case 'COMPOUND INTEREST':
+//                     $totalPayable = $loanPlusExtras * pow(1 + $monthlyRate, $durationMonths);
+//                     $expectedInterest = $totalPayable - $loanPlusExtras;
+//                     $monthlyPayment = $totalPayable / $durationMonths;
+//                     break;
 
-                case 'REDUCING BALANCE':
-                default:
-                    if ($monthlyRate > 0) {
-                        $monthlyPayment = $loanPlusExtras * $monthlyRate * pow(1 + $monthlyRate, $durationMonths)
-                            / (pow(1 + $monthlyRate, $durationMonths) - 1);
-                    } else {
-                        $monthlyPayment = $loanPlusExtras / $durationMonths;
-                    }
-                    $expectedInterest = ($monthlyPayment * $durationMonths) - $loanPlusExtras;
-                    break;
-            }
+//                 case 'REDUCING BALANCE':
+//                 default:
+//                     if ($monthlyRate > 0) {
+//                         $monthlyPayment = $loanPlusExtras * $monthlyRate * pow(1 + $monthlyRate, $durationMonths)
+//                             / (pow(1 + $monthlyRate, $durationMonths) - 1);
+//                     } else {
+//                         $monthlyPayment = $loanPlusExtras / $durationMonths;
+//                     }
+//                     $expectedInterest = ($monthlyPayment * $durationMonths) - $loanPlusExtras;
+//                     break;
+//             }
 
-            return [
-                'monthly_payment'           => round($monthlyPayment, 2),
-                'monthly_payment_principal' => round($amountForEmi / $durationMonths, 2),
-                'expected_interest'         => round($expectedInterest, 2),
-                'insurance'                 => round($insurance, 2),
-            ];
-    }
-}
+//             return [
+//                 'monthly_payment'           => round($monthlyPayment, 2),
+//                 'monthly_payment_principal' => round($amountForEmi / $durationMonths, 2),
+//                 'expected_interest'         => round($expectedInterest, 2),
+//                 'insurance'                 => round($insurance, 2),
+//             ];
+//     }
+// }
     private function updateSaccoAccountsTrans($subAccountId, $debit, $credit, $docNo, $description, $date, $period, $sourceDescription)
     {
         DB::table('sacco_accounts_trans')->insert([
@@ -3235,55 +3235,7 @@ private function resolveLoanTransactionCharges(float $requestedLoanAmount, array
             'insurance' => $insurance,
         ];
     }
-    private function default_calc_loan_interest_insurance($loanAmount, $durationMonths, $loanType, $member, $commission = 0)
-    {
-        $interestType = strtoupper(trim($loanType->loan_type_interest_type ?? 'REDUCING BALANCE'));
-        $annualRate = (float) $loanType->loan_type_interest;
-        $monthlyRate = $annualRate / 12 / 100;
-
-        // Insurance: fixed 1%
-        $insurance = round($loanAmount * 0.01, 2);
-
-        // Total for EMI calculation
-        $loanPlusExtras = $loanAmount + $commission + $insurance;
-
-        $emi = 0;
-        $expectedInterest = 0;
-
-        switch ($interestType) {
-            case 'FIXED INTEREST':
-                // Fixed interest = loanAmount * interest% * duration/12
-                $expectedInterest = ($loanAmount * $annualRate * ($durationMonths / 12)) / 100;
-                $totalPayable = $loanPlusExtras + $expectedInterest;
-                $emi = $totalPayable / $durationMonths;
-                break;
-
-            case 'COMPOUND INTEREST':
-                // Compound interest = A = P(1 + r)^n
-                $totalPayable = $loanPlusExtras * pow(1 + $monthlyRate, $durationMonths);
-                $expectedInterest = $totalPayable - $loanPlusExtras;
-                $emi = $totalPayable / $durationMonths;
-                break;
-
-            case 'REDUCING BALANCE':
-            default:
-                // Standard EMI formula
-                if ($monthlyRate > 0) {
-                    $emi = $loanPlusExtras * $monthlyRate * pow(1 + $monthlyRate, $durationMonths) / (pow(1 + $monthlyRate, $durationMonths) - 1);
-                } else {
-                    $emi = $loanPlusExtras / $durationMonths;
-                }
-                $expectedInterest = ($emi * $durationMonths) - $loanPlusExtras;
-                break;
-        }
-
-        return [
-            'monthly_payment' => round($emi, 2),
-            'monthly_payment_principal' => round($loanAmount / $durationMonths, 2),
-            'expected_interest' => round($expectedInterest, 2),
-            'insurance' => $insurance,
-        ];
-    }
+   
 
     private function getMaxGuarantorFactorSelf()
     {
