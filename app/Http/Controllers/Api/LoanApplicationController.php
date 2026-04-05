@@ -114,6 +114,19 @@ class LoanApplicationController extends Controller
         'loan_products' => $loanTypes,
     ]);
 }
+
+private function getMemberMonthsInSacco($member): int
+{
+    if (empty($member->member_date_joined)) {
+        return 0;
+    }
+
+    try {
+        return Carbon::parse($member->member_date_joined)->diffInMonths(now());
+    } catch (\Throwable $e) {
+        return 0;
+    }
+}
     private function buildLoanQualificationFeedback($member, $loanType, int $monthsInSacco): array
 {
     $productMaxAmount = round((float) ($loanType->loan_type_max_amount ?? 0), 2);
