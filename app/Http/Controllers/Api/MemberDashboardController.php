@@ -802,9 +802,9 @@ private function getExpectedContributionDues($memberRow): array
     $defaults = $this->getContributionDefaults();
 
     $items = array_merge(
-        $this->getExpectedShareDues($memberRow, $defaults),
         $this->getExpectedCapitalDues($memberRow, $defaults),
-        $this->getExpectedFosaDues($memberRow) // keep existing FOSA logic as-is
+        $this->getExpectedShareDues($memberRow, $defaults),
+        $this->getExpectedFosaDues($memberRow)
     );
 
     return array_values($items);
