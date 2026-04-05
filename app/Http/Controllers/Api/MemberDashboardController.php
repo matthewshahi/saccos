@@ -16,159 +16,160 @@ class MemberDashboardController extends Controller
      * Uses DB query builder only (no Eloquent models).
      */
     public function index(Request $request)
-    {
-        // 🔐 Authenticated member
-        $member = $request->user();
+{
+    // 🔐 Authenticated member
+    $member = $request->user();
 
-        if (!$member || !isset($member->member_id)) {
-            return response()->json(['message' => 'Unauthenticated.'], 401);
-        }
-
-        $memberId  = $member->member_id;
-        // $nowPeriod = (int) date('Ym');
-        $nowPeriod = date('Ym');
-
-        /*
-    |--------------------------------------------------------------------------
-    | 1. Core member (authoritative)
-    |--------------------------------------------------------------------------
-    */
-        $row = DB::table('sacco_members')
-            ->where('member_id', $memberId)
-            ->where('member_active', 'Y')
-            ->first();
-
-        if (!$row) {
-            return response()->json(['message' => 'Member not found or inactive.'], 404);
-        }
-
-        /*
-    |--------------------------------------------------------------------------
-    | 2. Financial snapshot (home dashboard)
-    |--------------------------------------------------------------------------
-    */
-
-        $fosaBreakdown = $this->getFosaBreakdown($memberId);
-
-        $snapshot = [
-            'shares'        => (float) ($row->member_total_share ?? 0),
-            'capital'       => (float) ($row->member_total_share_capital ?? 0),
-            'other_savings' => $fosaBreakdown,
-            'loans'         => (float) ($row->member_total_loan ?? 0),
-        ];
-
-
-        /*
-    |--------------------------------------------------------------------------
-    | 3. Loan attention signals (non-judgemental)
-    |--------------------------------------------------------------------------
-    | Flags loans whose last repayment is ≥ 2 periods behind.
-    | Uses YYYYMM arithmetic (consistent with SACCO data model).
-    |--------------------------------------------------------------------------
-    */
-        $rawLoans = DB::table('sacco_loans as l')
-            ->leftJoin(
-                'sacco_loan_payments as p',
-                'p.loan_payments_loan_id',
-                '=',
-                'l.loan_id'
-            )
-            ->join(
-                'sacco_loan_types as t',
-                't.loan_type_id',
-                '=',
-                'l.loan_loan_type'
-            )
-            ->where('l.loan_member', $memberId)
-            ->where('l.loan_stoped', 'N')
-            ->groupBy(
-                'l.loan_id',
-                'l.loan_amount',
-                'l.loan_loan_paid',
-                'l.loan_taken_period',
-                't.loan_type_name'
-            )
-            ->selectRaw('
-            l.loan_id,
-            t.loan_type_name,
-            l.loan_amount,
-            COALESCE(l.loan_loan_paid, 0) as paid,
-            COALESCE(MAX(p.loan_payments_period), l.loan_taken_period) as last_period
-        ')
-            ->get();
-
-        $attention = [];
-
-        foreach ($rawLoans as $loan) {
-            $principal = (float) ($loan->loan_amount ?? 0);
-            $paid      = (float) ($loan->paid ?? 0);
-            $balance   = $principal - $paid;
-
-            // Skip cleared or near-zero balances
-            if ($balance <= 1) {
-                continue;
-            }
-
-            // $monthsBehind = $nowPeriod - (int) $loan->last_period;
-
-            $monthsBehind = $this->diffPeriodsInMonths($loan->last_period, $nowPeriod);
-
-            if ($monthsBehind >= 2) {
-                $attention[] = [
-                    'loan_id'   => $loan->loan_id,
-                    'label'     => strtoupper($loan->loan_type_name)
-                        . ' (' . $loan->loan_id . ')',
-                    'balance'   => $balance,
-                    'last_paid' => (int) $loan->last_period,
-                    'months'    => $monthsBehind,
-                    'message'   => 'Repayment review recommended',
-                ];
-            }
-        }
-
-
-        /*
-    |--------------------------------------------------------------------------
-    | 4. Final response (Home Dashboard Contract)
-    |--------------------------------------------------------------------------
-    */
-
-        $quickPayments = $this->getQuickPayments($memberId);
-
-        $duesItems = $this->getExpectedFosaDues($row);
-
-$duesTotal = 0.0;
-foreach ($duesItems as $it) {
-    $duesTotal += (float) ($it['balance'] ?? 0);
-}
-
-        return response()->json([
-            'member' => [
-                'name'          => $row->member_name,
-                'member_number' => 'SACCO / ' . (string) $row->member_sacco_id,
-                'status' => $row->member_active === 'Y'
-                    ? 'Active'
-                    : 'Inactive',
-            ],
-
-            'snapshot' => $snapshot,
-
-            // ✅ ADD THIS
-            'quick_payments' => $quickPayments,
-
-            'attention' => [
-                'count' => count($attention),
-                'items' => $attention,
-            ],
-            'dues' => [
-        'count'         => count($duesItems),
-        'total_balance' => round($duesTotal, 2),
-        'as_of'         => Carbon::now()->toDateString(),
-        'items'         => $duesItems,
-    ],
-        ]);
+    if (!$member || !isset($member->member_id)) {
+        return response()->json(['message' => 'Unauthenticated.'], 401);
     }
 
+    $memberId  = $member->member_id;
+    // $nowPeriod = (int) date('Ym');
+    $nowPeriod = date('Ym');
+
+    /*
+|--------------------------------------------------------------------------
+| 1. Core member (authoritative)
+|--------------------------------------------------------------------------
+*/
+    $row = DB::table('sacco_members')
+        ->where('member_id', $memberId)
+        ->where('member_active', 'Y')
+        ->first();
+
+    if (!$row) {
+        return response()->json(['message' => 'Member not found or inactive.'], 404);
+    }
+
+    /*
+|--------------------------------------------------------------------------
+| 2. Financial snapshot (home dashboard)
+|--------------------------------------------------------------------------
+*/
+
+    $fosaBreakdown = $this->getFosaBreakdown($memberId);
+
+    $snapshot = [
+        'shares'        => (float) ($row->member_total_share ?? 0),
+        'capital'       => (float) ($row->member_total_share_capital ?? 0),
+        'other_savings' => $fosaBreakdown,
+        'loans'         => (float) ($row->member_total_loan ?? 0),
+    ];
+
+
+    /*
+|--------------------------------------------------------------------------
+| 3. Loan attention signals (non-judgemental)
+|--------------------------------------------------------------------------
+| Flags loans whose last repayment is ≥ 2 periods behind.
+| Uses YYYYMM arithmetic (consistent with SACCO data model).
+|--------------------------------------------------------------------------
+*/
+    $rawLoans = DB::table('sacco_loans as l')
+        ->leftJoin(
+            'sacco_loan_payments as p',
+            'p.loan_payments_loan_id',
+            '=',
+            'l.loan_id'
+        )
+        ->join(
+            'sacco_loan_types as t',
+            't.loan_type_id',
+            '=',
+            'l.loan_loan_type'
+        )
+        ->where('l.loan_member', $memberId)
+        ->where('l.loan_stoped', 'N')
+        ->groupBy(
+            'l.loan_id',
+            'l.loan_amount',
+            'l.loan_loan_paid',
+            'l.loan_taken_period',
+            't.loan_type_name'
+        )
+        ->selectRaw('
+        l.loan_id,
+        t.loan_type_name,
+        l.loan_amount,
+        COALESCE(l.loan_loan_paid, 0) as paid,
+        COALESCE(MAX(p.loan_payments_period), l.loan_taken_period) as last_period
+    ')
+        ->get();
+
+    $attention = [];
+
+    foreach ($rawLoans as $loan) {
+        $principal = (float) ($loan->loan_amount ?? 0);
+        $paid      = (float) ($loan->paid ?? 0);
+        $balance   = $principal - $paid;
+
+        // Skip cleared or near-zero balances
+        if ($balance <= 1) {
+            continue;
+        }
+
+        // $monthsBehind = $nowPeriod - (int) $loan->last_period;
+
+        $monthsBehind = $this->diffPeriodsInMonths($loan->last_period, $nowPeriod);
+
+        if ($monthsBehind >= 2) {
+            $attention[] = [
+                'loan_id'   => $loan->loan_id,
+                'label'     => strtoupper($loan->loan_type_name)
+                    . ' (' . $loan->loan_id . ')',
+                'balance'   => $balance,
+                'last_paid' => (int) $loan->last_period,
+                'months'    => $monthsBehind,
+                'message'   => 'Repayment review recommended',
+            ];
+        }
+    }
+
+
+    /*
+|--------------------------------------------------------------------------
+| 4. Final response (Home Dashboard Contract)
+|--------------------------------------------------------------------------
+*/
+
+    $quickPayments = $this->getQuickPayments($memberId);
+
+    // $duesItems = $this->getExpectedFosaDues($row);
+    $duesItems = $this->getExpectedContributionDues($row);
+    $asOf = $this->getContributionAsOfDate($row);
+
+    $duesTotal = 0.0;
+    foreach ($duesItems as $it) {
+        $duesTotal += (float) ($it['balance'] ?? 0);
+    }
+
+    return response()->json([
+        'member' => [
+            'name'          => $row->member_name,
+            'member_number' => 'SACCO / ' . (string) $row->member_sacco_id,
+            'status' => $row->member_active === 'Y'
+                ? 'Active'
+                : 'Inactive',
+        ],
+
+        'snapshot' => $snapshot,
+
+        // ✅ ADD THIS
+        'quick_payments' => $quickPayments,
+
+        'attention' => [
+            'count' => count($attention),
+            'items' => $attention,
+        ],
+        'dues' => [
+            'count'         => count($duesItems),
+            'total_balance' => round($duesTotal, 2),
+            'as_of'         => $asOf->toDateString(),
+            'items'         => $duesItems,
+        ],
+    ]);
+}
     /**
      * --------------------------------------------------------------------------
      * Quick Payments (M-PESA Tap-to-Pay)
@@ -796,4 +797,233 @@ private function getQuickPayments(int $memberId): array
             'next_of_kin' => $nextOfKin,
         ]);
     }
+private function getExpectedContributionDues($memberRow): array
+{
+    $defaults = $this->getContributionDefaults();
+
+    $items = array_merge(
+        $this->getExpectedShareDues($memberRow, $defaults),
+        $this->getExpectedCapitalDues($memberRow, $defaults),
+        $this->getExpectedFosaDues($memberRow) // keep existing FOSA logic as-is
+    );
+
+    return array_values($items);
+}
+
+private function getContributionDefaults(): array
+{
+    $this->ensureContributionDefaultExists('min_share_contribution', '1000');
+    $this->ensureContributionDefaultExists('min_capital_contribution', '1000');
+    $this->ensureContributionDefaultExists('min_share_daily_contribution', '0');
+
+    $defaults = DB::table('sacco_defaults')
+        ->whereIn('default_name', [
+            'min_share_contribution',
+            'min_capital_contribution',
+            'min_share_daily_contribution',
+        ])
+        ->pluck('default_value', 'default_name');
+
+    return [
+        'min_share_contribution' => (float) ($defaults['min_share_contribution'] ?? 1000),
+        'min_capital_contribution' => (float) ($defaults['min_capital_contribution'] ?? 1000),
+        'min_share_daily_contribution' => (float) ($defaults['min_share_daily_contribution'] ?? 0),
+    ];
+}
+
+private function ensureContributionDefaultExists(string $name, string $value): void
+{
+    $exists = DB::table('sacco_defaults')
+        ->where('default_name', $name)
+        ->exists();
+
+    if ($exists) {
+        return;
+    }
+
+    DB::table('sacco_defaults')->insert([
+        'default_name' => $name,
+        'default_value' => $value,
+        'default_userid' => null,
+        'default_ip' => 'AUTO-API',
+        'default_transdate' => now(),
+    ]);
+}
+
+private function getExpectedShareDues($memberRow, array $defaults): array
+{
+    $memberId = (int) $memberRow->member_id;
+    $asOf = $this->getContributionAsOfDate($memberRow);
+
+    $dailyMin = (float) ($defaults['min_share_daily_contribution'] ?? 0);
+    $monthlyMin = (float) ($defaults['min_share_contribution'] ?? 0);
+
+    $expectedAmount = 0.0;
+    $expectedTotal = 0.0;
+    $units = 0;
+    $expectedPeriod = 'monthly';
+    $periodLabel = 'Monthly';
+    $unitLabel = 'months';
+    $effectiveStart = null;
+
+    /*
+    |--------------------------------------------------------------------------
+    | Daily logic takes priority only when min_share_daily_contribution > 0
+    |--------------------------------------------------------------------------
+    */
+    if ($dailyMin > 0) {
+        $effectiveStart = $this->getShareDailyWindowStartDate($memberRow, $asOf);
+
+        if ($effectiveStart->greaterThan($asOf)) {
+            return [];
+        }
+
+        $units = $effectiveStart->copy()->startOfDay()->diffInDays($asOf->copy()->startOfDay()) + 1;
+        $expectedAmount = $dailyMin;
+        $expectedTotal = round($dailyMin * $units, 2);
+        $expectedPeriod = 'daily';
+        $periodLabel = 'Daily';
+        $unitLabel = 'days';
+    } else {
+        /*
+        |--------------------------------------------------------------------------
+        | Monthly logic only when daily default is zero
+        | Window = last 12 months max, but never before join date
+        |--------------------------------------------------------------------------
+        */
+        if ($monthlyMin <= 0) {
+            return [];
+        }
+
+        $effectiveStart = $this->getShareMonthlyWindowStartDate($memberRow, $asOf);
+
+        if ($effectiveStart->greaterThan($asOf)) {
+            return [];
+        }
+
+        $startMonth = $effectiveStart->copy()->startOfMonth();
+        $endMonth = $asOf->copy()->startOfMonth();
+
+        $units = $startMonth->diffInMonths($endMonth) + 1;
+        $expectedAmount = $monthlyMin;
+        $expectedTotal = round($monthlyMin * $units, 2);
+        $expectedPeriod = 'monthly';
+        $periodLabel = 'Monthly';
+        $unitLabel = 'months';
+    }
+
+    $paid = (float) DB::table('sacco_shares')
+        ->where('share_member_id', $memberId)
+        ->whereRaw('COALESCE(share_date_paid, share_transdate) >= ?', [$effectiveStart->toDateTimeString()])
+        ->whereRaw('COALESCE(share_date_paid, share_transdate) <= ?', [$asOf->toDateTimeString()])
+        ->sum('share_amount_paying');
+
+    $lastPaidAt = DB::table('sacco_shares')
+        ->where('share_member_id', $memberId)
+        ->whereRaw('COALESCE(share_date_paid, share_transdate) >= ?', [$effectiveStart->toDateTimeString()])
+        ->whereRaw('COALESCE(share_date_paid, share_transdate) <= ?', [$asOf->toDateTimeString()])
+        ->orderByRaw('COALESCE(share_date_paid, share_transdate) DESC')
+        ->value(DB::raw('COALESCE(share_date_paid, share_transdate)'));
+
+    $balance = round($expectedTotal - $paid, 2);
+
+    if ($balance <= 0.01) {
+        return [];
+    }
+
+    return [[
+        'type_id'         => 1000001,
+        'type_name'       => 'SHARES',
+        'type_prefix'     => 'SH',
+        'expected_period' => $expectedPeriod,
+        'period_label'    => $periodLabel,
+        'expected_amount' => round($expectedAmount, 2),
+        'expected_total'  => round($expectedTotal, 2),
+        'paid_total'      => round($paid, 2),
+        'balance'         => $balance,
+        'units'           => $units,
+        'unit_label'      => $unitLabel,
+        'effective_start' => $effectiveStart->toDateString(),
+        'as_of'           => $asOf->toDateString(),
+        'last_paid_at'    => $lastPaidAt ? Carbon::parse($lastPaidAt)->toDateTimeString() : null,
+    ]];
+}
+
+private function getExpectedCapitalDues($memberRow, array $defaults): array
+{
+    $expectedCapital = (float) ($defaults['min_capital_contribution'] ?? 0);
+
+    if ($expectedCapital <= 0) {
+        return [];
+    }
+
+    $paidCapital = (float) ($memberRow->member_total_share_capital ?? 0);
+    $balance = round($expectedCapital - $paidCapital, 2);
+
+    if ($balance <= 0.01) {
+        return [];
+    }
+
+    $asOf = $this->getContributionAsOfDate($memberRow);
+    $joinedAt = !empty($memberRow->member_date_joined)
+        ? Carbon::parse($memberRow->member_date_joined)->startOfDay()
+        : $asOf->copy()->startOfDay();
+
+    return [[
+        'type_id'         => 1000002,
+        'type_name'       => 'CAPITAL SHARES',
+        'type_prefix'     => 'CA',
+        'expected_period' => 'one_time',
+        'period_label'    => 'One-time',
+        'expected_amount' => round($expectedCapital, 2),
+        'expected_total'  => round($expectedCapital, 2),
+        'paid_total'      => round($paidCapital, 2),
+        'balance'         => $balance,
+        'units'           => 1,
+        'unit_label'      => 'time',
+        'effective_start' => $joinedAt->toDateString(),
+        'as_of'           => $asOf->toDateString(),
+        'last_paid_at'    => null,
+    ]];
+}
+
+private function getContributionAsOfDate($memberRow): Carbon
+{
+    $asOf = Carbon::now()->endOfDay();
+
+    if (!empty($memberRow->member_date_dactivated)) {
+        $deactivatedAt = Carbon::parse($memberRow->member_date_dactivated)->endOfDay();
+        if ($deactivatedAt->lessThan($asOf)) {
+            $asOf = $deactivatedAt;
+        }
+    }
+
+    return $asOf;
+}
+
+private function getShareDailyWindowStartDate($memberRow, Carbon $asOf): Carbon
+{
+    $joinedAt = !empty($memberRow->member_date_joined)
+        ? Carbon::parse($memberRow->member_date_joined)->startOfDay()
+        : $asOf->copy()->startOfDay();
+
+    $maxLookbackStart = $asOf->copy()->subDays(364)->startOfDay();
+
+    return $joinedAt->greaterThan($maxLookbackStart)
+        ? $joinedAt
+        : $maxLookbackStart;
+}
+
+private function getShareMonthlyWindowStartDate($memberRow, Carbon $asOf): Carbon
+{
+    $joinedAt = !empty($memberRow->member_date_joined)
+        ? Carbon::parse($memberRow->member_date_joined)->startOfDay()
+        : $asOf->copy()->startOfDay();
+
+    $maxLookbackStart = $asOf->copy()->startOfMonth()->subMonths(11)->startOfDay();
+
+    return $joinedAt->greaterThan($maxLookbackStart)
+        ? $joinedAt
+        : $maxLookbackStart;
+}
 }
