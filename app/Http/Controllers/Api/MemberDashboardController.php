@@ -933,7 +933,7 @@ private function getExpectedShareDues($memberRow, array $defaults): array
 
     return [[
         'type_id'         => 1000001,
-        'type_name'       => 'SHARES',
+        'type_name'       => 'SAVINGS/DEPOSITS',
         'type_prefix'     => 'SH',
         'expected_period' => $expectedPeriod,
         'period_label'    => $periodLabel,
