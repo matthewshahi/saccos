@@ -21,69 +21,221 @@ class LoanApplicationController extends Controller
      * Read-only, authenticated, integrity-first.
      */
     public function products(Request $request)
-    {
-        /*
-        |------------------------------------------------------------------
-        | 1. Authenticate member (authoritative, never client-provided)
-        |------------------------------------------------------------------
-        */
-        $member = $request->user();
+{
+    /*
+    |------------------------------------------------------------------
+    | 1. Authenticate member (authoritative, never client-provided)
+    |------------------------------------------------------------------
+    */
+    $member = $request->user();
 
-        if (!$member || !isset($member->member_id)) {
-            return response()->json([
-                'message' => 'Unauthenticated.',
-            ], 401);
-        }
-
-        /*
-        |------------------------------------------------------------------
-        | 2. Fetch active loan types only
-        |------------------------------------------------------------------
-        | loan_type_deleted = 'N' → authoritative active filter
-        |------------------------------------------------------------------
-        */
-        $loanTypes = DB::table('sacco_loan_types')
-            ->where('loan_type_deleted', 'N')
-            // ->where('loan_type_guaranteable_percent', 0)
-            ->orderBy('loan_type_name')
-            ->get()
-            ->map(function ($t) {
-                return [
-                    // 🔑 Canonical identifier (never trust name)
-                    'loan_type_id' => (int) $t->loan_type_id,
-
-                    // 🏷 UI-facing fields
-                    'loan_name'    => $t->loan_type_name,
-                    'loan_code'    => $t->loan_type_code,
-
-                    // 💰 Financial constraints (authoritative)
-                    'interest_rate'        => (float) $t->loan_type_interest,
-                    'interest_type'        => $t->loan_type_interest_type,
-                    'max_amount'           => (float) $t->loan_type_max_amount,
-                    'duration_months'      => (int) $t->loan_type_duration,
-
-                    // 📋 Qualification hints (non-enforcing, UI guidance only)
-                    'qualification_period' => (int) $t->loan_type_qualification_period,
-                    'instant_qualification' => $t->loan_type_instant_qualification === 'Y',
-
-                    // 🔒 Flags (future use)
-                    'insurable'            => $t->loan_type_insurable === 'Y',
-                    'share_factor'         => (int) $t->loan_type_share_factor,
-
-                    'loan_type_guaranteable_percent' => $t->loan_type_guaranteable_percent,
-                ];
-            })
-            ->values();
-
-        /*
-        |------------------------------------------------------------------
-        | 3. Final response (Loan Application – Products Contract)
-        |------------------------------------------------------------------
-        */
+    if (!$member || !isset($member->member_id)) {
         return response()->json([
-            'loan_products' => $loanTypes,
+            'message' => 'Unauthenticated.',
+        ], 401);
+    }
+
+    /*
+    |------------------------------------------------------------------
+    | 2. Fetch authoritative member record
+    |------------------------------------------------------------------
+    */
+    $memberRow = DB::table('sacco_members')
+        ->where('member_id', (int) $member->member_id)
+        ->where('member_active', 'Y')
+        ->where('member_deleted', '<>', 'Y')
+        ->first();
+
+    if (!$memberRow) {
+        return response()->json([
+            'message' => 'Member not found or inactive.',
+        ], 404);
+    }
+
+    $monthsInSacco = $this->getMemberMonthsInSacco($memberRow);
+
+    /*
+    |------------------------------------------------------------------
+    | 3. Fetch active loan types and enrich with member-specific feedback
+    |------------------------------------------------------------------
+    */
+    $loanTypes = DB::table('sacco_loan_types')
+        ->where('loan_type_deleted', 'N')
+        ->orderBy('loan_type_name')
+        ->get()
+        ->map(function ($t) use ($memberRow, $monthsInSacco) {
+            $qualification = $this->buildLoanQualificationFeedback(
+                $memberRow,
+                $t,
+                $monthsInSacco
+            );
+
+            return [
+                // 🔑 Canonical identifier (never trust name)
+                'loan_type_id' => (int) $t->loan_type_id,
+
+                // 🏷 UI-facing fields
+                'loan_name'    => $t->loan_type_name,
+                'loan_code'    => $t->loan_type_code,
+
+                // 💰 Financial constraints (authoritative)
+                'interest_rate'   => (float) $t->loan_type_interest,
+                'interest_type'   => $t->loan_type_interest_type,
+                'max_amount'      => (float) $t->loan_type_max_amount,
+                'duration_months' => (int) $t->loan_type_duration,
+
+                // 📋 Qualification hints
+                'qualification_period'  => (int) $t->loan_type_qualification_period,
+                'instant_qualification' => $this->isInstantLoanType($t),
+
+                // 🔒 Flags / existing fields
+                'insurable' => strtoupper((string) ($t->loan_type_insurable ?? 'N')) === 'Y',
+                'share_factor' => (int) $t->loan_type_share_factor,
+                'loan_type_guaranteable_percent' => (float) ($t->loan_type_guaranteable_percent ?? 0),
+
+                // ✅ New member-specific feedback
+                'qualifies' => $qualification['qualifies'],
+                'qualified_amount' => $qualification['qualified_amount'],
+                'qualification_text' => $qualification['qualification_text'],
+                'qualification_reason' => $qualification['qualification_reason'],
+                'qualification_shortfall' => $qualification['qualification_shortfall'],
+                'months_in_sacco' => $monthsInSacco,
+                'current_total_loans' => $qualification['current_total_loans'],
+            ];
+        })
+        ->values();
+
+    /*
+    |------------------------------------------------------------------
+    | 4. Final response (Loan Application – Products Contract)
+    |------------------------------------------------------------------
+    */
+    return response()->json([
+        'loan_products' => $loanTypes,
+    ]);
+}
+    private function buildLoanQualificationFeedback($member, $loanType, int $monthsInSacco): array
+{
+    $productMaxAmount = round((float) ($loanType->loan_type_max_amount ?? 0), 2);
+    $qualificationPeriod = max(0, (int) ($loanType->loan_type_qualification_period ?? 0));
+    $isInstant = $this->isInstantLoanType($loanType);
+
+    $memberSavings = round((float) ($member->member_total_share ?? 0), 2);
+    $memberTotalLoans = round((float) ($member->member_total_loan ?? 0), 2);
+
+    /*
+    |--------------------------------------------------------------------------
+    | Membership age gate
+    |--------------------------------------------------------------------------
+    | Instant loans bypass this gate.
+    |--------------------------------------------------------------------------
+    */
+    if (!$isInstant && $monthsInSacco < $qualificationPeriod) {
+        $remainingMonths = max(0, $qualificationPeriod - $monthsInSacco);
+
+        return [
+            'qualifies' => false,
+            'qualified_amount' => 0.00,
+            'qualification_text' => 'You do not qualify for this loan yet.',
+            'qualification_reason' => 'You need ' . $remainingMonths . ' more month' . ($remainingMonths === 1 ? '' : 's') . ' in the SACCO.',
+            'qualification_shortfall' => 0.00,
+            'current_total_loans' => $memberTotalLoans,
+        ];
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Amount rule
+    |--------------------------------------------------------------------------
+    | Normal loans:
+    |   (member_total_share * loan_factor_or_shares) - member_total_loan
+    |
+    | Instant loans:
+    |   use product max amount directly
+    |--------------------------------------------------------------------------
+    */
+    if ($isInstant) {
+        $qualifiedAmount = $productMaxAmount;
+    } else {
+        $loanFactor = $this->getLoanFactorOrSharesDefault();
+
+        $rawQualifiedAmount = round(
+            ($memberSavings * $loanFactor) - $memberTotalLoans,
+            2
+        );
+
+        $rawQualifiedAmount = max(0, $rawQualifiedAmount);
+        $qualifiedAmount = min($productMaxAmount, $rawQualifiedAmount);
+    }
+
+    $qualifiedAmount = round(max(0, $qualifiedAmount), 2);
+
+    if ($qualifiedAmount < 1) {
+        return [
+            'qualifies' => false,
+            'qualified_amount' => 0.00,
+            'qualification_text' => 'You do not qualify for this loan at the moment.',
+            'qualification_reason' => 'Your savings/deposits and current loans do not support this loan yet.',
+            'qualification_shortfall' => 0.00,
+            'current_total_loans' => $memberTotalLoans,
+        ];
+    }
+
+    return [
+        'qualifies' => true,
+        'qualified_amount' => $qualifiedAmount,
+        'qualification_text' => 'You qualify to apply for up to KES ' . number_format($qualifiedAmount, 2) . '.',
+        'qualification_reason' => '',
+        'qualification_shortfall' => 0.00,
+        'current_total_loans' => $memberTotalLoans,
+    ];
+}
+
+private function getLoanFactorOrSharesDefault(): float
+{
+    $exists = DB::table('sacco_defaults')
+        ->where('default_name', 'loan_factor_or_shares')
+        ->exists();
+
+    if (!$exists) {
+        DB::table('sacco_defaults')->insert([
+            'default_name' => 'loan_factor_or_shares',
+            'default_value' => '3',
+            'default_userid' => null,
+            'default_ip' => 'AUTO-API',
+            'default_transdate' => now(),
         ]);
     }
+
+    $value = DB::table('sacco_defaults')
+        ->where('default_name', 'loan_factor_or_shares')
+        ->value('default_value');
+
+    $factor = (float) $value;
+
+    return $factor > 0 ? $factor : 3.0;
+}
+
+private function isInstantLoanType($loanType): bool
+{
+    $raw = $loanType->loan_type_instant_qualification ?? 0;
+
+    if (is_bool($raw)) {
+        return $raw;
+    }
+
+    if (is_numeric($raw) && (int) $raw === 1) {
+        return true;
+    }
+
+    $name = strtoupper(trim((string) ($loanType->loan_type_name ?? '')));
+    $code = strtoupper(trim((string) ($loanType->loan_type_code ?? '')));
+    $normalized = strtoupper(trim((string) $raw));
+
+    return in_array($normalized, ['1', 'Y', 'YES', 'TRUE'], true)
+        || str_contains($name, 'INSTANT')
+        || str_contains($code, 'INSTANT');
+}
     /**
      * GET /api/auth/loan-applications/context
      *
