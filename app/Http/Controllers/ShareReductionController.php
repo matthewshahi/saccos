@@ -12,7 +12,7 @@ class ShareReductionController extends Controller
 {
     protected $recordLimit = 200;
 
-    protected const SHARE_PAID_BY = 'SHARE REDUCTION';
+    protected const SHARE_PAID_BY = 'SAVINGS REDUCTION';
     protected const LEDGER_SOURCE = 'Member Savings Reduction';
 
     public function index(Request $request)

@@ -6267,36 +6267,85 @@ public function storeLoanType(Request $request)
         return view('accounts.sub.edit', compact('subAccount', 'mainAccounts'));
     }
 
-    public function storeSubAccount(Request $request)
-    {
-        $request->validate([
-            'sub_account_name' => 'required|string|max:100|unique:sacco_sub_account,sub_account_name',
-            'sub_account_code' => 'required|string|max:3',
-            'sub_account_main_account' => 'required|integer',
-        ]);
+   public function storeSubAccount(Request $request)
+{
+    $request->validate([
+        'sub_account_name' => 'required|string|max:100|unique:sacco_sub_account,sub_account_name',
+        'sub_account_main_account' => 'required|integer',
+    ]);
 
-        // Check for the combination of main account and sub account code
-        $existingSubAccount = DB::table('sacco_sub_account')
-            ->where('sub_account_main_account', $request->sub_account_main_account)
-            ->where('sub_account_code', $request->sub_account_code)
-            ->first();
+    $mainAccount = DB::table('sacco_main_account')
+        ->where('main_account_id', $request->sub_account_main_account)
+        ->where('main_account_deleted', '<>', 'Y')
+        ->first();
 
-        if ($existingSubAccount) {
-            return redirect()->back()->withErrors(['The combination of main account and sub account code already exists.'])->withInput();
-        }
-
-        DB::table('sacco_sub_account')->insert([
-            'sub_account_name' => strtoupper($request->sub_account_name),
-            'sub_account_code' => $request->sub_account_code,
-            'sub_account_main_account' => $request->sub_account_main_account,
-            'sub_account_debit' => 0,
-            'sub_account_credit' => 0,
-            'sub_account_user_id' => auth()->id(),
-            'sub_account_ip' => $request->ip(),
-        ]);
-
-        return redirect()->route('accounts.sub')->with('success', 'Sub account added successfully.');
+    if (!$mainAccount) {
+        return redirect()->back()
+            ->withErrors(['Selected main account was not found.'])
+            ->withInput();
     }
+
+    $subAccountCode = $this->generateNextSubAccountCode($request->sub_account_main_account);
+
+    if (!$subAccountCode) {
+        return redirect()->back()
+            ->withErrors(['No available sub account codes remain for the selected main account. Maximum allowed is 999.'])
+            ->withInput();
+    }
+
+    $existingSubAccount = DB::table('sacco_sub_account')
+        ->where('sub_account_main_account', $request->sub_account_main_account)
+        ->where('sub_account_code', $subAccountCode)
+        ->where('sub_account_deleted', '<>', 'Y')
+        ->first();
+
+    if ($existingSubAccount) {
+        return redirect()->back()
+            ->withErrors(['Unable to generate a unique sub account code. Please try again.'])
+            ->withInput();
+    }
+
+    DB::table('sacco_sub_account')->insert([
+        'sub_account_name' => strtoupper($request->sub_account_name),
+        'sub_account_code' => $subAccountCode,
+        'sub_account_main_account' => $request->sub_account_main_account,
+        'sub_account_debit' => 0,
+        'sub_account_credit' => 0,
+        'sub_account_user_id' => auth()->id(),
+        'sub_account_ip' => $request->ip(),
+    ]);
+
+    return redirect()->route('accounts.sub')
+        ->with('success', 'Sub account added successfully.');
+}
+
+private function generateNextSubAccountCode($mainAccountId)
+{
+    $usedCodes = DB::table('sacco_sub_account')
+        ->where('sub_account_main_account', $mainAccountId)
+        ->where('sub_account_deleted', '<>', 'Y')
+        ->pluck('sub_account_code')
+        ->map(function ($code) {
+            return (int) $code;
+        })
+        ->filter(function ($code) {
+            return $code >= 1 && $code <= 999;
+        })
+        ->unique()
+        ->sort()
+        ->values()
+        ->toArray();
+
+    $usedLookup = array_flip($usedCodes);
+
+    for ($i = 1; $i <= 999; $i++) {
+        if (!isset($usedLookup[$i])) {
+            return str_pad($i, 3, '0', STR_PAD_LEFT);
+        }
+    }
+
+    return null;
+}
 
     public function updateSubAccount(Request $request, $id)
     {
