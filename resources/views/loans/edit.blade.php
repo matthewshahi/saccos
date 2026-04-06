@@ -163,6 +163,16 @@
                                 <option value="N" {{ old('loan_type_insurable', $loanType->loan_type_insurable) == 'N' ? 'selected' : '' }}>No</option>
                             </select>
                         </div>
+
+                        <div class="col-md-3 form-group mb-3">
+                            <label for="loan_type_insurance_effect">Insurance Treatment</label>
+                            <select class="form-control" id="loan_type_insurance_effect" name="loan_type_insurance_effect">
+                                <option value="">Select treatment</option>
+                                <option value="ADD_TO_LOAN" {{ old('loan_type_insurance_effect', $loanType->loan_type_insurance_effect ?? '') == 'ADD_TO_LOAN' ? 'selected' : '' }}>Add to Loan</option>
+                                <option value="DEDUCT_FROM_DISBURSEMENT" {{ old('loan_type_insurance_effect', $loanType->loan_type_insurance_effect ?? '') == 'DEDUCT_FROM_DISBURSEMENT' ? 'selected' : '' }}>Deduct from Amount Disbursed</option>
+                            </select>
+                            <small class="text-muted">Only applies if this loan type is insurable.</small>
+                        </div>
                     </div>
                 </div>
             </div>
