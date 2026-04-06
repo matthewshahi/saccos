@@ -272,6 +272,17 @@
                                         </span>
 
                                         <span class="cell-line">
+                                            <strong>Insurance Effect:</strong>
+                                            @if(($loanType->loan_type_insurance_effect ?? '') === 'ADD_TO_LOAN')
+                                                Add to Loan
+                                            @elseif(($loanType->loan_type_insurance_effect ?? '') === 'DEDUCT_FROM_DISBURSEMENT')
+                                                Deduct from Payout
+                                            @else
+                                                N/A
+                                            @endif
+                                        </span>
+
+                                        <span class="cell-line">
                                             <strong>CRB Required:</strong>
                                             @if(($loanType->loan_type_crb_required ?? 'N') === 'Y')
                                                 <span class="badge text-bg-info">Yes</span>
