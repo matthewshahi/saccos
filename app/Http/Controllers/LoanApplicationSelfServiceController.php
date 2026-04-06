@@ -2441,6 +2441,7 @@ private function calculateSaccoLoanFinancials(
         'calc_loan_interest_insurance_adom',
         'calc_loan_interest_insurance_yes',
         'calc_loan_interest_insurance_dhl',
+        'calc_loan_interest_insurance_kass',
         'default_calc_loan_interest_insurance',
     ];
 
@@ -2449,16 +2450,17 @@ private function calculateSaccoLoanFinancials(
     }
 
     if (!$isInsurable) {
-        $insurance = 0.00;
-    } elseif ($calcMethod === 'calc_loan_interest_insurance_adom') {
-        $baseInsu = ((5.03 * $durationMonths + 3.03) * $requestedLoanAmount) / 6000;
-        $baseInsu = max($baseInsu, 100);
-        $phcf = $baseInsu * 0.0025;
-        $insurance = round($baseInsu + $phcf, 2);
-    } else {
-        $insurance = round($requestedLoanAmount * 0.01, 2);
-    }
-
+    $insurance = 0.00;
+} elseif ($calcMethod === 'calc_loan_interest_insurance_adom') {
+    $baseInsu = ((5.03 * $durationMonths + 3.03) * $requestedLoanAmount) / 6000;
+    $baseInsu = max($baseInsu, 100);
+    $phcf = $baseInsu * 0.0025;
+    $insurance = round($baseInsu + $phcf, 2);
+} elseif ($calcMethod === 'calc_loan_interest_insurance_kass') {
+    $insurance = round(($requestedLoanAmount * 10.4) / 1000, 2);
+} else {
+    $insurance = round($requestedLoanAmount * 0.01, 2);
+}
     $commissionAddedToLoan = $commissionEffect === 'ADD_TO_LOAN' ? $commission : 0.00;
     $commissionDeductedFromDisbursement = $commissionEffect === 'DEDUCT_FROM_DISBURSEMENT' ? $commission : 0.00;
 

@@ -55,7 +55,7 @@ use App\Http\Controllers\FosaTransferController;
 use App\Http\Controllers\Reports\FinalAccountsController;
 use App\Http\Controllers\Reports\LedgerController;
 use App\Http\Controllers\LoanDeductionTypeController;
-
+use App\Http\Controllers\ShareReductionController;
 
 use App\Http\Controllers\KassMigrationController;
 use App\Http\Controllers\KasMemberImportController;
@@ -371,6 +371,11 @@ Route::prefix('mobile')->group(function () {
             Route::post('/update/{id}', [MpesaConfigController::class, 'update'])->name('mpesa_config.update')->middleware('check_user_rights:mpesa_admin');; // Update configuration
         });
     });
+
+
+    
+       
+  
 });
 
 
@@ -379,8 +384,8 @@ Route::prefix('mobile')->group(function () {
 
 Route::middleware(['auth', 'check_member_position'])->group(function () {
 
-Route::post('/loans/selfservice/{id}/adjust-charges', [LoanApplicationSelfServiceController::class, 'saveAdjustedCharges'])
-    ->name('loans.selfservice.adjust.charges.save')->middleware('check_user_rights:adjust_loan_charges');
+    Route::post('/loans/selfservice/{id}/adjust-charges', [LoanApplicationSelfServiceController::class, 'saveAdjustedCharges'])
+        ->name('loans.selfservice.adjust.charges.save')->middleware('check_user_rights:adjust_loan_charges');
 
 
     // Show manual recovery form
@@ -547,7 +552,7 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
             Route::post('/store', [FosaTypeController::class, 'store'])->name('fosa.store');
             Route::post('/{id}/toggle', [FosaTypeController::class, 'toggle'])->name('fosa.toggle');
             Route::get('/{id}/edit', [FosaTypeController::class, 'edit'])->name('fosa.edit');
-Route::post('/{id}/update', [FosaTypeController::class, 'update'])->name('fosa.update');
+            Route::post('/{id}/update', [FosaTypeController::class, 'update'])->name('fosa.update');
         });
 
 
@@ -721,13 +726,13 @@ Route::post('/{id}/update', [FosaTypeController::class, 'update'])->name('fosa.u
     Route::get('/institutions/list', [HomeController::class, 'listInstitutions'])->name('institutions.list')->middleware('check_user_rights:edit_company');
 
     Route::get('/institutions/edit/{id}', [HomeController::class, 'editInstitution'])
-    ->name('institutions.edit')
-    ->middleware('check_user_rights:edit_company');
+        ->name('institutions.edit')
+        ->middleware('check_user_rights:edit_company');
 
-Route::post('/institutions/update/{id}', [HomeController::class, 'updateInstitution'])
-    ->name('institutions.update')
-    ->middleware('check_user_rights:edit_company');
-    
+    Route::post('/institutions/update/{id}', [HomeController::class, 'updateInstitution'])
+        ->name('institutions.update')
+        ->middleware('check_user_rights:edit_company');
+
     Route::get('/modify/member/shares', [HomeController::class, 'modifyShares'])->name('modify.member.shares')->middleware('check_user_rights:modify_member_shares_journal');
     Route::post('/modify/member/shares', [HomeController::class, 'modifyShares'])->middleware('check_user_rights:modify_member_shares_journal');
     Route::get('/search/accounts', [HomeController::class, 'searchAccounts'])->name('search.accounts')->middleware('check_user_rights:modify_member_shares_journal');
@@ -806,10 +811,10 @@ Route::post('/institutions/update/{id}', [HomeController::class, 'updateInstitut
     Route::get('admin/loans/pending/approval', [LoanApplicationSelfServiceController::class, 'listLoansPendingApproval'])
         ->name('loans.pending.approval')
         ->middleware('check_user_rights:end_month_processing_loans');
-    
+
     Route::patch('admin/loans/pending/approval/{id}/doc-no', [LoanApplicationSelfServiceController::class, 'updatePendingLoanDocNo'])
-    ->name('loans.pending.approval.docno.update')
-    ->middleware('check_user_rights:end_month_processing_loans');
+        ->name('loans.pending.approval.docno.update')
+        ->middleware('check_user_rights:end_month_processing_loans');
 
     Route::post(
         'admin/loans/approve/{loanId}',
@@ -859,28 +864,28 @@ Route::post('/institutions/update/{id}', [HomeController::class, 'updateInstitut
     Route::delete('/loans/types/delete/{id}', [HomeController::class, 'deleteLoanType'])->name('loans.types.delete')->middleware('check_user_rights:add_loan_type');
 
     Route::get('/loans/deduction-types', [LoanDeductionTypeController::class, 'index'])
-    ->name('loans.deduction-types')
-    ->middleware('check_user_rights:list_loan_deduction_types');
+        ->name('loans.deduction-types')
+        ->middleware('check_user_rights:list_loan_deduction_types');
 
-Route::get('/loans/deduction-types/add', [LoanDeductionTypeController::class, 'create'])
-    ->name('loans.deduction-types.add')
-    ->middleware('check_user_rights:add_loan_deduction_type');
+    Route::get('/loans/deduction-types/add', [LoanDeductionTypeController::class, 'create'])
+        ->name('loans.deduction-types.add')
+        ->middleware('check_user_rights:add_loan_deduction_type');
 
-Route::post('/loans/deduction-types/store', [LoanDeductionTypeController::class, 'store'])
-    ->name('loans.deduction-types.store')
-    ->middleware('check_user_rights:add_loan_deduction_type');
+    Route::post('/loans/deduction-types/store', [LoanDeductionTypeController::class, 'store'])
+        ->name('loans.deduction-types.store')
+        ->middleware('check_user_rights:add_loan_deduction_type');
 
-Route::get('/loans/deduction-types/edit/{id}', [LoanDeductionTypeController::class, 'edit'])
-    ->name('loans.deduction-types.edit')
-    ->middleware('check_user_rights:add_loan_deduction_type');
+    Route::get('/loans/deduction-types/edit/{id}', [LoanDeductionTypeController::class, 'edit'])
+        ->name('loans.deduction-types.edit')
+        ->middleware('check_user_rights:add_loan_deduction_type');
 
-Route::put('/loans/deduction-types/update/{id}', [LoanDeductionTypeController::class, 'update'])
-    ->name('loans.deduction-types.update')
-    ->middleware('check_user_rights:add_loan_deduction_type');
+    Route::put('/loans/deduction-types/update/{id}', [LoanDeductionTypeController::class, 'update'])
+        ->name('loans.deduction-types.update')
+        ->middleware('check_user_rights:add_loan_deduction_type');
 
-Route::delete('/loans/deduction-types/delete/{id}', [LoanDeductionTypeController::class, 'destroy'])
-    ->name('loans.deduction-types.delete')
-    ->middleware('check_user_rights:add_loan_deduction_type');
+    Route::delete('/loans/deduction-types/delete/{id}', [LoanDeductionTypeController::class, 'destroy'])
+        ->name('loans.deduction-types.delete')
+        ->middleware('check_user_rights:add_loan_deduction_type');
 
     Route::get('/loans/categories', [HomeController::class, 'loansCategories'])->name('loans.categories')->middleware('check_user_rights:add_loan_type');
     Route::get('/loans/categories/create', [HomeController::class, 'createLoanCategory'])->name('loans.categories.create')->middleware('check_user_rights:add_loan_type');
@@ -1066,8 +1071,8 @@ Route::delete('/loans/deduction-types/delete/{id}', [LoanDeductionTypeController
     Route::post('/admin/defaults/update', [HomeController::class, 'updateDefaults'])->name('admin.defaults.update')->middleware('check_user_rights:add_default');
     Route::post('/admin/defaults/store', [HomeController::class, 'storeDefault'])->name('admin.defaults.store')->middleware('check_user_rights:add_default');
     Route::delete('/admin/defaults/{id}', [HomeController::class, 'destroyDefault'])
-    ->name('admin.defaults.destroy')
-    ->middleware('check_user_rights:add_default');
+        ->name('admin.defaults.destroy')
+        ->middleware('check_user_rights:add_default');
     Route::get('/admin/budget', [HomeController::class, 'adminBudget'])->name('admin.budget')->middleware('check_user_rights:list_budgets');
     Route::post('/admin/budget/store', [HomeController::class, 'adminBudget_store'])->name('admin.budget.store')->middleware('check_user_rights:add_budget');
     Route::get('/admin/year-end', [HomeController::class, 'adminYearEnd'])->name('admin.year-end')->middleware('check_user_rights:proc_end_year');
@@ -1217,7 +1222,32 @@ Route::delete('/loans/deduction-types/delete/{id}', [LoanDeductionTypeController
     )->name('reports.final_accounts.balance_sheet.excel')
         ->middleware('check_user_rights:rpt_balance_sheet');
 
+ Route::prefix('shares-reductions')->group(function () {
 
+            Route::get('/', [ShareReductionController::class, 'index'])
+                ->name('shares_reductions.index')
+                ->middleware('check_user_rights:shares_reductions');
+
+            Route::get('/create', [ShareReductionController::class, 'create'])
+                ->name('shares_reductions.create')
+                ->middleware('check_user_rights:shares_reductions');
+
+            Route::post('/store', [ShareReductionController::class, 'store'])
+                ->name('shares_reductions.store')
+                ->middleware('check_user_rights:shares_reductions');
+
+            Route::get('/show/{id}', [ShareReductionController::class, 'show'])
+                ->name('shares_reductions.show')
+                ->middleware('check_user_rights:shares_reductions');
+
+            Route::get('/search-members', [ShareReductionController::class, 'searchMembers'])
+                ->name('shares_reductions.search_members')
+                ->middleware('check_user_rights:shares_reductions');
+
+            Route::get('/search-accounts', [ShareReductionController::class, 'searchAccounts'])
+                ->name('shares_reductions.search_accounts')
+                ->middleware('check_user_rights:shares_reductions');
+        });
     // =========================
     // LEDGERS (DRILL-DOWN)
     // =========================

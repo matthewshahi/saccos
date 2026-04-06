@@ -3493,14 +3493,21 @@ private function calculateLoanFinancialsForTransaction(
             );
     }
 }
-
 private function resolveCalcFunction(): string
 {
     $calcFunction = DB::table('sacco_defaults')
         ->where('default_name', 'loan_interest_insurance')
         ->value('default_value');
 
-    if (!$calcFunction || !method_exists($this, $calcFunction)) {
+    $allowed = [
+        'calc_loan_interest_insurance_adom',
+        'calc_loan_interest_insurance_yes',
+        'calc_loan_interest_insurance_dhl',
+        'calc_loan_interest_insurance_kass',
+        'default_calc_loan_interest_insurance',
+    ];
+
+    if (!$calcFunction || !in_array($calcFunction, $allowed, true)) {
         return 'default_calc_loan_interest_insurance';
     }
 
@@ -3521,6 +3528,11 @@ private function resolveInsuranceAmount(
     if (!$isInsurable) {
         return 0.0;
     }
+
+
+if ($calcFunction === 'calc_loan_interest_insurance_kass') {
+    return round(($requestedLoanAmount * 10.4) / 1000, 2);
+}
 
     if ($calcFunction === 'calc_loan_interest_insurance_adom') {
         $baseInsu = ((5.03 * $durationMonths + 3.03) * $requestedLoanAmount) / 6000;

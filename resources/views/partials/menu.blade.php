@@ -126,6 +126,12 @@ $defaultLogoPath = '/image/logo.jpg'; // Default logo
                             </li>
 
                             <li class="item-name">
+                                <a href="{{ route('shares_reductions.index') }}">
+                                    <span class="text-muted">Mass Savings Reductions</span>
+                                </a>
+                            </li>
+
+                            <li class="item-name">
                                 <a href="{{ route('proc.end.month.shares') }}">
                                     <span class="text-muted">End month proc.</span>
                                 </a>
@@ -173,11 +179,7 @@ $defaultLogoPath = '/image/logo.jpg'; // Default logo
                                     <span class="text-muted">Add/reduce</span>
                                 </a>
                             </li>
-                            <li class="item-name">
-                                <a href="{{ route('fosa.transactions.index') }}">
-                                    <span class="text-muted">Add/reduce</span>
-                                </a>
-                            </li>
+
                             <li class="item-name">
                                 <a href="{{ route('fosa.transfers.index') }}">
                                     <span class="text-muted">FOSA Out Transfers</span>
@@ -283,11 +285,11 @@ $defaultLogoPath = '/image/logo.jpg'; // Default logo
                                     <span class="text-muted">Loan types</span>
                                 </a>
                             </li>
-                           <li class="item-name">
-    <a href="{{ route('loans.deduction-types') }}">
-        <span class="text-muted">Loan Deduction Types</span>
-    </a>
-</li>
+                            <li class="item-name">
+                                <a href="{{ route('loans.deduction-types') }}">
+                                    <span class="text-muted">Loan Deduction Types</span>
+                                </a>
+                            </li>
                             <li class="item-name">
                                 <a href="{{ url('/loans/types/list') }}">
                                     <span class="text-muted">Loans & Loan Calculator</span>
@@ -412,6 +414,7 @@ $defaultLogoPath = '/image/logo.jpg'; // Default logo
                                     <i class="i-Bar-Chart text-20 me-2" style="color: #663399;"></i>
                                     <span class="item-name text-15 text-muted">Savings</span>
                                 </a>
+
                                 <ul class="mm-collapse">
                                     <li class="item-name">
                                         <a href="{{ url('reports/sasra/member_contributions/data') }}">
@@ -473,7 +476,7 @@ $defaultLogoPath = '/image/logo.jpg'; // Default logo
                                     <span class="item-name text-15 text-muted">Final accounts</span>
                                 </a>
                                 <ul class="mm-collapse">
-                                    
+
                                     <li class="item-name">
                                         <a href="{{ url('/reports/final-accounts/trial-balance') }}">
                                             <span class="text-muted">Trial balance</span>
@@ -685,8 +688,8 @@ $defaultLogoPath = '/image/logo.jpg'; // Default logo
 
                             <li class="item-name">
                                 <a href="{{ url('/dashboard/member_dashboard') }}?view_as_member=y">
-    <span class="text-muted">View as a Member</span>
-</a>
+                                    <span class="text-muted">View as a Member</span>
+                                </a>
 
                             </li>
 
