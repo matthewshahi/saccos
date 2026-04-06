@@ -5624,6 +5624,7 @@ public function updateLoanType(Request $request, $id)
         'loan_type_share_factor'             => 'required|numeric|min:0',
         'loan_type_guaranteable_percent'     => 'required|integer|min:0|max:100',
         'loan_type_insurable'                => 'required|in:Y,N',
+        'loan_type_insurance_effect'         => 'nullable|in:ADD_TO_LOAN,DEDUCT_FROM_DISBURSEMENT',
 
         'loan_type_qualification_period'     => 'required|integer|min:0',
         'loan_type_max_qualification_period' => 'nullable|integer|min:0',
@@ -5651,6 +5652,17 @@ public function updateLoanType(Request $request, $id)
         return back()
             ->withErrors([
                 'loan_type_max_qualification_period' => 'Maximum months in SACCO cannot be less than minimum months in SACCO.'
+            ])
+            ->withInput();
+    }
+
+    if (
+        $validated['loan_type_insurable'] === 'Y' &&
+        empty($validated['loan_type_insurance_effect'])
+    ) {
+        return back()
+            ->withErrors([
+                'loan_type_insurance_effect' => 'Please select insurance treatment when this loan type is insurable.'
             ])
             ->withInput();
     }
@@ -5695,6 +5707,7 @@ public function updateLoanType(Request $request, $id)
 
     $crbRequired        = $validated['loan_type_crb_required'];
     $commissionRequired = $validated['loan_type_commission_required'];
+    $insurable          = $validated['loan_type_insurable'];
 
     $crbCharge = $crbRequired === 'Y'
         ? (float) ($validated['loan_type_crb_charge'] ?? 0)
@@ -5716,6 +5729,10 @@ public function updateLoanType(Request $request, $id)
         ? ($validated['loan_type_commission_effect'] ?? null)
         : 'ADD_TO_LOAN';
 
+    $insuranceEffect = $insurable === 'Y'
+        ? ($validated['loan_type_insurance_effect'] ?? null)
+        : null;
+
     DB::table('sacco_loan_types')
         ->where('loan_type_id', $id)
         ->update([
@@ -5730,7 +5747,8 @@ public function updateLoanType(Request $request, $id)
 
             'loan_type_share_factor'             => (float) $validated['loan_type_share_factor'],
             'loan_type_guaranteable_percent'     => (int) $validated['loan_type_guaranteable_percent'],
-            'loan_type_insurable'                => $validated['loan_type_insurable'],
+            'loan_type_insurable'                => $insurable,
+            'loan_type_insurance_effect'         => $insuranceEffect,
 
             'loan_type_qualification_period'     => (int) $validated['loan_type_qualification_period'],
             'loan_type_max_qualification_period' => $validated['loan_type_max_qualification_period'] !== null
@@ -5820,8 +5838,7 @@ public function createLoanType()
         'incomeLiabilityAccounts'
     ));
 }
-
-    public function storeLoanType(Request $request)
+public function storeLoanType(Request $request)
 {
     $validated = $request->validate([
         'loan_type_name'                     => 'required|string|max:250|unique:sacco_loan_types,loan_type_name',
@@ -5837,6 +5854,7 @@ public function createLoanType()
         'loan_type_share_factor'             => 'required|numeric|min:0',
         'loan_type_guaranteable_percent'     => 'required|integer|min:0|max:100',
         'loan_type_insurable'                => 'required|in:Y,N',
+        'loan_type_insurance_effect'         => 'nullable|in:ADD_TO_LOAN,DEDUCT_FROM_DISBURSEMENT',
 
         'loan_type_qualification_period'     => 'required|integer|min:0',
         'loan_type_max_qualification_period' => 'nullable|integer|min:0',
@@ -5863,6 +5881,15 @@ public function createLoanType()
     ) {
         return back()
             ->withErrors(['loan_type_max_qualification_period' => 'Maximum months in SACCO cannot be less than minimum months in SACCO.'])
+            ->withInput();
+    }
+
+    if (
+        $validated['loan_type_insurable'] === 'Y' &&
+        empty($validated['loan_type_insurance_effect'])
+    ) {
+        return back()
+            ->withErrors(['loan_type_insurance_effect' => 'Please select insurance treatment when this loan type is insurable.'])
             ->withInput();
     }
 
@@ -5912,6 +5939,9 @@ public function createLoanType()
         'loan_type_share_factor'             => $validated['loan_type_share_factor'],
         'loan_type_guaranteable_percent'     => $validated['loan_type_guaranteable_percent'],
         'loan_type_insurable'                => $validated['loan_type_insurable'],
+        'loan_type_insurance_effect'         => $validated['loan_type_insurable'] === 'Y'
+                                                ? ($validated['loan_type_insurance_effect'] ?? null)
+                                                : null,
 
         'loan_type_qualification_period'     => $validated['loan_type_qualification_period'],
         'loan_type_max_qualification_period' => $validated['loan_type_max_qualification_period'] ?? null,
