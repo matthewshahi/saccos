@@ -56,7 +56,7 @@ use App\Http\Controllers\Reports\FinalAccountsController;
 use App\Http\Controllers\Reports\LedgerController;
 use App\Http\Controllers\LoanDeductionTypeController;
 use App\Http\Controllers\ShareReductionController;
-
+use App\Http\Controllers\LoanReprocessController;
 use App\Http\Controllers\KassMigrationController;
 use App\Http\Controllers\KasMemberImportController;
 
@@ -438,7 +438,23 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
 Route::middleware(['auth', 'check_member_position'])->group(function () {
 
 
+Route::prefix('loans/reprocess')
+    ->name('loans.reprocess.')
+    ->middleware(['auth', 'check_member_position', 'check_user_rights:end_month_processing_loans'])
+    ->group(function () {
 
+        Route::get('/', [LoanReprocessController::class, 'index'])
+            ->name('index');
+
+        Route::post('/reset-guarantors', [LoanReprocessController::class, 'resetGuarantors'])
+            ->name('reset-guarantors');
+
+        Route::post('/update-member-loan-balances', [LoanReprocessController::class, 'updateMemberLoanBalances'])
+            ->name('update-member-loan-balances');
+
+        Route::post('/run-all', [LoanReprocessController::class, 'runAll'])
+            ->name('run-all');
+    });
 
 
 

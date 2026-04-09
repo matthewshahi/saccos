@@ -301,6 +301,9 @@ $defaultLogoPath = '/image/logo.jpg'; // Default logo
                                 </a>
                             </li>
 
+<a href="{{ route('loans.reprocess.index') }}">
+    <span class="text-muted">Reprocess</span>
+</a>
 
                         </ul>
                     </li>
