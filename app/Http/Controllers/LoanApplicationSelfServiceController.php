@@ -959,28 +959,31 @@ $guarantorCheck = $this->validateFreshGuarantorsForEdit(
             $updateData['batch_trans_terms_of_employment'] = $validated['batch_trans_terms_of_employment'] ?? null;
         }
 
+        
+
         DB::table('sacco_loan_batch_trans_members')
-            ->where('batch_trans_id', $id)
-            ->where('batch_trans_member_id', $trustedMemberId)
-            ->where('batch_trans_deleted', '<>', 'Y')
-            ->where('batch_trans_updated', 'N')
-            ->update($updateData);
+    ->where('batch_trans_id', $id)
+    ->where('batch_trans_member_id', $trustedMemberId)
+    ->where('batch_trans_deleted', '<>', 'Y')
+    ->where('batch_trans_updated', 'N')
+    ->update($updateData);
 
-        DB::commit();
+/*
+|--------------------------------------------------------------------------
+| 11. Replace old guarantors with fresh validated guarantors
+|--------------------------------------------------------------------------
+*/
+$this->replaceLoanGuarantorsForEdit(
+    (int) $id,
+    $guarantorCheck['guarantors'],
+    $actorUserId,
+    $request->ip(),
+    now(),
+    (string) ($member->member_name ?? '')
+);
 
-        /*
-        |--------------------------------------------------------------------------
-        | 11. Replace old guarantors with fresh validated guarantors
-        |--------------------------------------------------------------------------
-        */
-        $this->replaceLoanGuarantorsForEdit(
-            (int) $id,
-            $guarantorCheck['guarantors'],
-            $actorUserId,
-            $request->ip(),
-            now(),
-            (string) ($member->member_name ?? '')
-        );
+DB::commit();
+
 
         return $respondSuccess('Loan updated successfully.', [
             'insurance' => round((float) ($financials['insurance'] ?? 0), 2),
