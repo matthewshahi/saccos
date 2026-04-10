@@ -79,11 +79,12 @@
                             <th>Date Applied</th>
                             <th>Updated</th>
 
-                            @if($isAdmin)
-                                <th>Adjust Charges</th>
-                            @else
-                                <th>Edit</th>
-                            @endif
+                           @if($isAdmin)
+    <th>Adjust Charges</th>
+    <th>Edit</th>
+@else
+    <th>Edit</th>
+@endif
 
                             <th>PDF</th>
                             <th>Actions</th>
@@ -129,31 +130,50 @@
                                     @endif
                                 </td>
 
-                                @if($isAdmin)
-                                    <td>
-                                        @if ($loan->batch_trans_updated == 'N' && $loan->batch_trans_deleted != 'Y')
-                                            <button type="button"
-                                                    class="btn btn-outline-primary btn-sm"
-                                                    data-bs-toggle="modal"
-                                                    data-bs-target="#chargesModal{{ $loan->batch_trans_id }}">
-                                                Adjust Charges
-                                            </button>
-                                        @else
-                                            <span class="text-muted small">Closed</span>
-                                        @endif
-                                    </td>
-                                @else
-                                    <td>
-                                        @if ($loan->batch_trans_updated == 'N' && $loan->batch_trans_deleted != 'Y')
-                                            <a href="{{ route('loans.pending.approval.selfedit', ['id' => $loan->batch_trans_id]) }}"
-                                               class="btn btn-primary btn-sm">
-                                                Edit
-                                            </a>
-                                        @else
-                                            <span class="text-muted small">Closed</span>
-                                        @endif
-                                    </td>
-                                @endif
+                                
+                                @php
+    $isOwner = ((int) (Auth::user()->member_id ?? 0) === (int) ($loan->batch_trans_member_id ?? 0));
+    $isOpenLoan = ($loan->batch_trans_updated == 'N' && $loan->batch_trans_deleted != 'Y');
+@endphp
+
+@if($isAdmin)
+    <td>
+        @if ($isOpenLoan)
+            <button type="button"
+                    class="btn btn-outline-primary btn-sm"
+                    data-bs-toggle="modal"
+                    data-bs-target="#chargesModal{{ $loan->batch_trans_id }}">
+                Adjust Charges
+            </button>
+        @else
+            <span class="text-muted small">Closed</span>
+        @endif
+    </td>
+
+    <td>
+        @if ($isOpenLoan && $isOwner)
+            <a href="{{ route('loans.pending.approval.selfedit', ['id' => $loan->batch_trans_id]) }}"
+               class="btn btn-primary btn-sm">
+                Edit
+            </a>
+        @elseif (!$isOwner)
+            <span class="text-muted small">Not owner</span>
+        @else
+            <span class="text-muted small">Closed</span>
+        @endif
+    </td>
+@else
+    <td>
+        @if ($isOpenLoan)
+            <a href="{{ route('loans.pending.approval.selfedit', ['id' => $loan->batch_trans_id]) }}"
+               class="btn btn-primary btn-sm">
+                Edit
+            </a>
+        @else
+            <span class="text-muted small">Closed</span>
+        @endif
+    </td>
+@endif
 
                                 <td>
                                     <a href="{{ route('loans.pending.getPDF', ['loanId' => $loan->batch_trans_id]) }}"
@@ -172,7 +192,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="17" class="text-center">No loans pending approval.</td>
+                                <td colspan="{{ $isAdmin ? 19 : 18 }}" class="text-center">No loans pending approval.</td>
                             </tr>
                         @endforelse
                     </tbody>
