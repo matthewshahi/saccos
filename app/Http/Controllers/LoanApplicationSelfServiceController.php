@@ -528,70 +528,7 @@ class LoanApplicationSelfServiceController extends Controller
 
         return view('loans.apply', compact('loanTypes', 'loanCategories', 'maximumNoOfGuarantors', 'memberLoans'));
     }
-    // public function listLoansPendingApprovalSelfedit($id)
-    // {
-    //     // Get the logged-in user's member ID
-    //     $loggedInMemberId = auth()->user()->member_id;
-
-    //     // Fetch the loan application details with joins
-    //     $loan = DB::table('sacco_loan_batch_trans_members AS trans')
-    //         ->join('sacco_members AS members', 'trans.batch_trans_member_id', '=', 'members.member_id')
-    //         ->join('sacco_loan_types AS types', 'trans.batch_trans_loan_type', '=', 'types.loan_type_id')
-    //         ->leftJoin('sacco_loan_category AS categories', 'trans.batch_trans_loan_category', '=', 'categories.loan_category_id')
-    //         ->select(
-    //             'trans.*',
-    //             'members.member_name',
-    //             'members.member_sacco_id',
-    //             'types.loan_type_name',
-    //             'categories.loan_category_name'
-    //         )
-    //         ->where('trans.batch_trans_id', $id)
-    //         ->where('trans.batch_trans_member_id', $loggedInMemberId) // Restrict to the logged-in user's loan
-    //         ->first();
-
-    //     // Check if loan exists and belongs to the user
-    //     if (!$loan) {
-    //         return redirect()->route('loans.pending.approval')->with('error', 'Loan not found or unauthorized access.');
-    //     }
-
-    //     // Fetch loan types, categories, guarantor limits, and member loans
-    //     $loanTypes = DB::table('sacco_loan_types')
-    //         ->where('loan_type_deleted', '<>', 'Y')
-    //         ->orderBy('loan_type_name')
-    //         ->get();
-
-    //     $loanCategories = DB::table('sacco_loan_category')
-    //         ->where('loan_category_deleted', '<>', 'Y')
-    //         ->orderBy('loan_category_name')
-    //         ->get();
-
-    //     $maximumNoOfGuarantors = DB::table('sacco_defaults')
-    //         ->where('default_name', 'maximum_no_of_guarantors')
-    //         ->value('default_value');
-
-    //     $memberLoans = DB::table('sacco_loans')
-    //         ->join('sacco_loan_types', 'sacco_loans.loan_loan_type', '=', 'sacco_loan_types.loan_type_id')
-    //         ->select('sacco_loans.*', 'sacco_loan_types.loan_type_name', DB::raw('(sacco_loans.loan_amount - sacco_loans.loan_loan_paid) as loan_balance'))
-    //         ->where('sacco_loans.loan_member', $loggedInMemberId)
-    //         ->where('sacco_loans.loan_amount', '>', DB::raw('sacco_loans.loan_loan_paid'))
-    //         ->where('sacco_loans.loan_stoped', 'N')
-    //         ->get();
-
-    //     // Fetch guarantors for the loan
-    //     $guarantors = DB::table('sacco_loan_batch_guarantors_members AS guarantors')
-    //         ->join('sacco_members AS members', 'guarantors.guarantors_guarantor_id', '=', 'members.member_id')
-    //         ->select(
-    //             'guarantors.guarantors_id',
-    //             'members.member_name',
-    //             'guarantors.guarantors_amount_guaranteed',
-    //             'guarantors.guarantors_approved'
-    //         )
-    //         ->where('guarantors.guarantors_loan_batch_trans_id', $id)
-    //         ->where('guarantors.guarantors_deleted', '<>', 'Y') // Exclude deleted guarantors
-    //         ->get();
-
-    //     return view('loans.selfedit', compact('loan', 'loanTypes', 'loanCategories', 'maximumNoOfGuarantors', 'memberLoans', 'guarantors'));
-    // }
+    
     public function listLoansPendingApprovalSelfedit($id)
     {
         // Get the logged-in user's member ID
