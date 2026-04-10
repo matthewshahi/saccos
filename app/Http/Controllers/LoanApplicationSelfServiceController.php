@@ -671,7 +671,7 @@ class LoanApplicationSelfServiceController extends Controller
 
         return view('loans.selfedit', compact('loan', 'loanTypes', 'loanCategories', 'maximumNoOfGuarantors', 'memberLoans', 'guarantors'));
     }
-    public function updateLoanApplication(Request $request, $id)
+   public function updateLoanApplication(Request $request, $id)
 {
     $isApiRequest = $request->expectsJson()
         || $request->wantsJson()
@@ -1060,7 +1060,6 @@ class LoanApplicationSelfServiceController extends Controller
         return $respondError('Failed to update loan application. ' . $e->getMessage(), 500);
     }
 }
-
     private function validateFreshGuarantorsForEdit(array $data, $loanType, int $memberId, float $loanAmount): array
 {
     $nmsg = '';
