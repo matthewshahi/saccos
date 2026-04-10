@@ -1004,6 +1004,60 @@ DB::commit();
         return $respondError('Failed to update loan application. ' . $e->getMessage(), 500);
     }
 }
+
+private function replaceLoanGuarantorsForEdit(
+    int $batchTransId,
+    array $guarantors,
+    ?int $actorUserId,
+    string $ip,
+    $transdate,
+    string $borrowerName = ''
+): void {
+    $existingRows = DB::table('sacco_loan_batch_guarantors_members')
+        ->where('guarantors_loan_batch_trans_id', $batchTransId)
+        ->where('guarantors_deleted', '<>', 'Y')
+        ->get()
+        ->keyBy('guarantors_guarantor_id');
+
+    $description = 'Guarantor processed after loan edit'
+        . (!empty($borrowerName) ? ' - ' . $borrowerName : '');
+
+    foreach ($guarantors as $guarantor) {
+        $guarantorId = (int) $guarantor['id'];
+        $amount = round((float) $guarantor['amount'], 2);
+
+        if (isset($existingRows[$guarantorId])) {
+            DB::table('sacco_loan_batch_guarantors_members')
+                ->where('guarantors_id', $existingRows[$guarantorId]->guarantors_id)
+                ->update([
+                    'guarantors_amount_guaranteed' => $amount,
+                    'guarantors_description' => $description,
+                    'guarantors_approved' => 'N',
+                    'guarantors_email_sent' => 'N',
+                    'guarantors_by' => $actorUserId,
+                    'guarantors_on' => $transdate,
+                    'guarantors_ip' => $ip,
+                ]);
+        } else {
+            DB::table('sacco_loan_batch_guarantors_members')->insert([
+                'guarantors_loan_batch_trans_id' => $batchTransId,
+                'guarantors_guarantor_id' => $guarantorId,
+                'guarantors_amount_guaranteed' => $amount,
+                'guarantors_description' => $description,
+                'guarantors_transfered' => null,
+                'guarantors_approved' => 'N',
+                'guarantors_email_sent' => 'N',
+                'guarantors_by' => $actorUserId,
+                'guarantors_on' => $transdate,
+                'guarantors_ip' => $ip,
+                'guarantors_deleted' => 'N',
+                'guarantors_deleted_by' => null,
+                'guarantors_deleted_on' => null,
+                'guarantors_deleted_ip' => null,
+            ]);
+        }
+    }
+}
 private function validateFreshGuarantorsForEdit(
     array $data,
     $loanType,
