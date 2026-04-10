@@ -4391,21 +4391,35 @@ public function updateInstitution(Request $request, $id)
         }
 
         // Fetch loans pending guarantee approval
-        $loans = DB::table('sacco_loan_category')
-            ->join('sacco_loan_batch_trans_members', 'sacco_loan_category.loan_category_id', '=', 'sacco_loan_batch_trans_members.batch_trans_loan_category')
-            ->join('sacco_loan_types', 'sacco_loan_batch_trans_members.batch_trans_loan_type', '=', 'sacco_loan_types.loan_type_id')
-            ->join('sacco_members', 'sacco_loan_batch_trans_members.batch_trans_member_id', '=', 'sacco_members.member_id')
-            ->where('batch_trans_updated', '<>', 'Y')
-            ->where('batch_trans_deleted', '<>', 'Y')
-            ->whereIn('batch_trans_id', function ($query) use ($logged_in_user) {
-                $query->select('guarantors_loan_batch_trans_id')
-                    ->from('sacco_loan_batch_guarantors_members')
-                    ->where('guarantors_guarantor_id', $logged_in_user)
-                    ->where('guarantors_approved', '<>', 'Y')
-                    ->where('guarantors_deleted', '<>', 'Y');
-            })
-            ->get();
+        // $loans = DB::table('sacco_loan_category')
+        //     ->join('sacco_loan_batch_trans_members', 'sacco_loan_category.loan_category_id', '=', 'sacco_loan_batch_trans_members.batch_trans_loan_category')
+        //     ->join('sacco_loan_types', 'sacco_loan_batch_trans_members.batch_trans_loan_type', '=', 'sacco_loan_types.loan_type_id')
+        //     ->join('sacco_members', 'sacco_loan_batch_trans_members.batch_trans_member_id', '=', 'sacco_members.member_id')
+        //     ->where('batch_trans_updated', '<>', 'Y')
+        //     ->where('batch_trans_deleted', '<>', 'Y')
+        //     ->whereIn('batch_trans_id', function ($query) use ($logged_in_user) {
+        //         $query->select('guarantors_loan_batch_trans_id')
+        //             ->from('sacco_loan_batch_guarantors_members')
+        //             ->where('guarantors_guarantor_id', $logged_in_user)
+        //             ->where('guarantors_approved', '<>', 'Y')
+        //             ->where('guarantors_deleted', '<>', 'Y');
+        //     })
+        //     ->get();
 
+        $loans = DB::table('sacco_loan_category')
+    ->join('sacco_loan_batch_trans_members', 'sacco_loan_category.loan_category_id', '=', 'sacco_loan_batch_trans_members.batch_trans_loan_category')
+    ->join('sacco_loan_types', 'sacco_loan_batch_trans_members.batch_trans_loan_type', '=', 'sacco_loan_types.loan_type_id')
+    ->join('sacco_members', 'sacco_loan_batch_trans_members.batch_trans_member_id', '=', 'sacco_members.member_id')
+    ->where('batch_trans_updated', '<>', 'Y')
+    ->where('batch_trans_deleted', '<>', 'Y')
+    ->whereIn('batch_trans_id', function ($query) use ($logged_in_user) {
+        $query->select('guarantors_loan_batch_trans_id')
+            ->from('sacco_loan_batch_guarantors_members')
+            ->where('guarantors_guarantor_id', $logged_in_user)
+            ->where('guarantors_deleted', '<>', 'Y');
+    })
+    ->get();
+    
         return view('loans.guarantee_requests', compact('loans'));
     }
     public function listLoansPendingApproval()
