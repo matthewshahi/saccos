@@ -639,6 +639,10 @@ class ProcessPayrollDeductionsImportJob implements ShouldQueue
     $loanPaid = (float) ($loan->loan_loan_paid ?? 0);
     $outstanding = max(0, $loanAmount - $loanPaid);
 
+    /*
+     * If loan is already cleared, do not charge interest.
+     * Full payroll deduction becomes principal/overpayment.
+     */
     if ($outstanding <= 1) {
         return [
             'interest' => 0,
@@ -653,19 +657,21 @@ class ProcessPayrollDeductionsImportJob implements ShouldQueue
     if ($interestType === 'FIXED INTEREST') {
         /*
          * Fixed interest:
-         * Interest is charged on every deducted amount.
+         * Interest is charged on the deducted amount.
          */
         $interest = round(($interestRate / 100) * $deductedAmount, 2);
     } else {
         /*
          * Reducing balance:
-         * Interest is charged on outstanding balance,
-         * but only once per loan per period.
+         * loan_type_interest is annual.
+         * Monthly interest = annual rate / 12 / 100 × outstanding balance.
+         * Charge only once per loan per period.
          */
         if ($this->interestAlreadyChargedForPeriod((int) $loan->loan_id)) {
             $interest = 0;
         } else {
-            $interest = round(($interestRate / 100) * $outstanding, 2);
+            $monthlyRate = ($interestRate / 12) / 100;
+            $interest = round($monthlyRate * $outstanding, 2);
         }
     }
 
@@ -677,7 +683,6 @@ class ProcessPayrollDeductionsImportJob implements ShouldQueue
         'outstanding' => $outstanding,
     ];
 }
-
     private function releaseGuarantorShares(object $loan, float $principalPaid): void
     {
         $loanAmount = (float) $loan->loan_amount;
