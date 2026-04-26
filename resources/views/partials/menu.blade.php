@@ -231,6 +231,11 @@ $defaultLogoPath = '/image/logo.jpg'; // Default logo
                                     <span class="text-muted">Loans</span>
                                 </a>
                             </li>
+                            <li class="item-name">
+    <a href="{{ route('payroll.deductions.import.index') }}">
+        <span class="text-muted">Bulk Deductions Import</span>
+    </a>
+</li>
                         </ul>
                     </li>
                     <li class="Ul_li--hover">
@@ -256,10 +261,10 @@ $defaultLogoPath = '/image/logo.jpg'; // Default logo
                             </li>
 
                             <li class="item-name">
-                                <a href="{{ route('loans.repayments.import') }}">
-                                    <span class="text-muted">Import Loan Repayments (CSV)</span>
-                                </a>
-                            </li>
+    <a href="{{ route('payroll.deductions.import.index') }}">
+        <span class="text-muted">Bulk Deductions Import</span>
+    </a>
+</li>
 
                             <li class="item-name">
                                 <a href="{{ url('/reports/loans/active') }}">
