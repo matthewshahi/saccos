@@ -68,6 +68,10 @@ class PayrollDeductionsImportController extends Controller
 
     public function preview(Request $request)
     {
+        @set_time_limit(0);
+ini_set('max_execution_time', '0');
+ini_set('memory_limit', '512M');
+
         $currentPeriod = $this->getActivePeriod();
 
         $validated = $request->validate([
@@ -279,6 +283,9 @@ class PayrollDeductionsImportController extends Controller
         string $paymentDate,
         string $period
     ): array {
+        @set_time_limit(0);
+    ini_set('max_execution_time', '0');
+    ini_set('memory_limit', '512M');
         $errors = [];
         $warnings = [];
 
