@@ -64,6 +64,8 @@ use App\Http\Controllers\KassContributionsImportController;
 
 use App\Http\Controllers\KassMemberMasterImportController;
 
+use App\Http\Controllers\PayrollDeductionsImportController;
+
 /* good imports
 Route::prefix('kass')->group(function () {
     Route::get('/member-master-import', [KassMemberMasterImportController::class, 'index'])->name('kass.member_master_import.index');
@@ -379,7 +381,35 @@ Route::prefix('mobile')->group(function () {
 });
 
 
+Route::middleware(['auth', 'check_member_position'])->group(function () {
 
+    Route::prefix('payroll-deductions-import')
+        ->name('payroll.deductions.import.')
+        ->middleware('check_user_rights:end_month_processing_loans')
+        ->group(function () {
+
+            // 1. Upload form
+            Route::get('/', [PayrollDeductionsImportController::class, 'index'])
+                ->name('index');
+
+            // 2. Upload Excel and validate/preview
+            Route::post('/preview', [PayrollDeductionsImportController::class, 'preview'])
+                ->name('preview');
+
+            // 3. Confirm and process final import
+            Route::post('/process', [PayrollDeductionsImportController::class, 'process'])
+                ->name('process');
+
+            // 4. Cancel/clear current preview session
+            Route::post('/cancel', [PayrollDeductionsImportController::class, 'cancel'])
+                ->name('cancel');
+
+            // 5. Download sample template later, optional
+            Route::get('/sample', [PayrollDeductionsImportController::class, 'sample'])
+                ->name('sample');
+        });
+
+});
 
 
 Route::middleware(['auth', 'check_member_position'])->group(function () {

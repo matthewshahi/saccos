@@ -14,35 +14,20 @@ class KassLoanImportController extends Controller
     protected $lastLoan = [];
 
     protected $loanTypeMap = [
-        'LOAN 1' => 'NORMAL LOAN',
-        'NORMAL' => 'NORMAL LOAN',
-        'NORM' => 'NORMAL LOAN',
+    'EMERGENCY'   => 'EMERGENCY',
+    'KARIBISHA'   => 'KARIBISHA',
+    'MWANGAZA'    => 'MWANGAZA',
 
-        'LOAN 2' => 'EMERGENCY LOAN',
-        'EMERGENCY' => 'EMERGENCY LOAN',
+    'NORMAL'      => 'NORMAL',
+    'NORMAL A'    => 'NORMAL',
+    'NORMALA'     => 'NORMAL',
+    'NORM'        => 'NORMAL',
 
-        'LOAN 3' => 'SCHOOL FEES LOAN',
-        'SCHOOL' => 'SCHOOL FEES LOAN',
-
-        'LOAN 4' => 'UWEZO LOAN',
-        'UWEZO' => 'UWEZO LOAN',
-        'UWAZO' => 'UWEZO LOAN',
-
-        'SPARK' => 'SPARK LOAN',
-
-        'TOPUP' => 'NORMAL TOP-UP LOAN',
-        'TOP UP' => 'NORMAL TOP-UP LOAN',
-
-        'OKOA' => 'OKOA LOAN',
-
-        'KARIBISHA' => 'KARIBISHA LOAN',
-
-        'MOBILE' => 'MOBILE LOAN',
-        'M-LOAN' => 'MOBILE LOAN',
-        'M LOAN' => 'MOBILE LOAN',
-
-        'LOAN' => 'NORMAL LOAN'
-    ];
+    'OKOA'        => 'OKOA',
+    'SCHOOL FEES' => 'SCHOOL FEES',
+    'SCHOOL'      => 'SCHOOL FEES',
+    'UWEZO'       => 'UWEZO',
+];
 
     /* ============================================================
      *  INDEX (Dashboard)
