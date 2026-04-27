@@ -426,13 +426,28 @@ class LoanController extends Controller
             DB::raw('COALESCE(d.deduction_descriptions, "") as batch_trans_deduction_descriptions'),
             DB::raw('COALESCE(t.batch_trans_expected_interest, 0) as batch_trans_interest_amount'),
             DB::raw('(COALESCE(t.batch_trans_loan_amount, 0) + COALESCE(d.total_add_to_loan, 0)) as batch_trans_amount_for_emi'),
-            DB::raw('
-                (
-                    COALESCE(t.batch_trans_loan_amount, 0)
-                    - COALESCE(d.total_deduct_from_disbursement, 0)
-                    - COALESCE(t.batch_trans_commission, 0)
-                ) as batch_trans_net_disbursement
-            '),
+           DB::raw("
+    (
+        COALESCE(t.batch_trans_loan_amount, 0)
+
+        - COALESCE(d.total_deduct_from_disbursement, 0)
+
+        - CASE
+            WHEN UPPER(TRIM(COALESCE(lt.loan_type_commission_effect, 'ADD_TO_LOAN'))) = 'DEDUCT_FROM_DISBURSEMENT'
+            THEN COALESCE(t.batch_trans_commission, 0)
+            ELSE 0
+          END
+
+        - CASE
+            WHEN UPPER(TRIM(COALESCE(lt.loan_type_insurance_effect, 'ADD_TO_LOAN'))) = 'DEDUCT_FROM_DISBURSEMENT'
+            THEN COALESCE(t.batch_trans_insurance, 0)
+            ELSE 0
+          END
+
+        - COALESCE(t.batch_trans_loan_to_top_up_amount, 0)
+
+    ) as batch_trans_net_disbursement
+"),
             DB::raw('
                 (
                     COALESCE(t.batch_trans_monthly_payment, 0)
@@ -538,22 +553,99 @@ if ($batch->batch_approved === 'Y' || $batch->batch_updated === 'Y') {
 
 
     public function loans_batch_transactions_delete($transaction_id)
-    {
-        $transaction = DB::table('sacco_loan_batch_trans')->where('batch_trans_id', $transaction_id)->first();
+{
+    $transaction = DB::table('sacco_loan_batch_trans')
+        ->where('batch_trans_id', $transaction_id)
+        ->first();
 
-        if (!$transaction) {
-            return redirect()->route('loans.batches')->with('error', 'Transaction not found.');
-        }
-
-        DB::table('sacco_loan_batch_trans')->where('batch_trans_id', $transaction_id)->update([
-            'batch_trans_deleted' => 'Y',
-            'batch_trans_deleted_by' => auth()->id(),
-            'batch_trans_deleted_on' => now(),
-            'batch_trans_deleted_ip' => request()->ip()
-        ]);
-
-        return redirect()->route('loans.batch.transactions', $transaction->batch_trans_batch_id)->with('success', 'Transaction deleted successfully.');
+    if (!$transaction || $transaction->batch_trans_deleted === 'Y') {
+        return redirect()
+            ->route('loans.batches')
+            ->with('error', 'Transaction not found or has already been deleted.');
     }
+
+    $batch = DB::table('sacco_loan_batch')
+        ->where('batch_id', $transaction->batch_trans_batch_id)
+        ->first();
+
+    if (!$batch || $batch->batch_deleted === 'Y') {
+        return redirect()
+            ->route('loans.batches')
+            ->with('error', 'Parent batch not found or has been deleted.');
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Do not allow deleting transactions from approved or finalised batches.
+    |--------------------------------------------------------------------------
+    */
+    if ($batch->batch_approved === 'Y' || $batch->batch_updated === 'Y') {
+        $message = $batch->batch_updated === 'Y'
+            ? 'This batch has already been finalised. Transactions cannot be deleted.'
+            : 'This batch has already been approved. Transactions cannot be deleted.';
+
+        return redirect()
+            ->route('loans.batch.transactions', $transaction->batch_trans_batch_id)
+            ->with('error', $message);
+    }
+
+    DB::beginTransaction();
+
+    try {
+        DB::table('sacco_loan_batch_trans')
+            ->where('batch_trans_id', $transaction_id)
+            ->update([
+                'batch_trans_deleted'    => 'Y',
+                'batch_trans_deleted_by' => auth()->id(),
+                'batch_trans_deleted_on' => now(),
+                'batch_trans_deleted_ip' => request()->ip(),
+            ]);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Soft-delete related batch deduction rows.
+        |--------------------------------------------------------------------------
+        */
+        DB::table('sacco_loan_batch_trans_deductions')
+            ->where('batch_trans_deduction_batch_trans_id', $transaction_id)
+            ->where('batch_trans_deduction_deleted', 'N')
+            ->update([
+                'batch_trans_deduction_deleted'    => 'Y',
+                'batch_trans_deduction_deleted_by' => auth()->id(),
+                'batch_trans_deduction_deleted_on' => now(),
+                'batch_trans_deduction_deleted_ip' => request()->ip(),
+            ]);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Soft-delete related batch guarantors.
+        |--------------------------------------------------------------------------
+        */
+        DB::table('sacco_loan_batch_guarantors')
+            ->where('guarantors_loan_batch_trans_id', $transaction_id)
+            ->where('guarantors_deleted', 'N')
+            ->update([
+                'guarantors_deleted'    => 'Y',
+                'guarantors_deleted_by' => auth()->id(),
+                'guarantors_deleted_on' => now(),
+                'guarantors_deleted_ip' => request()->ip(),
+            ]);
+
+        DB::commit();
+
+        return redirect()
+            ->route('loans.batch.transactions', $transaction->batch_trans_batch_id)
+            ->with('success', 'Transaction deleted successfully.');
+    } catch (\Exception $e) {
+        DB::rollBack();
+
+        Log::error('Loan batch transaction delete failed: ' . $e->getMessage());
+
+        return redirect()
+            ->route('loans.batch.transactions', $transaction->batch_trans_batch_id)
+            ->with('error', 'Failed to delete transaction. Please try again.');
+    }
+}
 
     public function searchMembers(Request $request)
     {
@@ -933,16 +1025,112 @@ if ($batch->batch_approved === 'Y' || $batch->batch_updated === 'Y') {
         return ($amount / $totalAmount) * $requiredAmount;
     }
 
-    private function validateShareAndLoanConstraint($member, $loanType, $requestedLoanAmount)
-    {
-        $shareFactor = is_numeric($loanType->loan_type_share_factor) ? $loanType->loan_type_share_factor : 1;
-        $availableShares = ($member->member_total_share * $shareFactor) - $member->member_total_loan;
+     private function validateShareAndLoanConstraint($member, $loanType, $requestedLoanAmount)
+{
+    $policy = $this->getEffectiveLoanShareFactorPolicy($loanType);
 
+    /*
+    |--------------------------------------------------------------------------
+    | If factor is 0, share-factor limit is disabled for this loan product.
+    |--------------------------------------------------------------------------
+    */
+    if (!$policy['limited']) {
         return [
-            'is_valid' => $availableShares >= $requestedLoanAmount,
-            'max_amount' => $availableShares
+            'is_valid' => true,
+            'max_amount' => null,
+            'share_factor_limited' => false,
+            'share_factor_source' => $policy['source'],
+            'share_factor' => 0,
         ];
     }
+
+    $shareFactor = $policy['factor'];
+
+    $availableShares = (
+        ((float) ($member->member_total_share ?? 0) * $shareFactor)
+        - (float) ($member->member_total_loan ?? 0)
+    );
+
+    return [
+        'is_valid' => $availableShares >= (float) $requestedLoanAmount,
+        'max_amount' => max($availableShares, 0),
+        'share_factor_limited' => true,
+        'share_factor_source' => $policy['source'],
+        'share_factor' => $shareFactor,
+    ];
+}
+private function getEffectiveLoanShareFactorPolicy($loanType): array
+{
+    $rawLoanTypeFactor = $loanType->loan_type_share_factor ?? null;
+
+    /*
+    |--------------------------------------------------------------------------
+    | Loan-type factor has first priority.
+    | 0 is valid and means "no share-factor limit".
+    |--------------------------------------------------------------------------
+    */
+    if ($rawLoanTypeFactor !== null && $rawLoanTypeFactor !== '' && is_numeric($rawLoanTypeFactor)) {
+        $factor = (float) $rawLoanTypeFactor;
+
+        if ($factor == 0.0) {
+            return [
+                'limited' => false,
+                'factor'  => 0,
+                'source'  => 'loan_type_share_factor',
+            ];
+        }
+
+        return [
+            'limited' => true,
+            'factor'  => $factor,
+            'source'  => 'loan_type_share_factor',
+        ];
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Only fall back to global SACCO default if loan-type factor is unavailable.
+    |--------------------------------------------------------------------------
+    */
+    $defaultRow = DB::table('sacco_defaults')
+    ->where('default_name', 'loan_factor_or_shares')
+    ->first();
+
+if (!$defaultRow) {
+    DB::table('sacco_defaults')->insert([
+        'default_name'   => 'loan_factor_or_shares',
+        'default_value'  => 3,
+        'default_userid' => auth()->id(),
+        'default_ip'     => request()->ip(),
+    ]);
+
+    $defaultFactor = 3;
+} else {
+    $defaultFactor = $defaultRow->default_value;
+
+    if (!is_numeric($defaultFactor) || (float) $defaultFactor <= 0) {
+        DB::table('sacco_defaults')
+            ->where('default_name', 'loan_factor_or_shares')
+            ->update([
+                'default_value'  => 3,
+                'default_userid' => auth()->id(),
+                'default_ip'     => request()->ip(),
+            ]);
+
+        $defaultFactor = 3;
+    }
+}
+
+$defaultFactor = (float) $defaultFactor;
+
+    
+
+    return [
+        'limited' => true,
+        'factor'  => $defaultFactor,
+        'source'  => 'loan_factor_or_shares',
+    ];
+}
 
     public function loans_batch_transactions_update(Request $request, $batch_id, $transaction_id)
 {
@@ -2935,32 +3123,32 @@ private function resolveLoanTransactionCharges(float $requestedLoanAmount, array
             $errors[] = 'Member must have been in the SACCO for at least ' . $loanType->loan_type_qualification_period . ' months to qualify for this loan.';
         }
 
-        // 6. Share factor check using sacco_defaults setting
-        $loanFactor = DB::table('sacco_defaults')
-            ->where('default_name', 'loan_factor_or_shares')
-            ->value('default_value');
+        // 6. Share factor check using loan-type rule first
+$sharePolicy = $this->getEffectiveLoanShareFactorPolicy($loanType);
 
-        $loanFactor = is_numeric($loanFactor) ? (float) $loanFactor : 1;
+if ($sharePolicy['limited']) {
+    $loanFactor = $sharePolicy['factor'];
 
-        $totalShares = $member->member_total_share;
-        $maxLoanLimit = $totalShares * $loanFactor;
+    $totalShares = (float) ($member->member_total_share ?? 0);
+    $maxLoanLimit = $totalShares * $loanFactor;
 
-        // Sum of all unpaid loan balances
-        $existingLoanBalance = DB::table('sacco_loans')
-            ->where('loan_member', $member->member_id)
-            ->where('loan_stoped', 'N')
-            ->whereRaw('loan_amount > loan_loan_paid')
-            ->selectRaw('SUM(loan_amount - loan_loan_paid) AS balance')
-            ->value('balance') ?? 0;
+    $existingLoanBalance = DB::table('sacco_loans')
+        ->where('loan_member', $member->member_id)
+        ->where('loan_stoped', 'N')
+        ->whereRaw('loan_amount > COALESCE(loan_loan_paid, 0)')
+        ->selectRaw('SUM(loan_amount - COALESCE(loan_loan_paid, 0)) AS balance')
+        ->value('balance') ?? 0;
 
-        $totalExposure = $existingLoanBalance + $validated['batch_trans_loan_amount'];
+    $totalExposure = (float) $existingLoanBalance + (float) $validated['batch_trans_loan_amount'];
 
-        if ($totalExposure > $maxLoanLimit) {
-            $errors[] = 'Loan amount exceeds allowable limit based on SACCO share policy. '
-                . 'Maximum allowed is ' . number_format($maxLoanLimit, 2) . ' based on your shares ('
-                . number_format($totalShares, 2) . ' x factor of ' . $loanFactor . '). '
-                . 'Your current loan exposure (existing + new) would be ' . number_format($totalExposure, 2) . '.';
-        }
+    if ($totalExposure > $maxLoanLimit) {
+        $errors[] = 'Loan amount exceeds allowable limit based on SACCO share policy. '
+            . 'Maximum allowed is KES ' . number_format($maxLoanLimit, 2)
+            . ' based on shares of KES ' . number_format($totalShares, 2)
+            . ' x factor of ' . $loanFactor . '. '
+            . 'Current exposure plus new loan would be KES ' . number_format($totalExposure, 2) . '.';
+    }
+}
 
         return $errors;
     }

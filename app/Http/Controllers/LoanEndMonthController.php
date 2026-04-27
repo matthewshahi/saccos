@@ -495,21 +495,59 @@ class LoanEndMonthController extends Controller
 
             foreach ($loans as $loan) {
                 try {
-                    $principalPayment = (float) $loan->loan_monthly_repayment_amount;
-                    $interest = 0;
+                    $actualCashPaid = round((float) ($loan->loan_monthly_repayment_amount ?? 0), 2);
+$scheduledPrincipal = round((float) ($loan->loan_monthly_repayment_principal ?? 0), 2);
 
-                    // Compute interest
-                    if ($loanInterestType === "FIXED INTEREST") {
-                        $interest = $principalPayment - ($principalPayment * 100 / ($loanInterestRate + 100));
-                    } else {
-                        $interest = ($loan->loan_amount - $loan->loan_loan_paid) * $loanInterestRate / 12 / 100;
-                    }
+$interest = 0;
 
-                    if ($loanCalcMethod === 'principle' && $loanInterestType !== "FIXED INTEREST") {
-                        $principalPayment = $interest + $loan->loan_monthly_repayment_principal;
-                    }
+/*
+|--------------------------------------------------------------------------
+| Compute interest first.
+|--------------------------------------------------------------------------
+*/
+if ($loanInterestType === "FIXED INTEREST") {
+    if ($loanInterestRate > 0) {
+        $interest = $actualCashPaid - ($actualCashPaid * 100 / ($loanInterestRate + 100));
+    } else {
+        $interest = 0;
+    }
+} else {
+    $interest = (
+        ((float) ($loan->loan_amount ?? 0) - (float) ($loan->loan_loan_paid ?? 0))
+        * (float) $loanInterestRate / 12 / 100
+    );
+}
 
-                    $principalPaid = $principalPayment - $interest;
+$interest = round((float) $interest, 2);
+
+/*
+|--------------------------------------------------------------------------
+| Zero-payment override.
+| If no cash was paid, interest must be capitalised into the loan.
+|--------------------------------------------------------------------------
+*/
+if ($actualCashPaid <= 0 && $interest > 0) {
+    $principalPayment = 0;
+    $principalPaid = round(0 - $interest, 2);
+} elseif ($loanCalcMethod === 'principle' && $loanInterestType !== "FIXED INTEREST") {
+    /*
+    |--------------------------------------------------------------------------
+    | Fixed-principal mode:
+    | principal is fixed, interest changes, total paid changes.
+    |--------------------------------------------------------------------------
+    */
+    $principalPaid = $scheduledPrincipal;
+    $principalPayment = round($scheduledPrincipal + $interest, 2);
+} else {
+    /*
+    |--------------------------------------------------------------------------
+    | Normal instalment mode:
+    | actual total paid is split between interest and principal.
+    |--------------------------------------------------------------------------
+    */
+    $principalPayment = $actualCashPaid;
+    $principalPaid = round($actualCashPaid - $interest, 2);
+}
                     $loanDescription = "Payroll {$period} - Member ID: {$loan->member_id}";
 
                     // Skip duplicates
@@ -550,9 +588,13 @@ class LoanEndMonthController extends Controller
                     }
 
                     // Guarantor shares
-                    if (is_numeric($loan->loan_amount_guaranteed) && $loan->loan_amount_guaranteed > 0.1) {
-                        $this->updateGuarantorShares($loan->loan_id, $principalPaid);
-                    }
+                   if (
+    $principalPaid > 0 &&
+    is_numeric($loan->loan_amount_guaranteed) &&
+    $loan->loan_amount_guaranteed > 0.1
+) {
+    $this->updateGuarantorShares($loan->loan_id, $principalPaid);
+}
 
                     // Accounting records
                     $this->recordAccountingTransactions(
