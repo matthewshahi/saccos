@@ -531,28 +531,38 @@
 <script>
     const deductionTypes = @json($additionalDeductionTypes ?? []);
 
-    function showHintMembers(str) {
-        if (str.length === 0) {
-            document.getElementById('suggestions-box').innerHTML = "";
-            return;
-        }
+    let memberSearchTimer = null;
 
+function showHintMembers(str) {
+    str = (str || '').trim();
+
+    clearTimeout(memberSearchTimer);
+
+    if (str.length < 3) {
+        document.getElementById('suggestions-box').innerHTML = "";
+        return;
+    }
+
+    memberSearchTimer = setTimeout(function () {
         let xmlhttp = window.XMLHttpRequest ? new XMLHttpRequest() : new ActiveXObject("Microsoft.XMLHTTP");
 
         xmlhttp.onreadystatechange = function () {
             if (xmlhttp.readyState === 4 && xmlhttp.status === 200) {
                 let response = JSON.parse(xmlhttp.responseText);
                 let suggestions = '';
+
                 response.forEach(member => {
                     suggestions += `<div class="suggestion-item" onclick="selectMember('${member.label}', '${member.member_id}')">${member.label}</div>`;
                 });
+
                 document.getElementById('suggestions-box').innerHTML = suggestions;
             }
         };
 
-        xmlhttp.open("GET", "{{ url('/search/loan_batch/members') }}?query=" + encodeURIComponent(str), true);
+        xmlhttp.open("GET", "{{ route('search.loan_batch.members') }}?query=" + encodeURIComponent(str), true);
         xmlhttp.send();
-    }
+    }, 400);
+}
 
     function selectMember(label, memberId) {
         const memberInput = document.getElementById('member');
@@ -604,12 +614,19 @@
         xmlhttp.send();
     }
 
-    function showHintGuarantor(str, index) {
-        if (str.length === 0) {
-            document.getElementById(`suggestions-box-${index}`).innerHTML = "";
-            return;
-        }
+    let guarantorSearchTimers = {};
 
+function showHintGuarantor(str, index) {
+    str = (str || '').trim();
+
+    clearTimeout(guarantorSearchTimers[index]);
+
+    if (str.length < 3) {
+        document.getElementById(`suggestions-box-${index}`).innerHTML = "";
+        return;
+    }
+
+    guarantorSearchTimers[index] = setTimeout(function () {
         let xmlhttp = window.XMLHttpRequest ? new XMLHttpRequest() : new ActiveXObject("Microsoft.XMLHTTP");
 
         xmlhttp.onreadystatechange = function () {
@@ -625,9 +642,10 @@
             }
         };
 
-        xmlhttp.open("GET", "{{ url('/search/loan_batch/members') }}?query=" + encodeURIComponent(str), true);
+        xmlhttp.open("GET", "{{ route('search.loan_batch.members') }}?query=" + encodeURIComponent(str), true);
         xmlhttp.send();
-    }
+    }, 400);
+}
 
     function selectGuarantor(label, memberId, index) {
         let input = document.querySelectorAll('.guarantor-member')[index];
