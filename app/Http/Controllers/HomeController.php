@@ -5730,9 +5730,9 @@ public function updateLoanType(Request $request, $id)
         : 'ADD_TO_LOAN';
 
     $insuranceEffect = $insurable === 'Y'
-        ? ($validated['loan_type_insurance_effect'] ?? null)
-        : null;
-
+    ? ($validated['loan_type_insurance_effect'] ?? 'ADD_TO_LOAN')
+    : 'ADD_TO_LOAN';
+    
     DB::table('sacco_loan_types')
         ->where('loan_type_id', $id)
         ->update([
