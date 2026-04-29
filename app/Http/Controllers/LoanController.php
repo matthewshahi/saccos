@@ -648,33 +648,42 @@ if ($batch->batch_approved === 'Y' || $batch->batch_updated === 'Y') {
 }
 
     public function searchMembers(Request $request)
-    {
-        $query = $request->input('query');
-        $members = DB::table('sacco_members')
-            ->select('member_id', 'member_name', 'member_sacco_id')
-            ->where(function ($q) use ($query) {
-                $q->where('member_name', 'LIKE', '%' . $query . '%')
-                    ->orWhere('member_phone_no', 'LIKE', '%' . $query . '%')
-                    ->orWhere('member_sacco_id', 'LIKE', '%' . $query . '%');
-            })
-            ->where('member_active', 'Y')
-            ->where('member_total_share', '>', 0)
-            ->where('member_deleted', '<>', 'Y')
-            ->orderBy('member_name')
-            ->limit(5)
-            ->get();
+{
+    $query = trim((string) $request->input('query', ''));
 
-        $results = [];
-        foreach ($members as $member) {
-            $results[] = [
-                'label' => $member->member_name . ' - (' . $member->member_sacco_id . ')',
-                'value' => $member->member_name . ' - (' . $member->member_sacco_id . ')',
-                'member_id' => $member->member_id, // Make sure this is included
-            ];
-        }
-
-        return response()->json($results);
+    // Do not hit database for empty, 1-character, or 2-character searches
+    if (strlen($query) < 3) {
+        return response()->json([]);
     }
+
+    $members = DB::table('sacco_members')
+        ->select('member_id', 'member_name', 'member_sacco_id')
+        ->where('member_active', 'Y')
+        ->where('member_total_share', '>', 0)
+        ->where('member_deleted', '<>', 'Y')
+        ->where(function ($q) use ($query) {
+            $q->where('member_sacco_id', 'LIKE', $query . '%')
+                ->orWhere('member_phone_no', 'LIKE', $query . '%')
+                ->orWhere('member_name', 'LIKE', $query . '%');
+        })
+        ->orderBy('member_name')
+        ->limit(5)
+        ->get();
+
+    $results = [];
+
+    foreach ($members as $member) {
+        $label = $member->member_name . ' - (' . $member->member_sacco_id . ')';
+
+        $results[] = [
+            'label' => $label,
+            'value' => $label,
+            'member_id' => $member->member_id,
+        ];
+    }
+
+    return response()->json($results);
+}
 
 
     public function searchMemberLoans(Request $request)

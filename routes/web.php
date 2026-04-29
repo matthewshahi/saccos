@@ -891,7 +891,12 @@ Route::prefix('loans/reprocess')
     Route::get('/loans/batch/transactions/add/{batch_id}', [LoanController::class, 'loans_batch_transactions_add_view'])->name('loans.batch.transactions.add_view')->middleware('check_user_rights:add_loan_batch');
     Route::post('/loans/batch/transactions/add/{batch_id}', [LoanController::class, 'loans_batch_transactions_add'])->name('loans.batch.transactions.add')->middleware('check_user_rights:add_loan_batch');
     Route::get('/loans/batch/transactions/delete/{transaction_id}', [LoanController::class, 'loans_batch_transactions_delete'])->name('loans.batch.transactions.delete')->middleware('check_user_rights:add_loan_batch');
-    Route::get('/search/loan_batch/members', [LoanController::class, 'searchMembers'])->name('search.loan_batch.members')->middleware('check_user_rights:add_loan_batch');
+    Route::get('/search/loan_batch/members', [LoanController::class, 'searchMembers'])
+    ->name('search.loan_batch.members')
+    ->middleware([
+        'check_user_rights:add_loan_batch',
+        'throttle:40,1'
+    ]);
     Route::get('/search/loan_batch/member_loans', [LoanController::class, 'searchMemberLoans'])->name('loan_batch.member_loans')->middleware('check_user_rights:add_loan_batch');
     Route::get('/loans/get-free-shares', [LoanController::class, 'LoanGetFreeShares'])->name('loan.get.free.shares')->middleware('check_user_rights:add_loan_batch');
     Route::post('/loans/batch/transactions/update/{batch_id}/{transaction_id}', [LoanController::class, 'loans_batch_transactions_update'])->name('loans.batch.transactions.update')->middleware('check_user_rights:add_loan_batch');
