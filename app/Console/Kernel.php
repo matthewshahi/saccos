@@ -9,12 +9,12 @@ class Kernel extends ConsoleKernel
 {
     protected function schedule(Schedule $schedule): void
     {
-        $schedule->job(new \App\Jobs\ReconcileStkPushPaymentsJob())
-    ->everyMinute()
-    ->withoutOverlapping()
-    ->onOneServer()
-    ->timezone('Africa/Nairobi');
-    
+    //     $schedule->job(new \App\Jobs\ReconcileStkPushPaymentsJob())
+    // ->everyMinute()
+    // ->withoutOverlapping()
+    // ->onOneServer()
+    // ->timezone('Africa/Nairobi');
+
         // Process incoming transactions every minute
         $schedule->job(new \App\Jobs\ProcessTransactionsJob())
             ->everyMinute()
