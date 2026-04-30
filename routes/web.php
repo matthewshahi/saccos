@@ -65,7 +65,7 @@ use App\Http\Controllers\KassContributionsImportController;
 use App\Http\Controllers\KassMemberMasterImportController;
 
 use App\Http\Controllers\PayrollDeductionsImportController;
-
+use App\Http\Controllers\MpesaStatementReconciliationController;
 /* good imports
 Route::prefix('kass')->group(function () {
     Route::get('/member-master-import', [KassMemberMasterImportController::class, 'index'])->name('kass.member_master_import.index');
@@ -466,6 +466,14 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
 
 
 Route::middleware(['auth', 'check_member_position'])->group(function () {
+
+
+
+Route::get('/mpesa/statement-reconciliation', [MpesaStatementReconciliationController::class, 'index'])
+    ->name('mpesa.statement.reconciliation.index')->middleware('check_user_rights:mpesa-reconcile');
+
+Route::post('/mpesa/statement-reconciliation', [MpesaStatementReconciliationController::class, 'store'])
+    ->name('mpesa.statement.reconciliation.store')->middleware('check_user_rights:mpesa-reconcile');
 
 
 Route::prefix('loans/reprocess')
