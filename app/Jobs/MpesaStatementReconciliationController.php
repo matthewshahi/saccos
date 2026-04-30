@@ -38,20 +38,29 @@ class MpesaStatementReconciliationController extends Controller
         $summary = [
             'total_rows_seen' => 0,
             'valid_paybill_rows' => 0,
-            'inserted' => 0,
-            'skipped_existing_c2b' => 0,
-            'skipped_existing_stk_response' => 0,
+
+            'inserted_c2b' => 0,
+            'inserted_stk_response' => 0,
+            'updated_existing_stk_response' => 0,
+            'already_existing_c2b' => 0,
+            'already_existing_stk_response' => 0,
+
             'skipped_missing_data' => 0,
             'skipped_no_matching_stk' => 0,
             'skipped_conflict' => 0,
             'skipped_not_completed' => 0,
             'skipped_not_paybill' => 0,
             'errors' => 0,
+
             'rows' => [],
         ];
 
         try {
-            $rows = $this->readStatementRows($fullPath, $extension, $request->input('sheet_name'));
+            $rows = $this->readStatementRows(
+                $fullPath,
+                $extension,
+                $request->input('sheet_name')
+            );
 
             foreach ($rows as $rowNumber => $row) {
                 $summary['total_rows_seen']++;
@@ -63,6 +72,7 @@ class MpesaStatementReconciliationController extends Controller
                     $status = strtoupper(trim((string) ($row['transaction_status'] ?? '')));
                     $paidIn = $this->normalizeAmount($row['paid_in'] ?? null);
                     $withdrawn = $this->normalizeAmount($row['withdrawn'] ?? null);
+                    $balance = $this->normalizeAmount($row['balance'] ?? null);
                     $transactionType = strtoupper(trim((string) ($row['transaction_type'] ?? '')));
                     $otherParty = trim((string) ($row['other_party'] ?? ''));
 
@@ -97,19 +107,13 @@ class MpesaStatementReconciliationController extends Controller
 
                     $summary['valid_paybill_rows']++;
 
-                    if ($this->existsInC2B($receipt)) {
-                        $summary['skipped_existing_c2b']++;
-                        $this->addRowResult($summary, $rowNumber, $receipt, $accountReference, $paidIn, 'skipped_existing_c2b', 'Receipt already exists in c2b_payments.');
-                        continue;
-                    }
-
-                    if ($this->existsInStkResponses($receipt)) {
-                        $summary['skipped_existing_stk_response']++;
-                        $this->addRowResult($summary, $rowNumber, $receipt, $accountReference, $paidIn, 'skipped_existing_stk_response', 'Receipt already exists in stk_push_responses.');
-                        continue;
-                    }
-
-                    $stkLog = $this->findMatchingStkLog($accountReference, $paidIn, $completionTime, $maskedPhone, $shortcode);
+                    $stkLog = $this->findMatchingStkLog(
+                        $accountReference,
+                        $paidIn,
+                        $completionTime,
+                        $maskedPhone,
+                        $shortcode
+                    );
 
                     if (!$stkLog) {
                         $summary['skipped_no_matching_stk']++;
@@ -123,30 +127,80 @@ class MpesaStatementReconciliationController extends Controller
                         continue;
                     }
 
+                    $existingC2B = DB::table('c2b_payments')
+                        ->where('transaction_id', $receipt)
+                        ->first();
+
+                    $existingReceiptResponse = DB::table('stk_push_responses')
+                        ->where('mpesa_receipt_number', $receipt)
+                        ->first();
+
+                    if ($existingReceiptResponse && $existingReceiptResponse->checkout_request_id !== $stkLog->checkout_request_id) {
+                        $summary['skipped_conflict']++;
+                        $this->addRowResult($summary, $rowNumber, $receipt, $accountReference, $paidIn, 'skipped_conflict', 'Receipt already exists in stk_push_responses under a different CheckoutRequestID.');
+                        continue;
+                    }
+
                     $existingCheckout = DB::table('stk_push_responses')
                         ->where('checkout_request_id', $stkLog->checkout_request_id)
                         ->first();
 
                     if ($existingCheckout && !empty($existingCheckout->mpesa_receipt_number)) {
-                        $existingReceipt = $this->normalizeReceipt($existingCheckout->mpesa_receipt_number);
+                        $existingCheckoutReceipt = $this->normalizeReceipt($existingCheckout->mpesa_receipt_number);
 
-                        if ($existingReceipt !== $receipt) {
+                        if ($existingCheckoutReceipt !== $receipt) {
                             $summary['skipped_conflict']++;
                             $this->addRowResult($summary, $rowNumber, $receipt, $accountReference, $paidIn, 'skipped_conflict', 'CheckoutRequestID already has a different receipt.');
                             continue;
                         }
                     }
 
-                    DB::transaction(function () use (
+                    $result = DB::transaction(function () use (
                         $stkLog,
                         $receipt,
                         $completionTime,
                         $paidIn,
+                        $balance,
                         $accountReference,
                         $customerName,
                         $details,
+                        $otherParty,
+                        $shortcode,
+                        $existingC2B,
                         $existingCheckout
                     ) {
+                        $c2bPaymentId = null;
+                        $stkResponseId = null;
+                        $insertedC2B = false;
+                        $insertedStkResponse = false;
+                        $updatedExistingStkResponse = false;
+                        $alreadyExistingC2B = false;
+                        $alreadyExistingStkResponse = false;
+
+                        if ($existingC2B) {
+                            $c2bPaymentId = (int) $existingC2B->id;
+                            $alreadyExistingC2B = true;
+                        } else {
+                            $c2bPaymentId = $this->insertC2BPaymentFromStatement([
+                                'receipt' => $receipt,
+                                'transaction_time' => $completionTime['eat_string'],
+                                'amount' => $paidIn,
+                                'balance' => $balance,
+                                'shortcode' => $shortcode ?: ($stkLog->shortcode ?? null),
+                                'account_reference' => $accountReference,
+                                'phone_number' => $stkLog->phone_number ?? null,
+                                'customer_name' => $customerName,
+                                'details' => $details,
+                                'other_party' => $otherParty,
+                            ]);
+
+                            if (!$c2bPaymentId) {
+                                throw new Exception('Unable to insert c2b_payments record safely.');
+                            }
+
+                            $insertedC2B = true;
+                        }
+
                         $payload = [
                             'unique_number' => $accountReference,
                             'merchant_request_id' => $stkLog->merchant_request_id ?? null,
@@ -157,26 +211,40 @@ class MpesaStatementReconciliationController extends Controller
                             'transaction_date' => $completionTime['eat_string'],
                             'phone_number' => $stkLog->phone_number,
                             'amount' => $paidIn,
+
+                            /*
+                             * Important:
+                             * Final member/account posting is done by your normal processor.
+                             */
                             'processed' => 'N',
                             'processed_date' => null,
                             'updated_at' => now(),
                         ];
 
                         if ($existingCheckout) {
+                            $alreadyExistingStkResponse = true;
+
                             DB::table('stk_push_responses')
                                 ->where('id', $existingCheckout->id)
                                 ->update($payload);
 
-                            $stkResponseId = $existingCheckout->id;
+                            $stkResponseId = (int) $existingCheckout->id;
+                            $updatedExistingStkResponse = true;
                         } else {
                             $payload['created_at'] = now();
 
-                            $stkResponseId = DB::table('stk_push_responses')->insertGetId($payload);
+                            $stkResponseId = (int) DB::table('stk_push_responses')->insertGetId($payload);
+                            $insertedStkResponse = true;
                         }
 
-                        $this->updateStkLogAfterStatementImport($stkLog, $receipt, $completionTime['eat_string']);
+                        $this->updateStkLogAfterStatementImport(
+                            $stkLog,
+                            $receipt,
+                            $completionTime['eat_string']
+                        );
 
                         $this->writeReconAuditIfAvailable($stkLog, [
+                            'c2b_payment_id' => $c2bPaymentId,
                             'stk_push_response_id' => $stkResponseId,
                             'unique_number' => $accountReference,
                             'recon_status' => 'statement_import_success',
@@ -190,15 +258,49 @@ class MpesaStatementReconciliationController extends Controller
                                 'receipt' => $receipt,
                                 'account_reference' => $accountReference,
                                 'amount' => $paidIn,
+                                'balance' => $balance,
+                                'phone_number' => $stkLog->phone_number ?? null,
                                 'customer_name' => $customerName,
                                 'details' => $details,
+                                'other_party' => $otherParty,
                             ]),
-                            'notes' => 'Statement import inserted/updated stk_push_responses with processed=N.',
+                            'notes' => 'Statement import inserted/linked c2b_payments as processed=No/picked=No and stk_push_responses as processed=N.',
                         ]);
+
+                        return [
+                            'c2b_payment_id' => $c2bPaymentId,
+                            'stk_response_id' => $stkResponseId,
+                            'inserted_c2b' => $insertedC2B,
+                            'inserted_stk_response' => $insertedStkResponse,
+                            'updated_existing_stk_response' => $updatedExistingStkResponse,
+                            'already_existing_c2b' => $alreadyExistingC2B,
+                            'already_existing_stk_response' => $alreadyExistingStkResponse,
+                        ];
                     });
 
-                    $summary['inserted']++;
-                    $this->addRowResult($summary, $rowNumber, $receipt, $accountReference, $paidIn, 'inserted', 'Inserted into stk_push_responses with processed=N.');
+                    if ($result['inserted_c2b']) {
+                        $summary['inserted_c2b']++;
+                    } else {
+                        $summary['already_existing_c2b']++;
+                    }
+
+                    if ($result['inserted_stk_response']) {
+                        $summary['inserted_stk_response']++;
+                    } elseif ($result['updated_existing_stk_response']) {
+                        $summary['updated_existing_stk_response']++;
+                    } else {
+                        $summary['already_existing_stk_response']++;
+                    }
+
+                    $this->addRowResult(
+                        $summary,
+                        $rowNumber,
+                        $receipt,
+                        $accountReference,
+                        $paidIn,
+                        'imported',
+                        'Inserted/linked c2b_payments as processed=No/picked=No and stk_push_responses as processed=N.'
+                    );
                 } catch (Exception $e) {
                     $summary['errors']++;
 
@@ -208,7 +310,15 @@ class MpesaStatementReconciliationController extends Controller
                         'row' => $row,
                     ]);
 
-                    $this->addRowResult($summary, $rowNumber, $row['receipt_no'] ?? null, null, null, 'error', $e->getMessage());
+                    $this->addRowResult(
+                        $summary,
+                        $rowNumber,
+                        $row['receipt_no'] ?? null,
+                        null,
+                        null,
+                        'error',
+                        $e->getMessage()
+                    );
                 }
             }
         } catch (Exception $e) {
@@ -302,8 +412,10 @@ class MpesaStatementReconciliationController extends Controller
                 $normalizedValues[$column] = $this->normalizeHeader($value);
             }
 
-            if (in_array('receipt_no', $normalizedValues, true)
-                && in_array('completion_time', $normalizedValues, true)) {
+            if (
+                in_array('receipt_no', $normalizedValues, true)
+                && in_array('completion_time', $normalizedValues, true)
+            ) {
                 $headerRowNumber = $rowNumber;
 
                 foreach ($normalizedValues as $column => $normalizedHeader) {
@@ -333,6 +445,7 @@ class MpesaStatementReconciliationController extends Controller
             $status = $this->valueFromMappedRow($row, $headerMap, ['transaction_status', 'status']);
             $paidIn = $this->valueFromMappedRow($row, $headerMap, ['paid_in', 'paidin']);
             $withdrawn = $this->valueFromMappedRow($row, $headerMap, ['withdrawn']);
+            $balance = $this->valueFromMappedRow($row, $headerMap, ['balance']);
             $transactionType = $this->valueFromMappedRow($row, $headerMap, ['transaction_type']);
             $otherParty = $this->valueFromMappedRow($row, $headerMap, ['other_party']);
 
@@ -352,6 +465,7 @@ class MpesaStatementReconciliationController extends Controller
                 'transaction_status' => $status,
                 'paid_in' => $paidIn,
                 'withdrawn' => $withdrawn,
+                'balance' => $balance,
                 'transaction_type' => $transactionType,
                 'other_party' => $otherParty,
             ];
@@ -379,12 +493,16 @@ class MpesaStatementReconciliationController extends Controller
         $value = preg_replace('/[^a-z0-9]+/', '_', $value);
         $value = trim($value, '_');
 
-        if ($value === 'receipt_no') {
+        if (in_array($value, ['receipt_no', 'receipt_number', 'receipt'], true)) {
             return 'receipt_no';
         }
 
         if ($value === 'completion_time') {
             return 'completion_time';
+        }
+
+        if (in_array($value, ['paid_in', 'paidin'], true)) {
+            return 'paid_in';
         }
 
         return $value;
@@ -450,6 +568,10 @@ class MpesaStatementReconciliationController extends Controller
             'd/m/y h:i A',
             'j/n/y g:i A',
             'j/n/Y g:i A',
+            'm/d/Y H:i:s',
+            'm/d/Y H:i',
+            'm/d/y H:i:s',
+            'm/d/y H:i',
         ];
 
         foreach ($formats as $format) {
@@ -464,7 +586,7 @@ class MpesaStatementReconciliationController extends Controller
                     ];
                 }
             } catch (Exception $e) {
-                // try next format
+                // Try next format.
             }
         }
 
@@ -521,22 +643,13 @@ class MpesaStatementReconciliationController extends Controller
         return null;
     }
 
-    private function existsInC2B(string $receipt): bool
-    {
-        return DB::table('c2b_payments')
-            ->where('transaction_id', $receipt)
-            ->exists();
-    }
-
-    private function existsInStkResponses(string $receipt): bool
-    {
-        return DB::table('stk_push_responses')
-            ->where('mpesa_receipt_number', $receipt)
-            ->exists();
-    }
-
-    private function findMatchingStkLog(string $accountReference, float $amount, array $completionTime, ?string $maskedPhone = null, ?string $shortcode = null): ?object
-    {
+    private function findMatchingStkLog(
+        string $accountReference,
+        float $amount,
+        array $completionTime,
+        ?string $maskedPhone = null,
+        ?string $shortcode = null
+    ): ?object {
         $eat = $completionTime['eat'];
         $utc = $completionTime['utc'];
 
@@ -618,10 +731,115 @@ class MpesaStatementReconciliationController extends Controller
         return null;
     }
 
+    private function insertC2BPaymentFromStatement(array $data): ?int
+    {
+        $receipt = $this->normalizeReceipt($data['receipt'] ?? null);
+
+        if (!$receipt) {
+            return null;
+        }
+
+        $existing = DB::table('c2b_payments')
+            ->where('transaction_id', $receipt)
+            ->first();
+
+        if ($existing) {
+            return (int) $existing->id;
+        }
+
+        $amount = $this->normalizeAmount($data['amount'] ?? null);
+
+        if ($amount === null || $amount <= 0) {
+            return null;
+        }
+
+        $transactionTime = $data['transaction_time'] ?? null;
+        $accountReference = strtoupper(trim((string) ($data['account_reference'] ?? '')));
+        $shortcode = trim((string) ($data['shortcode'] ?? ''));
+        $phoneNumber = trim((string) ($data['phone_number'] ?? ''));
+        $customerName = trim((string) ($data['customer_name'] ?? ''));
+
+        if (!$transactionTime || !$accountReference || !$shortcode || !$phoneNumber) {
+            return null;
+        }
+
+        [$firstName, $middleName, $lastName] = $this->splitCustomerName($customerName);
+
+        $rawPayload = [
+            'source' => 'mpesa_business_statement_import',
+            'TransactionType' => 'Pay Bill',
+            'TransID' => $receipt,
+            'TransTime' => Carbon::parse($transactionTime, 'Africa/Nairobi')->format('YmdHis'),
+            'TransAmount' => number_format($amount, 2, '.', ''),
+            'BusinessShortCode' => $shortcode,
+            'BillRefNumber' => $accountReference,
+            'InvoiceNumber' => '',
+            'OrgAccountBalance' => $data['balance'] ?? null,
+            'ThirdPartyTransID' => '',
+            'MSISDN' => $phoneNumber,
+            'FirstName' => $firstName,
+            'MiddleName' => $middleName,
+            'LastName' => $lastName,
+            'Details' => $data['details'] ?? null,
+            'OtherParty' => $data['other_party'] ?? null,
+        ];
+
+        return (int) DB::table('c2b_payments')->insertGetId([
+            'transaction_type' => 'Pay Bill',
+            'transaction_id' => $receipt,
+            'transaction_time' => $transactionTime,
+            'transaction_amount' => $amount,
+            'business_shortcode' => $shortcode,
+            'bill_ref_number' => $accountReference,
+            'invoice_number' => '',
+            'org_account_balance' => $data['balance'] ?? null,
+            'third_party_transaction_id' => '',
+            'msisdn' => $phoneNumber,
+            'first_name' => $firstName,
+            'middle_name' => $middleName,
+            'last_name' => $lastName,
+            'raw_payload' => json_encode($rawPayload),
+            'ip_address' => request()->ip() ?: '127.0.0.1',
+
+            /*
+             * Important:
+             * Final posting is done later by your normal transaction processor.
+             */
+            'processed' => 'No',
+            'picked' => 'No',
+            'failure_reason' => null,
+            'processed_date' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    private function splitCustomerName(?string $customerName): array
+    {
+        $customerName = trim((string) $customerName);
+
+        if ($customerName === '') {
+            return [null, null, null];
+        }
+
+        $parts = preg_split('/\s+/', $customerName);
+
+        $firstName = $parts[0] ?? null;
+        $middleName = null;
+        $lastName = null;
+
+        if (count($parts) === 2) {
+            $lastName = $parts[1];
+        } elseif (count($parts) >= 3) {
+            $middleName = $parts[1];
+            $lastName = implode(' ', array_slice($parts, 2));
+        }
+
+        return [$firstName, $middleName, $lastName];
+    }
+
     private function updateStkLogAfterStatementImport(object $stkLog, string $receipt, string $transactionTime): void
     {
-        $updates = [];
-
         $possible = [
             'result_code' => '0',
             'result_description' => 'Payment imported from M-Pesa Business statement.',
@@ -632,9 +850,11 @@ class MpesaStatementReconciliationController extends Controller
             'recon_source' => 'mpesa_business_statement',
             'recon_attempts' => DB::raw('COALESCE(recon_attempts, 0) + 1'),
             'last_reconciled_at' => now(),
-            'recon_message' => 'Payment imported into stk_push_responses with processed=N from statement.',
+            'recon_message' => 'Payment imported into c2b_payments and stk_push_responses from statement.',
             'updated_at' => now(),
         ];
+
+        $updates = [];
 
         foreach ($possible as $column => $value) {
             if (Schema::hasColumn('stk_push_logs', $column)) {
@@ -657,7 +877,7 @@ class MpesaStatementReconciliationController extends Controller
 
         DB::table('mpesa_stk_reconciliations')->insert([
             'stk_push_log_id' => $stkLog->id,
-            'c2b_payment_id' => null,
+            'c2b_payment_id' => $data['c2b_payment_id'] ?? null,
             'stk_push_response_id' => $data['stk_push_response_id'] ?? null,
 
             'unique_number' => $data['unique_number'] ?? ($stkLog->unique_number ?? null),
@@ -689,8 +909,15 @@ class MpesaStatementReconciliationController extends Controller
         ]);
     }
 
-    private function addRowResult(array &$summary, $rowNumber, $receipt, $account, $amount, string $status, string $message): void
-    {
+    private function addRowResult(
+        array &$summary,
+        $rowNumber,
+        $receipt,
+        $account,
+        $amount,
+        string $status,
+        string $message
+    ): void {
         if (count($summary['rows']) >= 100) {
             return;
         }
