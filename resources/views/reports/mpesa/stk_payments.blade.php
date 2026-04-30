@@ -16,6 +16,12 @@
     </div>
 
     <div @class(['mb-2'])>
+        <a href="{{ route('mpesa.statement.reconciliation.index') }}" class="btn btn-success">
+            <i class="i-Upload me-1"></i> Excel Statement Recovery
+        </a>
+    </div>
+
+    <div @class(['mb-2'])>
         <a href="{{ route('mpesa.manual.list') }}" class="btn btn-outline-secondary">
             <i class="i-File-Clipboard me-1"></i> Manual Recoveries
         </a>
