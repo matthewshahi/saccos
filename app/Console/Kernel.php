@@ -17,6 +17,7 @@ class Kernel extends ConsoleKernel
             ->timezone('Africa/Nairobi')
         ; // ->runInBackground();
 
+        
         // Welcome emails (lightweight; still staggered safely)
         $schedule->job(new \App\Jobs\SendWelcomeEmailJob())
             ->everyMinute()
