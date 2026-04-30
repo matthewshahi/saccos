@@ -9,6 +9,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -23,6 +24,22 @@ class ReconcileStkPushPaymentsJob implements ShouldQueue
     private bool $defaultsEnsured = false;
 
     public function handle(): void
+    {
+        $lock = Cache::lock('mpesa-stk-reconciliation-job-lock', 300);
+
+        if (!$lock->get()) {
+            Log::info('STK reconciliation skipped because another run is active.');
+            return;
+        }
+
+        try {
+            $this->runReconciliation();
+        } finally {
+            optional($lock)->release();
+        }
+    }
+
+    private function runReconciliation(): void
     {
         $this->ensureMpesaStkReconDefaults();
 
@@ -46,7 +63,7 @@ class ReconcileStkPushPaymentsJob implements ShouldQueue
             ->whereNotNull('checkout_request_id')
             ->whereNull('recon_status')
             ->whereBetween('created_at', [$from, $to])
-            ->orderByDesc('created_at') // latest first
+            ->orderByDesc('created_at')
             ->limit($batchSize)
             ->get();
 
@@ -59,15 +76,11 @@ class ReconcileStkPushPaymentsJob implements ShouldQueue
 
         foreach ($records as $index => $stkLog) {
             try {
-                $resolvedLocally = $this->tryResolveFromLocalStkResponse($stkLog);
-
-                if ($resolvedLocally) {
+                if ($this->tryResolveFromLocalStkResponse($stkLog)) {
                     continue;
                 }
 
-                $resolvedFromC2B = $this->tryResolveFromC2B($stkLog, $c2bMatchWindowMinutes);
-
-                if ($resolvedFromC2B) {
+                if ($this->tryResolveFromC2B($stkLog, $c2bMatchWindowMinutes)) {
                     continue;
                 }
 
@@ -111,14 +124,44 @@ class ReconcileStkPushPaymentsJob implements ShouldQueue
         $resultCode = (string) $response->result_code;
 
         if ($resultCode === '0') {
-            DB::transaction(function () use ($stkLog, $response) {
+            $receiptNumber = $this->normalizeTransactionId($response->mpesa_receipt_number ?? null);
+
+            if (!$this->hasFullPaymentData(
+                $receiptNumber,
+                $response->transaction_date ?? null,
+                $response->phone_number ?? null,
+                $response->amount ?? null
+            )) {
+                $this->markMissingFullData($stkLog, 'local_stk_push_responses', $response, $response->id ?? null);
+                return true;
+            }
+
+            if ($this->mpesaTransactionUsedElsewhere(
+                $receiptNumber,
+                null,
+                $stkLog->id,
+                $stkLog->checkout_request_id
+            )) {
+                $this->markDuplicateTransactionSkipped(
+                    $stkLog,
+                    $receiptNumber,
+                    'local_stk_push_responses',
+                    null,
+                    $response->id ?? null,
+                    $response
+                );
+
+                return true;
+            }
+
+            DB::transaction(function () use ($stkLog, $response, $receiptNumber) {
                 DB::table('stk_push_logs')
                     ->where('id', $stkLog->id)
                     ->update([
                         'merchant_request_id' => $response->merchant_request_id ?? $stkLog->merchant_request_id,
                         'result_code' => $response->result_code,
                         'result_description' => $response->result_description,
-                        'transaction_id' => $response->mpesa_receipt_number,
+                        'transaction_id' => $receiptNumber,
                         'transaction_time' => $response->transaction_date,
                         'status' => 'completed',
                         'recon_status' => 'local_stk_response_success',
@@ -136,10 +179,10 @@ class ReconcileStkPushPaymentsJob implements ShouldQueue
                     'match_confidence' => 'high',
                     'safaricom_result_code' => $response->result_code,
                     'safaricom_result_description' => $response->result_description,
-                    'mpesa_receipt_number' => $response->mpesa_receipt_number,
+                    'mpesa_receipt_number' => $receiptNumber,
                     'transaction_time' => $response->transaction_date,
                     'raw_response' => json_encode($response),
-                    'notes' => 'Resolved from local stk_push_responses.',
+                    'notes' => 'Resolved from local stk_push_responses after full-data and duplicate checks.',
                 ]);
             });
 
@@ -170,7 +213,7 @@ class ReconcileStkPushPaymentsJob implements ShouldQueue
                 'safaricom_result_code' => $response->result_code,
                 'safaricom_result_description' => $response->result_description,
                 'raw_response' => json_encode($response),
-                'notes' => 'Failed/cancelled response found in stk_push_responses.',
+                'notes' => 'Failed/cancelled response found in stk_push_responses. No payment imported.',
             ]);
         });
 
@@ -198,42 +241,90 @@ class ReconcileStkPushPaymentsJob implements ShouldQueue
             return false;
         }
 
-        DB::transaction(function () use ($stkLog, $c2b) {
+        $transactionId = $this->normalizeTransactionId($c2b->transaction_id);
+
+        $phoneNumber = $stkLog->phone_number ?? null;
+        $amount = $c2b->transaction_amount ?? $stkLog->amount ?? null;
+        $transactionTime = $c2b->transaction_time ?? null;
+
+        if (!$this->hasFullPaymentData($transactionId, $transactionTime, $phoneNumber, $amount)) {
+            $this->markMissingFullData($stkLog, 'local_c2b_payments', $c2b, null, $c2b->id ?? null);
+            return true;
+        }
+
+        if ($this->mpesaTransactionUsedElsewhere(
+            $transactionId,
+            $c2b->id,
+            $stkLog->id,
+            $stkLog->checkout_request_id
+        )) {
+            $this->markDuplicateTransactionSkipped(
+                $stkLog,
+                $transactionId,
+                'local_c2b_payments',
+                $c2b->id,
+                null,
+                $c2b
+            );
+
+            return true;
+        }
+
+        DB::transaction(function () use ($stkLog, $c2b, $transactionId, $phoneNumber, $amount, $transactionTime) {
+            $stkResponseId = $this->insertOrUpdateStkPushResponseIfSafe([
+                'unique_number' => $stkLog->unique_number,
+                'checkout_request_id' => $stkLog->checkout_request_id,
+                'merchant_request_id' => $stkLog->merchant_request_id ?? null,
+                'result_code' => 0,
+                'result_description' => 'Payment confirmed from local c2b_payments.',
+                'mpesa_receipt_number' => $transactionId,
+                'transaction_date' => $transactionTime,
+                'phone_number' => $phoneNumber,
+                'amount' => $amount,
+                'processed' => 'N',
+            ]);
+
+            if (!$stkResponseId) {
+                DB::table('stk_push_logs')
+                    ->where('id', $stkLog->id)
+                    ->update([
+                        'recon_status' => 'stk_response_import_skipped',
+                        'recon_source' => 'local_c2b_payments',
+                        'recon_attempts' => DB::raw('COALESCE(recon_attempts, 0) + 1'),
+                        'last_reconciled_at' => now(),
+                        'recon_message' => 'Skipped because full STK response import was not safe.',
+                        'updated_at' => now(),
+                    ]);
+
+                $this->writeReconAudit($stkLog, [
+                    'c2b_payment_id' => $c2b->id,
+                    'recon_status' => 'stk_response_import_skipped',
+                    'recon_source' => 'local_c2b_payments',
+                    'match_confidence' => 'blocked',
+                    'mpesa_receipt_number' => $transactionId,
+                    'transaction_time' => $transactionTime,
+                    'raw_response' => json_encode($c2b),
+                    'notes' => 'Could not safely insert into stk_push_responses.',
+                ]);
+
+                return;
+            }
+
             DB::table('stk_push_logs')
                 ->where('id', $stkLog->id)
                 ->update([
                     'result_code' => '0',
                     'result_description' => 'Payment confirmed from local c2b_payments.',
-                    'transaction_id' => $c2b->transaction_id,
-                    'transaction_time' => $c2b->transaction_time,
+                    'transaction_id' => $transactionId,
+                    'transaction_time' => $transactionTime,
                     'status' => 'completed',
                     'recon_status' => 'local_c2b_success',
                     'recon_source' => 'local_c2b_payments',
                     'recon_attempts' => DB::raw('COALESCE(recon_attempts, 0) + 1'),
                     'last_reconciled_at' => now(),
-                    'recon_message' => 'Payment found locally in c2b_payments.',
+                    'recon_message' => 'Payment imported into stk_push_responses with processed=N.',
                     'updated_at' => now(),
                 ]);
-
-            DB::table('stk_push_responses')->updateOrInsert(
-                ['checkout_request_id' => $stkLog->checkout_request_id],
-                [
-                    'unique_number' => $stkLog->unique_number,
-                    'merchant_request_id' => $stkLog->merchant_request_id,
-                    'result_code' => 0,
-                    'result_description' => 'Payment confirmed from local c2b_payments.',
-                    'mpesa_receipt_number' => $c2b->transaction_id,
-                    'transaction_date' => $c2b->transaction_time,
-                    'phone_number' => $stkLog->phone_number,
-                    'amount' => $c2b->transaction_amount,
-                    'processed' => 'N',
-                    'updated_at' => now(),
-                ]
-            );
-
-            $stkResponseId = DB::table('stk_push_responses')
-                ->where('checkout_request_id', $stkLog->checkout_request_id)
-                ->value('id');
 
             $this->writeReconAudit($stkLog, [
                 'c2b_payment_id' => $c2b->id,
@@ -242,11 +333,11 @@ class ReconcileStkPushPaymentsJob implements ShouldQueue
                 'recon_source' => 'local_c2b_payments',
                 'match_confidence' => 'high',
                 'safaricom_result_code' => '0',
-                'safaricom_result_description' => 'Payment confirmed from c2b_payments.',
-                'mpesa_receipt_number' => $c2b->transaction_id,
-                'transaction_time' => $c2b->transaction_time,
+                'safaricom_result_description' => 'Payment confirmed from local c2b_payments.',
+                'mpesa_receipt_number' => $transactionId,
+                'transaction_time' => $transactionTime,
                 'raw_response' => json_encode($c2b),
-                'notes' => 'Matched by reference, amount, shortcode and transaction time window.',
+                'notes' => 'Matched by reference, amount, shortcode and transaction time. Inserted into stk_push_responses with processed=N.',
             ]);
         });
 
@@ -283,13 +374,6 @@ class ReconcileStkPushPaymentsJob implements ShouldQueue
         $body = $response->json() ?? [];
 
         if ($response->failed()) {
-            Log::warning('Safaricom STK query HTTP failure', [
-                'stk_push_log_id' => $stkLog->id,
-                'checkout_request_id' => $stkLog->checkout_request_id,
-                'status' => $response->status(),
-                'body' => $response->body(),
-            ]);
-
             DB::table('stk_push_logs')
                 ->where('id', $stkLog->id)
                 ->update([
@@ -298,6 +382,13 @@ class ReconcileStkPushPaymentsJob implements ShouldQueue
                     'recon_message' => 'Safaricom query HTTP failure. Will retry later.',
                     'updated_at' => now(),
                 ]);
+
+            Log::warning('Safaricom STK query HTTP failure', [
+                'stk_push_log_id' => $stkLog->id,
+                'checkout_request_id' => $stkLog->checkout_request_id,
+                'status' => $response->status(),
+                'body' => $response->body(),
+            ]);
 
             return false;
         }
@@ -309,79 +400,122 @@ class ReconcileStkPushPaymentsJob implements ShouldQueue
             ?? $body['errorMessage']
             ?? 'No result description returned.';
 
-        if ($responseCode !== null && $responseCode !== '0' && $resultCode === null) {
-            DB::transaction(function () use ($stkLog, $body, $responseCode, $resultDesc) {
-                DB::table('stk_push_logs')
-                    ->where('id', $stkLog->id)
-                    ->update([
-                        'recon_status' => 'safaricom_not_found',
-                        'recon_source' => 'safaricom_stk_query',
-                        'recon_attempts' => DB::raw('COALESCE(recon_attempts, 0) + 1'),
-                        'last_reconciled_at' => now(),
-                        'recon_message' => $resultDesc,
-                        'updated_at' => now(),
-                    ]);
-
-                $this->writeReconAudit($stkLog, [
-                    'recon_status' => 'safaricom_not_found',
-                    'recon_source' => 'safaricom_stk_query',
-                    'match_confidence' => 'none',
-                    'safaricom_result_code' => $responseCode,
-                    'safaricom_result_description' => $resultDesc,
-                    'raw_response' => json_encode($body),
-                    'notes' => 'Safaricom did not confirm this CheckoutRequestID.',
-                ]);
-            });
-
-            return true;
-        }
-
         if ($resultCode === '0') {
-            DB::transaction(function () use ($stkLog, $body, $resultCode, $resultDesc) {
+            /*
+             * Safaricom STK query usually confirms success/failure,
+             * but may not return MpesaReceiptNumber, transaction date, phone and amount.
+             * Since you said only full data should be imported, we do NOT insert into
+             * stk_push_responses from STK Query unless full payment details are available.
+             */
+            $receiptNumber = $this->normalizeTransactionId($body['MpesaReceiptNumber'] ?? null);
+            $transactionTime = $body['TransactionDate'] ?? null;
+            $phoneNumber = $body['PhoneNumber'] ?? $stkLog->phone_number ?? null;
+            $amount = $body['Amount'] ?? $stkLog->amount ?? null;
+
+            if (!$this->hasFullPaymentData($receiptNumber, $transactionTime, $phoneNumber, $amount)) {
+                DB::transaction(function () use ($stkLog, $body, $resultCode, $resultDesc) {
+                    DB::table('stk_push_logs')
+                        ->where('id', $stkLog->id)
+                        ->update([
+                            'result_code' => $resultCode,
+                            'result_description' => $resultDesc,
+                            'recon_status' => 'safaricom_success_missing_full_data',
+                            'recon_source' => 'safaricom_stk_query',
+                            'recon_attempts' => DB::raw('COALESCE(recon_attempts, 0) + 1'),
+                            'last_reconciled_at' => now(),
+                            'recon_message' => 'Safaricom confirmed success, but full payment data was missing. Not imported.',
+                            'updated_at' => now(),
+                        ]);
+
+                    $this->writeReconAudit($stkLog, [
+                        'recon_status' => 'safaricom_success_missing_full_data',
+                        'recon_source' => 'safaricom_stk_query',
+                        'match_confidence' => 'medium',
+                        'safaricom_result_code' => $resultCode,
+                        'safaricom_result_description' => $resultDesc,
+                        'raw_response' => json_encode($body),
+                        'notes' => 'Safaricom confirmed success but did not return full payment details. Skipped import.',
+                    ]);
+                });
+
+                return true;
+            }
+
+            if ($this->mpesaTransactionUsedElsewhere(
+                $receiptNumber,
+                null,
+                $stkLog->id,
+                $stkLog->checkout_request_id
+            )) {
+                $this->markDuplicateTransactionSkipped(
+                    $stkLog,
+                    $receiptNumber,
+                    'safaricom_stk_query',
+                    null,
+                    null,
+                    $body
+                );
+
+                return true;
+            }
+
+            DB::transaction(function () use ($stkLog, $body, $resultCode, $resultDesc, $receiptNumber, $transactionTime, $phoneNumber, $amount) {
+                $stkResponseId = $this->insertOrUpdateStkPushResponseIfSafe([
+                    'unique_number' => $stkLog->unique_number,
+                    'checkout_request_id' => $stkLog->checkout_request_id,
+                    'merchant_request_id' => $body['MerchantRequestID'] ?? $stkLog->merchant_request_id ?? null,
+                    'result_code' => 0,
+                    'result_description' => $resultDesc,
+                    'mpesa_receipt_number' => $receiptNumber,
+                    'transaction_date' => $transactionTime,
+                    'phone_number' => $phoneNumber,
+                    'amount' => $amount,
+                    'processed' => 'N',
+                ]);
+
+                if (!$stkResponseId) {
+                    DB::table('stk_push_logs')
+                        ->where('id', $stkLog->id)
+                        ->update([
+                            'recon_status' => 'stk_response_import_skipped',
+                            'recon_source' => 'safaricom_stk_query',
+                            'recon_attempts' => DB::raw('COALESCE(recon_attempts, 0) + 1'),
+                            'last_reconciled_at' => now(),
+                            'recon_message' => 'Safaricom success received but STK response import was not safe.',
+                            'updated_at' => now(),
+                        ]);
+
+                    return;
+                }
+
                 DB::table('stk_push_logs')
                     ->where('id', $stkLog->id)
                     ->update([
                         'merchant_request_id' => $body['MerchantRequestID'] ?? $stkLog->merchant_request_id,
                         'result_code' => $resultCode,
                         'result_description' => $resultDesc,
+                        'transaction_id' => $receiptNumber,
+                        'transaction_time' => $transactionTime,
                         'status' => 'completed',
                         'recon_status' => 'safaricom_success',
                         'recon_source' => 'safaricom_stk_query',
                         'recon_attempts' => DB::raw('COALESCE(recon_attempts, 0) + 1'),
                         'last_reconciled_at' => now(),
-                        'recon_message' => 'Safaricom STK Query confirmed success. Receipt may require callback/C2B/statement match.',
+                        'recon_message' => 'Safaricom confirmed success and full data was imported with processed=N.',
                         'updated_at' => now(),
                     ]);
-
-                DB::table('stk_push_responses')->updateOrInsert(
-                    ['checkout_request_id' => $stkLog->checkout_request_id],
-                    [
-                        'unique_number' => $stkLog->unique_number,
-                        'merchant_request_id' => $body['MerchantRequestID'] ?? $stkLog->merchant_request_id,
-                        'result_code' => 0,
-                        'result_description' => $resultDesc,
-                        'mpesa_receipt_number' => null,
-                        'transaction_date' => null,
-                        'phone_number' => $stkLog->phone_number,
-                        'amount' => $stkLog->amount,
-                        'processed' => 'N',
-                        'updated_at' => now(),
-                    ]
-                );
-
-                $stkResponseId = DB::table('stk_push_responses')
-                    ->where('checkout_request_id', $stkLog->checkout_request_id)
-                    ->value('id');
 
                 $this->writeReconAudit($stkLog, [
                     'stk_push_response_id' => $stkResponseId,
                     'recon_status' => 'safaricom_success',
                     'recon_source' => 'safaricom_stk_query',
-                    'match_confidence' => 'medium',
+                    'match_confidence' => 'high',
                     'safaricom_result_code' => $resultCode,
                     'safaricom_result_description' => $resultDesc,
+                    'mpesa_receipt_number' => $receiptNumber,
+                    'transaction_time' => $transactionTime,
                     'raw_response' => json_encode($body),
-                    'notes' => 'Safaricom confirmed success. STK Query may not return MpesaReceiptNumber.',
+                    'notes' => 'Safaricom confirmed success and full payment data was imported with processed=N.',
                 ]);
             });
 
@@ -405,33 +539,41 @@ class ReconcileStkPushPaymentsJob implements ShouldQueue
                         'updated_at' => now(),
                     ]);
 
-                DB::table('stk_push_responses')->updateOrInsert(
-                    ['checkout_request_id' => $stkLog->checkout_request_id],
-                    [
-                        'unique_number' => $stkLog->unique_number,
-                        'merchant_request_id' => $body['MerchantRequestID'] ?? $stkLog->merchant_request_id,
-                        'result_code' => $resultCode,
-                        'result_description' => $resultDesc,
-                        'phone_number' => null,
-                        'amount' => null,
-                        'processed' => 'N',
-                        'updated_at' => now(),
-                    ]
-                );
-
-                $stkResponseId = DB::table('stk_push_responses')
-                    ->where('checkout_request_id', $stkLog->checkout_request_id)
-                    ->value('id');
-
                 $this->writeReconAudit($stkLog, [
-                    'stk_push_response_id' => $stkResponseId,
                     'recon_status' => 'safaricom_failed',
                     'recon_source' => 'safaricom_stk_query',
                     'match_confidence' => 'high',
                     'safaricom_result_code' => $resultCode,
                     'safaricom_result_description' => $resultDesc,
                     'raw_response' => json_encode($body),
-                    'notes' => 'Safaricom confirmed failed/cancelled/timeout status.',
+                    'notes' => 'Safaricom confirmed failed/cancelled/timeout status. No payment imported.',
+                ]);
+            });
+
+            return true;
+        }
+
+        if ($responseCode !== null && $responseCode !== '0') {
+            DB::transaction(function () use ($stkLog, $body, $responseCode, $resultDesc) {
+                DB::table('stk_push_logs')
+                    ->where('id', $stkLog->id)
+                    ->update([
+                        'recon_status' => 'safaricom_not_found',
+                        'recon_source' => 'safaricom_stk_query',
+                        'recon_attempts' => DB::raw('COALESCE(recon_attempts, 0) + 1'),
+                        'last_reconciled_at' => now(),
+                        'recon_message' => $resultDesc,
+                        'updated_at' => now(),
+                    ]);
+
+                $this->writeReconAudit($stkLog, [
+                    'recon_status' => 'safaricom_not_found',
+                    'recon_source' => 'safaricom_stk_query',
+                    'match_confidence' => 'none',
+                    'safaricom_result_code' => $responseCode,
+                    'safaricom_result_description' => $resultDesc,
+                    'raw_response' => json_encode($body),
+                    'notes' => 'Safaricom did not confirm this CheckoutRequestID. No payment imported.',
                 ]);
             });
 
@@ -454,6 +596,212 @@ class ReconcileStkPushPaymentsJob implements ShouldQueue
         ]);
 
         return false;
+    }
+
+    private function insertOrUpdateStkPushResponseIfSafe(array $data): ?int
+    {
+        $receiptNumber = $this->normalizeTransactionId($data['mpesa_receipt_number'] ?? null);
+        $checkoutRequestId = $data['checkout_request_id'] ?? null;
+
+        if (!$this->hasFullPaymentData(
+            $receiptNumber,
+            $data['transaction_date'] ?? null,
+            $data['phone_number'] ?? null,
+            $data['amount'] ?? null
+        )) {
+            return null;
+        }
+
+        if (empty($checkoutRequestId)) {
+            return null;
+        }
+
+        $existingByReceipt = DB::table('stk_push_responses')
+            ->where('mpesa_receipt_number', $receiptNumber)
+            ->first();
+
+        if ($existingByReceipt && $existingByReceipt->checkout_request_id !== $checkoutRequestId) {
+            return null;
+        }
+
+        $existingByCheckout = DB::table('stk_push_responses')
+            ->where('checkout_request_id', $checkoutRequestId)
+            ->first();
+
+        $payload = [
+            'unique_number' => $data['unique_number'] ?? null,
+            'merchant_request_id' => $data['merchant_request_id'] ?? null,
+            'checkout_request_id' => $checkoutRequestId,
+            'result_code' => $data['result_code'],
+            'result_description' => $data['result_description'],
+            'mpesa_receipt_number' => $receiptNumber,
+            'transaction_date' => $data['transaction_date'],
+            'phone_number' => $data['phone_number'],
+            'amount' => $data['amount'],
+            'processed' => 'N',
+            'updated_at' => now(),
+        ];
+
+        if ($existingByCheckout) {
+            if (!empty($existingByCheckout->mpesa_receipt_number)
+                && $this->normalizeTransactionId($existingByCheckout->mpesa_receipt_number) !== $receiptNumber) {
+                return null;
+            }
+
+            DB::table('stk_push_responses')
+                ->where('id', $existingByCheckout->id)
+                ->update($payload);
+
+            return (int) $existingByCheckout->id;
+        }
+
+        $payload['created_at'] = now();
+
+        return (int) DB::table('stk_push_responses')->insertGetId($payload);
+    }
+
+    private function hasFullPaymentData($receiptNumber, $transactionTime, $phoneNumber, $amount): bool
+    {
+        $receiptNumber = $this->normalizeTransactionId($receiptNumber);
+
+        if (!$receiptNumber) {
+            return false;
+        }
+
+        if (empty($transactionTime)) {
+            return false;
+        }
+
+        if (empty($phoneNumber)) {
+            return false;
+        }
+
+        if ($amount === null || $amount === '' || (float) $amount <= 0) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private function normalizeTransactionId(?string $transactionId): ?string
+    {
+        $transactionId = trim((string) $transactionId);
+        return $transactionId !== '' ? strtoupper($transactionId) : null;
+    }
+
+    private function mpesaTransactionUsedElsewhere(
+        ?string $transactionId,
+        ?int $currentC2bId = null,
+        ?int $currentStkLogId = null,
+        ?string $currentCheckoutRequestId = null
+    ): bool {
+        $transactionId = $this->normalizeTransactionId($transactionId);
+
+        if (!$transactionId) {
+            return false;
+        }
+
+        $c2bQuery = DB::table('c2b_payments')
+            ->where('transaction_id', $transactionId);
+
+        if ($currentC2bId) {
+            $c2bQuery->where('id', '!=', $currentC2bId);
+        }
+
+        if ($c2bQuery->exists()) {
+            return true;
+        }
+
+        $stkResponseQuery = DB::table('stk_push_responses')
+            ->where('mpesa_receipt_number', $transactionId);
+
+        if ($currentCheckoutRequestId) {
+            $stkResponseQuery->where('checkout_request_id', '!=', $currentCheckoutRequestId);
+        }
+
+        if ($stkResponseQuery->exists()) {
+            return true;
+        }
+
+        $stkLogQuery = DB::table('stk_push_logs')
+            ->where('transaction_id', $transactionId);
+
+        if ($currentStkLogId) {
+            $stkLogQuery->where('id', '!=', $currentStkLogId);
+        }
+
+        return $stkLogQuery->exists();
+    }
+
+    private function markDuplicateTransactionSkipped(
+        object $stkLog,
+        string $transactionId,
+        string $source,
+        ?int $c2bPaymentId = null,
+        ?int $stkPushResponseId = null,
+        $rawResponse = null
+    ): void {
+        DB::transaction(function () use (
+            $stkLog,
+            $transactionId,
+            $source,
+            $c2bPaymentId,
+            $stkPushResponseId,
+            $rawResponse
+        ) {
+            DB::table('stk_push_logs')
+                ->where('id', $stkLog->id)
+                ->update([
+                    'recon_status' => 'duplicate_transaction_id_skipped',
+                    'recon_source' => $source,
+                    'recon_attempts' => DB::raw('COALESCE(recon_attempts, 0) + 1'),
+                    'last_reconciled_at' => now(),
+                    'recon_message' => 'Skipped: duplicate M-Pesa transaction ID already exists: ' . $transactionId,
+                    'updated_at' => now(),
+                ]);
+
+            $this->writeReconAudit($stkLog, [
+                'c2b_payment_id' => $c2bPaymentId,
+                'stk_push_response_id' => $stkPushResponseId,
+                'recon_status' => 'duplicate_transaction_id_skipped',
+                'recon_source' => $source,
+                'match_confidence' => 'blocked',
+                'mpesa_receipt_number' => $transactionId,
+                'raw_response' => $rawResponse ? json_encode($rawResponse) : null,
+                'notes' => 'Skipped because this M-Pesa transaction ID already exists elsewhere. No duplicate payment imported.',
+            ]);
+        });
+    }
+
+    private function markMissingFullData(
+        object $stkLog,
+        string $source,
+        $rawResponse = null,
+        ?int $stkPushResponseId = null,
+        ?int $c2bPaymentId = null
+    ): void {
+        DB::transaction(function () use ($stkLog, $source, $rawResponse, $stkPushResponseId, $c2bPaymentId) {
+            DB::table('stk_push_logs')
+                ->where('id', $stkLog->id)
+                ->update([
+                    'recon_status' => 'missing_full_payment_data',
+                    'recon_source' => $source,
+                    'recon_attempts' => DB::raw('COALESCE(recon_attempts, 0) + 1'),
+                    'last_reconciled_at' => now(),
+                    'recon_message' => 'Skipped: full payment data was missing. No payment imported.',
+                    'updated_at' => now(),
+                ]);
+
+            $this->writeReconAudit($stkLog, [
+                'c2b_payment_id' => $c2bPaymentId,
+                'stk_push_response_id' => $stkPushResponseId,
+                'recon_status' => 'missing_full_payment_data',
+                'recon_source' => $source,
+                'match_confidence' => 'none',
+                'raw_response' => $rawResponse ? json_encode($rawResponse) : null,
+                'notes' => 'Skipped because receipt number, transaction time, phone number, or amount was missing.',
+            ]);
+        });
     }
 
     private function writeReconAudit(object $stkLog, array $data): void
