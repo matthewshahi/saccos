@@ -56,29 +56,68 @@ class CheckSafaricomIP
     public function handle(Request $request, Closure $next)
     {
         /*
-         * Start with the real network peer.
-         * This avoids trusting spoofed X-Forwarded-For headers from direct requests.
+         * Separate daily IP log file:
+         * storage/logs/ip_logs-YYYY-MM-DD.log
+         */
+        $ipLog = Log::build([
+            'driver' => 'daily',
+            'path'   => storage_path('logs/ip_logs.log'),
+            'days'   => 14,
+        ]);
+
+        /*
+         * Start with the true network peer.
+         * This prevents direct attackers from spoofing X-Forwarded-For.
          */
         $remoteIp = $request->server('REMOTE_ADDR');
         $clientIP = $remoteIp;
 
         /*
-         * If the request came through Cloudflare, then and only then
-         * trust Cloudflare's real visitor IP header.
+         * Log every request that reaches this middleware.
+         * If a failed callback is not logged here, it did not reach this middleware.
          */
+        $ipLog->info('MPESA CALLBACK HIT MIDDLEWARE', [
+            'remote_addr'      => $remoteIp,
+            'request_ip'       => $request->ip(),
+            'cf_connecting_ip' => $request->header('CF-Connecting-IP'),
+            'x_forwarded_for'  => $request->header('X-Forwarded-For'),
+            'x_real_ip'        => $request->header('X-Real-IP'),
+            'true_client_ip'   => $request->header('True-Client-IP'),
+            'forwarded'        => $request->header('Forwarded'),
+            'method'           => $request->method(),
+            'url'              => $request->fullUrl(),
+            'path'             => $request->path(),
+            'user_agent'       => $request->userAgent(),
+        ]);
+
+        /*
+         * Only trust CF-Connecting-IP if REMOTE_ADDR is genuinely Cloudflare.
+         */
+        $cameThroughCloudflare = false;
+
         if ($remoteIp && IpUtils::checkIp($remoteIp, $this->cloudflareRanges)) {
+            $cameThroughCloudflare = true;
             $clientIP = $request->header('CF-Connecting-IP', $remoteIp);
         }
 
-        if (!in_array($clientIP, $this->allowedIPs, true)) {
-            Log::warning('Blocked non-whitelisted IP for M-Pesa callback', [
-                'client_ip'        => $clientIP,
-                'remote_addr'      => $remoteIp,
-                'request_ip'       => $request->ip(),
-                'cf_connecting_ip' => $request->header('CF-Connecting-IP'),
-                'x_forwarded_for'  => $request->header('X-Forwarded-For'),
-                'url'              => $request->fullUrl(),
-                'user_agent'       => $request->userAgent(),
+        $isAllowed = in_array($clientIP, $this->allowedIPs, true);
+
+        $ipLog->info('MPESA CALLBACK IP RESOLUTION RESULT', [
+            'resolved_client_ip'      => $clientIP,
+            'remote_addr'             => $remoteIp,
+            'came_through_cloudflare' => $cameThroughCloudflare ? 'Y' : 'N',
+            'is_safaricom_allowed'    => $isAllowed ? 'Y' : 'N',
+        ]);
+
+        if (!$isAllowed) {
+            $ipLog->warning('MPESA CALLBACK BLOCKED - IP NOT WHITELISTED', [
+                'blocked_client_ip' => $clientIP,
+                'remote_addr'       => $remoteIp,
+                'request_ip'        => $request->ip(),
+                'cf_connecting_ip'  => $request->header('CF-Connecting-IP'),
+                'x_forwarded_for'   => $request->header('X-Forwarded-For'),
+                'url'               => $request->fullUrl(),
+                'user_agent'        => $request->userAgent(),
             ]);
 
             return response()->json([
@@ -86,12 +125,12 @@ class CheckSafaricomIP
             ], 403);
         }
 
-        Log::info('Allowed Safaricom M-Pesa callback IP', [
-            'client_ip'        => $clientIP,
-            'remote_addr'      => $remoteIp,
-            'request_ip'       => $request->ip(),
-            'cf_connecting_ip' => $request->header('CF-Connecting-IP'),
-            'url'              => $request->fullUrl(),
+        $ipLog->info('MPESA CALLBACK ALLOWED - SAFARICOM IP VERIFIED', [
+            'allowed_client_ip' => $clientIP,
+            'remote_addr'       => $remoteIp,
+            'request_ip'        => $request->ip(),
+            'cf_connecting_ip'  => $request->header('CF-Connecting-IP'),
+            'url'               => $request->fullUrl(),
         ]);
 
         return $next($request);
