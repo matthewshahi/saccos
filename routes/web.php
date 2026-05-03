@@ -476,13 +476,16 @@ Route::post('/mpesa/statement-reconciliation', [MpesaStatementReconciliationCont
     ->name('mpesa.statement.reconciliation.store')->middleware('check_user_rights:mpesa-reconcile');
 
 
-Route::prefix('loans/reprocess')
+    Route::prefix('loans/reprocess')
     ->name('loans.reprocess.')
     ->middleware(['auth', 'check_member_position', 'check_user_rights:end_month_processing_loans'])
     ->group(function () {
 
         Route::get('/', [LoanReprocessController::class, 'index'])
             ->name('index');
+
+        Route::post('/recalculate-loan-paid', [LoanReprocessController::class, 'recalculateLoanPaid'])
+            ->name('recalculate-loan-paid');
 
         Route::post('/reset-guarantors', [LoanReprocessController::class, 'resetGuarantors'])
             ->name('reset-guarantors');

@@ -9,6 +9,7 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
+use Throwable;
 
 class UpdateMembersLoanBalancesJob implements ShouldQueue
 {
@@ -16,29 +17,73 @@ class UpdateMembersLoanBalancesJob implements ShouldQueue
 
     public $tries = 1;
 
-    public function handle()
+    public $timeout = 0;
+
+    public function handle(): void
     {
-        // Step 1: Reset all totals to zero
-        DB::table('sacco_members')->update(['member_total_loan' => 0]);
+        Log::info("mugera_Job started: UpdateMembersLoanBalancesJob is now running.");
 
-        // Step 2: Recalculate and update
-        DB::table('sacco_members')
-            ->select('member_id')
-            ->orderBy('member_id')
-            ->chunk(100, function ($members) {
-                foreach ($members as $member) {
-                    // Use COALESCE to handle NULLs in DB-side computation
-                    $totalBalance = DB::table('sacco_loans')
-                        ->where('loan_member', $member->member_id)
-                        ->selectRaw('COALESCE(SUM(COALESCE(loan_amount, 0) - COALESCE(loan_loan_paid, 0)), 0) as balance')
-                        ->value('balance');
+        try {
+            /*
+             * Step 1:
+             * Reset all member loan totals to zero.
+             */
+            Log::info("mugera_UpdateMembersLoanBalances Step 1: Resetting all member_total_loan to 0.");
 
-                    DB::table('sacco_members')
-                        ->where('member_id', $member->member_id)
-                        ->update(['member_total_loan' => $totalBalance]);
+            $resetCount = DB::table('sacco_members')->update([
+                'member_total_loan' => 0,
+            ]);
 
-                    Log::info("mugera_Updated member_total_loan for member {$member->member_id}: {$totalBalance}");
-                }
-            });
+            Log::info("mugera_UpdateMembersLoanBalances Step 1: Reset completed.", [
+                'members_reset' => $resetCount,
+            ]);
+
+            /*
+             * Step 2:
+             * Update member_total_loan from active outstanding loan balances.
+             *
+             * Balance = loan_amount - loan_loan_paid
+             *
+             * If balance <= 0:
+             *   count as 0
+             *
+             * This avoids overpaid loans reducing the member's total loan balance.
+             */
+            Log::info("mugera_UpdateMembersLoanBalances Step 2: Updating member_total_loan from loan balances.");
+
+            $updatedCount = DB::update("
+                UPDATE sacco_members m
+                INNER JOIN (
+                    SELECT
+                        loan_member,
+                        SUM(
+                            CASE
+                                WHEN (COALESCE(loan_amount, 0) - COALESCE(loan_loan_paid, 0)) > 0
+                                THEN (COALESCE(loan_amount, 0) - COALESCE(loan_loan_paid, 0))
+                                ELSE 0
+                            END
+                        ) AS total_loan_balance
+                    FROM sacco_loans
+                    WHERE loan_member IS NOT NULL
+                    GROUP BY loan_member
+                ) x
+                    ON x.loan_member = m.member_id
+                SET m.member_total_loan = COALESCE(x.total_loan_balance, 0)
+            ");
+
+            Log::info("mugera_UpdateMembersLoanBalances Step 2: Member loan totals updated.", [
+                'members_updated' => $updatedCount,
+            ]);
+
+            Log::info("mugera_Finished: UpdateMembersLoanBalancesJob completed successfully.");
+        } catch (Throwable $e) {
+            Log::error("mugera_UpdateMembersLoanBalancesJob failed.", [
+                'error' => $e->getMessage(),
+                'file'  => $e->getFile(),
+                'line'  => $e->getLine(),
+            ]);
+
+            throw $e;
+        }
     }
 }
