@@ -9,7 +9,13 @@ use Symfony\Component\HttpFoundation\IpUtils;
 
 class CheckSafaricomIP
 {
-    private $allowedIPs = [
+    /**
+     * Safaricom / M-Pesa callback IPs.
+     *
+     * These are checked against the resolved real client IP.
+     * Exact IPs are supported, and CIDR ranges can also be added later.
+     */
+    private array $allowedIPs = [
         '196.201.214.200',
         '196.201.214.206',
         '196.201.213.114',
@@ -27,7 +33,12 @@ class CheckSafaricomIP
         '196.201.212.74',
     ];
 
-    private $cloudflareRanges = [
+    /**
+     * Cloudflare official proxy IP ranges.
+     *
+     * We only trust CF-Connecting-IP when REMOTE_ADDR is inside these ranges.
+     */
+    private array $cloudflareRanges = [
         '103.21.244.0/22',
         '103.22.200.0/22',
         '103.31.4.0/22',
@@ -67,7 +78,13 @@ class CheckSafaricomIP
 
         /*
          * Start with the true network peer.
-         * This prevents direct attackers from spoofing X-Forwarded-For.
+         *
+         * If Safaricom hits the origin directly:
+         * REMOTE_ADDR will be Safaricom's IP.
+         *
+         * If Safaricom comes through Cloudflare:
+         * REMOTE_ADDR will be Cloudflare's IP,
+         * and CF-Connecting-IP should contain Safaricom's real IP.
          */
         $remoteIp = $request->server('REMOTE_ADDR');
         $clientIP = $remoteIp;
@@ -91,7 +108,11 @@ class CheckSafaricomIP
         ]);
 
         /*
-         * Only trust CF-Connecting-IP if REMOTE_ADDR is genuinely Cloudflare.
+         * Only trust CF-Connecting-IP if the immediate network peer
+         * is genuinely Cloudflare.
+         *
+         * This blocks attackers from spoofing:
+         * CF-Connecting-IP: 196.201.xxx.xxx
          */
         $cameThroughCloudflare = false;
 
@@ -100,7 +121,12 @@ class CheckSafaricomIP
             $clientIP = $request->header('CF-Connecting-IP', $remoteIp);
         }
 
-        $isAllowed = in_array($clientIP, $this->allowedIPs, true);
+        /*
+         * Check resolved client IP against Safaricom allow-list.
+         *
+         * IpUtils::checkIp supports exact IPs and CIDR ranges.
+         */
+        $isAllowed = $clientIP && IpUtils::checkIp($clientIP, $this->allowedIPs);
 
         $ipLog->info('MPESA CALLBACK IP RESOLUTION RESULT', [
             'resolved_client_ip'      => $clientIP,
@@ -116,6 +142,8 @@ class CheckSafaricomIP
                 'request_ip'        => $request->ip(),
                 'cf_connecting_ip'  => $request->header('CF-Connecting-IP'),
                 'x_forwarded_for'   => $request->header('X-Forwarded-For'),
+                'x_real_ip'         => $request->header('X-Real-IP'),
+                'true_client_ip'    => $request->header('True-Client-IP'),
                 'url'               => $request->fullUrl(),
                 'user_agent'        => $request->userAgent(),
             ]);
@@ -126,11 +154,12 @@ class CheckSafaricomIP
         }
 
         $ipLog->info('MPESA CALLBACK ALLOWED - SAFARICOM IP VERIFIED', [
-            'allowed_client_ip' => $clientIP,
-            'remote_addr'       => $remoteIp,
-            'request_ip'        => $request->ip(),
-            'cf_connecting_ip'  => $request->header('CF-Connecting-IP'),
-            'url'               => $request->fullUrl(),
+            'allowed_client_ip'      => $clientIP,
+            'remote_addr'            => $remoteIp,
+            'request_ip'             => $request->ip(),
+            'came_through_cloudflare'=> $cameThroughCloudflare ? 'Y' : 'N',
+            'cf_connecting_ip'       => $request->header('CF-Connecting-IP'),
+            'url'                    => $request->fullUrl(),
         ]);
 
         return $next($request);
