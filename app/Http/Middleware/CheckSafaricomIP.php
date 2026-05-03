@@ -16,6 +16,7 @@ class CheckSafaricomIP
      * Exact IPs are supported, and CIDR ranges can also be added later.
      */
     private array $allowedIPs = [
+        '102.217.167.34', // TEMP TEST ONLY - REMOVE AFTER TEST
         '196.201.214.200',
         '196.201.214.206',
         '196.201.213.114',
