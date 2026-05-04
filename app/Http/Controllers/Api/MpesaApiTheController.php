@@ -145,7 +145,7 @@ class MpesaApiTheController extends Controller
         $stkRequest = new Request([
             'phone'  => $phone,
             'uniq'   => $request->reference,
-            'amount' => $amount,
+            'amount' => $amount, 
         ]);
 
         $stkController = app(MpesaTheController::class);

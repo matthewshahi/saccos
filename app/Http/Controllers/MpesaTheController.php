@@ -719,6 +719,69 @@ public function handleSTKPushCallback(Request $request, $unique_number = null)
             );
         });
 
+
+        // If STK payment was successful, also create/update c2b_payments
+if ((int) $resultCode === 0 && !empty($mpesaReceiptNumber)) {
+
+    // Convert Safaricom date e.g. 20260504141308 to MySQL datetime
+    $transactionTime = null;
+
+    if (!empty($transactionDate)) {
+        try {
+            $transactionTime = \Carbon\Carbon::createFromFormat('YmdHis', (string) $transactionDate)
+                ->format('Y-m-d H:i:s');
+        } catch (\Throwable $e) {
+            \Log::warning('STK callback transaction date parse failed', [
+                'transaction_date' => $transactionDate,
+                'error' => $e->getMessage(),
+            ]);
+
+            $transactionTime = now()->format('Y-m-d H:i:s');
+        }
+    } else {
+        $transactionTime = now()->format('Y-m-d H:i:s');
+    }
+
+    DB::table('c2b_payments')->updateOrInsert(
+        [
+            'transaction_id' => $mpesaReceiptNumber,
+        ],
+        [
+            'transaction_type'           => 'Pay Bill',
+            'transaction_time'           => $transactionTime,
+            'transaction_amount'         => $amount ?? 0,
+            'business_shortcode'         => $this->shortcode ?? null,
+            'bill_ref_number'            => $unique_number,
+            'invoice_number'             => null,
+            'org_account_balance'        => null,
+            'third_party_transaction_id' => $checkoutRequestID ?? null,
+            'msisdn'                     => $phoneNumber ?? null,
+            'first_name'                 => null,
+            'middle_name'                => null,
+            'last_name'                  => null,
+            'raw_payload'                => json_encode($request->all()),
+            'ip_address'                 => $request->ip(),
+
+            // Important: make it available for ProcessTransactionsJob
+            'processed'                  => 'No',
+            'picked'                     => 'No',
+            'failure_reason'             => null,
+            'processed_date'             => null,
+
+            'created_at'                 => now(),
+            'updated_at'                 => now(),
+        ]
+    );
+
+    Log::info('STK callback inserted/updated c2b_payments', [
+        'unique_number' => $unique_number,
+        'transaction_id' => $mpesaReceiptNumber,
+        'amount' => $amount,
+        'phone' => $phoneNumber,
+        'checkout_request_id' => $checkoutRequestID ?? null,
+    ]);
+}
+
         Log::info('STK Push callback processed successfully.');
 
         // Redirect based on ResultCode
