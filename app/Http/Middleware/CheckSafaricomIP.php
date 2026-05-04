@@ -95,18 +95,21 @@ class CheckSafaricomIP
          * If a failed callback is not logged here, it did not reach this middleware.
          */
         $ipLog->info('MPESA CALLBACK HIT MIDDLEWARE', [
-            'remote_addr'      => $remoteIp,
-            'request_ip'       => $request->ip(),
-            'cf_connecting_ip' => $request->header('CF-Connecting-IP'),
-            'x_forwarded_for'  => $request->header('X-Forwarded-For'),
-            'x_real_ip'        => $request->header('X-Real-IP'),
-            'true_client_ip'   => $request->header('True-Client-IP'),
-            'forwarded'        => $request->header('Forwarded'),
-            'method'           => $request->method(),
-            'url'              => $request->fullUrl(),
-            'path'             => $request->path(),
-            'user_agent'       => $request->userAgent(),
-        ]);
+    'remote_addr'      => $remoteIp,
+    'request_ip'       => $request->ip(),
+    'cf_connecting_ip' => $request->header('CF-Connecting-IP'),
+    'x_forwarded_for'  => $request->header('X-Forwarded-For'),
+    'x_real_ip'        => $request->header('X-Real-IP'),
+    'true_client_ip'   => $request->header('True-Client-IP'),
+    'forwarded'        => $request->header('Forwarded'),
+    'method'           => $request->method(),
+    'url'              => $request->fullUrl(),
+    'path'             => $request->path(),
+    'user_agent'       => $request->userAgent(),
+    'content_type'     => $request->header('Content-Type'),
+    'payload'          => $request->all(),
+    'raw_body'         => $request->getContent(),
+]);
 
         /*
          * Only trust CF-Connecting-IP if the immediate network peer
