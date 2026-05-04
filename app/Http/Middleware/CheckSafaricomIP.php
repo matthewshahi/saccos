@@ -107,7 +107,14 @@ class CheckSafaricomIP
     'path'             => $request->path(),
     'user_agent'       => $request->userAgent(),
     'content_type'     => $request->header('Content-Type'),
+
+    // Full headers
+    'all_headers'      => $request->headers->all(),
+
+    // Parsed body
     'payload'          => $request->all(),
+
+    // Raw original body
     'raw_body'         => $request->getContent(),
 ]);
 
