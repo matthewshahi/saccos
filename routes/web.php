@@ -59,7 +59,7 @@ use App\Http\Controllers\ShareReductionController;
 use App\Http\Controllers\LoanReprocessController;
 use App\Http\Controllers\KassMigrationController;
 use App\Http\Controllers\KasMemberImportController;
-
+use App\Http\Controllers\MigrationStatementCleanupController;
 use App\Http\Controllers\KassContributionsImportController;
 
 use App\Http\Controllers\KassMemberMasterImportController;
@@ -774,6 +774,18 @@ Route::post('/mpesa/statement-reconciliation', [MpesaStatementReconciliationCont
 
     Route::get('/ajax-get-members', [HomeController::class, 'ajaxGetMembers'])->name('ajaxGetMembers')->middleware('check_user_rights:list_sacco_member');
     Route::get('/members/statement/{id?}', [HomeController::class, 'viewStatement'])->name('members.statement')->middleware('check_user_rights:list_member_statement');
+
+    Route::prefix('migration/statement-cleanup')
+    ->name('migration.statement.')
+    ->middleware('check_user_rights:end_month_processing_loans')
+    ->group(function () {
+        Route::delete('/loans/{loan}', [MigrationStatementCleanupController::class, 'destroyLoan'])
+            ->name('loan.destroy');
+
+        Route::delete('/loan-payments/{payment}', [MigrationStatementCleanupController::class, 'destroyPayment'])
+            ->name('payment.destroy');
+    });
+    
     Route::match(['get', 'post'], '/members/contributions/{id}', [HomeController::class, 'viewContributions'])->name('members.contributions')->middleware('check_user_rights:edit_member_share_contribution');
     Route::get('/members/change-password/{id}', [HomeController::class, 'changePassword'])->name('members.changePassword')->middleware('check_user_rights:edit_password');
     Route::post('/members/change-password/{id}', [HomeController::class, 'updatePassword'])->name('members.updatePassword')->middleware('check_user_rights:edit_password');

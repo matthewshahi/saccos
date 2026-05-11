@@ -55,9 +55,14 @@ return [
     |
     */
 
+
     'url' => env('APP_URL', 'http://localhost'),
 
     'asset_url' => env('ASSET_URL'),
+
+    // 'migration_mode' => strtoupper((string) env('MIGRATION', 'N')) === 'Y',
+
+    'migration_mode' => strtoupper((string) env('MIGRATION', 'N')) === 'Y' ? 'Y' : 'N',
 
     /*
     |--------------------------------------------------------------------------

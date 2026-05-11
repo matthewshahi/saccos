@@ -1352,6 +1352,7 @@ public function updateInstitution(Request $request, $id)
     public function viewStatement($id = null)
     {
 
+     $migrationMode = config('app.migration_mode', 'N');
         $user = auth()->user();
 
         // If the user is not an official or no ID is provided, use the authenticated user's ID
@@ -1522,6 +1523,7 @@ public function updateInstitution(Request $request, $id)
             'period_from' => $period_from,
             'period_to' => $period_to,
             'threshold_amount' => $threshold_amount,
+             'migrationMode' => $migrationMode,
         ];
 
         return view('members.statement', compact('data'));
