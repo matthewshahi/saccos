@@ -1394,12 +1394,13 @@ private function loanTypeNameVariants(string $loanTypeName): array
      * Controlled top-up fallback.
      * Add NORMAL here only if NORMAL should also repay NORMAL LOAN TOP UP.
      */
-    $topUpAllowed = [
-        'EMERGENCY',
-        'SCHOOL FEES',
-        'UWEZO',
-        'KARIBISHA',
-    ];
+   $topUpAllowed = [
+    'NORMAL',
+    'EMERGENCY',
+    'SCHOOL FEES',
+    'UWEZO',
+    'KARIBISHA',
+];
 
     if (in_array($baseName, $topUpAllowed, true)) {
         $variants[] = $baseName . ' TOP UP';
