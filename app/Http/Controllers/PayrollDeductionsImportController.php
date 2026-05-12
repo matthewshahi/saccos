@@ -1260,13 +1260,19 @@ $rowLoans[$index]['target_loan_type_id'] = $targetLoan->loan_loan_type ?? null;
         ];
     }
 
-    private function findLoanByTypeIds(
+   private function findLoanByTypeIds(
     int $memberId,
     array $loanTypeIds,
     string $period,
     float $threshold,
     bool $outstandingOnly
 ) {
+    $loanTypeIds = array_values(array_unique(array_filter(array_map('intval', $loanTypeIds))));
+
+    if (empty($loanTypeIds)) {
+        return null;
+    }
+
     $query = $this->baseLoanQuery($memberId, $loanTypeIds)
         ->where(function ($query) use ($period) {
             $query->whereNull('loan_taken_period')
@@ -1287,22 +1293,56 @@ $rowLoans[$index]['target_loan_type_id'] = $targetLoan->loan_loan_type ?? null;
         );
     }
 
+    /*
+     * Very important:
+     * Respect alias priority before date ordering.
+     *
+     * Example fallback order:
+     * EMERGENCY LOAN
+     * EMERGENCY LOANS
+     * EMERGENCY TOP UP
+     * EMERGENCY LOAN TOP UP
+     */
+    $placeholders = implode(',', array_fill(0, count($loanTypeIds), '?'));
+
+    $query->orderByRaw(
+        "FIELD(loan_loan_type, {$placeholders}) ASC",
+        $loanTypeIds
+    );
+
     $this->applyLoanOrdering($query);
 
     return $query->first();
 }
-
 private function getLoanTypeLookupIdsForImport($loanTypes, string $exactLoanTypeName, int $primaryLoanTypeId): array
 {
-    $allowedNames = $this->loanTypeNameVariants($exactLoanTypeName);
+    $orderedNames = $this->loanTypeNameVariants($exactLoanTypeName);
 
-    $ids = [$primaryLoanTypeId];
+    $nameToIds = [];
 
     foreach ($loanTypes as $loanType) {
         $dbName = $this->normalizeLoanTypeComparableName($loanType->loan_type_name ?? '');
 
-        if (in_array($dbName, $allowedNames, true)) {
-            $ids[] = (int) $loanType->loan_type_id;
+        if ($dbName === '') {
+            continue;
+        }
+
+        if (!isset($nameToIds[$dbName])) {
+            $nameToIds[$dbName] = [];
+        }
+
+        $nameToIds[$dbName][] = (int) $loanType->loan_type_id;
+    }
+
+    $ids = [$primaryLoanTypeId];
+
+    foreach ($orderedNames as $name) {
+        if (!isset($nameToIds[$name])) {
+            continue;
+        }
+
+        foreach ($nameToIds[$name] as $id) {
+            $ids[] = $id;
         }
     }
 
@@ -1318,25 +1358,57 @@ private function loanTypeNameVariants(string $loanTypeName): array
     }
 
     /*
-     * Build a controlled family of names.
+     * Remove loan/top-up suffixes to get the clean base name.
      *
-     * NORMAL       => NORMAL, NORMAL LOAN, NORMAL LOANS
-     * NORMAL LOAN  => NORMAL, NORMAL LOAN, NORMAL LOANS
-     * NORMAL LOANS => NORMAL, NORMAL LOAN, NORMAL LOANS
-     *
-     * This does NOT match NORMAL LOAN TOP UP.
+     * Examples:
+     * EMERGENCY LOAN TOP UP => EMERGENCY
+     * EMERGENCY TOP UP      => EMERGENCY
+     * EMERGENCY LOAN        => EMERGENCY
+     * UWEZO LOAN TOP-UP     => UWEZO
      */
-    $baseName = preg_replace('/\s+LOANS?$/', '', $name);
+    $baseName = $name;
+
+    $baseName = preg_replace('/\s+LOANS?\s+TOP\s+UP$/', '', $baseName);
+    $baseName = preg_replace('/\s+LOANS?\s+TOPUP$/', '', $baseName);
+    $baseName = preg_replace('/\s+TOP\s+UP$/', '', $baseName);
+    $baseName = preg_replace('/\s+TOPUP$/', '', $baseName);
+    $baseName = preg_replace('/\s+LOANS?$/', '', $baseName);
+
+    $baseName = trim($baseName);
 
     if ($baseName === '') {
         $baseName = $name;
     }
 
+    /*
+     * Ordered fallback list.
+     * The order matters.
+     */
     $variants = [
         $baseName,
         $baseName . ' LOAN',
         $baseName . ' LOANS',
     ];
+
+    /*
+     * Controlled top-up fallback.
+     * Add NORMAL here only if NORMAL should also repay NORMAL LOAN TOP UP.
+     */
+    $topUpAllowed = [
+        'EMERGENCY',
+        'SCHOOL FEES',
+        'UWEZO',
+        'KARIBISHA',
+    ];
+
+    if (in_array($baseName, $topUpAllowed, true)) {
+        $variants[] = $baseName . ' TOP UP';
+        $variants[] = $baseName . ' TOPUP';
+        $variants[] = $baseName . ' LOAN TOP UP';
+        $variants[] = $baseName . ' LOAN TOPUP';
+        $variants[] = $baseName . ' LOANS TOP UP';
+        $variants[] = $baseName . ' LOANS TOPUP';
+    }
 
     return array_values(array_unique(array_filter($variants)));
 }

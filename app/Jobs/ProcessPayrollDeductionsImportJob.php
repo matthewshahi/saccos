@@ -1053,14 +1053,19 @@ private function getTargetLoanForPosting(int $memberId, array $posting): object
         (int) ($posting['loan_type_id'] ?? 0),
         $posting['lookup_loan_type_ids'] ?? [(int) ($posting['loan_type_id'] ?? 0)]
     );
-}
-private function findLoanByTypeIds(
+}private function findLoanByTypeIds(
     int $memberId,
     array $loanTypeIds,
     string $period,
     float $threshold,
     bool $outstandingOnly
 ) {
+    $loanTypeIds = array_values(array_unique(array_filter(array_map('intval', $loanTypeIds))));
+
+    if (empty($loanTypeIds)) {
+        return null;
+    }
+
     $query = $this->baseLoanQuery($memberId, $loanTypeIds)
         ->where(function ($query) use ($period) {
             $query->whereNull('loan_taken_period')
@@ -1080,6 +1085,13 @@ private function findLoanByTypeIds(
             [$threshold]
         );
     }
+
+    $placeholders = implode(',', array_fill(0, count($loanTypeIds), '?'));
+
+    $query->orderByRaw(
+        "FIELD(loan_loan_type, {$placeholders}) ASC",
+        $loanTypeIds
+    );
 
     $this->applyLoanOrdering($query);
 
