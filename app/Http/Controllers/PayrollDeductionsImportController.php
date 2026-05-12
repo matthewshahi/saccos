@@ -438,12 +438,13 @@ ini_set('memory_limit', '512M');
             $member = $members->first();
 
             foreach ($rowLoans as $index => $loanPosting) {
-                $targetLoan = $this->findTargetLoanForMemberAndType(
-                    (int) $member->member_id,
-                    (int) $loanPosting['loan_type_id'],
-                    $period,
-                    (float) $minLoanAmountBillable
-                );
+              $targetLoan = $this->findTargetLoanForMemberAndType(
+    (int) $member->member_id,
+    (int) $loanPosting['loan_type_id'],
+    $loanPosting['lookup_loan_type_ids'] ?? [(int) $loanPosting['loan_type_id']],
+    $period,
+    (float) $minLoanAmountBillable
+);
 
                 if (!$targetLoan) {
                     $errors[] = "No {$loanPosting['loan_type_name']} loan record found for {$member->member_name} / National ID {$nationalId} in Excel row {$excelRow}.";
@@ -451,6 +452,7 @@ ini_set('memory_limit', '512M');
                 }
 
                 $rowLoans[$index]['target_loan_id'] = $targetLoan->loan_id;
+$rowLoans[$index]['target_loan_type_id'] = $targetLoan->loan_loan_type ?? null;
             }
 
             $this->validateDeclaredTotal($row, $columns['totals'], $rowTotal, $excelRow, $errors);
@@ -502,170 +504,223 @@ ini_set('memory_limit', '512M');
     }
 
     private function classifyColumns(array $headers, array &$errors): array
-    {
-        $columns = $this->emptyColumnClassification();
+{
+    $columns = $this->emptyColumnClassification();
 
-        $loanQuery = DB::table('sacco_loan_types')
-            ->select(
-                'loan_type_id',
-                'loan_type_name',
-                'loan_type_acount',
-                'loan_type_int_account'
+    /*
+     * Loan types are loaded as-is.
+     *
+     * Important:
+     * - Excel validation remains exact.
+     * - If Excel says LOAN - NORMAL, NORMAL must exist.
+     * - If Excel says LOAN - NORMAL LOAN, NORMAL LOAN must exist.
+     * - We do NOT merge NORMAL and NORMAL LOAN at this stage.
+     */
+    $loanQuery = DB::table('sacco_loan_types')
+        ->select(
+            'loan_type_id',
+            'loan_type_name',
+            'loan_type_acount',
+            'loan_type_int_account'
+        );
+
+    if (Schema::hasColumn('sacco_loan_types', 'loan_type_active')) {
+        $loanQuery->addSelect('loan_type_active');
+    }
+
+    if (Schema::hasColumn('sacco_loan_types', 'loan_type_deleted')) {
+        $loanQuery->addSelect('loan_type_deleted');
+    }
+
+    $loanTypes = $loanQuery
+        ->orderBy('loan_type_name')
+        ->get();
+
+    $loanTypeMap = [];
+
+    foreach ($loanTypes as $loanType) {
+        $key = $this->normalizeImportName($loanType->loan_type_name);
+
+        if ($key === '') {
+            continue;
+        }
+
+        if (isset($loanTypeMap[$key])) {
+            $errors[] = "Duplicate loan type after normalization: {$key}.";
+            continue;
+        }
+
+        $loanTypeMap[$key] = $loanType;
+    }
+
+    $fosaQuery = DB::table('sacco_fosa_types')
+        ->select('type_id', 'type_name');
+
+    if (Schema::hasColumn('sacco_fosa_types', 'type_prefix')) {
+        $fosaQuery->addSelect('type_prefix');
+    }
+
+    if (Schema::hasColumn('sacco_fosa_types', 'type_active')) {
+        $fosaQuery->addSelect('type_active');
+    }
+
+    $fosaTypes = $fosaQuery
+        ->orderBy('type_name')
+        ->get();
+
+    $fosaTypeMap = [];
+
+    foreach ($fosaTypes as $fosaType) {
+        $key = $this->normalizeImportName($fosaType->type_name);
+
+        if ($key === '') {
+            continue;
+        }
+
+        if (isset($fosaTypeMap[$key])) {
+            $errors[] = "Duplicate Others/FOSA type after normalization: {$key}.";
+            continue;
+        }
+
+        $fosaTypeMap[$key] = $fosaType;
+    }
+
+    foreach ($headers as $header) {
+        $originalHeader = trim((string) $header);
+        $normalizedHeader = $this->normalizeImportName($originalHeader);
+
+        if ($normalizedHeader === '') {
+            continue;
+        }
+
+        if (in_array($normalizedHeader, $this->identityColumns, true)) {
+            $columns['identity'][$originalHeader] = [
+                'excel_column' => $originalHeader,
+                'normalized'   => $normalizedHeader,
+            ];
+            continue;
+        }
+
+        if (in_array($normalizedHeader, $this->totalColumns, true)) {
+            $columns['totals'][$originalHeader] = [
+                'excel_column' => $originalHeader,
+                'normalized'   => $normalizedHeader,
+            ];
+            continue;
+        }
+
+        $parsed = $this->parsePrefixedHeader($normalizedHeader);
+
+        if (!$parsed) {
+            $columns['unknown'][$originalHeader] = [
+                'excel_column' => $originalHeader,
+                'normalized'   => $normalizedHeader,
+            ];
+            continue;
+        }
+
+        [$prefix, $itemName] = $parsed;
+
+        if ($prefix === self::PREFIX_DEPOSITS) {
+            $columns['deposits'][$originalHeader] = [
+                'excel_column' => $originalHeader,
+                'prefix'       => $prefix,
+                'item_name'    => $itemName,
+            ];
+            continue;
+        }
+
+        if ($prefix === self::PREFIX_CAPITAL) {
+            $columns['capital'][$originalHeader] = [
+                'excel_column' => $originalHeader,
+                'prefix'       => $prefix,
+                'item_name'    => $itemName,
+            ];
+            continue;
+        }
+
+        if ($prefix === self::PREFIX_OTHERS) {
+            if (!isset($fosaTypeMap[$itemName])) {
+                $errors[] = "Others/FOSA type missing in sacco_fosa_types: {$itemName}. Excel column: {$originalHeader}";
+                continue;
+            }
+
+            $columns['others'][$originalHeader] = [
+                'excel_column'   => $originalHeader,
+                'prefix'         => $prefix,
+                'item_name'      => $itemName,
+                'fosa_type_id'   => $fosaTypeMap[$itemName]->type_id,
+                'fosa_type_name' => $fosaTypeMap[$itemName]->type_name,
+            ];
+            continue;
+        }
+
+        if ($prefix === self::PREFIX_LOAN) {
+            /*
+             * Level 1 validation:
+             * The Excel loan name must exist exactly after normalisation.
+             *
+             * Example:
+             * LOAN - NORMAL must match NORMAL.
+             * LOAN - NORMAL LOAN must match NORMAL LOAN.
+             */
+            if (!isset($loanTypeMap[$itemName])) {
+                $errors[] = "Loan type missing in sacco_loan_types: {$itemName}. Excel column: {$originalHeader}";
+                continue;
+            }
+
+            $loanType = $loanTypeMap[$itemName];
+
+            /*
+             * Level 2 lookup:
+             * Used later when checking the member's actual loan.
+             *
+             * Example:
+             * Excel matched NORMAL, but member loan may be stored as NORMAL LOAN.
+             */
+            $lookupLoanTypeIds = $this->getLoanTypeLookupIdsForImport(
+                $loanTypes,
+                $loanType->loan_type_name,
+                (int) $loanType->loan_type_id
             );
 
-        if (Schema::hasColumn('sacco_loan_types', 'loan_type_active')) {
-            $loanQuery->addSelect('loan_type_active');
+            if (empty($loanType->loan_type_acount)) {
+                $errors[] = "Loan principal account missing for loan type: {$loanType->loan_type_name}";
+            }
+
+            if (empty($loanType->loan_type_int_account)) {
+                $errors[] = "Loan interest account missing for loan type: {$loanType->loan_type_name}";
+            }
+
+            $columns['loans'][$originalHeader] = [
+                'excel_column'           => $originalHeader,
+                'prefix'                 => $prefix,
+                'item_name'              => $itemName,
+
+                /*
+                 * This remains the exact Excel-matched loan type.
+                 * It is the primary type and should remain the accounting/config reference.
+                 */
+                'loan_type_id'           => (int) $loanType->loan_type_id,
+                'loan_type_name'         => $loanType->loan_type_name,
+
+                /*
+                 * These are only used to find the member's actual loan.
+                 * They allow NORMAL to also search NORMAL LOAN / NORMAL LOANS,
+                 * and NORMAL LOAN to also search NORMAL.
+                 */
+                'lookup_loan_type_ids'   => $lookupLoanTypeIds,
+
+                'loan_principal_account' => $loanType->loan_type_acount,
+                'loan_interest_account'  => $loanType->loan_type_int_account,
+            ];
+
+            continue;
         }
-
-        if (Schema::hasColumn('sacco_loan_types', 'loan_type_deleted')) {
-            $loanQuery->addSelect('loan_type_deleted');
-        }
-
-        $loanTypes = $loanQuery
-            ->orderBy('loan_type_name')
-            ->get();
-
-        $loanTypeMap = [];
-
-        foreach ($loanTypes as $loanType) {
-            $key = $this->normalizeImportName($loanType->loan_type_name);
-
-            if (isset($loanTypeMap[$key])) {
-                $errors[] = "Duplicate loan type after normalization: {$key}.";
-                continue;
-            }
-
-            $loanTypeMap[$key] = $loanType;
-        }
-
-        $fosaQuery = DB::table('sacco_fosa_types')
-            ->select('type_id', 'type_name');
-
-        if (Schema::hasColumn('sacco_fosa_types', 'type_prefix')) {
-            $fosaQuery->addSelect('type_prefix');
-        }
-
-        if (Schema::hasColumn('sacco_fosa_types', 'type_active')) {
-            $fosaQuery->addSelect('type_active');
-        }
-
-        $fosaTypes = $fosaQuery
-            ->orderBy('type_name')
-            ->get();
-
-        $fosaTypeMap = [];
-
-        foreach ($fosaTypes as $fosaType) {
-            $key = $this->normalizeImportName($fosaType->type_name);
-
-            if (isset($fosaTypeMap[$key])) {
-                $errors[] = "Duplicate Others/FOSA type after normalization: {$key}.";
-                continue;
-            }
-
-            $fosaTypeMap[$key] = $fosaType;
-        }
-
-        foreach ($headers as $header) {
-            $originalHeader = trim((string) $header);
-            $normalizedHeader = $this->normalizeImportName($originalHeader);
-
-            if ($normalizedHeader === '') {
-                continue;
-            }
-
-            if (in_array($normalizedHeader, $this->identityColumns, true)) {
-                $columns['identity'][$originalHeader] = [
-                    'excel_column' => $originalHeader,
-                    'normalized'   => $normalizedHeader,
-                ];
-                continue;
-            }
-
-            if (in_array($normalizedHeader, $this->totalColumns, true)) {
-                $columns['totals'][$originalHeader] = [
-                    'excel_column' => $originalHeader,
-                    'normalized'   => $normalizedHeader,
-                ];
-                continue;
-            }
-
-            $parsed = $this->parsePrefixedHeader($normalizedHeader);
-
-            if (!$parsed) {
-                $columns['unknown'][$originalHeader] = [
-                    'excel_column' => $originalHeader,
-                    'normalized'   => $normalizedHeader,
-                ];
-                continue;
-            }
-
-            [$prefix, $itemName] = $parsed;
-
-            if ($prefix === self::PREFIX_DEPOSITS) {
-                $columns['deposits'][$originalHeader] = [
-                    'excel_column' => $originalHeader,
-                    'prefix'       => $prefix,
-                    'item_name'    => $itemName,
-                ];
-                continue;
-            }
-
-            if ($prefix === self::PREFIX_CAPITAL) {
-                $columns['capital'][$originalHeader] = [
-                    'excel_column' => $originalHeader,
-                    'prefix'       => $prefix,
-                    'item_name'    => $itemName,
-                ];
-                continue;
-            }
-
-            if ($prefix === self::PREFIX_OTHERS) {
-                if (!isset($fosaTypeMap[$itemName])) {
-                    $errors[] = "Others/FOSA type missing in sacco_fosa_types: {$itemName}. Excel column: {$originalHeader}";
-                    continue;
-                }
-
-                $columns['others'][$originalHeader] = [
-                    'excel_column'   => $originalHeader,
-                    'prefix'         => $prefix,
-                    'item_name'      => $itemName,
-                    'fosa_type_id'   => $fosaTypeMap[$itemName]->type_id,
-                    'fosa_type_name' => $fosaTypeMap[$itemName]->type_name,
-                ];
-                continue;
-            }
-
-            if ($prefix === self::PREFIX_LOAN) {
-                if (!isset($loanTypeMap[$itemName])) {
-                    $errors[] = "Loan type missing in sacco_loan_types: {$itemName}. Excel column: {$originalHeader}";
-                    continue;
-                }
-
-                $loanType = $loanTypeMap[$itemName];
-
-                if (empty($loanType->loan_type_acount)) {
-                    $errors[] = "Loan principal account missing for loan type: {$loanType->loan_type_name}";
-                }
-
-                if (empty($loanType->loan_type_int_account)) {
-                    $errors[] = "Loan interest account missing for loan type: {$loanType->loan_type_name}";
-                }
-
-                $columns['loans'][$originalHeader] = [
-                    'excel_column'           => $originalHeader,
-                    'prefix'                 => $prefix,
-                    'item_name'              => $itemName,
-                    'loan_type_id'           => $loanType->loan_type_id,
-                    'loan_type_name'         => $loanType->loan_type_name,
-                    'loan_principal_account' => $loanType->loan_type_acount,
-                    'loan_interest_account'  => $loanType->loan_type_int_account,
-                ];
-            }
-        }
-
-        return $columns;
     }
+
+    return $columns;
+}
 
     private function parsePrefixedHeader(string $normalizedHeader): ?array
     {
@@ -911,58 +966,111 @@ ini_set('memory_limit', '512M');
     }
 
     private function findTargetLoanForMemberAndType(
-        int $memberId,
-        int $loanTypeId,
-        string $period,
-        float $minLoanAmountBillable
-    ) {
-        $threshold = max(1, (float) $minLoanAmountBillable);
+    int $memberId,
+    int $primaryLoanTypeId,
+    array $lookupLoanTypeIds,
+    string $period,
+    float $minLoanAmountBillable
+) {
+    $threshold = max(1, (float) $minLoanAmountBillable);
 
-        $outstandingLoan = $this->baseLoanQuery($memberId, $loanTypeId)
-            ->where(function ($query) use ($period) {
-                $query->whereNull('loan_start_deduction_period')
-                    ->orWhere('loan_start_deduction_period', '')
-                    ->orWhere('loan_start_deduction_period', '<=', $period);
-            })
-            ->where(function ($query) use ($period) {
-                $query->whereNull('loan_taken_period')
-                    ->orWhere('loan_taken_period', '')
-                    ->orWhere('loan_taken_period', '<=', $period);
-            })
-            ->whereRaw('(COALESCE(loan_amount, 0) - COALESCE(loan_loan_paid, 0)) > ?', [$threshold]);
+    $lookupLoanTypeIds = array_values(array_unique(array_filter(array_map('intval', $lookupLoanTypeIds))));
 
-        $this->applyLoanOrdering($outstandingLoan);
+    if (empty($lookupLoanTypeIds)) {
+        $lookupLoanTypeIds = [$primaryLoanTypeId];
+    }
 
-        $loan = $outstandingLoan->first();
+    if (!in_array($primaryLoanTypeId, $lookupLoanTypeIds, true)) {
+        array_unshift($lookupLoanTypeIds, $primaryLoanTypeId);
+    }
+
+    $fallbackLoanTypeIds = array_values(array_diff($lookupLoanTypeIds, [$primaryLoanTypeId]));
+
+    /*
+     * 1. First try the exact Excel-matched loan type.
+     *
+     * Example:
+     * Excel says LOAN - NORMAL.
+     * First search member loans under NORMAL only.
+     */
+    $loan = $this->findLoanByTypeIds(
+        $memberId,
+        [$primaryLoanTypeId],
+        $period,
+        $threshold,
+        true
+    );
+
+    if ($loan) {
+        return $loan;
+    }
+
+    /*
+     * 2. If exact type is not found, try naming variants.
+     *
+     * Example:
+     * Excel says NORMAL, but member loan is stored as NORMAL LOAN.
+     */
+    if (!empty($fallbackLoanTypeIds)) {
+        $loan = $this->findLoanByTypeIds(
+            $memberId,
+            $fallbackLoanTypeIds,
+            $period,
+            $threshold,
+            true
+        );
 
         if ($loan) {
             return $loan;
         }
-
-        $latestLoan = $this->baseLoanQuery($memberId, $loanTypeId)
-            ->where(function ($query) use ($period) {
-                $query->whereNull('loan_taken_period')
-                    ->orWhere('loan_taken_period', '')
-                    ->orWhere('loan_taken_period', '<=', $period);
-            });
-
-        $this->applyLoanOrdering($latestLoan);
-
-        return $latestLoan->first();
     }
 
-    private function baseLoanQuery(int $memberId, int $loanTypeId)
-    {
-        return DB::table('sacco_loans')
-            ->where('loan_member', $memberId)
-            ->where('loan_loan_type', $loanTypeId)
-            ->where('loan_amount', '>', 0)
-            ->where(function ($query) {
-                $query->whereNull('loan_stoped')
-                    ->orWhere('loan_stoped', '')
-                    ->orWhere('loan_stoped', '<>', 'Y');
-            });
+    /*
+     * 3. Existing fallback behaviour:
+     * If no outstanding exact loan is found, try latest exact loan.
+     */
+    $loan = $this->findLoanByTypeIds(
+        $memberId,
+        [$primaryLoanTypeId],
+        $period,
+        $threshold,
+        false
+    );
+
+    if ($loan) {
+        return $loan;
     }
+
+    /*
+     * 4. Last fallback:
+     * Try latest variant loan.
+     */
+    if (!empty($fallbackLoanTypeIds)) {
+        return $this->findLoanByTypeIds(
+            $memberId,
+            $fallbackLoanTypeIds,
+            $period,
+            $threshold,
+            false
+        );
+    }
+
+    return null;
+}
+   private function baseLoanQuery(int $memberId, array $loanTypeIds)
+{
+    $loanTypeIds = array_values(array_unique(array_filter(array_map('intval', $loanTypeIds))));
+
+    return DB::table('sacco_loans')
+        ->where('loan_member', $memberId)
+        ->whereIn('loan_loan_type', $loanTypeIds)
+        ->where('loan_amount', '>', 0)
+        ->where(function ($query) {
+            $query->whereNull('loan_stoped')
+                ->orWhere('loan_stoped', '')
+                ->orWhere('loan_stoped', '<>', 'Y');
+        });
+}
 
     private function applyLoanOrdering($query): void
     {
@@ -1151,4 +1259,99 @@ ini_set('memory_limit', '512M');
             ],
         ];
     }
+
+    private function findLoanByTypeIds(
+    int $memberId,
+    array $loanTypeIds,
+    string $period,
+    float $threshold,
+    bool $outstandingOnly
+) {
+    $query = $this->baseLoanQuery($memberId, $loanTypeIds)
+        ->where(function ($query) use ($period) {
+            $query->whereNull('loan_taken_period')
+                ->orWhere('loan_taken_period', '')
+                ->orWhere('loan_taken_period', '<=', $period);
+        });
+
+    if ($outstandingOnly) {
+        $query->where(function ($query) use ($period) {
+            $query->whereNull('loan_start_deduction_period')
+                ->orWhere('loan_start_deduction_period', '')
+                ->orWhere('loan_start_deduction_period', '<=', $period);
+        });
+
+        $query->whereRaw(
+            '(COALESCE(loan_amount, 0) - COALESCE(loan_loan_paid, 0)) > ?',
+            [$threshold]
+        );
+    }
+
+    $this->applyLoanOrdering($query);
+
+    return $query->first();
+}
+
+private function getLoanTypeLookupIdsForImport($loanTypes, string $exactLoanTypeName, int $primaryLoanTypeId): array
+{
+    $allowedNames = $this->loanTypeNameVariants($exactLoanTypeName);
+
+    $ids = [$primaryLoanTypeId];
+
+    foreach ($loanTypes as $loanType) {
+        $dbName = $this->normalizeLoanTypeComparableName($loanType->loan_type_name ?? '');
+
+        if (in_array($dbName, $allowedNames, true)) {
+            $ids[] = (int) $loanType->loan_type_id;
+        }
+    }
+
+    return array_values(array_unique(array_filter($ids)));
+}
+
+private function loanTypeNameVariants(string $loanTypeName): array
+{
+    $name = $this->normalizeLoanTypeComparableName($loanTypeName);
+
+    if ($name === '') {
+        return [];
+    }
+
+    /*
+     * Build a controlled family of names.
+     *
+     * NORMAL       => NORMAL, NORMAL LOAN, NORMAL LOANS
+     * NORMAL LOAN  => NORMAL, NORMAL LOAN, NORMAL LOANS
+     * NORMAL LOANS => NORMAL, NORMAL LOAN, NORMAL LOANS
+     *
+     * This does NOT match NORMAL LOAN TOP UP.
+     */
+    $baseName = preg_replace('/\s+LOANS?$/', '', $name);
+
+    if ($baseName === '') {
+        $baseName = $name;
+    }
+
+    $variants = [
+        $baseName,
+        $baseName . ' LOAN',
+        $baseName . ' LOANS',
+    ];
+
+    return array_values(array_unique(array_filter($variants)));
+}
+
+private function normalizeLoanTypeComparableName($value): string
+{
+    $value = strtoupper(trim((string) $value));
+
+    /*
+     * NORMAL-LOAN, NORMAL_LOAN, NORMAL   LOAN
+     * all become NORMAL LOAN.
+     */
+    $value = preg_replace('/[^A-Z0-9]+/', ' ', $value);
+    $value = preg_replace('/\s+/', ' ', $value);
+
+    return trim($value);
+}
 }

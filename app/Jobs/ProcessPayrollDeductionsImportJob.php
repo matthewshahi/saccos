@@ -210,16 +210,15 @@ class ProcessPayrollDeductionsImportJob implements ShouldQueue
                         continue;
                     }
 
-                    $this->postLoanRepayment(
-                        $memberId,
-                        $memberName,
-                        $nationalId,
-                        (int) $posting['loan_type_id'],
-                        (string) $posting['loan_type_name'],
-                        $amount,
-                        $company,
-                        $companyAccount
-                    );
+                   $this->postLoanRepayment(
+    $memberId,
+    $memberName,
+    $nationalId,
+    $posting,
+    $amount,
+    $company,
+    $companyAccount
+);
 
                     $summary['loan_payment_count']++;
                     $summary['loan_total'] += $amount;
@@ -433,192 +432,260 @@ class ProcessPayrollDeductionsImportJob implements ShouldQueue
         );
     }
 
-    private function postLoanRepayment(
-        int $memberId,
-        string $memberName,
-        string $nationalId,
-        int $loanTypeId,
-        string $loanTypeName,
-        float $deductedAmount,
-        object $company,
-        int $companyAccount
-    ): void {
-        $loan = $this->getTargetLoanForMemberAndType($memberId, $loanTypeId);
-        $loanType = $this->getLoanType($loanTypeId);
+   private function postLoanRepayment(
+    int $memberId,
+    string $memberName,
+    string $nationalId,
+    array $posting,
+    float $deductedAmount,
+    object $company,
+    int $companyAccount
+): void {
+    $loanTypeId = (int) ($posting['loan_type_id'] ?? 0);
+    $loanTypeName = (string) ($posting['loan_type_name'] ?? 'UNKNOWN LOAN');
 
-        if (empty($loanType->loan_type_acount)) {
-            throw new \RuntimeException("Loan principal account missing for loan type {$loanTypeName}.");
-        }
-
-        if (empty($loanType->loan_type_int_account)) {
-            throw new \RuntimeException("Loan interest account missing for loan type {$loanTypeName}.");
-        }
-
-        $principalAccount = (int) $loanType->loan_type_acount;
-        $interestAccount = (int) $loanType->loan_type_int_account;
-
-        $this->ensureAccountExists($principalAccount, "Loan principal account for {$loanTypeName}");
-        $this->ensureAccountExists($interestAccount, "Loan interest account for {$loanTypeName}");
-
-        $split = $this->calculateLoanSplit($loan, $loanType, $deductedAmount);
-
-        $interest = $split['interest'];
-        $principalPaid = $split['principal'];
-
-        $description = $this->limitText(
-            "{$this->period} Payroll Import - Loan - {$loanTypeName} - {$memberName} / {$nationalId}",
-            255
-        );
-
-        DB::table('sacco_loan_payments')->insert([
-            'loan_payments_amount' => $principalPaid,
-            'loan_payments_description' => $description,
-            'loan_payments_docno' => $this->docNo,
-            'loan_payments_paid_in_by' => $this->limitText($company->company_name ?? 'PAYROLL IMPORT', 100),
-            'loan_payments_period' => $this->period,
-            'loan_payments_paid_on' => $this->paymentDate,
-            'loan_payments_loan_id' => $loan->loan_id,
-            'loan_payments_interest' => $interest,
-            'loan_end_month_proc' => 'Y',
-            'loan_payments_by' => $this->userId,
-            'loan_payments_ip' => $this->requestIp,
-        ]);
-
-        DB::update(
-            'UPDATE sacco_loans 
-             SET loan_loan_paid = COALESCE(loan_loan_paid, 0) + ? 
-             WHERE loan_id = ?',
-            [$principalPaid, $loan->loan_id]
-        );
-
-        DB::update(
-            'UPDATE sacco_members 
-             SET member_total_loan = COALESCE(member_total_loan, 0) - ? 
-             WHERE member_id = ?',
-            [$principalPaid, $memberId]
-        );
-
-        $source = "{$this->period} Payroll Import - Loan Repayment - {$company->company_name}";
-
-        if ($principalPaid >= 0) {
-            $this->updateSaccoAccountsTrans(
-                $principalAccount,
-                0,
-                $principalPaid,
-                $this->docNo,
-                $description,
-                $this->paymentDate,
-                $this->period,
-                $source
-            );
-        } else {
-            $this->updateSaccoAccountsTrans(
-                $principalAccount,
-                abs($principalPaid),
-                0,
-                $this->docNo,
-                $description,
-                $this->paymentDate,
-                $this->period,
-                $source
-            );
-        }
-
-        if ($interest > 0) {
-            $this->updateSaccoAccountsTrans(
-                $interestAccount,
-                0,
-                $interest,
-                $this->docNo,
-                $description,
-                $this->paymentDate,
-                $this->period,
-                $source
-            );
-        }
-
-        if ($deductedAmount > 0) {
-            $this->updateSaccoAccountsTrans(
-                $companyAccount,
-                $deductedAmount,
-                0,
-                $this->docNo,
-                $description,
-                $this->paymentDate,
-                $this->period,
-                $source
-            );
-        }
-
-        if ($principalPaid > 0) {
-            $this->releaseGuarantorShares($loan, $principalPaid);
-        }
+    if ($loanTypeId <= 0) {
+        throw new \RuntimeException("Invalid loan type for {$memberName} / {$nationalId}.");
     }
 
-    private function getTargetLoanForMemberAndType(int $memberId, int $loanTypeId): object
-    {
-        $minLoanAmountBillable = DB::table('sacco_defaults')
-            ->where('default_name', 'min_loan_amount_bill_able')
-            ->value('default_value');
+    /*
+     * Important:
+     * Use the target loan selected during validation first.
+     * This prevents the job from re-searching exact-only and missing migrated loans.
+     */
+    $loan = $this->getTargetLoanForPosting($memberId, $posting);
 
-        if (!is_numeric($minLoanAmountBillable)) {
-            $minLoanAmountBillable = 1;
-        }
+    /*
+     * Keep using the exact Excel-matched loan type for accounting configuration.
+     * Example: Excel NORMAL uses NORMAL accounts, even if the member loan is stored as NORMAL LOAN.
+     */
+    $loanType = $this->getLoanType($loanTypeId);
 
-        $threshold = max(1, (float) $minLoanAmountBillable);
-        $period = $this->period;
+    if (empty($loanType->loan_type_acount)) {
+        throw new \RuntimeException("Loan principal account missing for loan type {$loanTypeName}.");
+    }
 
-        $outstandingLoan = $this->baseLoanQuery($memberId, $loanTypeId)
-            ->where(function ($query) use ($period) {
-                $query->whereNull('loan_start_deduction_period')
-                    ->orWhere('loan_start_deduction_period', '')
-                    ->orWhere('loan_start_deduction_period', '<=', $period);
-            })
-            ->where(function ($query) use ($period) {
-                $query->whereNull('loan_taken_period')
-                    ->orWhere('loan_taken_period', '')
-                    ->orWhere('loan_taken_period', '<=', $period);
-            })
-            ->whereRaw('(COALESCE(loan_amount, 0) - COALESCE(loan_loan_paid, 0)) > ?', [$threshold]);
+    if (empty($loanType->loan_type_int_account)) {
+        throw new \RuntimeException("Loan interest account missing for loan type {$loanTypeName}.");
+    }
 
-        $this->applyLoanOrdering($outstandingLoan);
+    $principalAccount = (int) $loanType->loan_type_acount;
+    $interestAccount = (int) $loanType->loan_type_int_account;
 
-        $loan = $outstandingLoan->first();
+    $this->ensureAccountExists($principalAccount, "Loan principal account for {$loanTypeName}");
+    $this->ensureAccountExists($interestAccount, "Loan interest account for {$loanTypeName}");
+
+    $split = $this->calculateLoanSplit($loan, $loanType, $deductedAmount);
+
+    $interest = $split['interest'];
+    $principalPaid = $split['principal'];
+
+    $description = $this->limitText(
+        "{$this->period} Payroll Import - Loan - {$loanTypeName} - {$memberName} / {$nationalId}",
+        255
+    );
+
+    DB::table('sacco_loan_payments')->insert([
+        'loan_payments_amount' => $principalPaid,
+        'loan_payments_description' => $description,
+        'loan_payments_docno' => $this->docNo,
+        'loan_payments_paid_in_by' => $this->limitText($company->company_name ?? 'PAYROLL IMPORT', 100),
+        'loan_payments_period' => $this->period,
+        'loan_payments_paid_on' => $this->paymentDate,
+        'loan_payments_loan_id' => $loan->loan_id,
+        'loan_payments_interest' => $interest,
+        'loan_end_month_proc' => 'Y',
+        'loan_payments_by' => $this->userId,
+        'loan_payments_ip' => $this->requestIp,
+    ]);
+
+    DB::update(
+        'UPDATE sacco_loans 
+         SET loan_loan_paid = COALESCE(loan_loan_paid, 0) + ? 
+         WHERE loan_id = ?',
+        [$principalPaid, $loan->loan_id]
+    );
+
+    DB::update(
+        'UPDATE sacco_members 
+         SET member_total_loan = COALESCE(member_total_loan, 0) - ? 
+         WHERE member_id = ?',
+        [$principalPaid, $memberId]
+    );
+
+    $source = "{$this->period} Payroll Import - Loan Repayment - {$company->company_name}";
+
+    if ($principalPaid >= 0) {
+        $this->updateSaccoAccountsTrans(
+            $principalAccount,
+            0,
+            $principalPaid,
+            $this->docNo,
+            $description,
+            $this->paymentDate,
+            $this->period,
+            $source
+        );
+    } else {
+        $this->updateSaccoAccountsTrans(
+            $principalAccount,
+            abs($principalPaid),
+            0,
+            $this->docNo,
+            $description,
+            $this->paymentDate,
+            $this->period,
+            $source
+        );
+    }
+
+    if ($interest > 0) {
+        $this->updateSaccoAccountsTrans(
+            $interestAccount,
+            0,
+            $interest,
+            $this->docNo,
+            $description,
+            $this->paymentDate,
+            $this->period,
+            $source
+        );
+    }
+
+    if ($deductedAmount > 0) {
+        $this->updateSaccoAccountsTrans(
+            $companyAccount,
+            $deductedAmount,
+            0,
+            $this->docNo,
+            $description,
+            $this->paymentDate,
+            $this->period,
+            $source
+        );
+    }
+
+    if ($principalPaid > 0) {
+        $this->releaseGuarantorShares($loan, $principalPaid);
+    }
+}
+
+   private function getTargetLoanForMemberAndType(
+    int $memberId,
+    int $primaryLoanTypeId,
+    array $lookupLoanTypeIds
+): object {
+    if ($primaryLoanTypeId <= 0) {
+        throw new \RuntimeException("Invalid loan type while searching loan for member {$memberId}.");
+    }
+
+    $minLoanAmountBillable = DB::table('sacco_defaults')
+        ->where('default_name', 'min_loan_amount_bill_able')
+        ->value('default_value');
+
+    if (!is_numeric($minLoanAmountBillable)) {
+        $minLoanAmountBillable = 1;
+    }
+
+    $threshold = max(1, (float) $minLoanAmountBillable);
+    $period = $this->period;
+
+    $lookupLoanTypeIds = array_values(array_unique(array_filter(array_map('intval', $lookupLoanTypeIds))));
+
+    if (empty($lookupLoanTypeIds)) {
+        $lookupLoanTypeIds = [$primaryLoanTypeId];
+    }
+
+    if (!in_array($primaryLoanTypeId, $lookupLoanTypeIds, true)) {
+        array_unshift($lookupLoanTypeIds, $primaryLoanTypeId);
+    }
+
+    $fallbackLoanTypeIds = array_values(array_diff($lookupLoanTypeIds, [$primaryLoanTypeId]));
+
+    /*
+     * 1. First try exact Excel-matched loan type.
+     */
+    $loan = $this->findLoanByTypeIds(
+        $memberId,
+        [$primaryLoanTypeId],
+        $period,
+        $threshold,
+        true
+    );
+
+    if ($loan) {
+        return $loan;
+    }
+
+    /*
+     * 2. Then try naming variants.
+     * Example: NORMAL -> NORMAL LOAN / NORMAL LOANS.
+     */
+    if (!empty($fallbackLoanTypeIds)) {
+        $loan = $this->findLoanByTypeIds(
+            $memberId,
+            $fallbackLoanTypeIds,
+            $period,
+            $threshold,
+            true
+        );
 
         if ($loan) {
             return $loan;
         }
+    }
 
-        $latestLoan = $this->baseLoanQuery($memberId, $loanTypeId)
-            ->where(function ($query) use ($period) {
-                $query->whereNull('loan_taken_period')
-                    ->orWhere('loan_taken_period', '')
-                    ->orWhere('loan_taken_period', '<=', $period);
-            });
+    /*
+     * 3. Existing fallback: latest exact loan.
+     */
+    $loan = $this->findLoanByTypeIds(
+        $memberId,
+        [$primaryLoanTypeId],
+        $period,
+        $threshold,
+        false
+    );
 
-        $this->applyLoanOrdering($latestLoan);
-
-        $loan = $latestLoan->first();
-
-        if (!$loan) {
-            throw new \RuntimeException("No loan record found for member {$memberId}, loan type {$loanTypeId}.");
-        }
-
+    if ($loan) {
         return $loan;
     }
 
-    private function baseLoanQuery(int $memberId, int $loanTypeId)
-    {
-        return DB::table('sacco_loans')
-            ->where('loan_member', $memberId)
-            ->where('loan_loan_type', $loanTypeId)
-            ->where('loan_amount', '>', 0)
-            ->where(function ($query) {
-                $query->whereNull('loan_stoped')
-                    ->orWhere('loan_stoped', '')
-                    ->orWhere('loan_stoped', '<>', 'Y');
-            });
+    /*
+     * 4. Last fallback: latest naming-variant loan.
+     */
+    if (!empty($fallbackLoanTypeIds)) {
+        $loan = $this->findLoanByTypeIds(
+            $memberId,
+            $fallbackLoanTypeIds,
+            $period,
+            $threshold,
+            false
+        );
+
+        if ($loan) {
+            return $loan;
+        }
     }
+
+    throw new \RuntimeException(
+        "No loan record found for member {$memberId}, loan type {$primaryLoanTypeId}."
+    );
+}
+
+   private function baseLoanQuery(int $memberId, array $loanTypeIds)
+{
+    $loanTypeIds = array_values(array_unique(array_filter(array_map('intval', $loanTypeIds))));
+
+    return DB::table('sacco_loans')
+        ->where('loan_member', $memberId)
+        ->whereIn('loan_loan_type', $loanTypeIds)
+        ->where('loan_amount', '>', 0)
+        ->where(function ($query) {
+            $query->whereNull('loan_stoped')
+                ->orWhere('loan_stoped', '')
+                ->orWhere('loan_stoped', '<>', 'Y');
+        });
+}
 
     private function applyLoanOrdering($query): void
     {
@@ -947,5 +1014,75 @@ private function interestAlreadyChargedForPeriod(int $loanId): bool
     }
 
     return $query->exists();
+}
+private function getTargetLoanForPosting(int $memberId, array $posting): object
+{
+    $targetLoanId = (int) ($posting['target_loan_id'] ?? 0);
+
+    /*
+     * Best path:
+     * The controller already validated the correct target loan.
+     */
+    if ($targetLoanId > 0) {
+        $loan = DB::table('sacco_loans')
+            ->where('loan_id', $targetLoanId)
+            ->where('loan_member', $memberId)
+            ->where('loan_amount', '>', 0)
+            ->where(function ($query) {
+                $query->whereNull('loan_stoped')
+                    ->orWhere('loan_stoped', '')
+                    ->orWhere('loan_stoped', '<>', 'Y');
+            })
+            ->first();
+
+        if ($loan) {
+            return $loan;
+        }
+
+        throw new \RuntimeException(
+            "Validated target loan {$targetLoanId} was not found for member {$memberId} during posting."
+        );
+    }
+
+    /*
+     * Fallback path:
+     * Should rarely be used, but keeps the job safe if old session data exists.
+     */
+    return $this->getTargetLoanForMemberAndType(
+        $memberId,
+        (int) ($posting['loan_type_id'] ?? 0),
+        $posting['lookup_loan_type_ids'] ?? [(int) ($posting['loan_type_id'] ?? 0)]
+    );
+}
+private function findLoanByTypeIds(
+    int $memberId,
+    array $loanTypeIds,
+    string $period,
+    float $threshold,
+    bool $outstandingOnly
+) {
+    $query = $this->baseLoanQuery($memberId, $loanTypeIds)
+        ->where(function ($query) use ($period) {
+            $query->whereNull('loan_taken_period')
+                ->orWhere('loan_taken_period', '')
+                ->orWhere('loan_taken_period', '<=', $period);
+        });
+
+    if ($outstandingOnly) {
+        $query->where(function ($query) use ($period) {
+            $query->whereNull('loan_start_deduction_period')
+                ->orWhere('loan_start_deduction_period', '')
+                ->orWhere('loan_start_deduction_period', '<=', $period);
+        });
+
+        $query->whereRaw(
+            '(COALESCE(loan_amount, 0) - COALESCE(loan_loan_paid, 0)) > ?',
+            [$threshold]
+        );
+    }
+
+    $this->applyLoanOrdering($query);
+
+    return $query->first();
 }
 }
