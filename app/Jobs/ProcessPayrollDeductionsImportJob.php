@@ -570,7 +570,7 @@ class ProcessPayrollDeductionsImportJob implements ShouldQueue
     }
 }
 
-   private function getTargetLoanForMemberAndType(
+private function getTargetLoanForMemberAndType(
     int $memberId,
     int $primaryLoanTypeId,
     array $lookupLoanTypeIds
@@ -579,16 +579,8 @@ class ProcessPayrollDeductionsImportJob implements ShouldQueue
         throw new \RuntimeException("Invalid loan type while searching loan for member {$memberId}.");
     }
 
-    $minLoanAmountBillable = DB::table('sacco_defaults')
-        ->where('default_name', 'min_loan_amount_bill_able')
-        ->value('default_value');
-
-    if (!is_numeric($minLoanAmountBillable)) {
-        $minLoanAmountBillable = 1;
-    }
-
-    $threshold = max(1, (float) $minLoanAmountBillable);
-    $period = $this->period;
+    $threshold = 1.0;
+    $period = (string) $this->period;
 
     $lookupLoanTypeIds = array_values(array_unique(array_filter(array_map('intval', $lookupLoanTypeIds))));
 
@@ -603,14 +595,13 @@ class ProcessPayrollDeductionsImportJob implements ShouldQueue
     $fallbackLoanTypeIds = array_values(array_diff($lookupLoanTypeIds, [$primaryLoanTypeId]));
 
     /*
-     * 1. First try exact Excel-matched loan type.
+     * 1. Exact loan type first.
      */
     $loan = $this->findLoanByTypeIds(
         $memberId,
         [$primaryLoanTypeId],
         $period,
-        $threshold,
-        true
+        $threshold
     );
 
     if ($loan) {
@@ -618,48 +609,15 @@ class ProcessPayrollDeductionsImportJob implements ShouldQueue
     }
 
     /*
-     * 2. Then try naming variants.
-     * Example: NORMAL -> NORMAL LOAN / NORMAL LOANS.
+     * 2. Backward compatibility:
+     * Only try variants if exact type has no outstanding loan.
      */
     if (!empty($fallbackLoanTypeIds)) {
         $loan = $this->findLoanByTypeIds(
             $memberId,
             $fallbackLoanTypeIds,
             $period,
-            $threshold,
-            true
-        );
-
-        if ($loan) {
-            return $loan;
-        }
-    }
-
-    /*
-     * 3. Existing fallback: latest exact loan.
-     */
-    $loan = $this->findLoanByTypeIds(
-        $memberId,
-        [$primaryLoanTypeId],
-        $period,
-        $threshold,
-        false
-    );
-
-    if ($loan) {
-        return $loan;
-    }
-
-    /*
-     * 4. Last fallback: latest naming-variant loan.
-     */
-    if (!empty($fallbackLoanTypeIds)) {
-        $loan = $this->findLoanByTypeIds(
-            $memberId,
-            $fallbackLoanTypeIds,
-            $period,
-            $threshold,
-            false
+            $threshold
         );
 
         if ($loan) {
@@ -668,8 +626,58 @@ class ProcessPayrollDeductionsImportJob implements ShouldQueue
     }
 
     throw new \RuntimeException(
-        "No loan record found for member {$memberId}, loan type {$primaryLoanTypeId}."
+        "No outstanding loan found for member {$memberId}, loan type {$primaryLoanTypeId}, period {$period}."
     );
+}
+
+
+
+private function findLoanByTypeIds(
+    int $memberId,
+    array $loanTypeIds,
+    string $period,
+    float $threshold
+) {
+    $loanTypeIds = array_values(array_unique(array_filter(array_map('intval', $loanTypeIds))));
+
+    if (empty($loanTypeIds)) {
+        return null;
+    }
+
+    $query = $this->baseLoanQuery($memberId, $loanTypeIds)
+        /*
+         * Never select future loans.
+         */
+        ->whereNotNull('loan_taken_period')
+        ->where('loan_taken_period', '<=', $period)
+
+        /*
+         * Do not pay before deduction start period.
+         */
+        ->where(function ($query) use ($period) {
+            $query->whereNull('loan_start_deduction_period')
+                ->orWhere('loan_start_deduction_period', '')
+                ->orWhere('loan_start_deduction_period', '<=', $period);
+        })
+
+        /*
+         * Only outstanding balance greater than 1.
+         */
+        ->whereRaw(
+            '(COALESCE(loan_amount, 0) - COALESCE(loan_loan_paid, 0)) > ?',
+            [$threshold]
+        );
+
+    $placeholders = implode(',', array_fill(0, count($loanTypeIds), '?'));
+
+    $query->orderByRaw(
+        "FIELD(loan_loan_type, {$placeholders}) ASC",
+        $loanTypeIds
+    );
+
+    $this->applyLoanOrdering($query);
+
+    return $query->first();
 }
 
    private function baseLoanQuery(int $memberId, array $loanTypeIds)
@@ -687,18 +695,15 @@ class ProcessPayrollDeductionsImportJob implements ShouldQueue
         });
 }
 
-    private function applyLoanOrdering($query): void
-    {
-        if (Schema::hasColumn('sacco_loans', 'loan_taken_period')) {
-            $query->orderBy('loan_taken_period', 'desc');
-        }
-
-        if (Schema::hasColumn('sacco_loans', 'loan_on')) {
-            $query->orderBy('loan_on', 'desc');
-        }
-
-        $query->orderBy('loan_id', 'desc');
-    }
+   private function applyLoanOrdering($query): void
+{
+    /*
+     * Latest period first.
+     * If same period, latest loan_id first.
+     */
+    $query->orderBy('loan_taken_period', 'desc');
+    $query->orderBy('loan_id', 'desc');
+}
 
     private function calculateLoanSplit(object $loan, object $loanType, float $deductedAmount): array
 {
@@ -1018,10 +1023,13 @@ private function interestAlreadyChargedForPeriod(int $loanId): bool
 private function getTargetLoanForPosting(int $memberId, array $posting): object
 {
     $targetLoanId = (int) ($posting['target_loan_id'] ?? 0);
+    $period = (string) $this->period;
+    $threshold = 1.0;
 
     /*
      * Best path:
-     * The controller already validated the correct target loan.
+     * Use the exact target loan selected during validation.
+     * But still re-check period and outstanding safety.
      */
     if ($targetLoanId > 0) {
         $loan = DB::table('sacco_loans')
@@ -1033,6 +1041,17 @@ private function getTargetLoanForPosting(int $memberId, array $posting): object
                     ->orWhere('loan_stoped', '')
                     ->orWhere('loan_stoped', '<>', 'Y');
             })
+            ->whereNotNull('loan_taken_period')
+            ->where('loan_taken_period', '<=', $period)
+            ->where(function ($query) use ($period) {
+                $query->whereNull('loan_start_deduction_period')
+                    ->orWhere('loan_start_deduction_period', '')
+                    ->orWhere('loan_start_deduction_period', '<=', $period);
+            })
+            ->whereRaw(
+                '(COALESCE(loan_amount, 0) - COALESCE(loan_loan_paid, 0)) > ?',
+                [$threshold]
+            )
             ->first();
 
         if ($loan) {
@@ -1040,61 +1059,19 @@ private function getTargetLoanForPosting(int $memberId, array $posting): object
         }
 
         throw new \RuntimeException(
-            "Validated target loan {$targetLoanId} was not found for member {$memberId} during posting."
+            "Validated target loan {$targetLoanId} is no longer valid for member {$memberId}, period {$period}. It may be cleared, stopped, future-dated, or below outstanding threshold."
         );
     }
 
     /*
-     * Fallback path:
-     * Should rarely be used, but keeps the job safe if old session data exists.
+     * Fallback path for older session/job payloads.
      */
     return $this->getTargetLoanForMemberAndType(
         $memberId,
         (int) ($posting['loan_type_id'] ?? 0),
         $posting['lookup_loan_type_ids'] ?? [(int) ($posting['loan_type_id'] ?? 0)]
     );
-}private function findLoanByTypeIds(
-    int $memberId,
-    array $loanTypeIds,
-    string $period,
-    float $threshold,
-    bool $outstandingOnly
-) {
-    $loanTypeIds = array_values(array_unique(array_filter(array_map('intval', $loanTypeIds))));
-
-    if (empty($loanTypeIds)) {
-        return null;
-    }
-
-    $query = $this->baseLoanQuery($memberId, $loanTypeIds)
-        ->where(function ($query) use ($period) {
-            $query->whereNull('loan_taken_period')
-                ->orWhere('loan_taken_period', '')
-                ->orWhere('loan_taken_period', '<=', $period);
-        });
-
-    if ($outstandingOnly) {
-        $query->where(function ($query) use ($period) {
-            $query->whereNull('loan_start_deduction_period')
-                ->orWhere('loan_start_deduction_period', '')
-                ->orWhere('loan_start_deduction_period', '<=', $period);
-        });
-
-        $query->whereRaw(
-            '(COALESCE(loan_amount, 0) - COALESCE(loan_loan_paid, 0)) > ?',
-            [$threshold]
-        );
-    }
-
-    $placeholders = implode(',', array_fill(0, count($loanTypeIds), '?'));
-
-    $query->orderByRaw(
-        "FIELD(loan_loan_type, {$placeholders}) ASC",
-        $loanTypeIds
-    );
-
-    $this->applyLoanOrdering($query);
-
-    return $query->first();
 }
+
+
 }

@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use PhpOffice\PhpSpreadsheet\IOFactory;
-
+ 
 class PayrollDeductionsImportController extends Controller
 {
     private const SESSION_KEY = 'payroll_deductions_import_preview';
@@ -965,6 +965,8 @@ $rowLoans[$index]['target_loan_type_id'] = $targetLoan->loan_loan_type ?? null;
             ->get();
     }
 
+ 
+    
     private function findTargetLoanForMemberAndType(
     int $memberId,
     int $primaryLoanTypeId,
@@ -972,7 +974,15 @@ $rowLoans[$index]['target_loan_type_id'] = $targetLoan->loan_loan_type ?? null;
     string $period,
     float $minLoanAmountBillable
 ) {
-    $threshold = max(1, (float) $minLoanAmountBillable);
+    if ($primaryLoanTypeId <= 0) {
+        return null;
+    }
+
+    /*
+     * Strict rule:
+     * Outstanding must be greater than 1.
+     */
+    $threshold = 1.0;
 
     $lookupLoanTypeIds = array_values(array_unique(array_filter(array_map('intval', $lookupLoanTypeIds))));
 
@@ -987,18 +997,13 @@ $rowLoans[$index]['target_loan_type_id'] = $targetLoan->loan_loan_type ?? null;
     $fallbackLoanTypeIds = array_values(array_diff($lookupLoanTypeIds, [$primaryLoanTypeId]));
 
     /*
-     * 1. First try the exact Excel-matched loan type.
-     *
-     * Example:
-     * Excel says LOAN - NORMAL.
-     * First search member loans under NORMAL only.
+     * 1. Exact loan type first.
      */
     $loan = $this->findLoanByTypeIds(
         $memberId,
         [$primaryLoanTypeId],
         $period,
-        $threshold,
-        true
+        $threshold
     );
 
     if ($loan) {
@@ -1006,18 +1011,15 @@ $rowLoans[$index]['target_loan_type_id'] = $targetLoan->loan_loan_type ?? null;
     }
 
     /*
-     * 2. If exact type is not found, try naming variants.
-     *
-     * Example:
-     * Excel says NORMAL, but member loan is stored as NORMAL LOAN.
+     * 2. Backward compatibility:
+     * Only try variant/alias loan types if exact type has no outstanding loan.
      */
     if (!empty($fallbackLoanTypeIds)) {
         $loan = $this->findLoanByTypeIds(
             $memberId,
             $fallbackLoanTypeIds,
             $period,
-            $threshold,
-            true
+            $threshold
         );
 
         if ($loan) {
@@ -1025,38 +1027,9 @@ $rowLoans[$index]['target_loan_type_id'] = $targetLoan->loan_loan_type ?? null;
         }
     }
 
-    /*
-     * 3. Existing fallback behaviour:
-     * If no outstanding exact loan is found, try latest exact loan.
-     */
-    $loan = $this->findLoanByTypeIds(
-        $memberId,
-        [$primaryLoanTypeId],
-        $period,
-        $threshold,
-        false
-    );
-
-    if ($loan) {
-        return $loan;
-    }
-
-    /*
-     * 4. Last fallback:
-     * Try latest variant loan.
-     */
-    if (!empty($fallbackLoanTypeIds)) {
-        return $this->findLoanByTypeIds(
-            $memberId,
-            $fallbackLoanTypeIds,
-            $period,
-            $threshold,
-            false
-        );
-    }
-
     return null;
 }
+
    private function baseLoanQuery(int $memberId, array $loanTypeIds)
 {
     $loanTypeIds = array_values(array_unique(array_filter(array_map('intval', $loanTypeIds))));
@@ -1072,18 +1045,15 @@ $rowLoans[$index]['target_loan_type_id'] = $targetLoan->loan_loan_type ?? null;
         });
 }
 
-    private function applyLoanOrdering($query): void
-    {
-        if (Schema::hasColumn('sacco_loans', 'loan_taken_period')) {
-            $query->orderBy('loan_taken_period', 'desc');
-        }
-
-        if (Schema::hasColumn('sacco_loans', 'loan_on')) {
-            $query->orderBy('loan_on', 'desc');
-        }
-
-        $query->orderBy('loan_id', 'desc');
-    }
+   private function applyLoanOrdering($query): void
+{
+    /*
+     * Pick latest qualifying loan up to the payroll period.
+     * If multiple loans exist in the same month, pick latest loan_id.
+     */
+    $query->orderBy('loan_taken_period', 'desc');
+    $query->orderBy('loan_id', 'desc');
+}
 
     private function documentAlreadyImported(string $docNo, string $period): bool
     {
@@ -1260,12 +1230,12 @@ $rowLoans[$index]['target_loan_type_id'] = $targetLoan->loan_loan_type ?? null;
         ];
     }
 
-   private function findLoanByTypeIds(
+   
+private function findLoanByTypeIds(
     int $memberId,
     array $loanTypeIds,
     string $period,
-    float $threshold,
-    bool $outstandingOnly
+    float $threshold
 ) {
     $loanTypeIds = array_values(array_unique(array_filter(array_map('intval', $loanTypeIds))));
 
@@ -1274,34 +1244,32 @@ $rowLoans[$index]['target_loan_type_id'] = $targetLoan->loan_loan_type ?? null;
     }
 
     $query = $this->baseLoanQuery($memberId, $loanTypeIds)
-        ->where(function ($query) use ($period) {
-            $query->whereNull('loan_taken_period')
-                ->orWhere('loan_taken_period', '')
-                ->orWhere('loan_taken_period', '<=', $period);
-        });
+        /*
+         * Never select future loans.
+         */
+        ->whereNotNull('loan_taken_period')
+        ->where('loan_taken_period', '<=', $period)
 
-    if ($outstandingOnly) {
-        $query->where(function ($query) use ($period) {
+        /*
+         * Do not pay before deduction start period.
+         * Null/blank allowed for older legacy loans.
+         */
+        ->where(function ($query) use ($period) {
             $query->whereNull('loan_start_deduction_period')
                 ->orWhere('loan_start_deduction_period', '')
                 ->orWhere('loan_start_deduction_period', '<=', $period);
-        });
+        })
 
-        $query->whereRaw(
+        /*
+         * Only loans with outstanding balance greater than 1.
+         */
+        ->whereRaw(
             '(COALESCE(loan_amount, 0) - COALESCE(loan_loan_paid, 0)) > ?',
             [$threshold]
         );
-    }
 
     /*
-     * Very important:
-     * Respect alias priority before date ordering.
-     *
-     * Example fallback order:
-     * EMERGENCY LOAN
-     * EMERGENCY LOANS
-     * EMERGENCY TOP UP
-     * EMERGENCY LOAN TOP UP
+     * In variant search, respect variant priority first.
      */
     $placeholders = implode(',', array_fill(0, count($loanTypeIds), '?'));
 
