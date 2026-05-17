@@ -66,6 +66,8 @@ use App\Http\Controllers\KassMemberMasterImportController;
 
 use App\Http\Controllers\PayrollDeductionsImportController;
 use App\Http\Controllers\MpesaStatementReconciliationController;
+
+use App\Http\Controllers\MinimumCapitalContributionController; 
 /* good imports
 Route::prefix('kass')->group(function () {
     Route::get('/member-master-import', [KassMemberMasterImportController::class, 'index'])->name('kass.member_master_import.index');
@@ -382,6 +384,18 @@ Route::prefix('mobile')->group(function () {
 
 
 Route::middleware(['auth', 'check_member_position'])->group(function () {
+
+
+Route::prefix('minimum-capital')
+    ->name('minimum_capital.')
+    ->middleware('check_user_rights:transfer_member_shares')
+    ->group(function () {
+        Route::get('/', [MinimumCapitalContributionController::class, 'index'])
+            ->name('index');
+
+        Route::post('/process', [MinimumCapitalContributionController::class, 'process'])
+            ->name('process');
+    });
 
     Route::prefix('payroll-deductions-import')
         ->name('payroll.deductions.import.')
