@@ -166,6 +166,13 @@ $defaultLogoPath = '/image/logo.jpg'; // Default logo
                                     <span class="text-muted">Transfer from deposits capital</span>
                                 </a>
                             </li>
+
+                            <li class="item-name">
+    <a href="{{ route('minimum_capital.index') }}">
+        <span class="text-muted">Bulk Transfer Deposits to Capital</span>
+    </a>
+</li>
+
                         </ul>
                     </li>
                     <li class="Ul_li--hover">
