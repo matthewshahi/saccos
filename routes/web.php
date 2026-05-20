@@ -297,8 +297,14 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/members/status/{self}', [HomeController::class, 'memberStatus']);
     Route::get('/members/status/{id}', [HomeController::class, 'memberStatus'])->name('members.status')->middleware('check_user_rights:rpt_loans_issued');
 
-    Route::get('/loans/apply', [HomeController::class, 'loansApply'])->name('loans.apply');
-    Route::post('/loans/apply', [HomeController::class, 'submitLoanApplication'])->name('loans.application.submit');
+    // Route::get('/loans/apply', [HomeController::class, 'loansApply'])->name('loans.apply');
+    // Route::post('/loans/apply', [HomeController::class, 'submitLoanApplication'])->name('loans.application.submit');
+    Route::get('/loans/apply', [LoanApplicationSelfServiceController::class, 'loansApply'])
+    ->name('loans.apply');
+
+Route::post('/loans/apply', [LoanApplicationSelfServiceController::class, 'submitLoanApplication'])
+    ->name('loans.application.submit');
+    
     Route::get('loans/pending/approval/self', [LoanApplicationSelfServiceController::class, 'listLoansPendingApprovalSelf'])
         ->name('loans.pending.approval.self');
     Route::get('loans/pending/approval/selfedit/{id}', [LoanApplicationSelfServiceController::class, 'listLoansPendingApprovalSelfedit'])

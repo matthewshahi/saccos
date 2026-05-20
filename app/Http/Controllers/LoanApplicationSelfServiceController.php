@@ -324,9 +324,10 @@ class LoanApplicationSelfServiceController extends Controller
             $loan_id = DB::table('sacco_loans')->insertGetId($loanInsert);
 
             $guarantors = DB::table('sacco_loan_batch_guarantors_members')
-                ->where('guarantors_loan_batch_trans_id', $loan->batch_trans_id)
-                ->where('guarantors_deleted', 'N')
-                ->get();
+    ->where('guarantors_loan_batch_trans_id', $loan->batch_trans_id)
+    ->whereRaw("COALESCE(guarantors_deleted, 'N') <> 'Y'")
+    ->where('guarantors_approved', 'Y')
+    ->get();
 
             foreach ($guarantors as $guarantor) {
                 DB::table('sacco_loan_guarantors')->insert([
@@ -504,6 +505,8 @@ class LoanApplicationSelfServiceController extends Controller
 
     public function loansApply()
     {
+        $trustedMemberId = (int) auth()->user()->member_id;
+
         $loanTypes = DB::table('sacco_loan_types')
             ->where('loan_type_deleted', '<>', 'Y')
             ->orderBy('loan_type_name')
@@ -514,21 +517,324 @@ class LoanApplicationSelfServiceController extends Controller
             ->orderBy('loan_category_name')
             ->get();
 
-        $maximumNoOfGuarantors = DB::table('sacco_defaults')
+        $maximumNoOfGuarantors = (int) (
+            DB::table('sacco_defaults')
             ->where('default_name', 'maximum_no_of_guarantors')
-            ->value('default_value');
+            ->value('default_value') ?? 3
+        );
 
         $memberLoans = DB::table('sacco_loans')
             ->join('sacco_loan_types', 'sacco_loans.loan_loan_type', '=', 'sacco_loan_types.loan_type_id')
-            ->select('sacco_loans.*', 'sacco_loan_types.loan_type_name', DB::raw('(sacco_loans.loan_amount - sacco_loans.loan_loan_paid) as loan_balance'))
-            ->where('sacco_loans.loan_member', auth()->user()->id)
-            ->where('sacco_loans.loan_amount', '>', DB::raw('sacco_loans.loan_loan_paid'))
+            ->select(
+                'sacco_loans.*',
+                'sacco_loan_types.loan_type_name',
+                DB::raw('(COALESCE(sacco_loans.loan_amount,0) - COALESCE(sacco_loans.loan_loan_paid,0)) as loan_balance')
+            )
+            ->where('sacco_loans.loan_member', $trustedMemberId)
+            ->whereRaw('COALESCE(sacco_loans.loan_amount,0) > COALESCE(sacco_loans.loan_loan_paid,0)')
             ->where('sacco_loans.loan_stoped', 'N')
             ->get();
 
-        return view('loans.apply', compact('loanTypes', 'loanCategories', 'maximumNoOfGuarantors', 'memberLoans'));
+        $maxGuarantorFactorSelf = (float) (
+            DB::table('sacco_defaults')
+            ->where('default_name', 'max_guarantor_factor_self')
+            ->value('default_value') ?? 1
+        );
+
+        $member = DB::table('sacco_members')
+            ->where('member_id', $trustedMemberId)
+            ->where('member_active', 'Y')
+            ->where('member_deleted', '<>', 'Y')
+            ->first();
+
+        $selfGuaranteeAvailable = 0;
+
+        if ($member) {
+            $selfGuaranteeAvailable = max(
+                0,
+                ((float) $member->member_total_share * $maxGuarantorFactorSelf)
+                    - (float) $member->member_tied_shares_self
+            );
+        }
+
+        return view('loans.apply', compact(
+            'loanTypes',
+            'loanCategories',
+            'maximumNoOfGuarantors',
+            'memberLoans',
+            'selfGuaranteeAvailable'
+        ));
     }
-    
+
+    public function submitLoanApplication(Request $request)
+    {
+        $isApiRequest = $request->expectsJson()
+            || $request->wantsJson()
+            || $request->input('context') === 'api'
+            || $request->is('api/*');
+
+        $respondError = function (string $message, int $status = 400, array $errors = []) use ($request, $isApiRequest) {
+            if ($isApiRequest) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $message,
+                    'errors'  => $errors,
+                ], $status);
+            }
+
+            return redirect()->back()
+                ->withErrors(!empty($errors) ? $errors : ['error' => $message])
+                ->withInput();
+        };
+
+        $respondSuccess = function (string $message, array $payload = []) use ($isApiRequest) {
+            if ($isApiRequest) {
+                return response()->json(array_merge([
+                    'success' => true,
+                    'message' => $message,
+                ], $payload), 201);
+            }
+
+            return redirect()
+                ->route('loans.pending.approval.self')
+                ->with('success', $message);
+        };
+
+        $principal = $request->user();
+
+        if (!$principal || !isset($principal->member_id)) {
+            $principal = Auth::user();
+        }
+
+        $trustedMemberId = isset($principal->member_id) ? (int) $principal->member_id : null;
+        $actorUserId = Auth::id();
+
+        if (!$trustedMemberId) {
+            return $respondError('Unauthenticated.', 401);
+        }
+
+        $postedMemberId = $request->input('batch_trans_member_id');
+
+        if ($postedMemberId !== null && $postedMemberId !== '' && (int) $postedMemberId !== $trustedMemberId) {
+            return $respondError('Unauthorized member reference.', 403, [
+                'batch_trans_member_id' => ['Unauthorized member reference.'],
+            ]);
+        }
+
+        $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
+            'batch_trans_loan_amount' => 'required|numeric|min:1',
+            'batch_trans_loan_type' => 'required|integer|exists:sacco_loan_types,loan_type_id',
+            'batch_trans_loan_category' => 'required|integer|exists:sacco_loan_category,loan_category_id',
+            'batch_trans_loan_duration' => 'required|integer|min:1|max:100',
+            'batch_trans_description' => 'required|string|max:50',
+            'batch_trans_commission' => 'nullable|numeric|min:0',
+            'batch_trans_loan_to_top_up' => 'nullable|integer|exists:sacco_loans,loan_id',
+            'batch_trans_pay1' => 'nullable|file|mimes:jpg,jpeg,png,gif|max:200',
+            'batch_trans_pay2' => 'nullable|file|mimes:jpg,jpeg,png,gif|max:200',
+            'batch_trans_payroll_number' => 'nullable|string|max:50',
+            'batch_trans_present_designation' => 'nullable|string|max:100',
+            'batch_trans_terms_of_employment' => 'nullable|string|max:100',
+        ]);
+
+        if ($validator->fails()) {
+            return $respondError('Validation failed.', 422, $validator->errors()->toArray());
+        }
+
+        $validated = $validator->validated();
+
+        DB::beginTransaction();
+
+        try {
+            $loanType = DB::table('sacco_loan_types')
+                ->where('loan_type_id', $validated['batch_trans_loan_type'])
+                ->where('loan_type_deleted', '<>', 'Y')
+                ->first();
+
+            if (!$loanType) {
+                DB::rollBack();
+                return $respondError('Invalid loan type.', 422);
+            }
+
+            $loanCategory = DB::table('sacco_loan_category')
+                ->where('loan_category_id', $validated['batch_trans_loan_category'])
+                ->where('loan_category_deleted', '<>', 'Y')
+                ->first();
+
+            if (!$loanCategory) {
+                DB::rollBack();
+                return $respondError('Invalid loan category.', 422);
+            }
+
+            $member = DB::table('sacco_members')
+                ->where('member_id', $trustedMemberId)
+                ->where('member_active', 'Y')
+                ->where('member_deleted', '<>', 'Y')
+                ->first();
+
+            if (!$member) {
+                DB::rollBack();
+                return $respondError('Invalid member.', 422);
+            }
+
+            $loanAmount = round((float) $validated['batch_trans_loan_amount'], 2);
+            $loanDuration = (int) $validated['batch_trans_loan_duration'];
+            $commission = round((float) ($validated['batch_trans_commission'] ?? 0), 2);
+
+            $topUpLoan = null;
+            $topUpLoanId = $validated['batch_trans_loan_to_top_up'] ?? null;
+            $topUpOutstanding = 0.00;
+
+            if (!empty($topUpLoanId)) {
+                $topUpLoan = DB::table('sacco_loans')
+                    ->where('loan_id', $topUpLoanId)
+                    ->where('loan_member', $trustedMemberId)
+                    ->first();
+
+                if (!$topUpLoan) {
+                    DB::rollBack();
+                    return $respondError('Invalid top-up loan.', 422, [
+                        'batch_trans_loan_to_top_up' => ['Invalid top-up loan.'],
+                    ]);
+                }
+
+                $topUpOutstanding = round(
+                    (float) (($topUpLoan->loan_amount ?? 0) - ($topUpLoan->loan_loan_paid ?? 0)),
+                    2
+                );
+
+                if ($loanAmount <= $topUpOutstanding) {
+                    DB::rollBack();
+                    return $respondError('Invalid top-up loan. New loan amount must exceed the current outstanding balance.', 422);
+                }
+            }
+
+            $nmsg = '';
+            $nmsg .= $this->validateLoanParameters($loanAmount, $loanType, $loanDuration, $topUpLoan);
+            $nmsg .= $this->validateMemberEligibility($member, $loanType);
+
+            if (!empty($nmsg)) {
+                DB::rollBack();
+                return $respondError(trim($nmsg), 422, [
+                    'loan' => [trim($nmsg)],
+                ]);
+            }
+
+            /*
+        |--------------------------------------------------------------------------
+        | New application has no adjusted charges yet.
+        |--------------------------------------------------------------------------
+        */
+            $amountForEmi = $loanAmount;
+
+            $financials = $this->calculateSaccoLoanFinancials(
+                $loanAmount,
+                $amountForEmi,
+                $loanDuration,
+                $loanType,
+                $commission
+            );
+
+            $payslip1Path = null;
+            if ($request->hasFile('batch_trans_pay1')) {
+                $payslip1Path = $request->file('batch_trans_pay1')->store('uploads/payslips');
+            }
+
+            $payslip2Path = null;
+            if ($request->hasFile('batch_trans_pay2')) {
+                $payslip2Path = $request->file('batch_trans_pay2')->store('uploads/payslips');
+            }
+
+            $insertData = [
+                'batch_trans_batch_id' => $trustedMemberId,
+                'batch_trans_member_id' => $trustedMemberId,
+                'batch_trans_loan_type' => (int) $validated['batch_trans_loan_type'],
+                'batch_trans_loan_category' => (int) $validated['batch_trans_loan_category'],
+                'batch_trans_loan_amount' => $loanAmount,
+                'batch_trans_loan_duration' => $loanDuration,
+                'batch_trans_monthly_payment' => round((float) ($financials['monthly_payment'] ?? 0), 2),
+                'batch_trans_monthly_payment_principal' => round((float) ($financials['monthly_payment_principal'] ?? 0), 2),
+                'batch_trans_doc_no' => 'N/A',
+                'batch_trans_description' => $validated['batch_trans_description'],
+                'batch_trans_commission' => $commission,
+                'batch_trans_loan_to_top_up_amount' => $topUpOutstanding,
+                'batch_trans_loan_to_top_up' => !empty($topUpLoanId) ? (int) $topUpLoanId : 0,
+                'batch_trans_insurance' => round((float) ($financials['insurance'] ?? 0), 2),
+                'batch_trans_loan_guaranteed' => 0,
+                'batch_trans_expected_interest' => round((float) ($financials['expected_interest'] ?? 0), 2),
+                'batch_trans_updated' => 'N',
+                'batch_trans_payslip1' => $payslip1Path,
+                'batch_trans_payslip2' => $payslip2Path,
+                'batch_trans_by' => $actorUserId,
+                'batch_trans_on' => now(),
+                'batch_trans_ip' => $request->ip(),
+                'batch_trans_deleted' => 'N',
+            ];
+
+            if (Schema::hasColumn('sacco_loan_batch_trans_members', 'batch_trans_payroll_number')) {
+                $insertData['batch_trans_payroll_number'] = $validated['batch_trans_payroll_number'] ?? null;
+            }
+
+            if (Schema::hasColumn('sacco_loan_batch_trans_members', 'batch_trans_present_designation')) {
+                $insertData['batch_trans_present_designation'] = $validated['batch_trans_present_designation'] ?? null;
+            }
+
+            if (Schema::hasColumn('sacco_loan_batch_trans_members', 'batch_trans_terms_of_employment')) {
+                $insertData['batch_trans_terms_of_employment'] = $validated['batch_trans_terms_of_employment'] ?? null;
+            }
+
+            $batchTransId = DB::table('sacco_loan_batch_trans_members')->insertGetId($insertData);
+
+            $guarantorCheck = $this->validateAndProcessGuarantors(
+                array_merge($request->all(), [
+                    'batch_trans_member_id' => $trustedMemberId,
+                ]),
+                $loanType,
+                $batchTransId,
+                $loanAmount
+            );
+
+            if (!$guarantorCheck['success']) {
+                DB::rollBack();
+
+                return $respondError(trim($guarantorCheck['message']), 422, [
+                    'guarantors' => [trim($guarantorCheck['message'])],
+                ]);
+            }
+
+            DB::table('sacco_loan_batch_trans_members')
+                ->where('batch_trans_id', $batchTransId)
+                ->where('batch_trans_member_id', $trustedMemberId)
+                ->where('batch_trans_deleted', '<>', 'Y')
+                ->where('batch_trans_updated', 'N')
+                ->update([
+                    'batch_trans_loan_guaranteed' => round((float) ($guarantorCheck['total_guaranteed'] ?? 0), 2),
+                    'batch_trans_ip' => $request->ip(),
+                    'batch_trans_by' => $actorUserId,
+                ]);
+
+            DB::commit();
+
+            return $respondSuccess('Loan application submitted successfully.', [
+                'batch_trans_id' => (int) $batchTransId,
+                'insurance' => round((float) ($financials['insurance'] ?? 0), 2),
+                'monthly_payment' => round((float) ($financials['monthly_payment'] ?? 0), 2),
+                'monthly_payment_principal' => round((float) ($financials['monthly_payment_principal'] ?? 0), 2),
+                'expected_interest' => round((float) ($financials['expected_interest'] ?? 0), 2),
+                'total_guaranteed' => round((float) ($guarantorCheck['total_guaranteed'] ?? 0), 2),
+            ]);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+
+            Log::error('Failed to submit self-service loan application', [
+                'member_id' => $trustedMemberId,
+                'user_id' => $actorUserId,
+                'message' => $e->getMessage(),
+            ]);
+
+            return $respondError('Failed to submit loan application. ' . $e->getMessage(), 500);
+        }
+    }
+
     public function listLoansPendingApprovalSelfedit($id)
     {
         // Get the logged-in user's member ID
@@ -608,42 +914,42 @@ class LoanApplicationSelfServiceController extends Controller
 
         return view('loans.selfedit', compact('loan', 'loanTypes', 'loanCategories', 'maximumNoOfGuarantors', 'memberLoans', 'guarantors'));
     }
-   public function updateLoanApplication(Request $request, $id)
-{
-    $isApiRequest = $request->expectsJson()
-        || $request->wantsJson()
-        || $request->input('context') === 'api'
-        || $request->is('api/*');
+    public function updateLoanApplication(Request $request, $id)
+    {
+        $isApiRequest = $request->expectsJson()
+            || $request->wantsJson()
+            || $request->input('context') === 'api'
+            || $request->is('api/*');
 
-    $respondError = function (string $message, int $status = 400, array $errors = []) use ($request, $isApiRequest) {
-        if ($isApiRequest) {
-            return response()->json([
-                'success' => false,
-                'message' => $message,
-                'errors'  => $errors,
-            ], $status);
-        }
+        $respondError = function (string $message, int $status = 400, array $errors = []) use ($request, $isApiRequest) {
+            if ($isApiRequest) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $message,
+                    'errors'  => $errors,
+                ], $status);
+            }
 
-        return redirect()->back()
-            ->withErrors(!empty($errors) ? $errors : ['error' => $message])
-            ->withInput();
-    };
+            return redirect()->back()
+                ->withErrors(!empty($errors) ? $errors : ['error' => $message])
+                ->withInput();
+        };
 
-    $respondSuccess = function (string $message, array $payload = []) use ($id, $isApiRequest) {
-        if ($isApiRequest) {
-            return response()->json(array_merge([
-                'success' => true,
-                'message' => $message,
-                'batch_trans_id' => (int) $id,
-            ], $payload), 200);
-        }
+        $respondSuccess = function (string $message, array $payload = []) use ($id, $isApiRequest) {
+            if ($isApiRequest) {
+                return response()->json(array_merge([
+                    'success' => true,
+                    'message' => $message,
+                    'batch_trans_id' => (int) $id,
+                ], $payload), 200);
+            }
 
-        return redirect()
-            ->route('loans.pending.approval.selfedit', ['id' => $id])
-            ->with('success', $message);
-    };
+            return redirect()
+                ->route('loans.pending.approval.selfedit', ['id' => $id])
+                ->with('success', $message);
+        };
 
-    /*
+        /*
     |--------------------------------------------------------------------------
     | 1. Resolve trusted member principal
     |--------------------------------------------------------------------------
@@ -651,240 +957,242 @@ class LoanApplicationSelfServiceController extends Controller
     | Web: fall back to session user if it carries member_id
     |--------------------------------------------------------------------------
     */
-    $principal = $request->user();
+        $principal = $request->user();
 
-    if (!$principal || !isset($principal->member_id)) {
-        $principal = Auth::user();
-    }
+        if (!$principal || !isset($principal->member_id)) {
+            $principal = Auth::user();
+        }
 
-    $trustedMemberId = isset($principal->member_id) ? (int) $principal->member_id : null;
-    $actorUserId = Auth::id();
+        $trustedMemberId = isset($principal->member_id) ? (int) $principal->member_id : null;
+        $actorUserId = Auth::id();
 
-    if (!$trustedMemberId) {
-        return $respondError('Unauthenticated.', 401);
-    }
+        if (!$trustedMemberId) {
+            return $respondError('Unauthenticated.', 401);
+        }
 
-    DB::beginTransaction();
+        DB::beginTransaction();
 
-    try {
-        /*
+        try {
+            /*
         |--------------------------------------------------------------------------
         | 2. Load only the member’s own pending, non-deleted application
         |--------------------------------------------------------------------------
         */
-        $loan = DB::table('sacco_loan_batch_trans_members')
-            ->where('batch_trans_id', $id)
-            ->where('batch_trans_member_id', $trustedMemberId)
-            ->where('batch_trans_deleted', '<>', 'Y')
-            ->where('batch_trans_updated', 'N')
-            ->first();
+            $loan = DB::table('sacco_loan_batch_trans_members')
+                ->where('batch_trans_id', $id)
+                ->where('batch_trans_member_id', $trustedMemberId)
+                ->where('batch_trans_deleted', '<>', 'Y')
+                ->where('batch_trans_updated', 'N')
+                ->first();
 
-        if (!$loan) {
-            DB::rollBack();
-            return $respondError('Loan not found, already processed, or unauthorized.', 404);
-        }
+            if (!$loan) {
+                DB::rollBack();
+                return $respondError('Loan not found, already processed, or unauthorized.', 404);
+            }
 
-        /*
+            /*
         |--------------------------------------------------------------------------
         | 3. Normalize both web and API payload names
         |--------------------------------------------------------------------------
         */
-        $normalized = [
-            'batch_trans_loan_amount' => $request->input(
-                'batch_trans_loan_amount',
-                $request->input('amount', $loan->batch_trans_loan_amount)
-            ),
-            'batch_trans_loan_type' => $request->input(
-                'batch_trans_loan_type',
-                $request->input('loan_type_id', $loan->batch_trans_loan_type)
-            ),
-            'batch_trans_loan_category' => $request->input(
-                'batch_trans_loan_category',
-                $request->input('loan_category_id', $loan->batch_trans_loan_category)
-            ),
-            'batch_trans_loan_duration' => $request->input(
-                'batch_trans_loan_duration',
-                $request->input('duration_months', $loan->batch_trans_loan_duration)
-            ),
-            'batch_trans_description' => $request->input(
-                'batch_trans_description',
-                $request->input('reason', $loan->batch_trans_description)
-            ),
-        ];
+            $normalized = [
+                'batch_trans_loan_amount' => $request->input(
+                    'batch_trans_loan_amount',
+                    $request->input('amount', $loan->batch_trans_loan_amount)
+                ),
+                'batch_trans_loan_type' => $request->input(
+                    'batch_trans_loan_type',
+                    $request->input('loan_type_id', $loan->batch_trans_loan_type)
+                ),
+                'batch_trans_loan_category' => $request->input(
+                    'batch_trans_loan_category',
+                    $request->input('loan_category_id', $loan->batch_trans_loan_category)
+                ),
+                'batch_trans_loan_duration' => $request->input(
+                    'batch_trans_loan_duration',
+                    $request->input('duration_months', $loan->batch_trans_loan_duration)
+                ),
+                'batch_trans_description' => $request->input(
+                    'batch_trans_description',
+                    $request->input('reason', $loan->batch_trans_description)
+                ),
+            ];
 
-        if (Schema::hasColumn('sacco_loan_batch_trans_members', 'batch_trans_loan_to_top_up')) {
-            $normalized['batch_trans_loan_to_top_up'] = $request->input(
-                'batch_trans_loan_to_top_up',
-                $request->input('topup_loan_id', $loan->batch_trans_loan_to_top_up ?? null)
-            );
-        }
+            if (Schema::hasColumn('sacco_loan_batch_trans_members', 'batch_trans_loan_to_top_up')) {
+                $normalized['batch_trans_loan_to_top_up'] = $request->input(
+                    'batch_trans_loan_to_top_up',
+                    $request->input('topup_loan_id', $loan->batch_trans_loan_to_top_up ?? null)
+                );
+            }
 
-        if (Schema::hasColumn('sacco_loan_batch_trans_members', 'batch_trans_payroll_number')) {
-            $normalized['batch_trans_payroll_number'] = $request->input(
-                'batch_trans_payroll_number',
-                $request->input('payroll_number', $loan->batch_trans_payroll_number ?? null)
-            );
-        }
+            if (Schema::hasColumn('sacco_loan_batch_trans_members', 'batch_trans_payroll_number')) {
+                $normalized['batch_trans_payroll_number'] = $request->input(
+                    'batch_trans_payroll_number',
+                    $request->input('payroll_number', $loan->batch_trans_payroll_number ?? null)
+                );
+            }
 
-        if (Schema::hasColumn('sacco_loan_batch_trans_members', 'batch_trans_present_designation')) {
-            $normalized['batch_trans_present_designation'] = $request->input(
-                'batch_trans_present_designation',
-                $request->input('designation', $loan->batch_trans_present_designation ?? null)
-            );
-        }
+            if (Schema::hasColumn('sacco_loan_batch_trans_members', 'batch_trans_present_designation')) {
+                $normalized['batch_trans_present_designation'] = $request->input(
+                    'batch_trans_present_designation',
+                    $request->input('designation', $loan->batch_trans_present_designation ?? null)
+                );
+            }
 
-        if (Schema::hasColumn('sacco_loan_batch_trans_members', 'batch_trans_terms_of_employment')) {
-            $normalized['batch_trans_terms_of_employment'] = $request->input(
-                'batch_trans_terms_of_employment',
-                $request->input('employment_terms', $loan->batch_trans_terms_of_employment ?? null)
-            );
-        }
+            if (Schema::hasColumn('sacco_loan_batch_trans_members', 'batch_trans_terms_of_employment')) {
+                $normalized['batch_trans_terms_of_employment'] = $request->input(
+                    'batch_trans_terms_of_employment',
+                    $request->input('employment_terms', $loan->batch_trans_terms_of_employment ?? null)
+                );
+            }
 
-        /*
+            /*
         |--------------------------------------------------------------------------
         | 4. Validate without redirect-only behaviour
         |--------------------------------------------------------------------------
         */
-        $validationPayload = array_merge($request->all(), $normalized);
+            $validationPayload = array_merge($request->all(), $normalized);
 
-        $validator = \Illuminate\Support\Facades\Validator::make($validationPayload, [
-            'batch_trans_loan_amount' => 'required|numeric|min:1',
-            'batch_trans_loan_type' => 'required|integer|exists:sacco_loan_types,loan_type_id',
-            'batch_trans_loan_category' => 'required|integer|exists:sacco_loan_category,loan_category_id',
-            'batch_trans_loan_duration' => 'required|integer|min:1|max:100',
-            'batch_trans_description' => 'required|string|max:50',
-            'batch_trans_loan_to_top_up' => 'nullable|integer|exists:sacco_loans,loan_id',
-            'batch_trans_pay1' => 'nullable|file|mimes:jpg,jpeg,png,gif|max:200',
-            'batch_trans_pay2' => 'nullable|file|mimes:jpg,jpeg,png,gif|max:200',
-            'batch_trans_payroll_number' => 'nullable|string|max:50',
-            'batch_trans_present_designation' => 'nullable|string|max:100',
-            'batch_trans_terms_of_employment' => 'nullable|string|max:100',
-        ]);
+            $validator = \Illuminate\Support\Facades\Validator::make($validationPayload, [
+                'batch_trans_loan_amount' => 'required|numeric|min:1',
+                'batch_trans_loan_type' => 'required|integer|exists:sacco_loan_types,loan_type_id',
+                'batch_trans_loan_category' => 'required|integer|exists:sacco_loan_category,loan_category_id',
+                'batch_trans_loan_duration' => 'required|integer|min:1|max:100',
+                'batch_trans_description' => 'required|string|max:50',
+                'batch_trans_loan_to_top_up' => 'nullable|integer|exists:sacco_loans,loan_id',
+                'batch_trans_pay1' => 'nullable|file|mimes:jpg,jpeg,png,gif|max:200',
+                'batch_trans_pay2' => 'nullable|file|mimes:jpg,jpeg,png,gif|max:200',
+                'batch_trans_payroll_number' => 'nullable|string|max:50',
+                'batch_trans_present_designation' => 'nullable|string|max:100',
+                'batch_trans_terms_of_employment' => 'nullable|string|max:100',
+            ]);
 
-        if ($validator->fails()) {
-            DB::rollBack();
-            return $respondError('Validation failed.', 422, $validator->errors()->toArray());
-        }
+            if ($validator->fails()) {
+                DB::rollBack();
+                return $respondError('Validation failed.', 422, $validator->errors()->toArray());
+            }
 
-        $validated = $validator->validated();
+            $validated = $validator->validated();
 
-        /*
+            /*
         |--------------------------------------------------------------------------
         | 5. Fetch authoritative loan type / category / member
         |--------------------------------------------------------------------------
         */
-        $loanType = DB::table('sacco_loan_types')
-            ->where('loan_type_id', $validated['batch_trans_loan_type'])
-            ->where('loan_type_deleted', '<>', 'Y')
-            ->first();
+            $loanType = DB::table('sacco_loan_types')
+                ->where('loan_type_id', $validated['batch_trans_loan_type'])
+                ->where('loan_type_deleted', '<>', 'Y')
+                ->first();
 
-        if (!$loanType) {
-            DB::rollBack();
-            return $respondError('Invalid loan type.', 422, [
-                'batch_trans_loan_type' => ['Invalid loan type.'],
-            ]);
-        }
+            if (!$loanType) {
+                DB::rollBack();
+                return $respondError('Invalid loan type.', 422, [
+                    'batch_trans_loan_type' => ['Invalid loan type.'],
+                ]);
+            }
 
-        $loanCategory = DB::table('sacco_loan_category')
-            ->where('loan_category_id', $validated['batch_trans_loan_category'])
-            ->where('loan_category_deleted', '<>', 'Y')
-            ->first();
+            $loanCategory = DB::table('sacco_loan_category')
+                ->where('loan_category_id', $validated['batch_trans_loan_category'])
+                ->where('loan_category_deleted', '<>', 'Y')
+                ->first();
 
-        if (!$loanCategory) {
-            DB::rollBack();
-            return $respondError('Invalid loan category.', 422, [
-                'batch_trans_loan_category' => ['Invalid loan category.'],
-            ]);
-        }
+            if (!$loanCategory) {
+                DB::rollBack();
+                return $respondError('Invalid loan category.', 422, [
+                    'batch_trans_loan_category' => ['Invalid loan category.'],
+                ]);
+            }
 
-        $member = DB::table('sacco_members')
-            ->where('member_id', $trustedMemberId)
-            ->where('member_active', 'Y')
-            ->where('member_deleted', '<>', 'Y')
-            ->first();
+            $member = DB::table('sacco_members')
+                ->where('member_id', $trustedMemberId)
+                ->where('member_active', 'Y')
+                ->where('member_deleted', '<>', 'Y')
+                ->first();
 
-        if (!$member) {
-            DB::rollBack();
-            return $respondError('Invalid member.', 422, [
-                'member' => ['Invalid member.'],
-            ]);
-        }
+            if (!$member) {
+                DB::rollBack();
+                return $respondError('Invalid member.', 422, [
+                    'member' => ['Invalid member.'],
+                ]);
+            }
 
-        $loanAmount = round((float) $validated['batch_trans_loan_amount'], 2);
-        $loanDuration = (int) $validated['batch_trans_loan_duration'];
+            $loanAmount = round((float) $validated['batch_trans_loan_amount'], 2);
+            $loanDuration = (int) $validated['batch_trans_loan_duration'];
 
-        /*
+            /*
         |--------------------------------------------------------------------------
         | 6. Validate optional top-up loan ownership
         |--------------------------------------------------------------------------
         */
-        $topUpLoan = null;
-        $topUpLoanId = $validated['batch_trans_loan_to_top_up'] ?? null;
+            $topUpLoan = null;
+            $topUpLoanId = $validated['batch_trans_loan_to_top_up'] ?? null;
 
-        if (!empty($topUpLoanId)) {
-            $topUpLoan = DB::table('sacco_loans')
-                ->where('loan_id', $topUpLoanId)
-                ->where('loan_member', $trustedMemberId)
-                ->first();
+            if (!empty($topUpLoanId)) {
+                $topUpLoan = DB::table('sacco_loans')
+                    ->where('loan_id', $topUpLoanId)
+                    ->where('loan_member', $trustedMemberId)
+                    ->first();
 
-            if (!$topUpLoan) {
-                DB::rollBack();
-                return $respondError('Invalid top-up loan.', 422, [
-                    'batch_trans_loan_to_top_up' => ['Invalid top-up loan.'],
-                ]);
+                if (!$topUpLoan) {
+                    DB::rollBack();
+                    return $respondError('Invalid top-up loan.', 422, [
+                        'batch_trans_loan_to_top_up' => ['Invalid top-up loan.'],
+                    ]);
+                }
             }
-        }
 
-        /*
+            /*
         |--------------------------------------------------------------------------
         | 7. Re-run business validations
         |--------------------------------------------------------------------------
         */
-        $nmsg = '';
-        $nmsg .= $this->validateLoanParameters($loanAmount, $loanType, $loanDuration, $topUpLoan);
-        $nmsg .= $this->validateMemberEligibility($member, $loanType);
+            $nmsg = '';
+            $nmsg .= $this->validateLoanParameters($loanAmount, $loanType, $loanDuration, $topUpLoan);
+            $nmsg .= $this->validateMemberEligibility($member, $loanType);
 
-        if (!empty($topUpLoan)) {
-            $topUpOutstanding = (float) (($topUpLoan->loan_amount ?? 0) - ($topUpLoan->loan_loan_paid ?? 0));
-            if ($loanAmount <= $topUpOutstanding) {
-                $nmsg .= 'Invalid top-up loan. ';
+            if (!empty($topUpLoan)) {
+                $topUpOutstanding = (float) (($topUpLoan->loan_amount ?? 0) - ($topUpLoan->loan_loan_paid ?? 0));
+                if ($loanAmount <= $topUpOutstanding) {
+                    $nmsg .= 'Invalid top-up loan. ';
+                }
             }
-        }
 
-        if (!empty($nmsg)) {
-            DB::rollBack();
-            return $respondError(trim($nmsg), 422, [
-                'loan' => [trim($nmsg)],
-            ]);
-        }
+            if (!empty($nmsg)) {
+                DB::rollBack();
+                return $respondError(trim($nmsg), 422, [
+                    'loan' => [trim($nmsg)],
+                ]);
+            }
 
-        /*
+            /*
         |--------------------------------------------------------------------------
         | 8. Validate fresh guarantors before updating loan
         |--------------------------------------------------------------------------
         */
-    
-     
-
-$guarantorCheck = $this->validateFreshGuarantorsForEdit(
-    $request->all(),
-    $loanType,
-    $trustedMemberId,
-    $loanAmount,
-    (int) $id
-);
 
 
- 
 
-        if (!$guarantorCheck['success']) {
-            DB::rollBack();
-            return $respondError(trim($guarantorCheck['message']), 422, [
-                'guarantors' => [trim($guarantorCheck['message'])],
-            ]);
-        }
+            $guarantorCheck = $this->validateAndProcessGuarantors(
+                array_merge($request->all(), [
+                    'batch_trans_member_id' => $trustedMemberId,
+                ]),
+                $loanType,
+                (int) $id,
+                $loanAmount,
+                false // validation only; do not save here because replaceLoanGuarantorsForEdit() saves later
+            );
 
-        /*
+
+
+
+            if (!$guarantorCheck['success']) {
+                DB::rollBack();
+                return $respondError(trim($guarantorCheck['message']), 422, [
+                    'guarantors' => [trim($guarantorCheck['message'])],
+                ]);
+            }
+
+            /*
         |--------------------------------------------------------------------------
         | 8. Recalculate self-service financials using existing saved charges
         |--------------------------------------------------------------------------
@@ -892,453 +1200,495 @@ $guarantorCheck = $this->validateFreshGuarantorsForEdit(
         | DEDUCT_FROM_DISBURSEMENT charges affect net cash, not EMI base.
         |--------------------------------------------------------------------------
         */
-        $chargeSummary = $this->getSelfServiceChargeSummary($loan->batch_trans_id);
-        $addToLoanTotal = round((float) ($chargeSummary['add_to_loan'] ?? 0), 2);
-        $existingCommission = round((float) ($loan->batch_trans_commission ?? 0), 2);
+            $chargeSummary = $this->getSelfServiceChargeSummary($loan->batch_trans_id);
+            $addToLoanTotal = round((float) ($chargeSummary['add_to_loan'] ?? 0), 2);
+            $existingCommission = round((float) ($loan->batch_trans_commission ?? 0), 2);
 
-        $amountForEmi = round($loanAmount + $addToLoanTotal, 2);
+            $amountForEmi = round($loanAmount + $addToLoanTotal, 2);
 
-        $financials = $this->calculateSaccoLoanFinancials(
-            $loanAmount,
-            $amountForEmi,
-            $loanDuration,
-            $loanType,
-            $existingCommission
-        );
+            $financials = $this->calculateSaccoLoanFinancials(
+                $loanAmount,
+                $amountForEmi,
+                $loanDuration,
+                $loanType,
+                $existingCommission
+            );
 
-        /*
+            /*
         |--------------------------------------------------------------------------
         | 9. Handle optional payslip uploads
         |--------------------------------------------------------------------------
         */
-        $payslip1Path = $loan->batch_trans_payslip1 ?? null;
-        if ($request->hasFile('batch_trans_pay1')) {
-            $payslip1Path = $request->file('batch_trans_pay1')->store('uploads/payslips');
-        }
+            $payslip1Path = $loan->batch_trans_payslip1 ?? null;
+            if ($request->hasFile('batch_trans_pay1')) {
+                $payslip1Path = $request->file('batch_trans_pay1')->store('uploads/payslips');
+            }
 
-        $payslip2Path = $loan->batch_trans_payslip2 ?? null;
-        if ($request->hasFile('batch_trans_pay2')) {
-            $payslip2Path = $request->file('batch_trans_pay2')->store('uploads/payslips');
-        }
+            $payslip2Path = $loan->batch_trans_payslip2 ?? null;
+            if ($request->hasFile('batch_trans_pay2')) {
+                $payslip2Path = $request->file('batch_trans_pay2')->store('uploads/payslips');
+            }
 
-        /*
+            /*
         |--------------------------------------------------------------------------
         | 10. Update only this member’s own pending application
         |--------------------------------------------------------------------------
         */
-        $updateData = [
-            'batch_trans_loan_amount' => $loanAmount,
-            'batch_trans_loan_type' => (int) $validated['batch_trans_loan_type'],
-            'batch_trans_loan_category' => (int) $validated['batch_trans_loan_category'],
-            'batch_trans_loan_duration' => $loanDuration,
-            'batch_trans_description' => $validated['batch_trans_description'],
-            'batch_trans_insurance' => round((float) ($financials['insurance'] ?? 0), 2),
-            'batch_trans_monthly_payment' => round((float) ($financials['monthly_payment'] ?? 0), 2),
-            'batch_trans_monthly_payment_principal' => round((float) ($financials['monthly_payment_principal'] ?? 0), 2),
-            'batch_trans_expected_interest' => round((float) ($financials['expected_interest'] ?? 0), 2),
-            'batch_trans_payslip1' => $payslip1Path,
-            'batch_trans_payslip2' => $payslip2Path,
-            'batch_trans_ip' => $request->ip(),
-            'batch_trans_loan_guaranteed' => round((float) ($guarantorCheck['total_guaranteed'] ?? 0), 2),
-        ];
+            $updateData = [
+                'batch_trans_loan_amount' => $loanAmount,
+                'batch_trans_loan_type' => (int) $validated['batch_trans_loan_type'],
+                'batch_trans_loan_category' => (int) $validated['batch_trans_loan_category'],
+                'batch_trans_loan_duration' => $loanDuration,
+                'batch_trans_description' => $validated['batch_trans_description'],
+                'batch_trans_insurance' => round((float) ($financials['insurance'] ?? 0), 2),
+                'batch_trans_monthly_payment' => round((float) ($financials['monthly_payment'] ?? 0), 2),
+                'batch_trans_monthly_payment_principal' => round((float) ($financials['monthly_payment_principal'] ?? 0), 2),
+                'batch_trans_expected_interest' => round((float) ($financials['expected_interest'] ?? 0), 2),
+                'batch_trans_payslip1' => $payslip1Path,
+                'batch_trans_payslip2' => $payslip2Path,
+                'batch_trans_ip' => $request->ip(),
+                'batch_trans_loan_guaranteed' => round((float) ($guarantorCheck['total_guaranteed'] ?? 0), 2),
+            ];
 
-        if ($actorUserId) {
-            $updateData['batch_trans_by'] = $actorUserId;
-        }
+            if ($actorUserId) {
+                $updateData['batch_trans_by'] = $actorUserId;
+            }
 
-        if (Schema::hasColumn('sacco_loan_batch_trans_members', 'batch_trans_loan_to_top_up')) {
-            $updateData['batch_trans_loan_to_top_up'] = !empty($topUpLoanId) ? (int) $topUpLoanId : null;
-        }
+            if (Schema::hasColumn('sacco_loan_batch_trans_members', 'batch_trans_loan_to_top_up')) {
+                $updateData['batch_trans_loan_to_top_up'] = !empty($topUpLoanId) ? (int) $topUpLoanId : null;
+            }
 
-        if (Schema::hasColumn('sacco_loan_batch_trans_members', 'batch_trans_payroll_number')) {
-            $updateData['batch_trans_payroll_number'] = $validated['batch_trans_payroll_number'] ?? null;
-        }
+            if (Schema::hasColumn('sacco_loan_batch_trans_members', 'batch_trans_payroll_number')) {
+                $updateData['batch_trans_payroll_number'] = $validated['batch_trans_payroll_number'] ?? null;
+            }
 
-        if (Schema::hasColumn('sacco_loan_batch_trans_members', 'batch_trans_present_designation')) {
-            $updateData['batch_trans_present_designation'] = $validated['batch_trans_present_designation'] ?? null;
-        }
+            if (Schema::hasColumn('sacco_loan_batch_trans_members', 'batch_trans_present_designation')) {
+                $updateData['batch_trans_present_designation'] = $validated['batch_trans_present_designation'] ?? null;
+            }
 
-        if (Schema::hasColumn('sacco_loan_batch_trans_members', 'batch_trans_terms_of_employment')) {
-            $updateData['batch_trans_terms_of_employment'] = $validated['batch_trans_terms_of_employment'] ?? null;
-        }
+            if (Schema::hasColumn('sacco_loan_batch_trans_members', 'batch_trans_terms_of_employment')) {
+                $updateData['batch_trans_terms_of_employment'] = $validated['batch_trans_terms_of_employment'] ?? null;
+            }
 
-        
 
-        DB::table('sacco_loan_batch_trans_members')
-    ->where('batch_trans_id', $id)
-    ->where('batch_trans_member_id', $trustedMemberId)
-    ->where('batch_trans_deleted', '<>', 'Y')
-    ->where('batch_trans_updated', 'N')
-    ->update($updateData);
 
-/*
+            DB::table('sacco_loan_batch_trans_members')
+                ->where('batch_trans_id', $id)
+                ->where('batch_trans_member_id', $trustedMemberId)
+                ->where('batch_trans_deleted', '<>', 'Y')
+                ->where('batch_trans_updated', 'N')
+                ->update($updateData);
+
+            /*
 |--------------------------------------------------------------------------
 | 11. Replace old guarantors with fresh validated guarantors
 |--------------------------------------------------------------------------
 */
-$this->replaceLoanGuarantorsForEdit(
-    (int) $id,
-    $guarantorCheck['guarantors'],
-    $actorUserId,
-    $request->ip(),
-    now(),
-    (string) ($member->member_name ?? '')
-);
+            $this->replaceLoanGuarantorsForEdit(
+                (int) $id,
+                $guarantorCheck['guarantors'],
+                $actorUserId,
+                $request->ip(),
+                now(),
+                (string) ($member->member_name ?? '')
+            );
 
-DB::commit();
+            DB::commit();
 
 
-        return $respondSuccess('Loan updated successfully.', [
-            'insurance' => round((float) ($financials['insurance'] ?? 0), 2),
-            'monthly_payment' => round((float) ($financials['monthly_payment'] ?? 0), 2),
-            'monthly_payment_principal' => round((float) ($financials['monthly_payment_principal'] ?? 0), 2),
-            'expected_interest' => round((float) ($financials['expected_interest'] ?? 0), 2),
-        ]);
-    } catch (\Throwable $e) {
-        DB::rollBack();
+            return $respondSuccess('Loan updated successfully.', [
+                'insurance' => round((float) ($financials['insurance'] ?? 0), 2),
+                'monthly_payment' => round((float) ($financials['monthly_payment'] ?? 0), 2),
+                'monthly_payment_principal' => round((float) ($financials['monthly_payment_principal'] ?? 0), 2),
+                'expected_interest' => round((float) ($financials['expected_interest'] ?? 0), 2),
+            ]);
+        } catch (\Throwable $e) {
+            DB::rollBack();
 
-        Log::error('Failed to update self-service loan application', [
-            'batch_trans_id' => $id,
-            'member_id' => $trustedMemberId,
-            'user_id' => $actorUserId,
-            'message' => $e->getMessage(),
-        ]);
+            Log::error('Failed to update self-service loan application', [
+                'batch_trans_id' => $id,
+                'member_id' => $trustedMemberId,
+                'user_id' => $actorUserId,
+                'message' => $e->getMessage(),
+            ]);
 
-        return $respondError('Failed to update loan application. ' . $e->getMessage(), 500);
+            return $respondError('Failed to update loan application. ' . $e->getMessage(), 500);
+        }
     }
-}
 
-private function replaceLoanGuarantorsForEdit(
-    int $batchTransId,
-    array $guarantors,
-    ?int $actorUserId,
-    string $ip,
-    $transdate,
-    string $borrowerName = ''
-): void {
-    $existingRows = DB::table('sacco_loan_batch_guarantors_members')
-        ->where('guarantors_loan_batch_trans_id', $batchTransId)
-        ->where('guarantors_deleted', '<>', 'Y')
-        ->get()
-        ->keyBy('guarantors_guarantor_id');
+    private function replaceLoanGuarantorsForEdit(
+        int $batchTransId,
+        array $guarantors,
+        ?int $actorUserId,
+        string $ip,
+        $transdate,
+        string $borrowerName = ''
+    ): void {
+        $existingRows = DB::table('sacco_loan_batch_guarantors_members')
+            ->where('guarantors_loan_batch_trans_id', $batchTransId)
+            ->whereRaw("COALESCE(guarantors_deleted, 'N') <> 'Y'")
+            ->get()
+            ->keyBy('guarantors_guarantor_id');
 
-    $description = 'Guarantor processed after loan edit'
-        . (!empty($borrowerName) ? ' - ' . $borrowerName : '');
+        $submittedGuarantorIds = collect($guarantors)
+            ->pluck('id')
+            ->map(fn($id) => (int) $id)
+            ->values()
+            ->toArray();
 
-    foreach ($guarantors as $guarantor) {
-        $guarantorId = (int) $guarantor['id'];
-        $amount = round((float) $guarantor['amount'], 2);
-
-        if (isset($existingRows[$guarantorId])) {
+        /*
+    |--------------------------------------------------------------------------
+    | Soft-delete guarantors removed during edit
+    |--------------------------------------------------------------------------
+    */
+        if (!empty($submittedGuarantorIds)) {
             DB::table('sacco_loan_batch_guarantors_members')
-                ->where('guarantors_id', $existingRows[$guarantorId]->guarantors_id)
+                ->where('guarantors_loan_batch_trans_id', $batchTransId)
+                ->whereRaw("COALESCE(guarantors_deleted, 'N') <> 'Y'")
+                ->whereNotIn('guarantors_guarantor_id', $submittedGuarantorIds)
                 ->update([
+                    'guarantors_deleted' => 'Y',
+                    'guarantors_deleted_by' => $actorUserId,
+                    'guarantors_deleted_on' => $transdate,
+                    'guarantors_deleted_ip' => $ip,
+                ]);
+        } else {
+            DB::table('sacco_loan_batch_guarantors_members')
+                ->where('guarantors_loan_batch_trans_id', $batchTransId)
+                ->whereRaw("COALESCE(guarantors_deleted, 'N') <> 'Y'")
+                ->update([
+                    'guarantors_deleted' => 'Y',
+                    'guarantors_deleted_by' => $actorUserId,
+                    'guarantors_deleted_on' => $transdate,
+                    'guarantors_deleted_ip' => $ip,
+                ]);
+
+            return;
+        }
+
+        $description = 'Guarantor processed after loan edit'
+            . (!empty($borrowerName) ? ' - ' . $borrowerName : '');
+
+        foreach ($guarantors as $guarantor) {
+            $guarantorId = (int) $guarantor['id'];
+            $amount = round((float) $guarantor['amount'], 2);
+
+            if (isset($existingRows[$guarantorId])) {
+                DB::table('sacco_loan_batch_guarantors_members')
+                    ->where('guarantors_id', $existingRows[$guarantorId]->guarantors_id)
+                    ->update([
+                        'guarantors_amount_guaranteed' => $amount,
+                        'guarantors_description' => $description,
+                        'guarantors_approved' => 'N',
+                        'guarantors_email_sent' => 'N',
+                        'guarantors_by' => $actorUserId,
+                        'guarantors_on' => $transdate,
+                        'guarantors_ip' => $ip,
+                        'guarantors_deleted' => 'N',
+                        'guarantors_deleted_by' => null,
+                        'guarantors_deleted_on' => null,
+                        'guarantors_deleted_ip' => null,
+                    ]);
+            } else {
+                DB::table('sacco_loan_batch_guarantors_members')->insert([
+                    'guarantors_loan_batch_trans_id' => $batchTransId,
+                    'guarantors_guarantor_id' => $guarantorId,
                     'guarantors_amount_guaranteed' => $amount,
                     'guarantors_description' => $description,
+                    'guarantors_transfered' => null,
                     'guarantors_approved' => 'N',
                     'guarantors_email_sent' => 'N',
                     'guarantors_by' => $actorUserId,
                     'guarantors_on' => $transdate,
                     'guarantors_ip' => $ip,
+                    'guarantors_deleted' => 'N',
+                    'guarantors_deleted_by' => null,
+                    'guarantors_deleted_on' => null,
+                    'guarantors_deleted_ip' => null,
                 ]);
-        } else {
-            DB::table('sacco_loan_batch_guarantors_members')->insert([
-                'guarantors_loan_batch_trans_id' => $batchTransId,
-                'guarantors_guarantor_id' => $guarantorId,
-                'guarantors_amount_guaranteed' => $amount,
-                'guarantors_description' => $description,
-                'guarantors_transfered' => null,
-                'guarantors_approved' => 'N',
-                'guarantors_email_sent' => 'N',
-                'guarantors_by' => $actorUserId,
-                'guarantors_on' => $transdate,
-                'guarantors_ip' => $ip,
-                'guarantors_deleted' => 'N',
-                'guarantors_deleted_by' => null,
-                'guarantors_deleted_on' => null,
-                'guarantors_deleted_ip' => null,
-            ]);
-        }
-    }
-}
-private function validateFreshGuarantorsForEdit(
-    array $data,
-    $loanType,
-    int $memberId,
-    float $loanAmount,
-    int $batchTransId
-): array {
-    $nmsg = '';
-    $guarantors = [];
-    $totalGuaranteed = 0.00;
-    $seenGuarantorIds = [];
-
-    $maximumNoOfGuarantors = (int) (
-        DB::table('sacco_defaults')
-            ->where('default_name', 'maximum_no_of_guarantors')
-            ->value('default_value') ?? 3
-    );
-
-    $maxGuarantorFactor = (float) (
-        DB::table('sacco_defaults')
-            ->where('default_name', 'max_guarantor_factor')
-            ->value('default_value') ?? 1
-    );
-
-    $maxGuarantorFactorSelf = (float) (
-        DB::table('sacco_defaults')
-            ->where('default_name', 'max_guarantor_factor_self')
-            ->value('default_value') ?? 1
-    );
-
-    /*
-    |--------------------------------------------------------------------------
-    | 1. Pull existing undeleted guarantors on this same loan
-    |--------------------------------------------------------------------------
-    | These remain active and must be processed together with any newly added
-    | guarantors. Do not delete them here.
-    |--------------------------------------------------------------------------
-    */
-    $existingGuarantors = DB::table('sacco_loan_batch_guarantors_members as g')
-        ->leftJoin('sacco_members as m', 'g.guarantors_guarantor_id', '=', 'm.member_id')
-        ->select(
-            'g.guarantors_id',
-            'g.guarantors_guarantor_id',
-            'g.guarantors_amount_guaranteed',
-            'm.member_id',
-            'm.member_name',
-            'm.member_sacco_id',
-            'm.member_total_share',
-            'm.member_tied_shares',
-            'm.member_tied_shares_self',
-            'm.member_active',
-            'm.member_deleted'
-        )
-        ->where('g.guarantors_loan_batch_trans_id', $batchTransId)
-        ->where('g.guarantors_deleted', '<>', 'Y')
-        ->get();
-
-    foreach ($existingGuarantors as $existingGuarantor) {
-        if (
-            empty($existingGuarantor->member_id)
-            || $existingGuarantor->member_active !== 'Y'
-            || $existingGuarantor->member_deleted === 'Y'
-        ) {
-            $nmsg .= "Error: One of the existing guarantors is missing or inactive. ";
-            continue;
-        }
-
-        $guarantorId = (int) $existingGuarantor->member_id;
-        $guarantorName = trim((string) $existingGuarantor->member_name);
-        $guarantorAmount = round((float) $existingGuarantor->guarantors_amount_guaranteed, 2);
-
-        if (in_array($guarantorId, $seenGuarantorIds, true)) {
-            $nmsg .= "Error: Guarantor {$guarantorName} appears more than once on this loan. ";
-            continue;
-        }
-
-        $isLockedByAnotherPendingLoan = DB::table('sacco_loan_batch_guarantors_members as g')
-            ->join('sacco_loan_batch_trans_members as t', 'g.guarantors_loan_batch_trans_id', '=', 't.batch_trans_id')
-            ->where('g.guarantors_guarantor_id', $guarantorId)
-            ->where('g.guarantors_deleted', '<>', 'Y')
-            ->where('t.batch_trans_deleted', '<>', 'Y')
-            ->where('t.batch_trans_updated', 'N')
-            ->where('t.batch_trans_id', '<>', $batchTransId)
-            ->exists();
-
-        if ($isLockedByAnotherPendingLoan) {
-            $nmsg .= "Error: Guarantor {$guarantorName} is already attached to another pending loan application and cannot be reused now. ";
-            continue;
-        }
-
-        if ($memberId !== $guarantorId) {
-            $availableShares = ((float) $existingGuarantor->member_total_share * $maxGuarantorFactor)
-                - (float) $existingGuarantor->member_tied_shares;
-
-            if ($availableShares < $guarantorAmount) {
-                $nmsg .= "Error: Guarantor {$guarantorName} does not have enough free shares to guarantee this amount. ";
-                continue;
             }
-        } else {
-            $availableSelfShares = ((float) $existingGuarantor->member_total_share * $maxGuarantorFactorSelf)
-                - (float) $existingGuarantor->member_tied_shares_self;
-
-            if ($availableSelfShares < $guarantorAmount) {
-                $nmsg .= "Error: Guarantor {$guarantorName} does not have enough free shares to self-guarantee this amount. ";
-                continue;
-            }
-        }
-
-        $seenGuarantorIds[] = $guarantorId;
-
-        $guarantors[] = [
-            'id' => $guarantorId,
-            'name' => $guarantorName,
-            'member_sacco_id' => (string) $existingGuarantor->member_sacco_id,
-            'amount' => $guarantorAmount,
-            'existing_guarantors_id' => (int) $existingGuarantor->guarantors_id,
-        ];
-
-        $totalGuaranteed += $guarantorAmount;
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | 2. Validate newly added guarantors
-    |--------------------------------------------------------------------------
-    */
-    for ($i = 0; $i < $maximumNoOfGuarantors; $i++) {
-        $guarantorName = trim((string) ($data['guarantors'][$i]['name'] ?? ''));
-        $guarantorAmount = !empty($data['guarantors'][$i]['amount'])
-            ? round((float) $data['guarantors'][$i]['amount'], 2)
-            : 0.00;
-
-        if ($guarantorName === '' && $guarantorAmount <= 0) {
-            continue;
-        }
-
-        if ($guarantorName === '') {
-            $nmsg .= "Error: Missing guarantor name on row " . ($i + 1) . ". ";
-            continue;
-        }
-
-        if ($guarantorAmount <= 0) {
-            $nmsg .= "Error: Guarantor amount for {$guarantorName} must be greater than zero. ";
-            continue;
-        }
-
-        $nameParts = explode(' - (', $guarantorName);
-        $memberName = trim($nameParts[0] ?? '');
-        $memberSaccoId = trim(isset($nameParts[1]) ? rtrim($nameParts[1], ") \t\n\r\0\x0B") : '');
-
-        if ($memberName === '' || $memberSaccoId === '') {
-            $nmsg .= "Error: Guarantor {$guarantorName} is not in the expected format. ";
-            continue;
-        }
-
-        $guarantor = DB::table('sacco_members')
-            ->where('member_name', $memberName)
-            ->where('member_sacco_id', $memberSaccoId)
-            ->where('member_active', 'Y')
-            ->where('member_deleted', '<>', 'Y')
-            ->first();
-
-        if (!$guarantor) {
-            $nmsg .= "Error: Guarantor {$guarantorName} not found or inactive. ";
-            continue;
-        }
-
-        if (in_array((int) $guarantor->member_id, $seenGuarantorIds, true)) {
-            $nmsg .= "Error: Guarantor {$guarantorName} has already been added to this same loan. ";
-            continue;
-        }
-
-        $isLockedByAnotherPendingLoan = DB::table('sacco_loan_batch_guarantors_members as g')
-            ->join('sacco_loan_batch_trans_members as t', 'g.guarantors_loan_batch_trans_id', '=', 't.batch_trans_id')
-            ->where('g.guarantors_guarantor_id', (int) $guarantor->member_id)
-            ->where('g.guarantors_deleted', '<>', 'Y')
-            ->where('t.batch_trans_deleted', '<>', 'Y')
-            ->where('t.batch_trans_updated', 'N')
-            ->where('t.batch_trans_id', '<>', $batchTransId)
-            ->exists();
-
-        if ($isLockedByAnotherPendingLoan) {
-            $nmsg .= "Error: Guarantor {$guarantorName} is already attached to another pending loan application and cannot be reused now. ";
-            continue;
-        }
-
-        if ($memberId != (int) $guarantor->member_id) {
-            $availableShares = ((float) $guarantor->member_total_share * $maxGuarantorFactor)
-                - (float) $guarantor->member_tied_shares;
-
-            if ($availableShares < $guarantorAmount) {
-                $nmsg .= "Error: Guarantor {$guarantorName} does not have enough free shares to guarantee this amount. ";
-                continue;
-            }
-        } else {
-            $availableSelfShares = ((float) $guarantor->member_total_share * $maxGuarantorFactorSelf)
-                - (float) $guarantor->member_tied_shares_self;
-
-            if ($availableSelfShares < $guarantorAmount) {
-                $nmsg .= "Error: Guarantor {$guarantorName} does not have enough free shares to self-guarantee this amount. ";
-                continue;
-            }
-        }
-
-        $seenGuarantorIds[] = (int) $guarantor->member_id;
-
-        $guarantors[] = [
-            'id' => (int) $guarantor->member_id,
-            'name' => (string) $guarantor->member_name,
-            'member_sacco_id' => (string) $guarantor->member_sacco_id,
-            'amount' => $guarantorAmount,
-            'existing_guarantors_id' => null,
-        ];
-
-        $totalGuaranteed += $guarantorAmount;
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | 3. Enforce maximum combined guarantors
-    |--------------------------------------------------------------------------
-    */
-    if (count($guarantors) > $maximumNoOfGuarantors) {
-        $nmsg .= "Error: Total guarantors on this loan cannot exceed {$maximumNoOfGuarantors}. ";
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | 4. Validate required guarantee and prorate combined set if necessary
-    |--------------------------------------------------------------------------
-    */
-    $requiredGuarantee = round(
-        $loanAmount * ((float) ($loanType->loan_type_guaranteable_percent ?? 0)) / 100,
-        2
-    );
-
-    if ((float) ($loanType->loan_type_guaranteable_percent ?? 0) > 0) {
-        if (empty($guarantors)) {
-            $nmsg .= "Error: This loan requires guarantors. ";
-        } elseif ($requiredGuarantee > $totalGuaranteed) {
-            $nmsg .= "Error: This loan application is under-guaranteed. Total guaranteed must be at least {$requiredGuarantee}. ";
-        } elseif ($totalGuaranteed > $requiredGuarantee) {
-            $gFactor = $requiredGuarantee / $totalGuaranteed;
-
-            foreach ($guarantors as $idx => $guarantor) {
-                $guarantors[$idx]['amount'] = round($guarantor['amount'] * $gFactor, 2);
-            }
-
-            $proratedTotal = round(array_sum(array_column($guarantors, 'amount')), 2);
-
-            if (!empty($guarantors) && $proratedTotal != $requiredGuarantee) {
-                $difference = round($requiredGuarantee - $proratedTotal, 2);
-                $lastIndex = count($guarantors) - 1;
-                $guarantors[$lastIndex]['amount'] = round($guarantors[$lastIndex]['amount'] + $difference, 2);
-            }
-
-            $totalGuaranteed = round(array_sum(array_column($guarantors, 'amount')), 2);
         }
     }
 
-    if (!empty($nmsg)) {
-        return [
-            'success' => false,
-            'message' => trim($nmsg),
-            'guarantors' => [],
-            'total_guaranteed' => 0,
-            'required_guarantee' => $requiredGuarantee,
-        ];
-    }
+ 
+    // private function validateFreshGuarantorsForEdit(
+    //     array $data,
+    //     $loanType,
+    //     int $memberId,
+    //     float $loanAmount,
+    //     int $batchTransId
+    // ): array {
+    //     $nmsg = '';
+    //     $guarantors = [];
+    //     $totalGuaranteed = 0.00;
+    //     $seenGuarantorIds = [];
 
-    return [
-        'success' => true,
-        'message' => 'Guarantors validated successfully.',
-        'guarantors' => $guarantors,
-        'total_guaranteed' => round($totalGuaranteed, 2),
-        'required_guarantee' => $requiredGuarantee,
-    ];
-}
+    //     $maximumNoOfGuarantors = (int) (
+    //         DB::table('sacco_defaults')
+    //         ->where('default_name', 'maximum_no_of_guarantors')
+    //         ->value('default_value') ?? 3
+    //     );
+
+    //     $maxGuarantorFactor = (float) (
+    //         DB::table('sacco_defaults')
+    //         ->where('default_name', 'max_guarantor_factor')
+    //         ->value('default_value') ?? 1
+    //     );
+
+    //     $maxGuarantorFactorSelf = (float) (
+    //         DB::table('sacco_defaults')
+    //         ->where('default_name', 'max_guarantor_factor_self')
+    //         ->value('default_value') ?? 1
+    //     );
+
+    //     /*
+    // |--------------------------------------------------------------------------
+    // | 1. Pull existing undeleted guarantors on this same loan
+    // |--------------------------------------------------------------------------
+    // | These remain active and must be processed together with any newly added
+    // | guarantors. Do not delete them here.
+    // |--------------------------------------------------------------------------
+    // */
+    //     $existingGuarantors = DB::table('sacco_loan_batch_guarantors_members as g')
+    //         ->leftJoin('sacco_members as m', 'g.guarantors_guarantor_id', '=', 'm.member_id')
+    //         ->select(
+    //             'g.guarantors_id',
+    //             'g.guarantors_guarantor_id',
+    //             'g.guarantors_amount_guaranteed',
+    //             'm.member_id',
+    //             'm.member_name',
+    //             'm.member_sacco_id',
+    //             'm.member_total_share',
+    //             'm.member_tied_shares',
+    //             'm.member_tied_shares_self',
+    //             'm.member_active',
+    //             'm.member_deleted'
+    //         )
+    //         ->where('g.guarantors_loan_batch_trans_id', $batchTransId)
+    //         ->where('g.guarantors_deleted', '<>', 'Y')
+    //         ->get();
+
+    //     foreach ($existingGuarantors as $existingGuarantor) {
+    //         if (
+    //             empty($existingGuarantor->member_id)
+    //             || $existingGuarantor->member_active !== 'Y'
+    //             || $existingGuarantor->member_deleted === 'Y'
+    //         ) {
+    //             $nmsg .= "Error: One of the existing guarantors is missing or inactive. ";
+    //             continue;
+    //         }
+
+    //         $guarantorId = (int) $existingGuarantor->member_id;
+    //         $guarantorName = trim((string) $existingGuarantor->member_name);
+    //         $guarantorAmount = round((float) $existingGuarantor->guarantors_amount_guaranteed, 2);
+
+    //         if (in_array($guarantorId, $seenGuarantorIds, true)) {
+    //             $nmsg .= "Error: Guarantor {$guarantorName} appears more than once on this loan. ";
+    //             continue;
+    //         }
+
+    //         $isLockedByAnotherPendingLoan = DB::table('sacco_loan_batch_guarantors_members as g')
+    //             ->join('sacco_loan_batch_trans_members as t', 'g.guarantors_loan_batch_trans_id', '=', 't.batch_trans_id')
+    //             ->where('g.guarantors_guarantor_id', $guarantorId)
+    //             ->where('g.guarantors_deleted', '<>', 'Y')
+    //             ->where('t.batch_trans_deleted', '<>', 'Y')
+    //             ->where('t.batch_trans_updated', 'N')
+    //             ->where('t.batch_trans_id', '<>', $batchTransId)
+    //             ->exists();
+
+    //         if ($isLockedByAnotherPendingLoan) {
+    //             $nmsg .= "Error: Guarantor {$guarantorName} is already attached to another pending loan application and cannot be reused now. ";
+    //             continue;
+    //         }
+
+    //         if ($memberId !== $guarantorId) {
+    //             $availableShares = ((float) $existingGuarantor->member_total_share * $maxGuarantorFactor)
+    //                 - (float) $existingGuarantor->member_tied_shares;
+
+    //             if ($availableShares < $guarantorAmount) {
+    //                 $nmsg .= "Error: Guarantor {$guarantorName} does not have enough free shares to guarantee this amount. ";
+    //                 continue;
+    //             }
+    //         } else {
+    //             $availableSelfShares = ((float) $existingGuarantor->member_total_share * $maxGuarantorFactorSelf)
+    //                 - (float) $existingGuarantor->member_tied_shares_self;
+
+    //             if ($availableSelfShares < $guarantorAmount) {
+    //                 $nmsg .= "Error: Guarantor {$guarantorName} does not have enough free shares to self-guarantee this amount. ";
+    //                 continue;
+    //             }
+    //         }
+
+    //         $seenGuarantorIds[] = $guarantorId;
+
+    //         $guarantors[] = [
+    //             'id' => $guarantorId,
+    //             'name' => $guarantorName,
+    //             'member_sacco_id' => (string) $existingGuarantor->member_sacco_id,
+    //             'amount' => $guarantorAmount,
+    //             'existing_guarantors_id' => (int) $existingGuarantor->guarantors_id,
+    //         ];
+
+    //         $totalGuaranteed += $guarantorAmount;
+    //     }
+
+    //     /*
+    // |--------------------------------------------------------------------------
+    // | 2. Validate newly added guarantors
+    // |--------------------------------------------------------------------------
+    // */
+    //     for ($i = 0; $i < $maximumNoOfGuarantors; $i++) {
+    //         $guarantorName = trim((string) ($data['guarantors'][$i]['name'] ?? ''));
+    //         $guarantorAmount = !empty($data['guarantors'][$i]['amount'])
+    //             ? round((float) $data['guarantors'][$i]['amount'], 2)
+    //             : 0.00;
+
+    //         if ($guarantorName === '' && $guarantorAmount <= 0) {
+    //             continue;
+    //         }
+
+    //         if ($guarantorName === '') {
+    //             $nmsg .= "Error: Missing guarantor name on row " . ($i + 1) . ". ";
+    //             continue;
+    //         }
+
+    //         if ($guarantorAmount <= 0) {
+    //             $nmsg .= "Error: Guarantor amount for {$guarantorName} must be greater than zero. ";
+    //             continue;
+    //         }
+
+    //         $nameParts = explode(' - (', $guarantorName);
+    //         $memberName = trim($nameParts[0] ?? '');
+    //         $memberSaccoId = trim(isset($nameParts[1]) ? rtrim($nameParts[1], ") \t\n\r\0\x0B") : '');
+
+    //         if ($memberName === '' || $memberSaccoId === '') {
+    //             $nmsg .= "Error: Guarantor {$guarantorName} is not in the expected format. ";
+    //             continue;
+    //         }
+
+    //         $guarantor = DB::table('sacco_members')
+    //             ->where('member_name', $memberName)
+    //             ->where('member_sacco_id', $memberSaccoId)
+    //             ->where('member_active', 'Y')
+    //             ->where('member_deleted', '<>', 'Y')
+    //             ->first();
+
+    //         if (!$guarantor) {
+    //             $nmsg .= "Error: Guarantor {$guarantorName} not found or inactive. ";
+    //             continue;
+    //         }
+
+    //         if (in_array((int) $guarantor->member_id, $seenGuarantorIds, true)) {
+    //             $nmsg .= "Error: Guarantor {$guarantorName} has already been added to this same loan. ";
+    //             continue;
+    //         }
+
+    //         $isLockedByAnotherPendingLoan = DB::table('sacco_loan_batch_guarantors_members as g')
+    //             ->join('sacco_loan_batch_trans_members as t', 'g.guarantors_loan_batch_trans_id', '=', 't.batch_trans_id')
+    //             ->where('g.guarantors_guarantor_id', (int) $guarantor->member_id)
+    //             ->where('g.guarantors_deleted', '<>', 'Y')
+    //             ->where('t.batch_trans_deleted', '<>', 'Y')
+    //             ->where('t.batch_trans_updated', 'N')
+    //             ->where('t.batch_trans_id', '<>', $batchTransId)
+    //             ->exists();
+
+    //         if ($isLockedByAnotherPendingLoan) {
+    //             $nmsg .= "Error: Guarantor {$guarantorName} is already attached to another pending loan application and cannot be reused now. ";
+    //             continue;
+    //         }
+
+    //         if ($memberId != (int) $guarantor->member_id) {
+    //             $availableShares = ((float) $guarantor->member_total_share * $maxGuarantorFactor)
+    //                 - (float) $guarantor->member_tied_shares;
+
+    //             if ($availableShares < $guarantorAmount) {
+    //                 $nmsg .= "Error: Guarantor {$guarantorName} does not have enough free shares to guarantee this amount. ";
+    //                 continue;
+    //             }
+    //         } else {
+    //             $availableSelfShares = ((float) $guarantor->member_total_share * $maxGuarantorFactorSelf)
+    //                 - (float) $guarantor->member_tied_shares_self;
+
+    //             if ($availableSelfShares < $guarantorAmount) {
+    //                 $nmsg .= "Error: Guarantor {$guarantorName} does not have enough free shares to self-guarantee this amount. ";
+    //                 continue;
+    //             }
+    //         }
+
+    //         $seenGuarantorIds[] = (int) $guarantor->member_id;
+
+    //         $guarantors[] = [
+    //             'id' => (int) $guarantor->member_id,
+    //             'name' => (string) $guarantor->member_name,
+    //             'member_sacco_id' => (string) $guarantor->member_sacco_id,
+    //             'amount' => $guarantorAmount,
+    //             'existing_guarantors_id' => null,
+    //         ];
+
+    //         $totalGuaranteed += $guarantorAmount;
+    //     }
+
+    //     /*
+    // |--------------------------------------------------------------------------
+    // | 3. Enforce maximum combined guarantors
+    // |--------------------------------------------------------------------------
+    // */
+    //     if (count($guarantors) > $maximumNoOfGuarantors) {
+    //         $nmsg .= "Error: Total guarantors on this loan cannot exceed {$maximumNoOfGuarantors}. ";
+    //     }
+
+    //     /*
+    // |--------------------------------------------------------------------------
+    // | 4. Validate required guarantee and prorate combined set if necessary
+    // |--------------------------------------------------------------------------
+    // */
+    //     $requiredGuarantee = round(
+    //         $loanAmount * ((float) ($loanType->loan_type_guaranteable_percent ?? 0)) / 100,
+    //         2
+    //     );
+
+    //     if ((float) ($loanType->loan_type_guaranteable_percent ?? 0) > 0) {
+    //         if (empty($guarantors)) {
+    //             $nmsg .= "Error: This loan requires guarantors. ";
+    //         } elseif ($requiredGuarantee > $totalGuaranteed) {
+    //             $nmsg .= "Error: This loan application is under-guaranteed. Total guaranteed must be at least {$requiredGuarantee}. ";
+    //         } elseif ($totalGuaranteed > $requiredGuarantee) {
+    //             $gFactor = $requiredGuarantee / $totalGuaranteed;
+
+    //             foreach ($guarantors as $idx => $guarantor) {
+    //                 $guarantors[$idx]['amount'] = round($guarantor['amount'] * $gFactor, 2);
+    //             }
+
+    //             $proratedTotal = round(array_sum(array_column($guarantors, 'amount')), 2);
+
+    //             if (!empty($guarantors) && $proratedTotal != $requiredGuarantee) {
+    //                 $difference = round($requiredGuarantee - $proratedTotal, 2);
+    //                 $lastIndex = count($guarantors) - 1;
+    //                 $guarantors[$lastIndex]['amount'] = round($guarantors[$lastIndex]['amount'] + $difference, 2);
+    //             }
+
+    //             $totalGuaranteed = round(array_sum(array_column($guarantors, 'amount')), 2);
+    //         }
+    //     }
+
+    //     if (!empty($nmsg)) {
+    //         return [
+    //             'success' => false,
+    //             'message' => trim($nmsg),
+    //             'guarantors' => [],
+    //             'total_guaranteed' => 0,
+    //             'required_guarantee' => $requiredGuarantee,
+    //         ];
+    //     }
+
+    //     return [
+    //         'success' => true,
+    //         'message' => 'Guarantors validated successfully.',
+    //         'guarantors' => $guarantors,
+    //         'total_guaranteed' => round($totalGuaranteed, 2),
+    //         'required_guarantee' => $requiredGuarantee,
+    //     ];
+    // }
     public function deleteGuarantor(Request $request, $id)
     {
         $isApiRequest = $request->expectsJson()
@@ -1715,20 +2065,20 @@ private function validateFreshGuarantorsForEdit(
             }
 
             $guarantorCheck = $this->validateAndProcessGuarantors(
-    array_merge($request->all(), [
-        'batch_trans_member_id' => $trustedMemberId,
-    ]),
-    $loanType,
-    $batchTransId,
-    $loanAmount
-);
+                array_merge($request->all(), [
+                    'batch_trans_member_id' => $trustedMemberId,
+                ]),
+                $loanType,
+                $batchTransId,
+                $loanAmount
+            );
 
-if (!$guarantorCheck['success']) {
-    DB::rollBack();
-    return $respondError(trim($guarantorCheck['message']), 422, [
-        'guarantors' => [trim($guarantorCheck['message'])],
-    ]);
-}
+            if (!$guarantorCheck['success']) {
+                DB::rollBack();
+                return $respondError(trim($guarantorCheck['message']), 422, [
+                    'guarantors' => [trim($guarantorCheck['message'])],
+                ]);
+            }
 
             /*
 |--------------------------------------------------------------------------
@@ -1837,169 +2187,390 @@ if (!$guarantorCheck['success']) {
             return $respondError('Failed to process loan application. ' . $e->getMessage(), 500);
         }
     }
-    private function validateAndProcessGuarantors($data, $loanType, $batch_trans_id, $loanAmount)
-{
-    $nmsg = "";
-    $guarantors = [];
-    $totalGuaranteed = 0;
+    private function validateAndProcessGuarantors($data, $loanType, $batchTransId, $loanAmount, bool $saveGuarantors = true)
+    {
+        $nmsg = '';
+        $desiredGuarantors = [];
+        $totalGuaranteed = 0.00;
+        $seenGuarantorIds = [];
 
-    $maximumNoOfGuarantors = DB::table('sacco_defaults')
-        ->where('default_name', 'maximum_no_of_guarantors')
-        ->value('default_value') ?? 3;
+        $maximumNoOfGuarantors = (int) (
+            DB::table('sacco_defaults')
+            ->where('default_name', 'maximum_no_of_guarantors')
+            ->value('default_value') ?? 3
+        );
 
-    $max_guarantor_factor = DB::table('sacco_defaults')
-        ->where('default_name', 'max_guarantor_factor')
-        ->value('default_value') ?? 1;
+        foreach (['max_guarantor_factor', 'max_guarantor_factor_self'] as $defaultName) {
+            $exists = DB::table('sacco_defaults')
+                ->where('default_name', $defaultName)
+                ->exists();
 
-    $existingGuarantors = DB::table('sacco_loan_batch_guarantors_members')
-        ->where('guarantors_loan_batch_trans_id', $batch_trans_id)
-        ->where('guarantors_deleted', '<>', 'Y')
-        ->get();
-
-    $existingGuarantorIds = $existingGuarantors
-        ->pluck('guarantors_guarantor_id')
-        ->map(fn ($id) => (int) $id)
-        ->toArray();
-
-    $seenGuarantorIds = $existingGuarantorIds;
-
-    foreach ($existingGuarantors as $existingGuarantor) {
-        $totalGuaranteed += (float) $existingGuarantor->guarantors_amount_guaranteed;
-    }
-
-    for ($i = 0; $i < $maximumNoOfGuarantors; $i++) {
-        $guarantorName = trim((string) ($data['guarantors'][$i]['name'] ?? ''));
-        $guarantorAmount = !empty($data['guarantors'][$i]['amount'])
-            ? round((float) $data['guarantors'][$i]['amount'], 2)
-            : 0.00;
-
-        if ($guarantorName === '' && $guarantorAmount <= 0) {
-            continue;
+            if (!$exists) {
+                DB::table('sacco_defaults')->insert([
+                    'default_name' => $defaultName,
+                    'default_value' => 1,
+                    'default_transdate' => now(),
+                    'default_userid' => auth()->id(),
+                    'default_ip' => request()->ip(),
+                ]);
+            }
         }
 
-        if ($guarantorName === '') {
-            $nmsg .= "Error: Missing guarantor name on row " . ($i + 1) . ". ";
-            continue;
-        }
+        $maxGuarantorFactor = (float) (
+            DB::table('sacco_defaults')
+            ->where('default_name', 'max_guarantor_factor')
+            ->value('default_value') ?? 1
+        );
 
-        if ($guarantorAmount <= 0) {
-            $nmsg .= "Error: Guarantor amount for {$guarantorName} must be greater than zero. ";
-            continue;
-        }
+        $maxGuarantorFactorSelf = (float) (
+            DB::table('sacco_defaults')
+            ->where('default_name', 'max_guarantor_factor_self')
+            ->value('default_value') ?? 1
+        );
 
-        $nameParts = explode(" - (", $guarantorName);
-        $memberName = trim($nameParts[0] ?? '');
-        $memberSaccoId = trim(isset($nameParts[1]) ? rtrim($nameParts[1], ") \t\n\r\0\x0B") : '');
+        $borrowerMemberId = (int) ($data['batch_trans_member_id'] ?? 0);
 
-        $guarantor = DB::table('sacco_members')
-            ->where('member_name', $memberName)
-            ->where('member_sacco_id', $memberSaccoId)
-            ->where('member_active', 'Y')
-            ->where('member_deleted', '<>', 'Y')
-            ->first();
+        /*
+    |--------------------------------------------------------------------------
+    | Normalize web + API guarantor payloads into one structure
+    |--------------------------------------------------------------------------
+    */
+        $submittedRows = [];
 
-        if (!$guarantor) {
-            $nmsg .= "Error: Guarantor {$guarantorName} not found or inactive. ";
-            continue;
-        }
-
-        if (in_array((int) $guarantor->member_id, $seenGuarantorIds, true)) {
-            $nmsg .= "Error: Guarantor {$guarantorName} has already been added to this loan. ";
-            continue;
-        }
-
-        $isLockedByAnotherPendingLoan = DB::table('sacco_loan_batch_guarantors_members as g')
-            ->join('sacco_loan_batch_trans_members as t', 'g.guarantors_loan_batch_trans_id', '=', 't.batch_trans_id')
-            ->where('g.guarantors_guarantor_id', (int) $guarantor->member_id)
-            ->where('g.guarantors_deleted', '<>', 'Y')
-            ->where('t.batch_trans_deleted', '<>', 'Y')
-            ->where('t.batch_trans_updated', 'N')
-            ->where('t.batch_trans_id', '<>', $batch_trans_id)
-            ->exists();
-
-        if ($isLockedByAnotherPendingLoan) {
-            $nmsg .= "Error: Guarantor {$guarantorName} is already attached to another pending loan application and cannot be reused now. ";
-            continue;
-        }
-
-        if ((int) ($data['batch_trans_member_id'] ?? 0) != (int) $guarantor->member_id) {
-            if ((($guarantor->member_total_share * $max_guarantor_factor) - $guarantor->member_tied_shares) < $guarantorAmount) {
-                $nmsg .= "Error: Guarantor {$guarantorName} does not have enough free shares to guarantee this amount. ";
-                continue;
+        if (isset($data['guarantors']) && is_array($data['guarantors'])) {
+            foreach ($data['guarantors'] as $row) {
+                $submittedRows[] = [
+                    'name' => trim((string) ($row['name'] ?? '')),
+                    'amount' => !empty($row['amount'])
+                        ? round((float) str_replace(',', '', (string) $row['amount']), 2)
+                        : 0.00,
+                ];
             }
         } else {
-            if (($guarantor->member_total_share - $guarantor->member_tied_shares_self) < $guarantorAmount) {
-                $nmsg .= "Error: Guarantor {$guarantorName} does not have enough free shares to self-guarantee this amount. ";
+            $names = $data['guarantors_guarantor_name'] ?? [];
+            $amounts = $data['guarantors_amount_guaranteed'] ?? [];
+
+            for ($i = 0; $i < $maximumNoOfGuarantors; $i++) {
+                $submittedRows[] = [
+                    'name' => trim((string) ($names[$i] ?? '')),
+                    'amount' => !empty($amounts[$i])
+                        ? round((float) str_replace(',', '', (string) $amounts[$i]), 2)
+                        : 0.00,
+                ];
+            }
+        }
+
+        /*
+    |--------------------------------------------------------------------------
+    | Existing rows are only used if no guarantors are submitted.
+    | If the user submits guarantor rows, those rows become the new final list.
+    |--------------------------------------------------------------------------
+    */
+        $hasSubmittedGuarantors = collect($submittedRows)->contains(function ($row) {
+            return ($row['name'] ?? '') !== '' || (float) ($row['amount'] ?? 0) > 0;
+        });
+
+        if (!$hasSubmittedGuarantors) {
+            $existingRows = DB::table('sacco_loan_batch_guarantors_members as g')
+                ->join('sacco_members as m', 'g.guarantors_guarantor_id', '=', 'm.member_id')
+                ->select(
+                    'm.member_name',
+                    'm.member_sacco_id',
+                    'g.guarantors_amount_guaranteed'
+                )
+                ->where('g.guarantors_loan_batch_trans_id', $batchTransId)
+                ->whereRaw("COALESCE(g.guarantors_deleted, 'N') <> 'Y'")
+                ->get();
+
+            $submittedRows = $existingRows->map(function ($row) {
+                return [
+                    'name' => $row->member_name . ' - (' . $row->member_sacco_id . ')',
+                    'amount' => round((float) $row->guarantors_amount_guaranteed, 2),
+                ];
+            })->toArray();
+        }
+
+        foreach ($submittedRows as $index => $row) {
+            $guarantorName = trim((string) ($row['name'] ?? ''));
+            $guarantorAmount = round((float) ($row['amount'] ?? 0), 2);
+
+            if ($guarantorName === '' && $guarantorAmount <= 0) {
                 continue;
             }
+
+            if ($guarantorName === '') {
+                $nmsg .= 'Error: Missing guarantor name on row ' . ($index + 1) . '. ';
+                continue;
+            }
+
+            if ($guarantorAmount <= 0) {
+                $nmsg .= "Error: Guarantor amount for {$guarantorName} must be greater than zero. ";
+                continue;
+            }
+
+            $nameParts = explode(' - (', $guarantorName);
+            $memberName = trim($nameParts[0] ?? '');
+            $memberSaccoId = trim(isset($nameParts[1]) ? rtrim($nameParts[1], ") \t\n\r\0\x0B") : '');
+
+            if ($memberName === '' || $memberSaccoId === '') {
+                $nmsg .= "Error: Guarantor {$guarantorName} is not in the expected format MEMBER NAME - (SACCO ID). ";
+                continue;
+            }
+
+            $guarantor = DB::table('sacco_members')
+                ->where('member_name', $memberName)
+                ->where('member_sacco_id', $memberSaccoId)
+                ->where('member_active', 'Y')
+                ->where('member_deleted', '<>', 'Y')
+                ->first();
+
+            if (!$guarantor) {
+                $nmsg .= "Error: Guarantor {$guarantorName} not found or inactive. ";
+                continue;
+            }
+
+            $guarantorId = (int) $guarantor->member_id;
+
+            if (in_array($guarantorId, $seenGuarantorIds, true)) {
+                $nmsg .= "Error: Guarantor {$guarantorName} has already been added to this loan. ";
+                continue;
+            }
+
+            /*
+        |--------------------------------------------------------------------------
+        | Strict pending-lock rule
+        |--------------------------------------------------------------------------
+        | If the guarantor is already on another unprocessed application,
+        | block reuse completely.
+        |--------------------------------------------------------------------------
+        */
+            $isLockedByAnotherPendingLoan = DB::table('sacco_loan_batch_guarantors_members as g')
+                ->join('sacco_loan_batch_trans_members as t', 'g.guarantors_loan_batch_trans_id', '=', 't.batch_trans_id')
+                ->where('g.guarantors_guarantor_id', $guarantorId)
+                ->whereRaw("COALESCE(g.guarantors_deleted, 'N') <> 'Y'")
+                ->whereRaw("COALESCE(t.batch_trans_deleted, 'N') <> 'Y'")
+                ->whereRaw("COALESCE(t.batch_trans_updated, 'N') = 'N'")
+                ->where('t.batch_trans_id', '<>', $batchTransId)
+                ->exists();
+
+            if ($isLockedByAnotherPendingLoan) {
+                $nmsg .= "Error: Guarantor {$guarantorName} is already attached to another pending loan application and cannot be reused until that application is approved, rejected, or deleted. ";
+                continue;
+            }
+
+            /*
+        |--------------------------------------------------------------------------
+        | Pending exposure, excluding this current application
+        |--------------------------------------------------------------------------
+        */
+            $pendingGuaranteeAmount = DB::table('sacco_loan_batch_guarantors_members as g')
+                ->join('sacco_loan_batch_trans_members as t', 'g.guarantors_loan_batch_trans_id', '=', 't.batch_trans_id')
+                ->where('g.guarantors_guarantor_id', $guarantorId)
+                ->whereRaw("COALESCE(g.guarantors_deleted, 'N') <> 'Y'")
+                ->whereRaw("COALESCE(t.batch_trans_deleted, 'N') <> 'Y'")
+                ->whereRaw("COALESCE(t.batch_trans_updated, 'N') = 'N'")
+                ->where('t.batch_trans_id', '<>', $batchTransId)
+                ->sum('g.guarantors_amount_guaranteed');
+
+            if ($borrowerMemberId !== $guarantorId) {
+                $availableToGuarantee = (
+                    ((float) $guarantor->member_total_share * $maxGuarantorFactor)
+                    - (float) $guarantor->member_tied_shares
+                    - (float) $pendingGuaranteeAmount
+                );
+
+                if ($availableToGuarantee < $guarantorAmount) {
+                    $nmsg .= "Error: Guarantor {$guarantorName} does not have enough free shares. "
+                        . "Available guarantee capacity is " . number_format(max(0, $availableToGuarantee), 2)
+                        . ", requested guarantee is " . number_format($guarantorAmount, 2) . ". ";
+                    continue;
+                }
+            } else {
+                $pendingSelfGuaranteeAmount = DB::table('sacco_loan_batch_guarantors_members as g')
+                    ->join('sacco_loan_batch_trans_members as t', 'g.guarantors_loan_batch_trans_id', '=', 't.batch_trans_id')
+                    ->where('g.guarantors_guarantor_id', $guarantorId)
+                    ->where('t.batch_trans_member_id', $guarantorId)
+                    ->whereRaw("COALESCE(g.guarantors_deleted, 'N') <> 'Y'")
+                    ->whereRaw("COALESCE(t.batch_trans_deleted, 'N') <> 'Y'")
+                    ->whereRaw("COALESCE(t.batch_trans_updated, 'N') = 'N'")
+                    ->where('t.batch_trans_id', '<>', $batchTransId)
+                    ->sum('g.guarantors_amount_guaranteed');
+
+                $availableSelfGuarantee = (
+                    ((float) $guarantor->member_total_share * $maxGuarantorFactorSelf)
+                    - (float) $guarantor->member_tied_shares_self
+                    - (float) $pendingSelfGuaranteeAmount
+                );
+
+                if ($availableSelfGuarantee < $guarantorAmount) {
+                    $nmsg .= "Error: Guarantor {$guarantorName} does not have enough free shares to self-guarantee. "
+                        . "Available self-guarantee capacity is " . number_format(max(0, $availableSelfGuarantee), 2)
+                        . ", requested guarantee is " . number_format($guarantorAmount, 2) . ". ";
+                    continue;
+                }
+            }
+
+            $seenGuarantorIds[] = $guarantorId;
+
+            $desiredGuarantors[] = [
+                'id' => $guarantorId,
+                'name' => (string) $guarantor->member_name,
+                'member_sacco_id' => (string) $guarantor->member_sacco_id,
+                'amount' => $guarantorAmount,
+            ];
+
+            $totalGuaranteed += $guarantorAmount;
         }
 
-        $guarantors[] = [
-            'id' => (int) $guarantor->member_id,
-            'amount' => $guarantorAmount,
-        ];
-
-        $seenGuarantorIds[] = (int) $guarantor->member_id;
-        $totalGuaranteed += $guarantorAmount;
-    }
-
-    $batch_trans_loan_guaranteed = $loanAmount * $loanType->loan_type_guaranteable_percent / 100;
-
-    if ($loanType->loan_type_guaranteable_percent > 0) {
-        if ($batch_trans_loan_guaranteed > $totalGuaranteed) {
-            $nmsg .= "Error: This loan application is under-guaranteed. Total guaranteed must be at least {$batch_trans_loan_guaranteed}. ";
-        } elseif ($totalGuaranteed > $batch_trans_loan_guaranteed) {
-            $prorationFactor = $batch_trans_loan_guaranteed / $totalGuaranteed;
-            $proratedGuarantors = [];
-
-            foreach ($existingGuarantors as $existingGuarantor) {
-                $proratedGuarantors[] = [
-                    'id' => (int) $existingGuarantor->guarantors_guarantor_id,
-                    'amount' => round($existingGuarantor->guarantors_amount_guaranteed * $prorationFactor, 2),
-                ];
-            }
-
-            foreach ($guarantors as $guarantor) {
-                $proratedGuarantors[] = [
-                    'id' => (int) $guarantor['id'],
-                    'amount' => round($guarantor['amount'] * $prorationFactor, 2),
-                ];
-            }
-
-            $proratedTotal = array_sum(array_column($proratedGuarantors, 'amount'));
-
-            if ($proratedTotal != $batch_trans_loan_guaranteed && !empty($proratedGuarantors)) {
-                $difference = $batch_trans_loan_guaranteed - $proratedTotal;
-                $proratedGuarantors[count($proratedGuarantors) - 1]['amount'] += $difference;
-            }
-
-            $guarantors = $proratedGuarantors;
-        }
-    }
-
-    if (!empty($nmsg)) {
-        return ['success' => false, 'message' => $nmsg];
-    }
-
-    foreach ($guarantors as $guarantor) {
-        DB::table('sacco_loan_batch_guarantors_members')->updateOrInsert(
-            [
-                'guarantors_loan_batch_trans_id' => $batch_trans_id,
-                'guarantors_guarantor_id' => $guarantor['id'],
-            ],
-            [
-                'guarantors_amount_guaranteed' => $guarantor['amount'],
-                'guarantors_by' => auth()->id(),
-                'guarantors_ip' => request()->ip(),
-                'guarantors_deleted' => 'N',
-                'guarantors_approved' => 'N',
-                'guarantors_email_sent' => 'N',
-            ]
-        );
-    }
-
-    return ['success' => true, 'message' => 'Guarantors validated and updated successfully.'];
+if (count($desiredGuarantors) > $maximumNoOfGuarantors) {
+    $nmsg .= "Error: Total guarantors on this loan cannot exceed {$maximumNoOfGuarantors}. ";
 }
+
+$requiredGuarantee = round(
+    $loanAmount * ((float) ($loanType->loan_type_guaranteable_percent ?? 0)) / 100,
+    2
+);
+
+/*
+|--------------------------------------------------------------------------
+| Stop here if there are row-level guarantor errors
+|--------------------------------------------------------------------------
+| Example: locked guarantor, inactive guarantor, duplicate guarantor,
+| insufficient shares, invalid format, etc.
+|
+| This prevents confusing double messages like:
+| "Guarantor is already attached..." + "This loan requires guarantors."
+|--------------------------------------------------------------------------
+*/
+if (!empty($nmsg)) {
+    return [
+        'success' => false,
+        'message' => trim($nmsg),
+        'guarantors' => [],
+        'total_guaranteed' => 0,
+        'required_guarantee' => $requiredGuarantee,
+    ];
+}
+
+if ((float) ($loanType->loan_type_guaranteable_percent ?? 0) > 0) {
+    if (empty($desiredGuarantors)) {
+        $nmsg .= 'Error: This loan requires guarantors. ';
+    } elseif ($requiredGuarantee > $totalGuaranteed) {
+        $nmsg .= 'Error: This loan application is under-guaranteed. '
+            . 'Required guarantee is ' . number_format($requiredGuarantee, 2)
+            . ', but total submitted guarantee is ' . number_format($totalGuaranteed, 2) . '. ';
+    } elseif ($totalGuaranteed > $requiredGuarantee) {
+        $prorationFactor = $requiredGuarantee / $totalGuaranteed;
+
+        foreach ($desiredGuarantors as $idx => $guarantor) {
+            $desiredGuarantors[$idx]['amount'] = round($guarantor['amount'] * $prorationFactor, 2);
+        }
+
+        $proratedTotal = round(array_sum(array_column($desiredGuarantors, 'amount')), 2);
+
+        if (!empty($desiredGuarantors) && $proratedTotal != $requiredGuarantee) {
+            $difference = round($requiredGuarantee - $proratedTotal, 2);
+            $lastIndex = count($desiredGuarantors) - 1;
+            $desiredGuarantors[$lastIndex]['amount'] = round($desiredGuarantors[$lastIndex]['amount'] + $difference, 2);
+        }
+
+        $totalGuaranteed = round(array_sum(array_column($desiredGuarantors, 'amount')), 2);
+    }
+}
+
+
+        // if (count($desiredGuarantors) > $maximumNoOfGuarantors) {
+        //     $nmsg .= "Error: Total guarantors on this loan cannot exceed {$maximumNoOfGuarantors}. ";
+        // }
+
+        // $requiredGuarantee = round(
+        //     $loanAmount * ((float) ($loanType->loan_type_guaranteable_percent ?? 0)) / 100,
+        //     2
+        // );
+
+        // if ((float) ($loanType->loan_type_guaranteable_percent ?? 0) > 0) {
+        //     if (empty($desiredGuarantors)) {
+        //         $nmsg .= 'Error: This loan requires guarantors. ';
+        //     } elseif ($requiredGuarantee > $totalGuaranteed) {
+        //         $nmsg .= 'Error: This loan application is under-guaranteed. '
+        //             . 'Required guarantee is ' . number_format($requiredGuarantee, 2)
+        //             . ', but total submitted guarantee is ' . number_format($totalGuaranteed, 2) . '. ';
+        //     } elseif ($totalGuaranteed > $requiredGuarantee) {
+        //         $prorationFactor = $requiredGuarantee / $totalGuaranteed;
+
+        //         foreach ($desiredGuarantors as $idx => $guarantor) {
+        //             $desiredGuarantors[$idx]['amount'] = round($guarantor['amount'] * $prorationFactor, 2);
+        //         }
+
+        //         $proratedTotal = round(array_sum(array_column($desiredGuarantors, 'amount')), 2);
+
+        //         if (!empty($desiredGuarantors) && $proratedTotal != $requiredGuarantee) {
+        //             $difference = round($requiredGuarantee - $proratedTotal, 2);
+        //             $lastIndex = count($desiredGuarantors) - 1;
+        //             $desiredGuarantors[$lastIndex]['amount'] = round($desiredGuarantors[$lastIndex]['amount'] + $difference, 2);
+        //         }
+
+        //         $totalGuaranteed = round(array_sum(array_column($desiredGuarantors, 'amount')), 2);
+        //     }
+        // }
+
+        if (!empty($nmsg)) {
+            return [
+                'success' => false,
+                'message' => trim($nmsg),
+                'guarantors' => [],
+                'total_guaranteed' => 0,
+                'required_guarantee' => $requiredGuarantee,
+            ];
+        }
+
+        /*
+    |--------------------------------------------------------------------------
+    | Replace the current pending guarantors for this application
+    |--------------------------------------------------------------------------
+    | This resets approval because the applicant has submitted/changed the
+    | guarantee structure.
+    |--------------------------------------------------------------------------
+    */
+        if ($saveGuarantors) {
+            DB::table('sacco_loan_batch_guarantors_members')
+                ->where('guarantors_loan_batch_trans_id', $batchTransId)
+                ->whereRaw("COALESCE(guarantors_deleted, 'N') <> 'Y'")
+                ->update([
+                    'guarantors_deleted' => 'Y',
+                    'guarantors_deleted_by' => auth()->id(),
+                    'guarantors_deleted_on' => now(),
+                    'guarantors_deleted_ip' => request()->ip(),
+                ]);
+
+            foreach ($desiredGuarantors as $guarantor) {
+                DB::table('sacco_loan_batch_guarantors_members')->insert([
+                    'guarantors_loan_batch_trans_id' => $batchTransId,
+                    'guarantors_guarantor_id' => $guarantor['id'],
+                    'guarantors_amount_guaranteed' => round((float) $guarantor['amount'], 2),
+                    'guarantors_description' => 'Guarantor submitted via self-service loan application',
+                    'guarantors_transfered' => null,
+                    'guarantors_approved' => 'N',
+                    'guarantors_email_sent' => 'N',
+                    'guarantors_by' => auth()->id(),
+                    'guarantors_on' => now(),
+                    'guarantors_ip' => request()->ip(),
+                    'guarantors_deleted' => 'N',
+                    'guarantors_deleted_by' => null,
+                    'guarantors_deleted_on' => null,
+                    'guarantors_deleted_ip' => null,
+                ]);
+            }
+        }
+
+        return [
+            'success' => true,
+            'message' => 'Guarantors validated and saved successfully.',
+            'guarantors' => $desiredGuarantors,
+            'total_guaranteed' => round($totalGuaranteed, 2),
+            'required_guarantee' => $requiredGuarantee,
+        ];
+    }
 
     private function validateLoanParameters($loanAmount, $loanType, $loanDuration, $topUpLoan = null)
     {
