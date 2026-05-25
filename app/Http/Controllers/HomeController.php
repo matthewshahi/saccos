@@ -435,48 +435,194 @@ class HomeController extends Controller
             'pms_srch'   => $search,
         ]);
     }
-    private function getMembersListFiltered($orderby = 'member_name', $sort_order = 'asc', $search = '', $limit = null, $memberActive = null, $isJunior = null, $memberDeleted = null)
-    {
-        if (is_null($limit)) {
-            $limit = $this->recordLimit;
-        }
-
-        $query = DB::table('sacco_members')
-            ->join('sacco_department', 'sacco_members.member_dept', '=', 'sacco_department.department_id')
-            ->join('sacco_company', 'sacco_department.department_company_id', '=', 'sacco_company.company_id')
-            ->join('sacco_position', 'sacco_members.member_position', '=', 'sacco_position.position_id')
-            ->where(function ($query) use ($search) {
-                if (!empty($search)) {
-                    $search = '%' . $search . '%';
-                    $query->where('department_name', 'like', $search)
-                        ->orWhere('position_name', 'like', $search)
-                        ->orWhere('company_name', 'like', $search)
-                        ->orWhere('member_name', 'like', $search)
-                        ->orWhere('member_sacco_id', 'like', $search)
-                        ->orWhere('member_national_id', 'like', $search)
-                        ->orWhere('member_email', 'like', $search)
-                        ->orWhere('member_phone_no', 'like', $search);
-                }
-            });
-
-        // OPTIONAL filters (only apply if provided)
-        if (!is_null($memberActive) && $memberActive !== '') {
-            $query->where('sacco_members.member_active', '=', $memberActive); // Y/N
-        }
-
-        if (!is_null($isJunior) && $isJunior !== '') {
-            $query->where('sacco_members.member_is_junior', '=', (int) $isJunior); // 0/1
-        }
-
-        if (!is_null($memberDeleted) && $memberDeleted !== '') {
-            $query->where('sacco_members.member_deleted', '=', $memberDeleted); // Y/N
-        }
-
-        return $query->orderBy($orderby, $sort_order)
-            ->select('*')
-            ->limit($limit)
-            ->get();
+    private function getMembersListFiltered(
+    $orderby = 'member_name',
+    $sort_order = 'asc',
+    $search = '',
+    $limit = null,
+    $memberActive = null,
+    $isJunior = null,
+    $memberDeleted = null
+) {
+    if (is_null($limit)) {
+        $limit = $this->recordLimit;
     }
+
+    $search = trim((string) $search);
+    $normalizedSearch = preg_replace('/\s+/', ' ', $search);
+
+    /*
+     * Split name search into words.
+     * Example:
+     * "mwangi maina" => ["mwangi", "maina"]
+     * "maina peter mwangi" => ["maina", "peter", "mwangi"]
+     */
+    $nameTokens = [];
+    if ($normalizedSearch !== '') {
+        $nameTokens = preg_split('/\s+/', $normalizedSearch);
+
+        // Ignore very tiny noise words unless the whole search is short.
+        $nameTokens = array_values(array_filter($nameTokens, function ($word) use ($normalizedSearch) {
+            return strlen($word) >= 2 || strlen($normalizedSearch) <= 2;
+        }));
+    }
+
+    // Protect orderBy from request injection / wrong columns
+    $allowedOrderColumns = [
+        'member_name'        => 'sacco_members.member_name',
+        'member_sacco_id'    => 'sacco_members.member_sacco_id',
+        'member_national_id' => 'sacco_members.member_national_id',
+        'member_date_joined' => 'sacco_members.member_date_joined',
+        'company_name'       => 'sacco_company.company_name',
+        'department_name'    => 'sacco_department.department_name',
+        'position_name'      => 'sacco_position.position_name',
+        'member_active'      => 'sacco_members.member_active',
+    ];
+
+    $orderbyColumn = $allowedOrderColumns[$orderby] ?? 'sacco_members.member_name';
+    $sort_order = strtolower($sort_order) === 'desc' ? 'desc' : 'asc';
+
+    $query = DB::table('sacco_members')
+        ->join('sacco_department', 'sacco_members.member_dept', '=', 'sacco_department.department_id')
+        ->join('sacco_company', 'sacco_department.department_company_id', '=', 'sacco_company.company_id')
+        ->join('sacco_position', 'sacco_members.member_position', '=', 'sacco_position.position_id');
+
+    if ($normalizedSearch !== '') {
+        $likeSearch       = '%' . $normalizedSearch . '%';
+        $startsWithSearch = $normalizedSearch . '%';
+
+        $query->where(function ($q) use ($normalizedSearch, $likeSearch, $startsWithSearch, $nameTokens) {
+            // Normal field search
+            $q->where('sacco_members.member_sacco_id', 'like', $likeSearch)
+                ->orWhere('sacco_members.member_national_id', 'like', $likeSearch)
+                ->orWhere('sacco_members.member_phone_no', 'like', $likeSearch)
+                ->orWhere('sacco_members.member_email', 'like', $likeSearch)
+                ->orWhere('sacco_company.company_name', 'like', $likeSearch)
+                ->orWhere('sacco_department.department_name', 'like', $likeSearch)
+                ->orWhere('sacco_position.position_name', 'like', $likeSearch)
+
+                // Full name phrase search
+                ->orWhere('sacco_members.member_name', 'like', $likeSearch);
+
+            /*
+             * Smart name token search:
+             * This means all typed name words must appear somewhere in the name,
+             * regardless of order.
+             *
+             * Search: "mwangi maina"
+             * Matches: "MAINA MWANGI", "MWANGI PETER MAINA", etc.
+             */
+            if (count($nameTokens) >= 2) {
+                $q->orWhere(function ($nameQ) use ($nameTokens) {
+                    foreach ($nameTokens as $token) {
+                        $nameQ->where('sacco_members.member_name', 'like', '%' . $token . '%');
+                    }
+                });
+            }
+
+            /*
+             * Partial fallback:
+             * Useful where user types one name only.
+             */
+            if (count($nameTokens) === 1) {
+                $q->orWhere('sacco_members.member_name', 'like', '%' . $nameTokens[0] . '%');
+            }
+        });
+
+        /*
+         * Build dynamic SQL for "all name words exist".
+         * Example:
+         * member_name LIKE '%mwangi%' AND member_name LIKE '%maina%'
+         */
+        $allNameTokensSql = '';
+        $allNameTokensBindings = [];
+
+        if (count($nameTokens) >= 2) {
+            $allNameTokensSql = '(' . implode(' AND ', array_fill(0, count($nameTokens), 'sacco_members.member_name LIKE ?')) . ')';
+            foreach ($nameTokens as $token) {
+                $allNameTokensBindings[] = '%' . $token . '%';
+            }
+        }
+
+        $caseSql = "
+            CASE
+                WHEN sacco_members.member_sacco_id = ? THEN 1
+                WHEN sacco_members.member_national_id = ? THEN 2
+                WHEN sacco_members.member_phone_no = ? THEN 3
+
+                WHEN sacco_members.member_sacco_id LIKE ? THEN 4
+                WHEN sacco_members.member_national_id LIKE ? THEN 5
+                WHEN sacco_members.member_phone_no LIKE ? THEN 6
+
+                WHEN sacco_members.member_name = ? THEN 7
+                WHEN sacco_members.member_name LIKE ? THEN 8
+                WHEN sacco_members.member_name LIKE ? THEN 9
+        ";
+
+        $caseBindings = [
+            $normalizedSearch,
+            $normalizedSearch,
+            $normalizedSearch,
+
+            $startsWithSearch,
+            $startsWithSearch,
+            $startsWithSearch,
+
+            $normalizedSearch,
+            $startsWithSearch,
+            $likeSearch,
+        ];
+
+        if ($allNameTokensSql !== '') {
+            $caseSql .= " WHEN {$allNameTokensSql} THEN 10 ";
+            $caseBindings = array_merge($caseBindings, $allNameTokensBindings);
+        }
+
+        $caseSql .= "
+                WHEN sacco_company.company_name LIKE ? THEN 20
+                WHEN sacco_department.department_name LIKE ? THEN 21
+                WHEN sacco_position.position_name LIKE ? THEN 22
+                WHEN sacco_members.member_email LIKE ? THEN 23
+
+                ELSE 99
+            END ASC
+        ";
+
+        $caseBindings = array_merge($caseBindings, [
+            $likeSearch,
+            $likeSearch,
+            $likeSearch,
+            $likeSearch,
+        ]);
+
+        $query->orderByRaw($caseSql, $caseBindings);
+    }
+
+    // Optional filters
+    if (!is_null($memberActive) && $memberActive !== '') {
+        $query->where('sacco_members.member_active', '=', $memberActive);
+    }
+
+    if (!is_null($isJunior) && $isJunior !== '') {
+        $query->where('sacco_members.member_is_junior', '=', (int) $isJunior);
+    }
+
+    if (!is_null($memberDeleted) && $memberDeleted !== '') {
+        $query->where('sacco_members.member_deleted', '=', $memberDeleted);
+    }
+
+    return $query
+        ->orderBy($orderbyColumn, $sort_order)
+        ->orderBy('sacco_members.member_name', 'asc')
+        ->select(
+            'sacco_members.*',
+            'sacco_company.company_name',
+            'sacco_department.department_name',
+            'sacco_position.position_name'
+        )
+        ->limit($limit)
+        ->get();
+}
     public function membersActive($status, Request $request)
     {
         $orderby = $request->input('orderby', 'member_name');
