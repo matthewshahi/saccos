@@ -2344,71 +2344,77 @@ class LoanApplicationSelfServiceController extends Controller
         | block reuse completely.
         |--------------------------------------------------------------------------
         */
-            $isLockedByAnotherPendingLoan = DB::table('sacco_loan_batch_guarantors_members as g')
-                ->join('sacco_loan_batch_trans_members as t', 'g.guarantors_loan_batch_trans_id', '=', 't.batch_trans_id')
-                ->where('g.guarantors_guarantor_id', $guarantorId)
-                ->whereRaw("COALESCE(g.guarantors_deleted, 'N') <> 'Y'")
-                ->whereRaw("COALESCE(t.batch_trans_deleted, 'N') <> 'Y'")
-                ->whereRaw("COALESCE(t.batch_trans_updated, 'N') = 'N'")
-                ->where('t.batch_trans_id', '<>', $batchTransId)
-                ->exists();
-
-            if ($isLockedByAnotherPendingLoan) {
-                $nmsg .= "Error: Guarantor {$guarantorName} is already attached to another pending loan application and cannot be reused until that application is approved, rejected, or deleted. ";
-                continue;
-            }
-
             /*
-        |--------------------------------------------------------------------------
-        | Pending exposure, excluding this current application
-        |--------------------------------------------------------------------------
-        */
-            $pendingGuaranteeAmount = DB::table('sacco_loan_batch_guarantors_members as g')
-                ->join('sacco_loan_batch_trans_members as t', 'g.guarantors_loan_batch_trans_id', '=', 't.batch_trans_id')
-                ->where('g.guarantors_guarantor_id', $guarantorId)
-                ->whereRaw("COALESCE(g.guarantors_deleted, 'N') <> 'Y'")
-                ->whereRaw("COALESCE(t.batch_trans_deleted, 'N') <> 'Y'")
-                ->whereRaw("COALESCE(t.batch_trans_updated, 'N') = 'N'")
-                ->where('t.batch_trans_id', '<>', $batchTransId)
-                ->sum('g.guarantors_amount_guaranteed');
+|--------------------------------------------------------------------------
+| Capacity-based guarantee control
+|--------------------------------------------------------------------------
+| A guarantor may appear in more than one pending application, but the
+| system must subtract pending exposure from the correct guarantee pool:
+|
+| 1. Guarantees for other members use member_tied_shares
+| 2. Self-guarantees use member_tied_shares_self
+|--------------------------------------------------------------------------
+*/
 
-            if ($borrowerMemberId !== $guarantorId) {
-                $availableToGuarantee = (
-                    ((float) $guarantor->member_total_share * $maxGuarantorFactor)
-                    - (float) $guarantor->member_tied_shares
-                    - (float) $pendingGuaranteeAmount
-                );
+if ($borrowerMemberId !== $guarantorId) {
+    /*
+    |--------------------------------------------------------------------------
+    | Pending guarantees for OTHER members only
+    |--------------------------------------------------------------------------
+    */
+    $pendingOtherGuaranteeAmount = DB::table('sacco_loan_batch_guarantors_members as g')
+        ->join('sacco_loan_batch_trans_members as t', 'g.guarantors_loan_batch_trans_id', '=', 't.batch_trans_id')
+        ->where('g.guarantors_guarantor_id', $guarantorId)
+        ->where('t.batch_trans_member_id', '<>', $guarantorId)
+        ->whereRaw("COALESCE(g.guarantors_deleted, 'N') <> 'Y'")
+        ->whereRaw("COALESCE(t.batch_trans_deleted, 'N') <> 'Y'")
+        ->whereRaw("COALESCE(t.batch_trans_updated, 'N') = 'N'")
+        ->where('t.batch_trans_id', '<>', $batchTransId)
+        ->sum('g.guarantors_amount_guaranteed');
 
-                if ($availableToGuarantee < $guarantorAmount) {
-                    $nmsg .= "Error: Guarantor {$guarantorName} does not have enough free shares. "
-                        . "Available guarantee capacity is " . number_format(max(0, $availableToGuarantee), 2)
-                        . ", requested guarantee is " . number_format($guarantorAmount, 2) . ". ";
-                    continue;
-                }
-            } else {
-                $pendingSelfGuaranteeAmount = DB::table('sacco_loan_batch_guarantors_members as g')
-                    ->join('sacco_loan_batch_trans_members as t', 'g.guarantors_loan_batch_trans_id', '=', 't.batch_trans_id')
-                    ->where('g.guarantors_guarantor_id', $guarantorId)
-                    ->where('t.batch_trans_member_id', $guarantorId)
-                    ->whereRaw("COALESCE(g.guarantors_deleted, 'N') <> 'Y'")
-                    ->whereRaw("COALESCE(t.batch_trans_deleted, 'N') <> 'Y'")
-                    ->whereRaw("COALESCE(t.batch_trans_updated, 'N') = 'N'")
-                    ->where('t.batch_trans_id', '<>', $batchTransId)
-                    ->sum('g.guarantors_amount_guaranteed');
+    $availableToGuaranteeOthers = (
+        ((float) $guarantor->member_total_share * $maxGuarantorFactor)
+        - (float) $guarantor->member_tied_shares
+        - (float) $pendingOtherGuaranteeAmount
+    );
 
-                $availableSelfGuarantee = (
-                    ((float) $guarantor->member_total_share * $maxGuarantorFactorSelf)
-                    - (float) $guarantor->member_tied_shares_self
-                    - (float) $pendingSelfGuaranteeAmount
-                );
+    if ($availableToGuaranteeOthers < $guarantorAmount) {
+        $nmsg .= "Error: Guarantor {$guarantorName} does not have enough free shares to guarantee others. "
+            . "Available guarantee capacity is " . number_format(max(0, $availableToGuaranteeOthers), 2)
+            . ", pending guarantees for others are " . number_format((float) $pendingOtherGuaranteeAmount, 2)
+            . ", requested guarantee is " . number_format($guarantorAmount, 2) . ". ";
+        continue;
+    }
+} else {
+    /*
+    |--------------------------------------------------------------------------
+    | Pending SELF guarantees only
+    |--------------------------------------------------------------------------
+    */
+    $pendingSelfGuaranteeAmount = DB::table('sacco_loan_batch_guarantors_members as g')
+        ->join('sacco_loan_batch_trans_members as t', 'g.guarantors_loan_batch_trans_id', '=', 't.batch_trans_id')
+        ->where('g.guarantors_guarantor_id', $guarantorId)
+        ->where('t.batch_trans_member_id', $guarantorId)
+        ->whereRaw("COALESCE(g.guarantors_deleted, 'N') <> 'Y'")
+        ->whereRaw("COALESCE(t.batch_trans_deleted, 'N') <> 'Y'")
+        ->whereRaw("COALESCE(t.batch_trans_updated, 'N') = 'N'")
+        ->where('t.batch_trans_id', '<>', $batchTransId)
+        ->sum('g.guarantors_amount_guaranteed');
 
-                if ($availableSelfGuarantee < $guarantorAmount) {
-                    $nmsg .= "Error: Guarantor {$guarantorName} does not have enough free shares to self-guarantee. "
-                        . "Available self-guarantee capacity is " . number_format(max(0, $availableSelfGuarantee), 2)
-                        . ", requested guarantee is " . number_format($guarantorAmount, 2) . ". ";
-                    continue;
-                }
-            }
+    $availableSelfGuarantee = (
+        ((float) $guarantor->member_total_share * $maxGuarantorFactorSelf)
+        - (float) $guarantor->member_tied_shares_self
+        - (float) $pendingSelfGuaranteeAmount
+    );
+
+    if ($availableSelfGuarantee < $guarantorAmount) {
+        $nmsg .= "Error: Guarantor {$guarantorName} does not have enough free shares to self-guarantee. "
+            . "Available self-guarantee capacity is " . number_format(max(0, $availableSelfGuarantee), 2)
+            . ", pending self-guarantees are " . number_format((float) $pendingSelfGuaranteeAmount, 2)
+            . ", requested guarantee is " . number_format($guarantorAmount, 2) . ". ";
+        continue;
+    }
+}
 
             $seenGuarantorIds[] = $guarantorId;
 
