@@ -1,5 +1,14 @@
 @extends('layouts.app')
 
+@php
+    $saccoName = trim((string) ($defaultCompanyName ?? config('app.name', 'SACCO')));
+@endphp
+
+@section('seo_title', $saccoName . ' Member Login | SACCO Member Portal')
+
+@section('seo_description', $saccoName . ' member login portal for accessing SACCO savings, loans, statements, contributions and member services.')
+
+@section('robots', 'noindex, follow')
 @section('content')
 <style>
     body {
@@ -117,13 +126,29 @@
         </form>
 
         <div class="login-footer">
-            <div><strong>Need Help?</strong><br>
-                Call or WhatsApp: <a href="tel:{{ env('SACCO_SUPPORT') }}">{{ env('SACCO_SUPPORT') }}</a>
-            </div>
-            <div class="mt-2">
-                ERP provided by: <a href="https://shahi.co.ke" target="_blank">shahi.co.ke</a>
-            </div>
+    @if(!empty(env('SACCO_SUPPORT')))
+        <div>
+            <strong>Need Help?</strong><br>
+            Call or WhatsApp:
+            <a href="tel:{{ preg_replace('/\s+/', '', env('SACCO_SUPPORT')) }}">
+                {{ env('SACCO_SUPPORT') }}
+            </a>
         </div>
+    @endif
+
+    <div class="mt-2">
+        <span>iSacco system by</span>
+        <a href="https://shahi.co.ke" target="_blank" rel="noopener">
+            Shahi Services
+        </a>
+    </div>
+
+    <div style="font-size: 0.82rem; margin-top: 2px;">
+        <a href="https://shahi.co.ke" target="_blank" rel="noopener">
+            shahi.co.ke
+        </a>
+    </div>
+</div>
     </div>
 </div>
 
