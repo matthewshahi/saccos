@@ -68,12 +68,11 @@
         font-size: 13px; border-top: 1px solid rgba(102, 51, 153, 0.18);">
     <div style="color: rgba(102, 51, 153, 1); line-height: 1.45;">
         <div style="font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: rgba(102, 51, 153, 0.68);">
-            Portal support
+            Technology provider
         </div>
 
         <div style="font-size: 13px; color: #4b3f5c; font-weight: 600;">
-            Managed on <strong style="color: rgba(102, 51, 153, 1);">iSacco</strong>
-            by
+            iSacco system by
             <a href="https://shahi.co.ke"
                target="_blank"
                rel="noopener"
