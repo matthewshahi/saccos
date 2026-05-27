@@ -3,7 +3,7 @@
 @php
     $saccoName = trim((string) ($defaultCompanyName ?? config('app.name', 'SACCO')));
     $technologyProviderName = 'Shahi Services';
-    $technologyProviderUrl = 'https://shahiservices.com';
+    $technologyProviderUrl = 'https://shahi.co.ke';
 @endphp
 
 @section('seo_title', 'Apply to Join ' . $saccoName . ' Online | SACCO Membership Application')

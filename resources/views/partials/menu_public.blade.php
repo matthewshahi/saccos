@@ -63,14 +63,31 @@
         </div>
     </div>
 
-    <div class="support-contact p-2 d-flex justify-content-between align-items-center"
-        style="position: absolute; bottom: 0; left: 0; width: 100%; background: linear-gradient(to right, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.9)); 
-            font-size: 14px; border-top: 1px solid rgba(102, 51, 153, 0.2);">
-        <div style="font-size: 13px; color: rgba(102, 51, 153, 1); font-weight: 600;">
-            <strong>ERP provided by:</strong> <br> Shahi Services,
-            <a href="tel:+254722400737" style="text-decoration: none; color: rgba(102, 51, 153, 1); font-weight: bold;">
-                +254722400737
+    <div class="support-contact p-2"
+    style="position: absolute; bottom: 0; left: 0; width: 100%; background: linear-gradient(to right, rgba(255, 255, 255, 0.94), rgba(250, 248, 255, 0.94)); 
+        font-size: 13px; border-top: 1px solid rgba(102, 51, 153, 0.18);">
+    <div style="color: rgba(102, 51, 153, 1); line-height: 1.45;">
+        <div style="font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: rgba(102, 51, 153, 0.68);">
+            Portal support
+        </div>
+
+        <div style="font-size: 13px; color: #4b3f5c; font-weight: 600;">
+            Managed on <strong style="color: rgba(102, 51, 153, 1);">iSacco</strong>
+            by
+            <a href="https://shahi.co.ke"
+               target="_blank"
+               rel="noopener"
+               style="text-decoration: none; color: rgba(102, 51, 153, 1); font-weight: 800;">
+                Shahi Services
             </a>
         </div>
+
+        <a href="https://shahi.co.ke"
+           target="_blank"
+           rel="noopener"
+           style="display: inline-block; margin-top: 3px; text-decoration: none; color: rgba(102, 51, 153, 0.85); font-size: 12px; font-weight: 700;">
+            shahi.co.ke
+        </a>
     </div>
+</div>
 </div>
