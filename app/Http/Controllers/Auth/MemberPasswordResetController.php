@@ -334,10 +334,7 @@ class MemberPasswordResetController extends Controller
         $safeResetUrl = htmlspecialchars($resetUrl, ENT_QUOTES, 'UTF-8');
 
         $message = "
-            <p style='font-family: Arial, sans-serif; font-size: 15px; color: #333;'>
-                Dear {$safeName},
-            </p>
-
+            
             <p style='font-family: Arial, sans-serif; font-size: 15px; color: #333;'>
                 We received a request to reset the password for your SACCO member portal account.
             </p>
