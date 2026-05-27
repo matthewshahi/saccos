@@ -420,35 +420,30 @@
                 </p>
 
                 <div class="bank-feature-list">
-                    <div class="bank-feature-item">
-                        <div class="bank-feature-icon">✓</div>
-                        <div>
-                            <strong>Member self-service</strong>
-                            <span>View key SACCO account services from one secure portal.</span>
-                        </div>
-                    </div>
+    <div class="bank-feature-item">
+        <div class="bank-feature-icon">✓</div>
+        <div>
+            <strong>Member self-service</strong>
+            <span>View key SACCO account services from one secure portal.</span>
+        </div>
+    </div>
 
-                    <div class="bank-feature-item">
-                        <div class="bank-feature-icon"> from one secure portal.</span>
-                        </div>
-                    </div>
+    <div class="bank-feature-item">
+        <div class="bank-feature-icon">✓</div>
+        <div>
+            <strong>Savings and loans access</strong>
+            <span>Check contributions, loan records and member account information.</span>
+        </div>
+    </div>
 
-                    <div class="bank-feature-item">
-                        <div class="bank-feature-icon">✓</div>
-                        <div>
-                            <strong>Savings and loans access</strong>
-                            <span>Check contributions, loan records and member account information.</span>
-                        </div>
-                    </div>
-
-                    <div class="bank-feature-item">
-                        <div class="bank-feature-icon">✓</div>
-                        <div>
-                            <strong>Protected sign-in</strong>
-                            <span>Your login is protected by account validation and security checks.</span>
-                        </div>
-                    </div>
-                </div>
+    <div class="bank-feature-item">
+        <div class="bank-feature-icon">✓</div>
+        <div>
+            <strong>Protected sign-in</strong>
+            <span>Your login is protected by account validation and security checks.</span>
+        </div>
+    </div>
+</div>
             </div>
 
             <div class="bank-brand-footer">
