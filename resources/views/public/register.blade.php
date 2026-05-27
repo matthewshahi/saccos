@@ -1,10 +1,76 @@
 @extends('layouts.app')
 
+@php
+    $saccoName = trim((string) ($defaultCompanyName ?? config('app.name', 'SACCO')));
+    $technologyProviderName = 'Shahi Services';
+    $technologyProviderUrl = 'https://shahiservices.com';
+@endphp
+
+@section('seo_title', 'Apply to Join ' . $saccoName . ' Online | SACCO Membership Application')
+
+@section('seo_description', 'Apply online to join ' . $saccoName . '. Complete your SACCO membership application, submit personal details, next of kin information, supporting documents and registration details through a secure portal powered by Shahi Services.')
+
+@section('canonical_url', url()->current())
+
+@section('seo_schema')
+<script type="application/ld+json">
+{!! json_encode([
+    '@context' => 'https://schema.org',
+    '@graph' => [
+        [
+            '@type' => 'WebPage',
+            '@id' => url()->current() . '#webpage',
+            'url' => url()->current(),
+            'name' => 'Apply to Join ' . $saccoName . ' Online',
+            'description' => 'Online SACCO membership application page for ' . $saccoName . ', powered by Shahi Services.',
+            'inLanguage' => 'en-KE',
+            'about' => [
+                '@id' => url()->current() . '#sacco',
+            ],
+            'provider' => [
+                '@id' => $technologyProviderUrl . '#organization',
+            ],
+        ],
+        [
+            '@type' => 'FinancialService',
+            '@id' => url()->current() . '#sacco',
+            'name' => $saccoName,
+            'url' => url()->current(),
+            'areaServed' => [
+                '@type' => 'Country',
+                'name' => 'Kenya',
+            ],
+            'serviceType' => 'SACCO membership application',
+        ],
+        [
+            '@type' => 'Organization',
+            '@id' => $technologyProviderUrl . '#organization',
+            'name' => $technologyProviderName,
+            'url' => $technologyProviderUrl,
+            'description' => 'Technology provider supporting SACCO digital registration, member management, savings, loans, guarantors and account services.',
+        ],
+    ],
+], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) !!}
+</script>
+@endsection
+
 @section('content')
 <div class="breadcrumb d-flex justify-content-between align-items-center">
-    <h1>New Member Registration / Application</h1>
+    <h1>Apply to Join {{ $saccoName }}</h1>
 </div>
-<div class="separator-breadcrumb border-top"></div>
+<div class="card mb-4 border-0 shadow-sm">
+    <div class="card-body">
+        <h2 class="h5 text-primary mb-2">Online SACCO Membership Application</h2>
+
+        <p class="text-muted mb-2">
+            This is the online membership application page for
+            <strong>{{ $saccoName }}</strong>. Please complete the form below with accurate personal details,
+            contact information, next of kin or nominee details, supporting documents and registration information.
+        </p>
+
+       
+    </div>
+</div>
 
 @if(session('success'))
     <div class="alert alert-success alert-dismissible fade show" role="alert">
@@ -30,10 +96,11 @@
 
 <div class="card mb-4">
     <div class="card-body">
-        <h4 class="card-title text-primary">Register as a Member</h4>
-        <p class="text-muted">
-        Please fill in the form below to apply for SACCO membership. Ensure all details are accurate. 
-        </p>
+        <h4 class="card-title text-primary">Register as a Member of {{ $saccoName }}</h4>
+<p class="text-muted">
+    Please fill in the form below to apply for membership with {{ $saccoName }}.
+    Ensure all details are accurate before submitting your SACCO application.
+</p>
         <form action="{{ route('register.submit') }}" method="POST" enctype="multipart/form-data" id="registration-form">
     @csrf
         
