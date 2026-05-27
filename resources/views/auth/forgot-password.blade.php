@@ -1,25 +1,286 @@
-<x-guest-layout>
-    <div class="mb-4 text-sm text-gray-600">
-        {{ __('Forgot your password? No problem. Just let us know your email address and we will email you a password reset link that will allow you to choose a new one.') }}
+@extends('layouts.app')
+
+@php
+    $saccoName = trim((string) ($defaultCompanyName ?? config('app.name', 'SACCO')));
+@endphp
+
+@section('seo_title', 'Forgot Password | ' . $saccoName . ' Member Portal')
+@section('seo_description', 'Reset your ' . $saccoName . ' SACCO member portal password securely.')
+@section('robots', 'noindex, follow')
+
+@section('content')
+<style>
+    body {
+        background:
+            radial-gradient(circle at top left, rgba(100, 58, 40, 0.12), transparent 35%),
+            linear-gradient(135deg, #f8f4f1 0%, #f3ede8 45%, #ffffff 100%);
+        min-height: 100vh;
+        min-height: 100svh;
+        margin: 0;
+    }
+
+    .reset-page {
+        min-height: 100vh;
+        min-height: 100svh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 18px;
+    }
+
+    .reset-card {
+        width: 100%;
+        max-width: 480px;
+        background: #ffffff;
+        border-radius: 22px;
+        box-shadow: 0 18px 48px rgba(45, 27, 20, 0.14);
+        border: 1px solid rgba(100, 58, 40, 0.08);
+        padding: 26px 20px;
+    }
+
+    .reset-badge {
+        display: inline-flex;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: rgba(100, 58, 40, 0.08);
+        color: #643A28;
+        font-size: 10px;
+        font-weight: 900;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+        margin-bottom: 14px;
+    }
+
+    .reset-title {
+        font-size: 24px;
+        font-weight: 900;
+        color: #241913;
+        letter-spacing: -0.03em;
+        margin-bottom: 8px;
+        line-height: 1.15;
+    }
+
+    .reset-text {
+        color: #756760;
+        font-size: 13px;
+        line-height: 1.65;
+        margin-bottom: 22px;
+    }
+
+    .reset-form-group {
+        margin-bottom: 15px;
+    }
+
+    .reset-form-group label {
+        display: block;
+        font-size: 13px;
+        font-weight: 800;
+        color: #3d2b23;
+        margin-bottom: 7px;
+    }
+
+    .reset-form-group .form-control {
+        width: 100%;
+        height: 50px;
+        border-radius: 14px;
+        border: 1px solid rgba(100, 58, 40, 0.16);
+        background: #ffffff;
+        color: #2d211c;
+        font-size: 14px;
+        padding: 12px 14px;
+    }
+
+    .reset-form-group .form-control:focus {
+        border-color: rgba(100, 58, 40, 0.72);
+        box-shadow: 0 0 0 4px rgba(100, 58, 40, 0.10);
+        outline: none;
+    }
+
+    .reset-btn {
+        width: 100%;
+        height: 50px;
+        border-radius: 14px;
+        background: linear-gradient(135deg, #643A28, #4f2e20);
+        border: none;
+        color: #ffffff;
+        font-weight: 900;
+        font-size: 15px;
+        box-shadow: 0 12px 28px rgba(100, 58, 40, 0.24);
+    }
+
+    .reset-btn:hover {
+        color: #ffffff;
+        box-shadow: 0 16px 34px rgba(100, 58, 40, 0.30);
+    }
+
+    .reset-btn:disabled {
+        opacity: .75;
+        cursor: not-allowed;
+    }
+
+    .security-note {
+        margin-top: 16px;
+        padding: 12px 14px;
+        border-radius: 14px;
+        background: #faf6f3;
+        border: 1px solid rgba(0, 0, 0, 0.05);
+        color: #756760;
+        font-size: 12px;
+        line-height: 1.55;
+    }
+
+    .reset-footer {
+        margin-top: 18px;
+        text-align: center;
+        font-size: 13px;
+    }
+
+    .reset-footer a {
+        color: #643A28;
+        font-weight: 800;
+        text-decoration: none;
+    }
+
+    .reset-footer a:hover {
+        text-decoration: underline;
+    }
+
+    @media (min-width: 576px) {
+        .reset-page {
+            padding: 34px 18px;
+        }
+
+        .reset-card {
+            padding: 34px;
+            border-radius: 24px;
+            box-shadow: 0 24px 70px rgba(45, 27, 20, 0.16);
+        }
+
+        .reset-title {
+            font-size: 28px;
+        }
+
+        .reset-text {
+            font-size: 14px;
+        }
+    }
+
+    @media (max-width: 360px) {
+        .reset-page {
+            padding: 10px;
+        }
+
+        .reset-card {
+            padding: 22px 16px;
+            border-radius: 18px;
+        }
+
+        .reset-title {
+            font-size: 22px;
+        }
+    }
+</style>
+
+<div class="reset-page">
+    <div class="reset-card">
+        <div class="reset-badge">Password Assistance</div>
+
+        <div class="reset-title">Reset your password</div>
+
+        <p class="reset-text">
+            Enter your SACCO member number or account number together with your registered email address.
+            If the details match an active account, reset instructions will be sent to your email.
+        </p>
+
+        @if(session('status'))
+            <div class="alert alert-success">
+                {{ session('status') }}
+            </div>
+        @endif
+
+        @if($errors->any())
+            <div class="alert alert-danger">
+                {{ $errors->first() }}
+            </div>
+        @endif
+
+        <form method="POST" action="{{ route('member.password.email') }}" id="forgotPasswordForm">
+            @csrf
+
+            <div class="reset-form-group">
+                <label for="account_number">Member Number / Account Number</label>
+                <input type="text"
+                       name="account_number"
+                       id="account_number"
+                       class="form-control"
+                       placeholder="Enter your member or account number"
+                       value="{{ old('account_number') }}"
+                       autocomplete="username"
+                       inputmode="text"
+                       required>
+            </div>
+
+            <div class="reset-form-group">
+                <label for="email">Registered Email Address</label>
+                <input type="email"
+                       name="email"
+                       id="email"
+                       class="form-control"
+                       placeholder="Enter your registered email"
+                       value="{{ old('email') }}"
+                       autocomplete="email"
+                       inputmode="email"
+                       required>
+            </div>
+
+            <input type="hidden" name="recaptcha_token" id="recaptcha_token">
+
+            <button type="submit" class="reset-btn" id="resetBtn">
+                Send Reset Instructions
+            </button>
+        </form>
+
+        <div class="security-note">
+            For your protection, we do not confirm whether the member number or email exists.
+        </div>
+
+        <div class="reset-footer">
+            <a href="{{ route('login') }}">Back to member login</a>
+        </div>
     </div>
+</div>
 
-    <!-- Session Status -->
-    <x-auth-session-status class="mb-4" :status="session('status')" />
+<script src="https://www.google.com/recaptcha/api.js?render={{ config('services.recaptcha.site_key') }}"></script>
+<script>
+(function() {
+    const SITE_KEY = "{{ config('services.recaptcha.site_key') }}";
+    const form = document.getElementById('forgotPasswordForm');
+    const tokenInput = document.getElementById('recaptcha_token');
+    const submitBtn = document.getElementById('resetBtn');
 
-    <form method="POST" action="{{ route('password.email') }}">
-        @csrf
+    form.addEventListener('submit', function(e) {
+        if (typeof grecaptcha === 'undefined') {
+            return;
+        }
 
-        <!-- Email Address -->
-        <div>
-            <x-input-label for="email" :value="__('Email')" />
-            <x-text-input id="email" class="block mt-1 w-full" type="email" name="email" :value="old('email')" required autofocus />
-            <x-input-error :messages="$errors->get('email')" class="mt-2" />
-        </div>
+        if (tokenInput.value) {
+            return;
+        }
 
-        <div class="flex items-center justify-end mt-4">
-            <x-primary-button>
-                {{ __('Email Password Reset Link') }}
-            </x-primary-button>
-        </div>
-    </form>
-</x-guest-layout>
+        e.preventDefault();
+        submitBtn.disabled = true;
+        submitBtn.innerText = 'Checking security...';
+
+        grecaptcha.ready(function() {
+            grecaptcha.execute(SITE_KEY, { action: 'password_request' }).then(function(token) {
+                tokenInput.value = token;
+                form.submit();
+            }).catch(function() {
+                submitBtn.disabled = false;
+                submitBtn.innerText = 'Send Reset Instructions';
+            });
+        });
+    });
+})();
+</script>
+@endsection

@@ -68,6 +68,8 @@ use App\Http\Controllers\PayrollDeductionsImportController;
 use App\Http\Controllers\MpesaStatementReconciliationController;
 
 use App\Http\Controllers\MinimumCapitalContributionController; 
+use App\Http\Controllers\Auth\MemberPasswordResetController;
+
 /* good imports
 Route::prefix('kass')->group(function () {
     Route::get('/member-master-import', [KassMemberMasterImportController::class, 'index'])->name('kass.member_master_import.index');
@@ -267,6 +269,23 @@ Route::get('/', [HomeController::class, 'redirectBasedOnAuth'])->name('home1');
 Route::get('login', [CustomAuthController::class, 'showLoginForm'])->name('login');
 Route::post('login', [CustomAuthController::class, 'login']);
 Route::post('logout', [CustomAuthController::class, 'logout'])->name('logout');
+
+
+
+Route::get('/forgot-password', [MemberPasswordResetController::class, 'showForgotForm'])
+    ->name('member.password.request');
+
+Route::post('/forgot-password', [MemberPasswordResetController::class, 'sendResetInstructions'])
+    ->name('member.password.email')
+    ->middleware('throttle:6,1');
+
+Route::get('/reset-password/{token}', [MemberPasswordResetController::class, 'showResetForm'])
+    ->name('member.password.reset');
+
+Route::post('/reset-password', [MemberPasswordResetController::class, 'resetPassword'])
+    ->name('member.password.update')
+    ->middleware('throttle:6,1');
+
 Route::get('/loans/calculator', [HomeController::class, 'loansCalculator'])->name('loans.calculator');
 
 Route::get('/register', [PublicRegistrationController::class, 'showForm'])->name('register.form');

@@ -283,59 +283,63 @@
 </head>
 
 <body class="text-start">
-    @include('partials.period_alert')
-    @include('partials.password_change')
+    @php
+        $routeName = Route::currentRouteName();
 
+        /*
+         * Auth/public utility screens should not show sidebar/header menus.
+         * These pages need a clean banking-style standalone layout.
+         */
+        $isAuthScreen = in_array($routeName, [
+            'login',
+            'member.password.request',
+            'member.password.reset',
+        ], true)
+        || request()->is('login')
+        || request()->is('forgot-password')
+        || request()->is('reset-password/*');
+    @endphp
 
-    @php $isLoginRoute = Route::currentRouteName() === 'login'; @endphp
-    <div class="app-admin-wrap {{ $isLoginRoute ? '' : 'layout-sidebar-vertical sidebar-full' }}">
+    @if (!$isAuthScreen)
+        @include('partials.period_alert')
+        @include('partials.password_change')
+    @endif
 
+    <div class="app-admin-wrap {{ $isAuthScreen ? '' : 'layout-sidebar-vertical sidebar-full' }}">
+        @if (!$isAuthScreen)
+            @include('partials.header')
 
+            @php
+                $viewAsMember = request()->query('view_as_member') === 'y';
+                $pos = Auth::check() ? (int) Auth::user()->member_position : null;
+            @endphp
 
-        @php
-            $isLoginRoute = Route::currentRouteName() === 'login';
-        @endphp
-
-        @php $isLoginRoute = Route::currentRouteName() === 'login'; @endphp
-        <div class="app-admin-wrap {{ $isLoginRoute ? '' : 'layout-sidebar-vertical sidebar-full' }}">
-
-            @if (!$isLoginRoute)
-                @include('partials.header')
-
-                @php
-                    $viewAsMember = request()->query('view_as_member') === 'y';
-                    $pos = Auth::check() ? (int) Auth::user()->member_position : null;
-                @endphp
-
-                @if (Auth::check())
-                    {{-- FORCE member menu when ?view_as_member=y for member_position 1 or 2 --}}
-                    @if ($viewAsMember && in_array($pos, [1, 2], true))
-                        @include('partials.menu_members')
-
-                        {{-- Normal logic --}}
-                    @elseif ($pos === 2)
-                        @include('partials.menu')
-                    @elseif ($pos === 1)
-                        @include('partials.menu_members')
-                    @else
-                        @include('partials.menu_public')
-                    @endif
+            @if (Auth::check())
+                {{-- FORCE member menu when ?view_as_member=y for member_position 1 or 2 --}}
+                @if ($viewAsMember && in_array($pos, [1, 2], true))
+                    @include('partials.menu_members')
+                @elseif ($pos === 2)
+                    @include('partials.menu')
+                @elseif ($pos === 1)
+                    @include('partials.menu_members')
                 @else
                     @include('partials.menu_public')
                 @endif
+            @else
+                @include('partials.menu_public')
             @endif
+        @endif
 
-
-            <div class="main-content-wrap mobile-menu-content bg-off-white m-0" style="padding: 3px;">
-
-                <div class="main-content pt-4">
-                    @yield('content')
-                </div>
-                @include('partials.footer')
+        <div class="main-content-wrap mobile-menu-content bg-off-white m-0" style="padding: 3px;">
+            <div class="main-content {{ $isAuthScreen ? '' : 'pt-4' }}">
+                @yield('content')
             </div>
+
+            @if (!$isAuthScreen)
+                @include('partials.footer')
+            @endif
         </div>
-
-
+    </div>
 </body>
 
 </html>
