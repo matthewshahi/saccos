@@ -15,8 +15,8 @@
 <style>
     body {
         background:
-            radial-gradient(circle at top left, rgba(90, 24, 154, 0.12), transparent 35%),
-            linear-gradient(135deg, #f7f7fc 0%, #f3f1f8 45%, #ffffff 100%);
+            radial-gradient(circle at top left, rgba(100, 58, 40, 0.12), transparent 35%),
+            linear-gradient(135deg, #f8f4f1 0%, #f3ede8 45%, #ffffff 100%);
         min-height: 100vh;
     }
 
@@ -37,15 +37,15 @@
         background: #ffffff;
         border-radius: 28px;
         overflow: hidden;
-        box-shadow: 0 24px 70px rgba(35, 20, 55, 0.16);
-        border: 1px solid rgba(90, 24, 154, 0.08);
+        box-shadow: 0 24px 70px rgba(45, 27, 20, 0.18);
+        border: 1px solid rgba(100, 58, 40, 0.08);
     }
 
     .bank-login-brand-panel {
         position: relative;
         padding: 42px;
         background:
-            linear-gradient(135deg, rgba(90, 24, 154, 0.96), rgba(65, 14, 117, 0.98)),
+            linear-gradient(135deg, rgba(100, 58, 40, 0.98), rgba(79, 46, 32, 0.99)),
             radial-gradient(circle at top right, rgba(255,255,255,0.22), transparent 38%);
         color: #ffffff;
         display: flex;
@@ -170,7 +170,7 @@
         align-items: center;
         justify-content: center;
         background:
-            linear-gradient(180deg, #ffffff 0%, #fbfaff 100%);
+            linear-gradient(180deg, #ffffff 0%, #fcf8f5 100%);
     }
 
     .bank-login-card {
@@ -188,8 +188,8 @@
         align-items: center;
         padding: 6px 10px;
         border-radius: 999px;
-        background: rgba(90, 24, 154, 0.08);
-        color: #5a189a;
+        background: rgba(100, 58, 40, 0.08);
+        color: #643A28;
         font-size: 11px;
         font-weight: 900;
         text-transform: uppercase;
@@ -200,7 +200,7 @@
     .sacco-brand {
         font-size: 28px;
         font-weight: 900;
-        color: #241232;
+        color: #241913;
         letter-spacing: -0.03em;
         line-height: 1.15;
         margin-bottom: 6px;
@@ -208,7 +208,7 @@
 
     .bank-login-subtitle {
         font-size: 14px;
-        color: #6d6578;
+        color: #756760;
         line-height: 1.6;
         margin: 0;
     }
@@ -221,7 +221,7 @@
         display: block;
         font-size: 13px;
         font-weight: 800;
-        color: #3d3448;
+        color: #3d2b23;
         margin-bottom: 7px;
     }
 
@@ -232,9 +232,9 @@
     .bank-input-wrap .form-control {
         height: 50px;
         border-radius: 14px;
-        border: 1px solid rgba(90, 24, 154, 0.16);
+        border: 1px solid rgba(100, 58, 40, 0.16);
         background: #ffffff;
-        color: #2d2437;
+        color: #2d211c;
         font-size: 14px;
         padding: 12px 14px;
         box-shadow: 0 1px 0 rgba(0,0,0,0.02);
@@ -242,26 +242,26 @@
     }
 
     .bank-input-wrap .form-control:focus {
-        border-color: rgba(90, 24, 154, 0.72);
-        box-shadow: 0 0 0 4px rgba(90, 24, 154, 0.10);
+        border-color: rgba(100, 58, 40, 0.72);
+        box-shadow: 0 0 0 4px rgba(100, 58, 40, 0.10);
     }
 
     .bank-submit-btn {
         width: 100%;
         height: 50px;
         border-radius: 14px;
-        background: linear-gradient(135deg, #5a189a, #431174);
+        background: linear-gradient(135deg, #643A28, #4f2e20);
         border: none;
         color: #ffffff;
         font-weight: 900;
         font-size: 15px;
-        box-shadow: 0 12px 28px rgba(90, 24, 154, 0.26);
+        box-shadow: 0 12px 28px rgba(100, 58, 40, 0.26);
         transition: transform .16s ease, box-shadow .16s ease;
     }
 
     .bank-submit-btn:hover {
         transform: translateY(-1px);
-        box-shadow: 0 16px 34px rgba(90, 24, 154, 0.32);
+        box-shadow: 0 16px 34px rgba(100, 58, 40, 0.32);
         color: #ffffff;
     }
 
@@ -269,17 +269,17 @@
         margin-top: 16px;
         padding: 14px;
         border-radius: 16px;
-        background: rgba(90, 24, 154, 0.06);
-        border: 1px solid rgba(90, 24, 154, 0.10);
+        background: rgba(100, 58, 40, 0.06);
+        border: 1px solid rgba(100, 58, 40, 0.10);
         text-align: center;
         font-size: 13px;
-        color: #5f566b;
+        color: #675951;
     }
 
     .bank-apply-box a {
         display: inline-block;
         margin-top: 4px;
-        color: #5a189a;
+        color: #643A28;
         font-weight: 900;
         text-decoration: none;
     }
@@ -294,15 +294,15 @@
         margin-top: 18px;
         padding: 12px 14px;
         border-radius: 16px;
-        background: #f8f7fb;
+        background: #faf6f3;
         border: 1px solid rgba(0,0,0,0.05);
-        color: #6d6578;
+        color: #756760;
         font-size: 12px;
         line-height: 1.55;
     }
 
     .bank-security-note strong {
-        color: #3d3448;
+        color: #3d2b23;
     }
 
     .security-dot {
@@ -319,11 +319,11 @@
         font-size: 0.86rem;
         text-align: center;
         margin-top: 24px;
-        color: #5f566b;
+        color: #675951;
     }
 
     .login-footer a {
-        color: #5a189a;
+        color: #643A28;
         text-decoration: none;
         font-weight: 800;
     }
@@ -335,14 +335,14 @@
     .provider-credit {
         margin-top: 12px;
         padding-top: 12px;
-        border-top: 1px solid rgba(90, 24, 154, 0.10);
+        border-top: 1px solid rgba(100, 58, 40, 0.10);
         font-size: 0.82rem;
-        color: #756d7f;
+        color: #7a6c64;
         line-height: 1.45;
     }
 
     .provider-credit strong {
-        color: #5a189a;
+        color: #643A28;
         font-weight: 900;
     }
 
@@ -425,6 +425,11 @@
                         <div>
                             <strong>Member self-service</strong>
                             <span>View key SACCO account services from one secure portal.</span>
+                        </div>
+                    </div>
+
+                    <div class="bank-feature-item">
+                        <div class="bank-feature-icon"> from one secure portal.</span>
                         </div>
                     </div>
 
