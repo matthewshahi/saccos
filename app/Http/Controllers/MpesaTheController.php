@@ -1050,10 +1050,10 @@ class MpesaTheController extends Controller
         return view('mpesa.waiting', ['checkoutRequestId' => $checkoutRequestId]);
     }
 
-    private function mpesaEnv(): string
-    {
-        return strtolower(trim((string) config('services.mpesa.env', 'sandbox')));
-    }
+   private function mpesaEnv(): string
+{
+    return strtolower(trim((string) config('mpesa.env', config('services.mpesa.env', 'sandbox'))));
+}
 
     private function mpesaBaseUrl(): string
     {
