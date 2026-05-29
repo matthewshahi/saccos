@@ -74,8 +74,13 @@ class MpesaApiTheController extends Controller
         }
 
         $safaricomPrefixes = [
-            '25470', '25471', '25472', '25474',
-            '25475', '25476', '25479',
+            '25470',
+            '25471',
+            '25472',
+            '25474',
+            '25475',
+            '25476',
+            '25479',
         ];
 
         $isSafaricom = false;
@@ -145,14 +150,16 @@ class MpesaApiTheController extends Controller
         $stkRequest = new Request([
             'phone'  => $phone,
             'uniq'   => $request->reference,
-            'amount' => $amount, 
+            'amount' => $amount,
         ]);
 
         $stkController = app(MpesaTheController::class);
         $stkResponse = $stkController->storeStkPush($stkRequest);
 
-        if (method_exists($stkResponse, 'getStatusCode')
-            && $stkResponse->getStatusCode() !== 200) {
+        if (
+            method_exists($stkResponse, 'getStatusCode')
+            && $stkResponse->getStatusCode() !== 200
+        ) {
             return $stkResponse;
         }
 
@@ -169,5 +176,16 @@ class MpesaApiTheController extends Controller
                 'reference' => $request->reference,
             ],
         ], 200);
+    }
+    private function mpesaEnv(): string
+    {
+        return strtolower(trim((string) config('services.mpesa.env', 'sandbox')));
+    }
+
+    private function mpesaBaseUrl(): string
+    {
+        return $this->mpesaEnv() === 'live'
+            ? 'https://api.safaricom.co.ke'
+            : 'https://sandbox.safaricom.co.ke';
     }
 }
