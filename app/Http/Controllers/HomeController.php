@@ -3867,7 +3867,7 @@ public function updateInstitution(Request $request, $id)
     {
         $status = $request->get('status', 'Y');
         $offset = $request->get('offset', 0);
-        $limit = $request->get('limit', 5);
+        $limit = $request->get('limit', 20);
 
         $membersQuery = DB::table('sacco_members')
             ->join('sacco_department', 'sacco_members.member_dept', '=', 'sacco_department.department_id')

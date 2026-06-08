@@ -78,7 +78,7 @@
 <script>
     $(document).ready(function() {
         let offset = 0;
-        const limit = 20ssss;
+        const limit = 20;
         let isLoading = false;
         let allRecordsLoaded = false;
 
