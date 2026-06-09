@@ -41,6 +41,12 @@ $defaultLogoPath = '/image/logo.jpg'; // Default logo
         <div class="side-nav">
             <div class="main-menu">
                 <ul class="metismenu" id="menu">
+                <li class="Ul_li--hover">
+                        <a class="has-arrow" href="/dashboard">
+                            <i class="i-Library text-20 me-2" style="color: #663399;"></i>
+                            <span class="item-name text-15 text-muted">Dashboard</span>
+                        </a>
+                        </li>
                     <li class="Ul_li--hover">
                         <a class="has-arrow" href="#">
                             <i class="i-Library text-20 me-2" style="color: #663399;"></i>
