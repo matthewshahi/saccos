@@ -168,10 +168,10 @@ $defaultLogoPath = '/image/logo.jpg'; // Default logo
                             </li>
 
                             <li class="item-name">
-    <a href="{{ route('minimum_capital.index') }}">
-        <span class="text-muted">Bulk Transfer Deposits to Capital</span>
-    </a>
-</li>
+                                <a href="{{ route('minimum_capital.index') }}">
+                                    <span class="text-muted">Bulk Transfer Deposits to Capital</span>
+                                </a>
+                            </li>
 
                         </ul>
                     </li>
@@ -212,6 +212,88 @@ $defaultLogoPath = '/image/logo.jpg'; // Default logo
                             </li>
                         </ul>
                     </li>
+
+                    <li class="Ul_li--hover">
+                        <a class="has-arrow" href="#">
+                            <i class="i-Coins text-20 me-2" style="color: #663399;"></i>
+                            <span class="item-name text-15 text-muted">Special Savings</span>
+                        </a>
+
+                        <ul class="mm-collapse">
+                            <li class="item-name">
+                                <a href="{{ route('special_savings.dashboard') }}">
+                                    <span class="text-muted">Dashboard</span>
+                                </a>
+                            </li>
+
+                            <li class="item-name">
+                                <a href="{{ route('special_savings.accounts.index') }}">
+                                    <span class="text-muted">Member Accounts</span>
+                                </a>
+                            </li>
+
+                            <li class="item-name">
+                                <a href="{{ route('special_savings.deposits.create') }}">
+                                    <span class="text-muted">Post Deposit</span>
+                                </a>
+                            </li>
+
+                            <li class="item-name">
+                                <a href="{{ route('special_savings.transfers.create') }}">
+                                    <span class="text-muted">Transfer to Special Savings</span>
+                                </a>
+                            </li>
+
+                            <li class="item-name">
+                                <a href="{{ route('special_savings.withdrawals.index') }}">
+                                    <span class="text-muted">Withdrawals</span>
+                                </a>
+                            </li>
+
+                            <li class="item-name">
+                                <a href="{{ route('special_savings.transactions.index') }}">
+                                    <span class="text-muted">Transactions</span>
+                                </a>
+                            </li>
+
+                            <li class="item-name">
+                                <a href="{{ route('special_savings.interest.index') }}">
+                                    <span class="text-muted">Interest Processing</span>
+                                </a>
+                            </li>
+
+                            <li class="item-name">
+                                <a href="{{ route('special_savings.vesting.index') }}">
+                                    <span class="text-muted">Interest Vesting</span>
+                                </a>
+                            </li>
+
+                            <li class="item-name">
+                                <a href="{{ route('special_savings.end_month.index') }}">
+                                    <span class="text-muted">End Month Proc.</span>
+                                </a>
+                            </li>
+
+                            <li class="item-name">
+                                <a href="{{ route('special_savings.import.form') }}">
+                                    <span class="text-muted">Import Contributions</span>
+                                </a>
+                            </li>
+
+                            <li class="item-name">
+                                <a href="{{ route('special_savings.products.index') }}">
+                                    <span class="text-muted">Products</span>
+                                </a>
+                            </li>
+
+                            <li class="item-name">
+                                <a href="{{ route('special_savings.categories.index') }}">
+                                    <span class="text-muted">Categories</span>
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+
                     <li class="Ul_li--hover">
                         <a class="has-arrow" href="#">
                             <i class="i-Calendar-4 text-20 me-2" style="color: #663399;"></i>
@@ -239,10 +321,10 @@ $defaultLogoPath = '/image/logo.jpg'; // Default logo
                                 </a>
                             </li>
                             <li class="item-name">
-    <a href="{{ route('payroll.deductions.import.index') }}">
-        <span class="text-muted">Bulk Deductions Import</span>
-    </a>
-</li>
+                                <a href="{{ route('payroll.deductions.import.index') }}">
+                                    <span class="text-muted">Bulk Deductions Import</span>
+                                </a>
+                            </li>
                         </ul>
                     </li>
                     <li class="Ul_li--hover">
@@ -268,10 +350,10 @@ $defaultLogoPath = '/image/logo.jpg'; // Default logo
                             </li>
 
                             <li class="item-name">
-    <a href="{{ route('payroll.deductions.import.index') }}">
-        <span class="text-muted">Bulk Deductions Import</span>
-    </a>
-</li>
+                                <a href="{{ route('payroll.deductions.import.index') }}">
+                                    <span class="text-muted">Bulk Deductions Import</span>
+                                </a>
+                            </li>
 
                             <li class="item-name">
                                 <a href="{{ url('/reports/loans/active') }}">
@@ -313,9 +395,9 @@ $defaultLogoPath = '/image/logo.jpg'; // Default logo
                                 </a>
                             </li>
 
-<a href="{{ route('loans.reprocess.index') }}">
-    <span class="text-muted">Reprocess</span>
-</a>
+                            <a href="{{ route('loans.reprocess.index') }}">
+                                <span class="text-muted">Reprocess</span>
+                            </a>
 
                         </ul>
                     </li>
