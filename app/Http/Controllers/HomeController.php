@@ -57,7 +57,7 @@ class HomeController extends Controller
         }
 
         if ($user->member_position == 2) {
-            return redirect('/dashboard');
+            return redirect('/members/active/y');
         }
 
         if ($user->member_position == 1) {
