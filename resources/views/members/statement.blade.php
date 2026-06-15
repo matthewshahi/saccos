@@ -295,6 +295,139 @@
                 </div>
             </div>
 
+{{-- SPECIAL SAVINGS --}}
+@if(isset($data['specialSavings']) && $data['specialSavings']->count() > 0)
+    <div class="card mb-4">
+        <div class="card-header bg-info text-white fw-bold">
+            Special Savings Statement
+        </div>
+
+        <div class="card-body p-0">
+            @foreach($data['specialSavings'] as $specialSaving)
+                @php
+                    $account = $specialSaving->account;
+                    $transactions = $specialSaving->transactions;
+
+                    $totalDebit = 0;
+                    $totalCredit = 0;
+                @endphp
+
+                <div class="bg-secondary text-white p-2 fw-bold">
+                    {{ $account->special_saving_product_name ?? 'Special Savings' }}
+                    @if(!empty($account->special_saving_account_number))
+                        — {{ $account->special_saving_account_number }}
+                    @endif
+                </div>
+
+                <div class="p-2 small bg-light">
+                    <strong>Status:</strong> {{ $account->special_saving_account_status }}
+                    |
+                    <strong>Principal:</strong> {{ number_format((float) $account->special_saving_account_principal_balance, 2) }}
+                    |
+                    <strong>Accrued Interest:</strong> {{ number_format((float) $account->special_saving_account_accrued_interest_balance, 2) }}
+                    |
+                    <strong>Available Interest:</strong> {{ number_format((float) $account->special_saving_account_available_interest_balance, 2) }}
+                    |
+                    <strong>Total:</strong> {{ number_format((float) $account->special_saving_account_total_balance, 2) }}
+                </div>
+
+                <table class="table table-striped table-sm mb-0">
+                    <thead class="bg-light">
+                        <tr>
+                            <th>#</th>
+                            <th>Period</th>
+                            <th>Date</th>
+                            <th>Description</th>
+                            <th>Doc No</th>
+                            <th>Type</th>
+                            <th class="text-end">Debit</th>
+                            <th class="text-end">Credit</th>
+                            <th class="text-end">Principal Bal</th>
+                            <th class="text-end">Interest Bal</th>
+                            <th class="text-end">Total Bal</th>
+                        </tr>
+
+                        <tr class="table-secondary">
+                            <td colspan="8" class="text-end fw-bold">Opening Balance</td>
+                            <td class="text-end fw-bold">
+                                {{ number_format((float) $specialSaving->opening_principal, 2) }}
+                            </td>
+                            <td class="text-end fw-bold">
+                                {{ number_format((float) $specialSaving->opening_accrued_interest + (float) $specialSaving->opening_available_interest, 2) }}
+                            </td>
+                            <td class="text-end fw-bold">
+                                {{ number_format((float) $specialSaving->opening_total, 2) }}
+                            </td>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        @foreach($transactions as $txn)
+                            @php
+                                $direction = strtoupper((string) $txn->special_saving_transaction_direction);
+                                $amount = (float) $txn->special_saving_transaction_amount;
+
+                                $debit = $direction === 'DEBIT' ? $amount : 0;
+                                $credit = $direction === 'CREDIT' ? $amount : 0;
+
+                                $totalDebit += $debit;
+                                $totalCredit += $credit;
+
+                                $interestBalance =
+                                    (float) $txn->special_saving_transaction_accrued_interest_after
+                                    + (float) $txn->special_saving_transaction_available_interest_after;
+                            @endphp
+
+                            <tr>
+                                <td>{{ $loop->iteration }}</td>
+                                <td>{{ $txn->special_saving_transaction_period }}</td>
+                                <td>{{ \Carbon\Carbon::parse($txn->special_saving_transaction_date)->format('d-m-Y') }}</td>
+                                <td>{{ $txn->special_saving_transaction_description }}</td>
+                                <td>{{ $txn->special_saving_transaction_doc_no }}</td>
+                                <td>{{ $txn->special_saving_transaction_type }}</td>
+
+                                <td class="text-end">
+                                    {{ $debit != 0 ? number_format($debit, 2) : '' }}
+                                </td>
+
+                                <td class="text-end">
+                                    {{ $credit != 0 ? number_format($credit, 2) : '' }}
+                                </td>
+
+                                <td class="text-end fw-bold">
+                                    {{ number_format((float) $txn->special_saving_transaction_principal_balance_after, 2) }}
+                                </td>
+
+                                <td class="text-end fw-bold">
+                                    {{ number_format($interestBalance, 2) }}
+                                </td>
+
+                                <td class="text-end fw-bold">
+                                    {{ number_format((float) $txn->special_saving_transaction_total_balance_after, 2) }}
+                                </td>
+                            </tr>
+                        @endforeach
+
+                        <tr class="table-secondary fw-bold">
+                            <td colspan="6" class="text-end">
+                                Subtotal for {{ $account->special_saving_product_name ?? 'Special Savings' }}
+                            </td>
+                            <td class="text-end">{{ number_format($totalDebit, 2) }}</td>
+                            <td class="text-end">{{ number_format($totalCredit, 2) }}</td>
+                            <td class="text-end">{{ number_format((float) $account->special_saving_account_principal_balance, 2) }}</td>
+                            <td class="text-end">
+                                {{ number_format((float) $account->special_saving_account_accrued_interest_balance + (float) $account->special_saving_account_available_interest_balance, 2) }}
+                            </td>
+                            <td class="text-end">{{ number_format((float) $account->special_saving_account_total_balance, 2) }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <br>
+            @endforeach
+        </div>
+    </div>
+@endif
             {{-- LOANS --}}
             <div class="card mb-5">
                 <div class="card-header bg-danger text-white fw-bold">Loan Statement</div>

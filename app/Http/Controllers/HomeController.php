@@ -1517,7 +1517,7 @@ public function updateInstitution(Request $request, $id)
 
         // Set period_from and period_to, defaulting to '000000' and '999900' if not provided
         $period_from = request('period_from', '000000');
-        $period_to = request('period_to', '999900');
+        $period_to = request('period_to', '999999');
 
         // Fetch the threshold amount for determining cleared loans
         $threshold = DB::table('sacco_defaults')
@@ -1547,9 +1547,32 @@ public function updateInstitution(Request $request, $id)
             ->get();
 
 
-        $fosaGrouped = $fosaContributions->groupBy(function ($row) {
-            return $row->type_name ?: 'UNSPECIFIED';
-        });
+        /*
+|--------------------------------------------------------------------------
+| Remove Special Savings products from old FOSA/Other Contributions display
+|--------------------------------------------------------------------------
+| FEDHA now lives in sacco_special_saving_* tables.
+| This prevents the old FEDHA/FOSA records from showing under Other Contributions.
+*/
+$specialSavingProductCodes = DB::table('sacco_special_saving_products')
+    ->where('special_saving_product_deleted', 'N')
+    ->pluck('special_saving_product_code')
+    ->map(fn ($code) => strtoupper(trim((string) $code)))
+    ->filter()
+    ->values()
+    ->all();
+
+$fosaContributions = $fosaContributions->reject(function ($row) use ($specialSavingProductCodes) {
+    $typeName = strtoupper(trim((string) ($row->type_name ?? '')));
+    $typePrefix = strtoupper(trim((string) ($row->type_prefix ?? '')));
+
+    return in_array($typeName, $specialSavingProductCodes, true)
+        || in_array($typePrefix, $specialSavingProductCodes, true);
+})->values();
+
+$fosaGrouped = $fosaContributions->groupBy(function ($row) {
+    return $row->type_name ?: 'UNSPECIFIED';
+});
 
 
 
@@ -1655,6 +1678,72 @@ public function updateInstitution(Request $request, $id)
         // Group loan payments by loan_id
         $paymentsByLoan = $loanPayments->groupBy('loan_payments_loan_id');
 
+        /*
+|--------------------------------------------------------------------------
+| Special Savings Statement
+|--------------------------------------------------------------------------
+| Pulls FEDHA and any future special saving product from the new module.
+| It respects period_from / period_to and uses transaction balance-after fields.
+*/
+$specialSavingAccounts = DB::table('sacco_special_saving_accounts as a')
+    ->leftJoin('sacco_special_saving_products as p', 'p.special_saving_product_id', '=', 'a.special_saving_account_product_id')
+    ->where('a.special_saving_account_member_id', $id)
+    ->where('a.special_saving_account_deleted', 'N')
+    ->select(
+        'a.*',
+        'p.special_saving_product_name',
+        'p.special_saving_product_code'
+    )
+    ->orderBy('p.special_saving_product_name')
+    ->orderBy('a.special_saving_account_number')
+    ->get();
+
+$specialSavings = $specialSavingAccounts->map(function ($account) use ($period_from, $period_to) {
+    $openingTxn = DB::table('sacco_special_saving_transactions')
+        ->where('special_saving_transaction_account_id', $account->special_saving_account_id)
+        ->where('special_saving_transaction_deleted', 'N')
+        ->where(function ($q) {
+            $q->where('special_saving_transaction_reversed', 'N')
+              ->orWhereNull('special_saving_transaction_reversed');
+        })
+        ->where('special_saving_transaction_period', '<', $period_from)
+        ->orderByDesc('special_saving_transaction_period')
+        ->orderByDesc('special_saving_transaction_date')
+        ->orderByDesc('special_saving_transaction_id')
+        ->first();
+
+    $transactions = DB::table('sacco_special_saving_transactions')
+        ->where('special_saving_transaction_account_id', $account->special_saving_account_id)
+        ->where('special_saving_transaction_deleted', 'N')
+        ->where(function ($q) {
+            $q->where('special_saving_transaction_reversed', 'N')
+              ->orWhereNull('special_saving_transaction_reversed');
+        })
+        ->whereBetween('special_saving_transaction_period', [$period_from, $period_to])
+        ->orderBy('special_saving_transaction_period')
+        ->orderBy('special_saving_transaction_date')
+        ->orderBy('special_saving_transaction_id')
+        ->get();
+
+    $openingPrincipal = $openingTxn ? (float) $openingTxn->special_saving_transaction_principal_balance_after : 0;
+    $openingAccruedInterest = $openingTxn ? (float) $openingTxn->special_saving_transaction_accrued_interest_after : 0;
+    $openingAvailableInterest = $openingTxn ? (float) $openingTxn->special_saving_transaction_available_interest_after : 0;
+    $openingTotal = $openingTxn ? (float) $openingTxn->special_saving_transaction_total_balance_after : 0;
+
+    return (object) [
+        'account' => $account,
+        'opening_principal' => $openingPrincipal,
+        'opening_accrued_interest' => $openingAccruedInterest,
+        'opening_available_interest' => $openingAvailableInterest,
+        'opening_total' => $openingTotal,
+        'transactions' => $transactions,
+    ];
+})->filter(function ($item) {
+    return $item->transactions->count() > 0
+        || abs((float) $item->opening_total) > 0
+        || abs((float) $item->account->special_saving_account_total_balance) > 0;
+})->values();
+
         $data = [
             'member' => $member,
             'fosaContributions' => $fosaContributions,
@@ -1670,6 +1759,7 @@ public function updateInstitution(Request $request, $id)
             'period_to' => $period_to,
             'threshold_amount' => $threshold_amount,
              'migrationMode' => $migrationMode,
+             'specialSavings' => $specialSavings,
         ];
 
         return view('members.statement', compact('data'));
