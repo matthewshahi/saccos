@@ -408,18 +408,38 @@
                             </tr>
                         @endforeach
 
-                        <tr class="table-secondary fw-bold">
-                            <td colspan="6" class="text-end">
-                                Subtotal for {{ $account->special_saving_product_name ?? 'Special Savings' }}
-                            </td>
-                            <td class="text-end">{{ number_format($totalDebit, 2) }}</td>
-                            <td class="text-end">{{ number_format($totalCredit, 2) }}</td>
-                            <td class="text-end">{{ number_format((float) $account->special_saving_account_principal_balance, 2) }}</td>
-                            <td class="text-end">
-                                {{ number_format((float) $account->special_saving_account_accrued_interest_balance + (float) $account->special_saving_account_available_interest_balance, 2) }}
-                            </td>
-                            <td class="text-end">{{ number_format((float) $account->special_saving_account_total_balance, 2) }}</td>
-                        </tr>
+                         <tr class="table-secondary fw-bold special-savings-subtotal">
+    <td colspan="6" class="text-end subtotal-title">
+        Subtotal for {{ $account->special_saving_product_name ?? 'Special Savings' }}
+    </td>
+
+    <td class="text-end subtotal-money">
+        <span>Debit</span>
+        <strong>{{ number_format($totalDebit, 2) }}</strong>
+    </td>
+
+    <td class="text-end subtotal-money">
+        <span>Credit</span>
+        <strong>{{ number_format($totalCredit, 2) }}</strong>
+    </td>
+
+    <td class="text-end subtotal-money">
+        <span>Principal Bal</span>
+        <strong>{{ number_format((float) $account->special_saving_account_principal_balance, 2) }}</strong>
+    </td>
+
+    <td class="text-end subtotal-money">
+        <span>Interest Bal</span>
+        <strong>
+            {{ number_format((float) $account->special_saving_account_accrued_interest_balance + (float) $account->special_saving_account_available_interest_balance, 2) }}
+        </strong>
+    </td>
+
+    <td class="text-end subtotal-money">
+        <span>Total Bal</span>
+        <strong>{{ number_format((float) $account->special_saving_account_total_balance, 2) }}</strong>
+    </td>
+</tr>
                     </tbody>
                 </table>
 
@@ -603,14 +623,68 @@
             letter-spacing: 0.3px;
         }
 
-        .table th,
-        .table td {
-            vertical-align: middle;
-        }
+        .statement-sections table {
+    border-collapse: collapse !important;
+    width: 100%;
+}
 
-        .table th {
-            font-weight: 600;
-        }
+.statement-sections table th,
+.statement-sections table td {
+    vertical-align: middle;
+    border: 1px solid #d5dbe3 !important;
+}
+
+.statement-sections table th {
+    font-weight: 700;
+    background-clip: padding-box;
+}
+
+/* Keep period and date readable everywhere */
+.statement-sections table th:nth-child(2),
+.statement-sections table td:nth-child(2),
+.statement-sections table th:nth-child(3),
+.statement-sections table td:nth-child(3) {
+    white-space: nowrap !important;
+}
+
+/* Keep money columns from wrapping */
+.statement-sections table th.text-end,
+.statement-sections table td.text-end {
+    white-space: nowrap !important;
+}
+
+/* Make FEDHA subtotal readable */
+.special-savings-subtotal .subtotal-title {
+    font-size: 0.9rem;
+    background: #d8dde3 !important;
+}
+
+.special-savings-subtotal .subtotal-money {
+    background: #d8dde3 !important;
+    min-width: 105px;
+}
+
+.special-savings-subtotal .subtotal-money span {
+    display: block;
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: #495057;
+    text-transform: uppercase;
+    line-height: 1.1;
+    margin-bottom: 2px;
+}
+
+.special-savings-subtotal .subtotal-money strong {
+    display: block;
+    font-size: 0.86rem;
+    color: #111827;
+}
+
+/* Improve dense statement tables */
+.table-sm th,
+.table-sm td {
+    padding: 0.38rem 0.45rem;
+}
 
         .loan-box {
             background: #fffdfd;
