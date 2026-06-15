@@ -29,27 +29,27 @@
             </div>
         </div>
 
-        @if(session('success'))
+        @if (session('success'))
             <div class="alert alert-success">
                 {{ session('success') }}
             </div>
         @endif
 
-        @if(session('error'))
+        @if (session('error'))
             <div class="alert alert-danger">
                 {{ session('error') }}
             </div>
         @endif
 
-        @if($errors->any())
+        @if ($errors->any())
             <div class="alert alert-danger">
-                @foreach($errors->all() as $error)
+                @foreach ($errors->all() as $error)
                     <div>{{ $error }}</div>
                 @endforeach
             </div>
         @endif
 
-        @if($migrationMode)
+        @if ($migrationMode)
             <div class="alert alert-warning">
                 <strong>Migration Mode is ON.</strong> Red X buttons are enabled for deleting loans and loan repayments.
             </div>
@@ -61,13 +61,13 @@
                     <div class="col-md-3 mb-2">
                         <label class="form-label fw-bold">Period From (YYYYMM)</label>
                         <input type="text" name="period_from" class="form-control form-control-sm"
-                               value="{{ request('period_from', '000000') }}">
+                            value="{{ request('period_from', '000000') }}">
                     </div>
 
                     <div class="col-md-3 mb-2">
                         <label class="form-label fw-bold">Period To (YYYYMM)</label>
                         <input type="text" name="period_to" class="form-control form-control-sm"
-                               value="{{ request('period_to', '999999') }}">
+                            value="{{ request('period_to', '999999') }}">
                     </div>
 
                     <div class="col-md-3 mb-2">
@@ -295,7 +295,7 @@
                 </div>
             </div>
 
-{{-- SPECIAL SAVINGS --}}
+           {{-- SPECIAL SAVINGS --}}
 @if(isset($data['specialSavings']) && $data['specialSavings']->count() > 0)
     <div class="card mb-4">
         <div class="card-header bg-info text-white fw-bold">
@@ -310,6 +310,35 @@
 
                     $totalDebit = 0;
                     $totalCredit = 0;
+
+                    $principalDebit = 0;
+                    $principalCredit = 0;
+
+                    $interestDebit = 0;
+                    $interestCredit = 0;
+
+                    $openingPrincipal = (float) $specialSaving->opening_principal;
+                    $openingInterest =
+                        (float) $specialSaving->opening_accrued_interest
+                        + (float) $specialSaving->opening_available_interest;
+                    $openingTotal = (float) $specialSaving->opening_total;
+
+                    $closingTxn = $transactions->last();
+
+                    $closingPrincipal = $closingTxn
+                        ? (float) $closingTxn->special_saving_transaction_principal_balance_after
+                        : $openingPrincipal;
+
+                    $closingInterest = $closingTxn
+                        ? (
+                            (float) $closingTxn->special_saving_transaction_accrued_interest_after
+                            + (float) $closingTxn->special_saving_transaction_available_interest_after
+                        )
+                        : $openingInterest;
+
+                    $closingTotal = $closingTxn
+                        ? (float) $closingTxn->special_saving_transaction_total_balance_after
+                        : $openingTotal;
                 @endphp
 
                 <div class="bg-secondary text-white p-2 fw-bold">
@@ -319,135 +348,172 @@
                     @endif
                 </div>
 
-                <div class="p-2 small bg-light">
-                    <strong>Status:</strong> {{ $account->special_saving_account_status }}
+                <div class="p-2 small bg-light special-savings-current-balance">
+                    <strong>Account Status:</strong> {{ $account->special_saving_account_status }}
                     |
-                    <strong>Principal:</strong> {{ number_format((float) $account->special_saving_account_principal_balance, 2) }}
+                    <strong>Current Principal:</strong> {{ number_format((float) $account->special_saving_account_principal_balance, 2) }}
                     |
-                    <strong>Accrued Interest:</strong> {{ number_format((float) $account->special_saving_account_accrued_interest_balance, 2) }}
+                    <strong>Current Accrued Interest:</strong> {{ number_format((float) $account->special_saving_account_accrued_interest_balance, 2) }}
                     |
-                    <strong>Available Interest:</strong> {{ number_format((float) $account->special_saving_account_available_interest_balance, 2) }}
+                    <strong>Current Available Interest:</strong> {{ number_format((float) $account->special_saving_account_available_interest_balance, 2) }}
                     |
-                    <strong>Total:</strong> {{ number_format((float) $account->special_saving_account_total_balance, 2) }}
+                    <strong>Current Total:</strong> {{ number_format((float) $account->special_saving_account_total_balance, 2) }}
                 </div>
 
-                <table class="table table-striped table-sm mb-0">
-                    <thead class="bg-light">
-                        <tr>
-                            <th>#</th>
-                            <th>Period</th>
-                            <th>Date</th>
-                            <th>Description</th>
-                            <th>Doc No</th>
-                            <th>Type</th>
-                            <th class="text-end">Debit</th>
-                            <th class="text-end">Credit</th>
-                            <th class="text-end">Principal Bal</th>
-                            <th class="text-end">Interest Bal</th>
-                            <th class="text-end">Total Bal</th>
-                        </tr>
-
-                        <tr class="table-secondary">
-                            <td colspan="8" class="text-end fw-bold">Opening Balance</td>
-                            <td class="text-end fw-bold">
-                                {{ number_format((float) $specialSaving->opening_principal, 2) }}
-                            </td>
-                            <td class="text-end fw-bold">
-                                {{ number_format((float) $specialSaving->opening_accrued_interest + (float) $specialSaving->opening_available_interest, 2) }}
-                            </td>
-                            <td class="text-end fw-bold">
-                                {{ number_format((float) $specialSaving->opening_total, 2) }}
-                            </td>
-                        </tr>
-                    </thead>
-
-                    <tbody>
-                        @foreach($transactions as $txn)
-                            @php
-                                $direction = strtoupper((string) $txn->special_saving_transaction_direction);
-                                $amount = (float) $txn->special_saving_transaction_amount;
-
-                                $debit = $direction === 'DEBIT' ? $amount : 0;
-                                $credit = $direction === 'CREDIT' ? $amount : 0;
-
-                                $totalDebit += $debit;
-                                $totalCredit += $credit;
-
-                                $interestBalance =
-                                    (float) $txn->special_saving_transaction_accrued_interest_after
-                                    + (float) $txn->special_saving_transaction_available_interest_after;
-                            @endphp
-
+                <div class="table-responsive">
+                    <table class="table table-striped table-bordered table-sm mb-0 statement-ledger-table">
+                        <thead class="bg-light">
                             <tr>
-                                <td>{{ $loop->iteration }}</td>
-                                <td>{{ $txn->special_saving_transaction_period }}</td>
-                                <td>{{ \Carbon\Carbon::parse($txn->special_saving_transaction_date)->format('d-m-Y') }}</td>
-                                <td>{{ $txn->special_saving_transaction_description }}</td>
-                                <td>{{ $txn->special_saving_transaction_doc_no }}</td>
-                                <td>{{ $txn->special_saving_transaction_type }}</td>
+                                <th>#</th>
+                                <th class="nowrap-cell">Period</th>
+                                <th class="nowrap-cell">Date</th>
+                                <th>Description</th>
+                                <th class="nowrap-cell">Doc No</th>
+                                <th class="nowrap-cell">Type</th>
+                                <th class="text-end money-cell">Debit</th>
+                                <th class="text-end money-cell">Credit</th>
+                                <th class="text-end money-cell">Principal Bal</th>
+                                <th class="text-end money-cell">Interest Bal</th>
+                                <th class="text-end money-cell">Total Bal</th>
+                            </tr>
 
-                                <td class="text-end">
-                                    {{ $debit != 0 ? number_format($debit, 2) : '' }}
+                            <tr class="table-secondary opening-row">
+                                <td colspan="8" class="text-end fw-bold">
+                                    Opening Balance before selected period
                                 </td>
-
-                                <td class="text-end">
-                                    {{ $credit != 0 ? number_format($credit, 2) : '' }}
+                                <td class="text-end fw-bold money-cell">
+                                    {{ number_format($openingPrincipal, 2) }}
                                 </td>
-
-                                <td class="text-end fw-bold">
-                                    {{ number_format((float) $txn->special_saving_transaction_principal_balance_after, 2) }}
+                                <td class="text-end fw-bold money-cell">
+                                    {{ number_format($openingInterest, 2) }}
                                 </td>
-
-                                <td class="text-end fw-bold">
-                                    {{ number_format($interestBalance, 2) }}
-                                </td>
-
-                                <td class="text-end fw-bold">
-                                    {{ number_format((float) $txn->special_saving_transaction_total_balance_after, 2) }}
+                                <td class="text-end fw-bold money-cell">
+                                    {{ number_format($openingTotal, 2) }}
                                 </td>
                             </tr>
-                        @endforeach
+                        </thead>
 
-                         <tr class="table-secondary fw-bold special-savings-subtotal">
-    <td colspan="6" class="text-end subtotal-title">
-        Subtotal for {{ $account->special_saving_product_name ?? 'Special Savings' }}
-    </td>
+                        <tbody>
+                            @foreach($transactions as $txn)
+                                @php
+                                    $direction = strtoupper((string) $txn->special_saving_transaction_direction);
+                                    $amount = (float) $txn->special_saving_transaction_amount;
 
-    <td class="text-end subtotal-money">
-        <span>Debit</span>
-        <strong>{{ number_format($totalDebit, 2) }}</strong>
-    </td>
+                                    $principalAmount = abs((float) ($txn->special_saving_transaction_principal_amount ?? 0));
+                                    $interestAmount = abs((float) ($txn->special_saving_transaction_interest_amount ?? 0));
 
-    <td class="text-end subtotal-money">
-        <span>Credit</span>
-        <strong>{{ number_format($totalCredit, 2) }}</strong>
-    </td>
+                                    $debit = $direction === 'DEBIT' ? $amount : 0;
+                                    $credit = $direction === 'CREDIT' ? $amount : 0;
 
-    <td class="text-end subtotal-money">
-        <span>Principal Bal</span>
-        <strong>{{ number_format((float) $account->special_saving_account_principal_balance, 2) }}</strong>
-    </td>
+                                    $totalDebit += $debit;
+                                    $totalCredit += $credit;
 
-    <td class="text-end subtotal-money">
-        <span>Interest Bal</span>
-        <strong>
-            {{ number_format((float) $account->special_saving_account_accrued_interest_balance + (float) $account->special_saving_account_available_interest_balance, 2) }}
-        </strong>
-    </td>
+                                    if ($direction === 'DEBIT') {
+                                        $principalDebit += $principalAmount;
+                                        $interestDebit += $interestAmount;
+                                    } else {
+                                        $principalCredit += $principalAmount;
+                                        $interestCredit += $interestAmount;
+                                    }
 
-    <td class="text-end subtotal-money">
-        <span>Total Bal</span>
-        <strong>{{ number_format((float) $account->special_saving_account_total_balance, 2) }}</strong>
-    </td>
-</tr>
-                    </tbody>
-                </table>
+                                    $interestBalance =
+                                        (float) $txn->special_saving_transaction_accrued_interest_after
+                                        + (float) $txn->special_saving_transaction_available_interest_after;
+                                @endphp
+
+                                <tr>
+                                    <td>{{ $loop->iteration }}</td>
+                                    <td class="nowrap-cell">{{ $txn->special_saving_transaction_period }}</td>
+                                    <td class="nowrap-cell">{{ \Carbon\Carbon::parse($txn->special_saving_transaction_date)->format('d-m-Y') }}</td>
+                                    <td>{{ $txn->special_saving_transaction_description }}</td>
+                                    <td class="nowrap-cell">{{ $txn->special_saving_transaction_doc_no }}</td>
+                                    <td class="nowrap-cell">{{ $txn->special_saving_transaction_type }}</td>
+
+                                    <td class="text-end money-cell">
+                                        {{ $debit != 0 ? number_format($debit, 2) : '' }}
+                                    </td>
+
+                                    <td class="text-end money-cell">
+                                        {{ $credit != 0 ? number_format($credit, 2) : '' }}
+                                    </td>
+
+                                    <td class="text-end fw-bold money-cell">
+                                        {{ number_format((float) $txn->special_saving_transaction_principal_balance_after, 2) }}
+                                    </td>
+
+                                    <td class="text-end fw-bold money-cell">
+                                        {{ number_format($interestBalance, 2) }}
+                                    </td>
+
+                                    <td class="text-end fw-bold money-cell">
+                                        {{ number_format((float) $txn->special_saving_transaction_total_balance_after, 2) }}
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+
+                @php
+                    $expectedClosingTotal = $openingTotal + $totalCredit - $totalDebit;
+                    $difference = round($expectedClosingTotal - $closingTotal, 2);
+                @endphp
+
+                <div class="special-savings-summary-box">
+                    <div class="special-savings-summary-title">
+                        FEDHA Summary for this statement period
+                    </div>
+
+                    <table class="table table-bordered table-sm mb-0 special-savings-summary-table">
+                        <thead>
+                            <tr>
+                                <th>Opening Total</th>
+                                <th>Principal Credits</th>
+                                <th>Interest Credits</th>
+                                <th>Total Credits Posted</th>
+                                <th>Total Debits / Resets</th>
+                                <th>Closing Principal</th>
+                                <th>Closing Interest</th>
+                                <th>Closing Total</th>
+                                <th>Check Difference</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            <tr>
+                                <td class="text-end money-cell">{{ number_format($openingTotal, 2) }}</td>
+                                <td class="text-end money-cell">{{ number_format($principalCredit, 2) }}</td>
+                                <td class="text-end money-cell">{{ number_format($interestCredit, 2) }}</td>
+                                <td class="text-end money-cell">{{ number_format($totalCredit, 2) }}</td>
+                                <td class="text-end money-cell">{{ number_format($totalDebit, 2) }}</td>
+                                <td class="text-end money-cell">{{ number_format($closingPrincipal, 2) }}</td>
+                                <td class="text-end money-cell">{{ number_format($closingInterest, 2) }}</td>
+                                <td class="text-end money-cell fw-bold">{{ number_format($closingTotal, 2) }}</td>
+                                <td class="text-end money-cell {{ abs($difference) > 0.01 ? 'text-danger' : 'text-success' }}">
+                                    {{ number_format($difference, 2) }}
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div class="special-savings-summary-note">
+                        Formula:
+                        Opening Total
+                        + Total Credits Posted
+                        - Total Debits / Resets
+                        =
+                        Closing Total.
+                        Principal Credits and Interest Credits are shown separately so the movement is clear.
+                    </div>
+                </div>
 
                 <br>
             @endforeach
         </div>
     </div>
 @endif
+            
+
             {{-- LOANS --}}
             <div class="card mb-5">
                 <div class="card-header bg-danger text-white fw-bold">Loan Statement</div>
@@ -461,14 +527,11 @@
                                     {{ $loan->loan_type_name }} ({{ $loan->loan_id }}) — {{ $loan->loan_doc_no }}
                                 </span>
 
-                                @if($migrationMode)
-                                    <form
-                                        method="POST"
+                                @if ($migrationMode)
+                                    <form method="POST"
                                         action="{{ route('migration.statement.loan.destroy', $loan->loan_id) }}"
-                                        class="migration-delete-form d-inline"
-                                        data-export="ignore"
-                                        onsubmit="return confirm('Delete this loan and all its repayments? This cannot be undone.');"
-                                    >
+                                        class="migration-delete-form d-inline" data-export="ignore"
+                                        onsubmit="return confirm('Delete this loan and all its repayments? This cannot be undone.');">
                                         @csrf
                                         @method('DELETE')
 
@@ -517,7 +580,7 @@
                                             <th class="text-end">Total</th>
                                             <th class="text-end">Balance</th>
 
-                                            @if($migrationMode)
+                                            @if ($migrationMode)
                                                 <th class="text-center migration-action-col" data-export="ignore">
                                                     Action
                                                 </th>
@@ -535,7 +598,7 @@
                                                 {{ number_format($balance, 2) }}
                                             </td>
 
-                                            @if($migrationMode)
+                                            @if ($migrationMode)
                                                 <td class="text-center migration-action-col" data-export="ignore"></td>
                                             @endif
                                         </tr>
@@ -548,7 +611,8 @@
                                             <tr>
                                                 <td>{{ $i + 1 }}</td>
                                                 <td>{{ $p->loan_payments_period }}</td>
-                                                <td>{{ \Carbon\Carbon::parse($p->loan_payments_paid_on)->format('d-m-Y') }}</td>
+                                                <td>{{ \Carbon\Carbon::parse($p->loan_payments_paid_on)->format('d-m-Y') }}
+                                                </td>
                                                 <td>{{ $p->loan_payments_docno }}</td>
                                                 <td>{{ $p->loan_payments_description }}</td>
 
@@ -568,19 +632,17 @@
                                                     {{ number_format($balance, 2) }}
                                                 </td>
 
-                                                @if($migrationMode)
+                                                @if ($migrationMode)
                                                     <td class="text-center migration-action-col" data-export="ignore">
-                                                        <form
-                                                            method="POST"
+                                                        <form method="POST"
                                                             action="{{ route('migration.statement.payment.destroy', $p->loan_payments_id) }}"
-                                                            class="migration-delete-form d-inline"
-                                                            data-export="ignore"
-                                                            onsubmit="return confirm('Delete this loan repayment? This cannot be undone.');"
-                                                        >
+                                                            class="migration-delete-form d-inline" data-export="ignore"
+                                                            onsubmit="return confirm('Delete this loan repayment? This cannot be undone.');">
                                                             @csrf
                                                             @method('DELETE')
 
-                                                            <button type="submit" class="migration-delete-x" title="Delete repayment">
+                                                            <button type="submit" class="migration-delete-x"
+                                                                title="Delete repayment">
                                                                 &times;
                                                             </button>
                                                         </form>
@@ -624,67 +686,67 @@
         }
 
         .statement-sections table {
-    border-collapse: collapse !important;
-    width: 100%;
-}
+            border-collapse: collapse !important;
+            width: 100%;
+        }
 
-.statement-sections table th,
-.statement-sections table td {
-    vertical-align: middle;
-    border: 1px solid #d5dbe3 !important;
-}
+        .statement-sections table th,
+        .statement-sections table td {
+            vertical-align: middle;
+            border: 1px solid #d5dbe3 !important;
+        }
 
-.statement-sections table th {
-    font-weight: 700;
-    background-clip: padding-box;
-}
+        .statement-sections table th {
+            font-weight: 700;
+            background-clip: padding-box;
+        }
 
-/* Keep period and date readable everywhere */
-.statement-sections table th:nth-child(2),
-.statement-sections table td:nth-child(2),
-.statement-sections table th:nth-child(3),
-.statement-sections table td:nth-child(3) {
-    white-space: nowrap !important;
-}
+        /* Keep period and date readable everywhere */
+        .statement-sections table th:nth-child(2),
+        .statement-sections table td:nth-child(2),
+        .statement-sections table th:nth-child(3),
+        .statement-sections table td:nth-child(3) {
+            white-space: nowrap !important;
+        }
 
-/* Keep money columns from wrapping */
-.statement-sections table th.text-end,
-.statement-sections table td.text-end {
-    white-space: nowrap !important;
-}
+        /* Keep money columns from wrapping */
+        .statement-sections table th.text-end,
+        .statement-sections table td.text-end {
+            white-space: nowrap !important;
+        }
 
-/* Make FEDHA subtotal readable */
-.special-savings-subtotal .subtotal-title {
-    font-size: 0.9rem;
-    background: #d8dde3 !important;
-}
+        /* Make FEDHA subtotal readable */
+        .special-savings-subtotal .subtotal-title {
+            font-size: 0.9rem;
+            background: #d8dde3 !important;
+        }
 
-.special-savings-subtotal .subtotal-money {
-    background: #d8dde3 !important;
-    min-width: 105px;
-}
+        .special-savings-subtotal .subtotal-money {
+            background: #d8dde3 !important;
+            min-width: 105px;
+        }
 
-.special-savings-subtotal .subtotal-money span {
-    display: block;
-    font-size: 0.68rem;
-    font-weight: 700;
-    color: #495057;
-    text-transform: uppercase;
-    line-height: 1.1;
-    margin-bottom: 2px;
-}
+        .special-savings-subtotal .subtotal-money span {
+            display: block;
+            font-size: 0.68rem;
+            font-weight: 700;
+            color: #495057;
+            text-transform: uppercase;
+            line-height: 1.1;
+            margin-bottom: 2px;
+        }
 
-.special-savings-subtotal .subtotal-money strong {
-    display: block;
-    font-size: 0.86rem;
-    color: #111827;
-}
+        .special-savings-subtotal .subtotal-money strong {
+            display: block;
+            font-size: 0.86rem;
+            color: #111827;
+        }
 
-/* Improve dense statement tables */
-.table-sm th,
-.table-sm td {
-    padding: 0.38rem 0.45rem;
-}
+        /* Improve dense statement tables */
+        .table-sm th,
+        .table-sm td {
+            padding: 0.38rem 0.45rem;
+        }
 
         .loan-box {
             background: #fffdfd;
@@ -730,6 +792,7 @@
         }
 
         @media print {
+
             #nonPrintable,
             .migration-delete-form,
             .migration-delete-x,
@@ -744,8 +807,10 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <script>
-        document.getElementById("downloadPDF").addEventListener("click", function () {
-            const { jsPDF } = window.jspdf;
+        document.getElementById("downloadPDF").addEventListener("click", function() {
+            const {
+                jsPDF
+            } = window.jspdf;
             const pdf = new jsPDF('l', 'mm', 'a4');
             const container = document.getElementById("printableArea");
             const btn = this;
@@ -791,7 +856,7 @@
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
     <script>
-        document.getElementById("downloadExcel").addEventListener("click", function () {
+        document.getElementById("downloadExcel").addEventListener("click", function() {
             const container = document.getElementById("printableArea");
 
             if (!container) {
@@ -804,8 +869,13 @@
 
             const title = `Member Statement - ${memberName || ""}`.trim();
 
-            XLSX.utils.sheet_add_aoa(ws, [[title]], {
-                origin: { r: rowCursor, c: 0 }
+            XLSX.utils.sheet_add_aoa(ws, [
+                [title]
+            ], {
+                origin: {
+                    r: rowCursor,
+                    c: 0
+                }
             });
 
             rowCursor += 2;
@@ -814,8 +884,13 @@
 
             blocks.forEach(block => {
                 if (block.type === "text") {
-                    XLSX.utils.sheet_add_aoa(ws, [[block.value]], {
-                        origin: { r: rowCursor, c: 0 }
+                    XLSX.utils.sheet_add_aoa(ws, [
+                        [block.value]
+                    ], {
+                        origin: {
+                            r: rowCursor,
+                            c: 0
+                        }
                     });
 
                     rowCursor += 1;
@@ -825,7 +900,10 @@
                     const aoa = tableToAOAWithSpans(block.node);
 
                     XLSX.utils.sheet_add_aoa(ws, aoa, {
-                        origin: { r: rowCursor, c: 0 }
+                        origin: {
+                            r: rowCursor,
+                            c: 0
+                        }
                     });
 
                     rowCursor += aoa.length + 2;
@@ -878,7 +956,10 @@
                 }
 
                 if (node.tagName === "TABLE") {
-                    blocks.push({ type: "table", node });
+                    blocks.push({
+                        type: "table",
+                        node
+                    });
                     walker.currentNode = node;
                     continue;
                 }
@@ -904,7 +985,10 @@
 
                 seenText.add(text);
 
-                blocks.push({ type: "text", value: text });
+                blocks.push({
+                    type: "text",
+                    value: text
+                });
             }
 
             return blocks;
@@ -986,7 +1070,10 @@
                 let maxLen = 10;
 
                 for (let R = range.s.r; R <= range.e.r; ++R) {
-                    const addr = XLSX.utils.encode_cell({ r: R, c: C });
+                    const addr = XLSX.utils.encode_cell({
+                        r: R,
+                        c: C
+                    });
                     const cell = ws[addr];
 
                     if (!cell || cell.v == null) {
