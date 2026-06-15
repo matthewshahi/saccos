@@ -1515,9 +1515,20 @@ public function updateInstitution(Request $request, $id)
             return back()->withErrors(['error' => 'Member not found.']);
         }
 
-        // Set period_from and period_to, defaulting to '000000' and '999900' if not provided
-        $period_from = request('period_from', '000000');
-        $period_to = request('period_to', '999999');
+       // Statement filters
+$period_from = request('period_from', '000000');
+$period_to = request('period_to', '999999');
+
+// Default: show only loans outstanding as at selected period_to.
+$cleared_loans = request('cleared_loans', 'uncleared');
+
+if (!in_array($cleared_loans, ['uncleared', 'cleared', 'all'], true)) {
+    $cleared_loans = 'uncleared';
+}
+
+// For statement loan filtering only.
+// User requirement: outstanding loans with balance greater than 0.10.
+$statementLoanBalanceThreshold = 0.10;
 
         // Fetch the threshold amount for determining cleared loans
         $threshold = DB::table('sacco_defaults')
@@ -1621,20 +1632,65 @@ $fosaGrouped = $fosaContributions->groupBy(function ($row) {
         //         ->get();
 
 
-        $loans = DB::table('sacco_loans')
-            ->join('sacco_loan_types', 'sacco_loans.loan_loan_type', '=', 'sacco_loan_types.loan_type_id')
-            ->join('sacco_loan_category', 'sacco_loans.loan_loan_category', '=', 'sacco_loan_category.loan_category_id')
-            ->where('sacco_loans.loan_member', $id)
-            ->where('sacco_loans.loan_taken_period', '<=', $period_to)
-            ->select(
-                'sacco_loans.*',
-                'sacco_loan_types.loan_type_name',
-                'sacco_loan_category.loan_category_name'
-            )
-            ->orderBy('sacco_loans.loan_taken_period', 'asc')
-            ->orderBy('sacco_loans.loan_on', 'asc')
-            ->orderBy('sacco_loans.loan_loan_type', 'asc')
-            ->get();
+        /*
+|--------------------------------------------------------------------------
+| Loans for Statement
+|--------------------------------------------------------------------------
+| Default view:
+|   - show only loans whose balance as at period_to is greater than 0.10.
+|
+| Options:
+|   - uncleared: outstanding as at period_to > 0.10
+|   - cleared: outstanding as at period_to <= 0.10
+|   - all: all loans taken up to period_to
+|
+| Important:
+|   Balance is calculated from actual repayments up to period_to,
+|   not just the current loan_loan_paid value. This keeps period filters correct.
+*/
+$loanPaidToPeriodSub = DB::table('sacco_loan_payments')
+    ->select(
+        'loan_payments_loan_id',
+        DB::raw('SUM(COALESCE(loan_payments_amount, 0)) as paid_to_period')
+    )
+    ->where('loan_payments_period', '<=', $period_to)
+    ->groupBy('loan_payments_loan_id');
+
+$loansQuery = DB::table('sacco_loans')
+    ->join('sacco_loan_types', 'sacco_loans.loan_loan_type', '=', 'sacco_loan_types.loan_type_id')
+    ->join('sacco_loan_category', 'sacco_loans.loan_loan_category', '=', 'sacco_loan_category.loan_category_id')
+    ->leftJoinSub($loanPaidToPeriodSub, 'paid_period', function ($join) {
+        $join->on('sacco_loans.loan_id', '=', 'paid_period.loan_payments_loan_id');
+    })
+    ->where('sacco_loans.loan_member', $id)
+    ->where('sacco_loans.loan_taken_period', '<=', $period_to)
+    ->select(
+        'sacco_loans.*',
+        'sacco_loan_types.loan_type_name',
+        'sacco_loan_category.loan_category_name',
+        DB::raw('COALESCE(paid_period.paid_to_period, 0) as paid_as_at_period_to'),
+        DB::raw('(COALESCE(sacco_loans.loan_amount, 0) - COALESCE(paid_period.paid_to_period, 0)) as balance_as_at_period_to')
+    );
+
+if ($cleared_loans === 'uncleared') {
+    $loansQuery->whereRaw(
+        '(COALESCE(sacco_loans.loan_amount, 0) - COALESCE(paid_period.paid_to_period, 0)) > ?',
+        [$statementLoanBalanceThreshold]
+    );
+}
+
+if ($cleared_loans === 'cleared') {
+    $loansQuery->whereRaw(
+        '(COALESCE(sacco_loans.loan_amount, 0) - COALESCE(paid_period.paid_to_period, 0)) <= ?',
+        [$statementLoanBalanceThreshold]
+    );
+}
+
+$loans = $loansQuery
+    ->orderBy('sacco_loans.loan_taken_period', 'asc')
+    ->orderBy('sacco_loans.loan_on', 'asc')
+    ->orderBy('sacco_loans.loan_loan_type', 'asc')
+    ->get();
 
 
         // Fetch all loan payments
@@ -1760,6 +1816,8 @@ $specialSavings = $specialSavingAccounts->map(function ($account) use ($period_f
             'threshold_amount' => $threshold_amount,
              'migrationMode' => $migrationMode,
              'specialSavings' => $specialSavings,
+             'cleared_loans' => $cleared_loans,
+'statementLoanBalanceThreshold' => $statementLoanBalanceThreshold,
         ];
 
         return view('members.statement', compact('data'));

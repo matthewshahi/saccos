@@ -71,19 +71,21 @@
                     </div>
 
                     <div class="col-md-3 mb-2">
-                        <label class="form-label fw-bold">Loan Status</label>
-                        <select name="cleared_loans" class="form-control form-control-sm">
-                            <option value="all" {{ request('cleared_loans', 'all') == 'all' ? 'selected' : '' }}>
-                                All
-                            </option>
-                            <option value="cleared" {{ request('cleared_loans') == 'cleared' ? 'selected' : '' }}>
-                                Cleared
-                            </option>
-                            <option value="uncleared" {{ request('cleared_loans') == 'uncleared' ? 'selected' : '' }}>
-                                Uncleared
-                            </option>
-                        </select>
-                    </div>
+    <label class="form-label fw-bold">Loan Status</label>
+    <select name="cleared_loans" class="form-control form-control-sm">
+        <option value="uncleared" {{ request('cleared_loans', $data['cleared_loans'] ?? 'uncleared') == 'uncleared' ? 'selected' : '' }}>
+            Outstanding Only
+        </option>
+
+        <option value="all" {{ request('cleared_loans', $data['cleared_loans'] ?? 'uncleared') == 'all' ? 'selected' : '' }}>
+            All Loans
+        </option>
+
+        <option value="cleared" {{ request('cleared_loans', $data['cleared_loans'] ?? 'uncleared') == 'cleared' ? 'selected' : '' }}>
+            Cleared Only
+        </option>
+    </select>
+</div>
 
                     <div class="col-md-3 mb-2">
                         <button type="submit" class="btn btn-success w-100">
