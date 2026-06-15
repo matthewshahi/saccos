@@ -295,33 +295,54 @@
                 </div>
             </div>
 
-           {{-- SPECIAL SAVINGS --}}
+            {{-- SPECIAL SAVINGS --}}
 @if(isset($data['specialSavings']) && $data['specialSavings']->count() > 0)
-    <div class="card mb-4">
-        <div class="card-header bg-info text-white fw-bold">
-            Special Savings Statement
+    <div class="card mb-4 financial-section-card">
+        <div class="card-header financial-section-header">
+            <div>
+                <div class="financial-section-title">Special Savings Statement</div>
+                <div class="financial-section-subtitle">FEDHA and related special savings ledger movements</div>
+            </div>
         </div>
 
-        <div class="card-body p-0">
+        <div class="card-body financial-section-body">
             @foreach($data['specialSavings'] as $specialSaving)
                 @php
                     $account = $specialSaving->account;
-                    $transactions = $specialSaving->transactions;
-
-                    $totalDebit = 0;
-                    $totalCredit = 0;
-
-                    $principalDebit = 0;
-                    $principalCredit = 0;
-
-                    $interestDebit = 0;
-                    $interestCredit = 0;
+                    $transactions = $specialSaving->transactions ?? collect();
 
                     $openingPrincipal = (float) $specialSaving->opening_principal;
                     $openingInterest =
                         (float) $specialSaving->opening_accrued_interest
                         + (float) $specialSaving->opening_available_interest;
                     $openingTotal = (float) $specialSaving->opening_total;
+
+                    $totalDebit = 0;
+                    $totalCredit = 0;
+
+                    $principalCredit = 0;
+                    $principalDebit = 0;
+
+                    $interestCredit = 0;
+                    $interestDebit = 0;
+
+                    foreach ($transactions as $summaryTxn) {
+                        $summaryDirection = strtoupper((string) $summaryTxn->special_saving_transaction_direction);
+                        $summaryAmount = (float) $summaryTxn->special_saving_transaction_amount;
+
+                        $summaryPrincipalAmount = abs((float) ($summaryTxn->special_saving_transaction_principal_amount ?? 0));
+                        $summaryInterestAmount = abs((float) ($summaryTxn->special_saving_transaction_interest_amount ?? 0));
+
+                        if ($summaryDirection === 'DEBIT') {
+                            $totalDebit += $summaryAmount;
+                            $principalDebit += $summaryPrincipalAmount;
+                            $interestDebit += $summaryInterestAmount;
+                        } else {
+                            $totalCredit += $summaryAmount;
+                            $principalCredit += $summaryPrincipalAmount;
+                            $interestCredit += $summaryInterestAmount;
+                        }
+                    }
 
                     $closingTxn = $transactions->last();
 
@@ -339,180 +360,169 @@
                     $closingTotal = $closingTxn
                         ? (float) $closingTxn->special_saving_transaction_total_balance_after
                         : $openingTotal;
-                @endphp
 
-                <div class="bg-secondary text-white p-2 fw-bold">
-                    {{ $account->special_saving_product_name ?? 'Special Savings' }}
-                    @if(!empty($account->special_saving_account_number))
-                        — {{ $account->special_saving_account_number }}
-                    @endif
-                </div>
-
-                <div class="p-2 small bg-light special-savings-current-balance">
-                    <strong>Account Status:</strong> {{ $account->special_saving_account_status }}
-                    |
-                    <strong>Current Principal:</strong> {{ number_format((float) $account->special_saving_account_principal_balance, 2) }}
-                    |
-                    <strong>Current Accrued Interest:</strong> {{ number_format((float) $account->special_saving_account_accrued_interest_balance, 2) }}
-                    |
-                    <strong>Current Available Interest:</strong> {{ number_format((float) $account->special_saving_account_available_interest_balance, 2) }}
-                    |
-                    <strong>Current Total:</strong> {{ number_format((float) $account->special_saving_account_total_balance, 2) }}
-                </div>
-
-                <div class="table-responsive">
-                    <table class="table table-striped table-bordered table-sm mb-0 statement-ledger-table">
-                        <thead class="bg-light">
-                            <tr>
-                                <th>#</th>
-                                <th class="nowrap-cell">Period</th>
-                                <th class="nowrap-cell">Date</th>
-                                <th>Description</th>
-                                <th class="nowrap-cell">Doc No</th>
-                                <th class="nowrap-cell">Type</th>
-                                <th class="text-end money-cell">Debit</th>
-                                <th class="text-end money-cell">Credit</th>
-                                <th class="text-end money-cell">Principal Bal</th>
-                                <th class="text-end money-cell">Interest Bal</th>
-                                <th class="text-end money-cell">Total Bal</th>
-                            </tr>
-
-                            <tr class="table-secondary opening-row">
-                                <td colspan="8" class="text-end fw-bold">
-                                    Opening Balance before selected period
-                                </td>
-                                <td class="text-end fw-bold money-cell">
-                                    {{ number_format($openingPrincipal, 2) }}
-                                </td>
-                                <td class="text-end fw-bold money-cell">
-                                    {{ number_format($openingInterest, 2) }}
-                                </td>
-                                <td class="text-end fw-bold money-cell">
-                                    {{ number_format($openingTotal, 2) }}
-                                </td>
-                            </tr>
-                        </thead>
-
-                        <tbody>
-                            @foreach($transactions as $txn)
-                                @php
-                                    $direction = strtoupper((string) $txn->special_saving_transaction_direction);
-                                    $amount = (float) $txn->special_saving_transaction_amount;
-
-                                    $principalAmount = abs((float) ($txn->special_saving_transaction_principal_amount ?? 0));
-                                    $interestAmount = abs((float) ($txn->special_saving_transaction_interest_amount ?? 0));
-
-                                    $debit = $direction === 'DEBIT' ? $amount : 0;
-                                    $credit = $direction === 'CREDIT' ? $amount : 0;
-
-                                    $totalDebit += $debit;
-                                    $totalCredit += $credit;
-
-                                    if ($direction === 'DEBIT') {
-                                        $principalDebit += $principalAmount;
-                                        $interestDebit += $interestAmount;
-                                    } else {
-                                        $principalCredit += $principalAmount;
-                                        $interestCredit += $interestAmount;
-                                    }
-
-                                    $interestBalance =
-                                        (float) $txn->special_saving_transaction_accrued_interest_after
-                                        + (float) $txn->special_saving_transaction_available_interest_after;
-                                @endphp
-
-                                <tr>
-                                    <td>{{ $loop->iteration }}</td>
-                                    <td class="nowrap-cell">{{ $txn->special_saving_transaction_period }}</td>
-                                    <td class="nowrap-cell">{{ \Carbon\Carbon::parse($txn->special_saving_transaction_date)->format('d-m-Y') }}</td>
-                                    <td>{{ $txn->special_saving_transaction_description }}</td>
-                                    <td class="nowrap-cell">{{ $txn->special_saving_transaction_doc_no }}</td>
-                                    <td class="nowrap-cell">{{ $txn->special_saving_transaction_type }}</td>
-
-                                    <td class="text-end money-cell">
-                                        {{ $debit != 0 ? number_format($debit, 2) : '' }}
-                                    </td>
-
-                                    <td class="text-end money-cell">
-                                        {{ $credit != 0 ? number_format($credit, 2) : '' }}
-                                    </td>
-
-                                    <td class="text-end fw-bold money-cell">
-                                        {{ number_format((float) $txn->special_saving_transaction_principal_balance_after, 2) }}
-                                    </td>
-
-                                    <td class="text-end fw-bold money-cell">
-                                        {{ number_format($interestBalance, 2) }}
-                                    </td>
-
-                                    <td class="text-end fw-bold money-cell">
-                                        {{ number_format((float) $txn->special_saving_transaction_total_balance_after, 2) }}
-                                    </td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
-
-                @php
                     $expectedClosingTotal = $openingTotal + $totalCredit - $totalDebit;
                     $difference = round($expectedClosingTotal - $closingTotal, 2);
+
+                    $productName = $account->special_saving_product_name ?? 'Special Savings';
+                    $accountNumber = $account->special_saving_account_number ?? '';
                 @endphp
 
-                <div class="special-savings-summary-box">
-                    <div class="special-savings-summary-title">
-                        FEDHA Summary for this statement period
+                <div class="financial-product-panel">
+                    <div class="financial-product-header">
+                        <div>
+                            <div class="financial-product-title">
+                                {{ $productName }}
+                                @if(!empty($accountNumber))
+                                    <span class="financial-account-number">{{ $accountNumber }}</span>
+                                @endif
+                            </div>
+
+                            <div class="financial-product-meta">
+                                Status:
+                                <span class="financial-status-badge">
+                                    {{ $account->special_saving_account_status }}
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="financial-closing-box">
+                            <span>Current Account Total</span>
+                            <strong>{{ number_format((float) $account->special_saving_account_total_balance, 2) }}</strong>
+                        </div>
                     </div>
 
-                    <table class="table table-bordered table-sm mb-0 special-savings-summary-table">
-                        <thead>
-                            <tr>
-                                <th>Opening Total</th>
-                                <th>Principal Credits</th>
-                                <th>Interest Credits</th>
-                                <th>Total Credits Posted</th>
-                                <th>Total Debits / Resets</th>
-                                <th>Closing Principal</th>
-                                <th>Closing Interest</th>
-                                <th>Closing Total</th>
-                                <th>Check Difference</th>
-                            </tr>
-                        </thead>
+                    <div class="financial-summary-grid">
+                        <div class="financial-summary-item">
+                            <span>Opening Total</span>
+                            <strong>{{ number_format($openingTotal, 2) }}</strong>
+                        </div>
 
-                        <tbody>
-                            <tr>
-                                <td class="text-end money-cell">{{ number_format($openingTotal, 2) }}</td>
-                                <td class="text-end money-cell">{{ number_format($principalCredit, 2) }}</td>
-                                <td class="text-end money-cell">{{ number_format($interestCredit, 2) }}</td>
-                                <td class="text-end money-cell">{{ number_format($totalCredit, 2) }}</td>
-                                <td class="text-end money-cell">{{ number_format($totalDebit, 2) }}</td>
-                                <td class="text-end money-cell">{{ number_format($closingPrincipal, 2) }}</td>
-                                <td class="text-end money-cell">{{ number_format($closingInterest, 2) }}</td>
-                                <td class="text-end money-cell fw-bold">{{ number_format($closingTotal, 2) }}</td>
-                                <td class="text-end money-cell {{ abs($difference) > 0.01 ? 'text-danger' : 'text-success' }}">
-                                    {{ number_format($difference, 2) }}
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+                        <div class="financial-summary-item">
+                            <span>Principal Credits Posted</span>
+                            <strong>{{ number_format($principalCredit, 2) }}</strong>
+                        </div>
 
-                    <div class="special-savings-summary-note">
-                        Formula:
-                        Opening Total
-                        + Total Credits Posted
-                        - Total Debits / Resets
-                        =
-                        Closing Total.
-                        Principal Credits and Interest Credits are shown separately so the movement is clear.
+                        <div class="financial-summary-item">
+                            <span>Interest Credits Posted</span>
+                            <strong>{{ number_format($interestCredit, 2) }}</strong>
+                        </div>
+
+                        <div class="financial-summary-item">
+                            <span>Total Credits Posted</span>
+                            <strong>{{ number_format($totalCredit, 2) }}</strong>
+                        </div>
+
+                        <div class="financial-summary-item">
+                            <span>Total Debits / Resets</span>
+                            <strong>{{ number_format($totalDebit, 2) }}</strong>
+                        </div>
+
+                        <div class="financial-summary-item">
+                            <span>Closing Principal</span>
+                            <strong>{{ number_format($closingPrincipal, 2) }}</strong>
+                        </div>
+
+                        <div class="financial-summary-item">
+                            <span>Closing Interest</span>
+                            <strong>{{ number_format($closingInterest, 2) }}</strong>
+                        </div>
+
+                        <div class="financial-summary-item financial-summary-total">
+                            <span>Closing Total</span>
+                            <strong>{{ number_format($closingTotal, 2) }}</strong>
+                        </div>
+
+                        <div class="financial-summary-item {{ abs($difference) > 0.01 ? 'financial-check-bad' : 'financial-check-good' }}">
+                            <span>Reconciliation Check</span>
+                            <strong>{{ number_format($difference, 2) }}</strong>
+                        </div>
+                    </div>
+
+                    <div class="financial-formula-line">
+                        Opening Total + Total Credits Posted - Total Debits / Resets = Closing Total
+                    </div>
+
+                    <div class="financial-table-wrap">
+                        <table class="table table-sm mb-0 financial-ledger-table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th class="nowrap-cell">Period</th>
+                                    <th class="nowrap-cell">Date</th>
+                                    <th>Description</th>
+                                    <th class="nowrap-cell">Doc No</th>
+                                    <th class="nowrap-cell">Type</th>
+                                    <th class="text-end money-cell">Debit</th>
+                                    <th class="text-end money-cell">Credit</th>
+                                    <th class="text-end money-cell">Principal Bal</th>
+                                    <th class="text-end money-cell">Interest Bal</th>
+                                    <th class="text-end money-cell">Total Bal</th>
+                                </tr>
+
+                                <tr class="financial-opening-row">
+                                    <td colspan="8" class="text-end fw-bold">
+                                        Opening Balance before selected period
+                                    </td>
+                                    <td class="text-end fw-bold money-cell">{{ number_format($openingPrincipal, 2) }}</td>
+                                    <td class="text-end fw-bold money-cell">{{ number_format($openingInterest, 2) }}</td>
+                                    <td class="text-end fw-bold money-cell">{{ number_format($openingTotal, 2) }}</td>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                @foreach($transactions as $txn)
+                                    @php
+                                        $direction = strtoupper((string) $txn->special_saving_transaction_direction);
+                                        $amount = (float) $txn->special_saving_transaction_amount;
+
+                                        $debit = $direction === 'DEBIT' ? $amount : 0;
+                                        $credit = $direction === 'CREDIT' ? $amount : 0;
+
+                                        $interestBalance =
+                                            (float) $txn->special_saving_transaction_accrued_interest_after
+                                            + (float) $txn->special_saving_transaction_available_interest_after;
+                                    @endphp
+
+                                    <tr>
+                                        <td class="row-number-cell">{{ $loop->iteration }}</td>
+                                        <td class="nowrap-cell">{{ $txn->special_saving_transaction_period }}</td>
+                                        <td class="nowrap-cell">{{ \Carbon\Carbon::parse($txn->special_saving_transaction_date)->format('d-m-Y') }}</td>
+                                        <td class="description-cell">{{ $txn->special_saving_transaction_description }}</td>
+                                        <td class="nowrap-cell">{{ $txn->special_saving_transaction_doc_no }}</td>
+                                        <td class="nowrap-cell">{{ $txn->special_saving_transaction_type }}</td>
+
+                                        <td class="text-end money-cell">
+                                            {{ $debit != 0 ? number_format($debit, 2) : '' }}
+                                        </td>
+
+                                        <td class="text-end money-cell">
+                                            {{ $credit != 0 ? number_format($credit, 2) : '' }}
+                                        </td>
+
+                                        <td class="text-end fw-bold money-cell">
+                                            {{ number_format((float) $txn->special_saving_transaction_principal_balance_after, 2) }}
+                                        </td>
+
+                                        <td class="text-end fw-bold money-cell">
+                                            {{ number_format($interestBalance, 2) }}
+                                        </td>
+
+                                        <td class="text-end fw-bold money-cell total-balance-cell">
+                                            {{ number_format((float) $txn->special_saving_transaction_total_balance_after, 2) }}
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
                     </div>
                 </div>
-
-                <br>
             @endforeach
         </div>
     </div>
 @endif
             
+
 
             {{-- LOANS --}}
             <div class="card mb-5">
@@ -665,142 +675,356 @@
     <script>
         const memberName = @json($data['member']->member_name);
     </script>
+body {
+    background: #f4f6f9;
+    color: #1f2937;
+}
 
-    <style>
-        body {
-            background: #f7f9fc;
-        }
+.statement-header h2 {
+    color: #1f2937;
+}
 
-        .statement-header h2 {
-            color: #2c3e50;
-        }
+.statement-sections {
+    padding: 0 18px 24px 18px;
+}
 
-        .statement-sections .card {
-            border-radius: 10px;
-            overflow: hidden;
-        }
+.statement-sections-inner {
+    max-width: 100%;
+}
 
-        .card-header {
-            font-size: 1rem;
-            letter-spacing: 0.3px;
-        }
+.statement-sections .card {
+    border: 1px solid #d9dee7;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+    background: #ffffff;
+}
 
-        .statement-sections table {
-            border-collapse: collapse !important;
-            width: 100%;
-        }
+.card-header {
+    font-size: 0.95rem;
+    letter-spacing: 0.2px;
+}
 
-        .statement-sections table th,
-        .statement-sections table td {
-            vertical-align: middle;
-            border: 1px solid #d5dbe3 !important;
-        }
+.statement-sections table {
+    border-collapse: collapse !important;
+    width: 100%;
+    margin-bottom: 0;
+}
 
-        .statement-sections table th {
-            font-weight: 700;
-            background-clip: padding-box;
-        }
+.statement-sections table th,
+.statement-sections table td {
+    vertical-align: middle;
+    border: 1px solid #dde3ec !important;
+}
 
-        /* Keep period and date readable everywhere */
-        .statement-sections table th:nth-child(2),
-        .statement-sections table td:nth-child(2),
-        .statement-sections table th:nth-child(3),
-        .statement-sections table td:nth-child(3) {
-            white-space: nowrap !important;
-        }
+.statement-sections table th {
+    font-weight: 700;
+}
 
-        /* Keep money columns from wrapping */
-        .statement-sections table th.text-end,
-        .statement-sections table td.text-end {
-            white-space: nowrap !important;
-        }
+.statement-sections table th:nth-child(2),
+.statement-sections table td:nth-child(2),
+.statement-sections table th:nth-child(3),
+.statement-sections table td:nth-child(3) {
+    white-space: nowrap !important;
+}
 
-        /* Make FEDHA subtotal readable */
-        .special-savings-subtotal .subtotal-title {
-            font-size: 0.9rem;
-            background: #d8dde3 !important;
-        }
+.statement-sections table th.text-end,
+.statement-sections table td.text-end,
+.money-cell {
+    white-space: nowrap !important;
+    font-variant-numeric: tabular-nums;
+}
 
-        .special-savings-subtotal .subtotal-money {
-            background: #d8dde3 !important;
-            min-width: 105px;
-        }
+.nowrap-cell {
+    white-space: nowrap !important;
+}
 
-        .special-savings-subtotal .subtotal-money span {
-            display: block;
-            font-size: 0.68rem;
-            font-weight: 700;
-            color: #495057;
-            text-transform: uppercase;
-            line-height: 1.1;
-            margin-bottom: 2px;
-        }
+.table-sm th,
+.table-sm td {
+    padding: 0.42rem 0.55rem;
+}
 
-        .special-savings-subtotal .subtotal-money strong {
-            display: block;
-            font-size: 0.86rem;
-            color: #111827;
-        }
+.financial-section-card {
+    border: 1px solid #cfd7e3 !important;
+}
 
-        /* Improve dense statement tables */
-        .table-sm th,
-        .table-sm td {
-            padding: 0.38rem 0.45rem;
-        }
+.financial-section-header {
+    background: #172033 !important;
+    color: #ffffff !important;
+    padding: 14px 18px;
+}
 
-        .loan-box {
-            background: #fffdfd;
-        }
+.financial-section-title {
+    font-size: 0.98rem;
+    font-weight: 800;
+    letter-spacing: 0.3px;
+}
 
-        .loading-indicator {
-            display: none;
-            color: #6c63ff;
-            font-weight: bold;
-            margin-left: 10px;
-        }
+.financial-section-subtitle {
+    font-size: 0.74rem;
+    opacity: 0.78;
+    margin-top: 2px;
+}
 
-        .migration-delete-form {
-            margin: 0;
-            padding: 0;
-        }
+.financial-section-body {
+    padding: 16px !important;
+    background: #f8fafc;
+}
 
-        .migration-delete-x {
-            border: none;
-            background: transparent;
-            color: #dc3545;
-            font-size: 1.35rem;
-            font-weight: 900;
-            line-height: 1;
-            padding: 0 6px;
-            cursor: pointer;
-        }
+.financial-product-panel {
+    background: #ffffff;
+    border: 1px solid #cfd7e3;
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 16px;
+}
 
-        .migration-delete-x:hover {
-            color: #9b0000;
-            transform: scale(1.08);
-        }
+.financial-product-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 18px;
+    align-items: center;
+    padding: 14px 16px;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    border-bottom: 1px solid #d9e0ea;
+}
 
-        .migration-action-col {
-            width: 45px;
-            min-width: 45px;
-        }
+.financial-product-title {
+    font-size: 1rem;
+    font-weight: 800;
+    color: #172033;
+}
 
-        .export-mode .migration-delete-form,
-        .export-mode .migration-delete-x,
-        .export-mode .migration-action-col {
-            display: none !important;
-        }
+.financial-account-number {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: #eef2f7;
+    color: #334155;
+    font-size: 0.74rem;
+    font-weight: 700;
+}
 
-        @media print {
+.financial-product-meta {
+    margin-top: 5px;
+    font-size: 0.78rem;
+    color: #64748b;
+}
 
-            #nonPrintable,
-            .migration-delete-form,
-            .migration-delete-x,
-            .migration-action-col {
-                display: none !important;
-            }
-        }
-    </style>
+.financial-status-badge {
+    display: inline-block;
+    margin-left: 4px;
+    padding: 2px 9px;
+    border-radius: 999px;
+    background: #e8f7ee;
+    color: #166534;
+    font-weight: 800;
+    font-size: 0.72rem;
+}
+
+.financial-closing-box {
+    min-width: 190px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    background: #172033;
+    color: #ffffff;
+    text-align: right;
+}
+
+.financial-closing-box span {
+    display: block;
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    opacity: 0.78;
+}
+
+.financial-closing-box strong {
+    display: block;
+    margin-top: 2px;
+    font-size: 1.12rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.financial-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(9, minmax(130px, 1fr));
+    gap: 0;
+    border-bottom: 1px solid #d9e0ea;
+    overflow-x: auto;
+}
+
+.financial-summary-item {
+    padding: 11px 12px;
+    border-right: 1px solid #e2e8f0;
+    background: #ffffff;
+    min-width: 130px;
+}
+
+.financial-summary-item span {
+    display: block;
+    color: #64748b;
+    font-size: 0.68rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.35px;
+    line-height: 1.2;
+}
+
+.financial-summary-item strong {
+    display: block;
+    margin-top: 5px;
+    color: #111827;
+    font-size: 0.92rem;
+    font-weight: 800;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.financial-summary-total {
+    background: #f1f5f9;
+}
+
+.financial-summary-total strong {
+    color: #0f172a;
+    font-size: 1rem;
+}
+
+.financial-check-good strong {
+    color: #15803d;
+}
+
+.financial-check-bad strong {
+    color: #b91c1c;
+}
+
+.financial-formula-line {
+    padding: 8px 12px;
+    background: #f8fafc;
+    border-bottom: 1px solid #d9e0ea;
+    color: #475569;
+    font-size: 0.75rem;
+}
+
+.financial-table-wrap {
+    width: 100%;
+    overflow-x: auto;
+    background: #ffffff;
+}
+
+.financial-ledger-table {
+    min-width: 1180px;
+    font-size: 0.79rem;
+}
+
+.financial-ledger-table thead th {
+    background: #273244 !important;
+    color: #ffffff;
+    border-color: #3b4658 !important;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.35px;
+}
+
+.financial-ledger-table tbody td {
+    background: #ffffff;
+    color: #243041;
+}
+
+.financial-ledger-table tbody tr:nth-child(even) td {
+    background: #f8fafc;
+}
+
+.financial-ledger-table tbody tr:hover td {
+    background: #eef6ff;
+}
+
+.financial-opening-row td {
+    background: #e5eaf1 !important;
+    color: #111827;
+}
+
+.row-number-cell {
+    text-align: center;
+    color: #64748b;
+    width: 42px;
+}
+
+.description-cell {
+    min-width: 320px;
+    max-width: 520px;
+    line-height: 1.35;
+}
+
+.total-balance-cell {
+    color: #0f172a;
+}
+
+.loan-box {
+    background: #ffffff;
+}
+
+.loading-indicator {
+    display: none;
+    color: #6c63ff;
+    font-weight: bold;
+    margin-left: 10px;
+}
+
+.migration-delete-form {
+    margin: 0;
+    padding: 0;
+}
+
+.migration-delete-x {
+    border: none;
+    background: transparent;
+    color: #dc3545;
+    font-size: 1.35rem;
+    font-weight: 900;
+    line-height: 1;
+    padding: 0 6px;
+    cursor: pointer;
+}
+
+.migration-delete-x:hover {
+    color: #9b0000;
+    transform: scale(1.08);
+}
+
+.migration-action-col {
+    width: 45px;
+    min-width: 45px;
+}
+
+.export-mode .migration-delete-form,
+.export-mode .migration-delete-x,
+.export-mode .migration-action-col {
+    display: none !important;
+}
+
+@media print {
+    #nonPrintable,
+    .migration-delete-form,
+    .migration-delete-x,
+    .migration-action-col {
+        display: none !important;
+    }
+
+    .statement-sections {
+        padding: 0;
+    }
+
+    .financial-section-body {
+        padding: 10px !important;
+    }
+
+    .financial-product-panel {
+        box-shadow: none;
+        page-break-inside: avoid;
+    }
+}
 
     {{-- ================= JS FOR PDF EXPORT ================= --}}
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
