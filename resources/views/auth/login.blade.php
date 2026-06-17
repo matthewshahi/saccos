@@ -11,7 +11,7 @@
 
 @section('robots', 'noindex, follow')
 
-@section('content')
+@section('content') 
 <style>
     :root {
         --fi-primary: #643A28;
