@@ -20,6 +20,42 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Application Logo
+    |--------------------------------------------------------------------------
+    |
+    | If APP_LOGO=Y, the login page will try to display a logo from:
+    |
+    | public/{APP_LOGO_FOLDER}/{safe_app_name}_logo.{APP_LOGO_EXTENSION}
+    |
+    | Example:
+    | APP_NAME="Kass Sacco"
+    | APP_LOGO=Y
+    |
+    | public/logo/kass_sacco_logo.jpg
+    |
+    */
+
+    'logo' => [
+        'enabled' => strtoupper((string) env('APP_LOGO', 'N')) === 'Y',
+
+        'folder' => trim((string) env('APP_LOGO_FOLDER', 'logo'), '/'),
+
+        'extension' => ltrim(strtolower((string) env('APP_LOGO_EXTENSION', 'jpg')), '.'),
+
+        'filename' => strtolower(
+            trim(
+                preg_replace(
+                    '/_+/',
+                    '_',
+                    preg_replace('/[^A-Za-z0-9]+/', '_', env('APP_NAME', 'app'))
+                ),
+                '_'
+            )
+        ) . '_logo.' . ltrim(strtolower((string) env('APP_LOGO_EXTENSION', 'jpg')), '.'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Environment
     |--------------------------------------------------------------------------
     |
@@ -55,12 +91,19 @@ return [
     |
     */
 
-
     'url' => env('APP_URL', 'http://localhost'),
 
     'asset_url' => env('ASSET_URL'),
 
-    // 'migration_mode' => strtoupper((string) env('MIGRATION', 'N')) === 'Y',
+    /*
+    |--------------------------------------------------------------------------
+    | Migration Mode
+    |--------------------------------------------------------------------------
+    |
+    | Custom setting used by the SACCO application to enable or disable
+    | migration mode.
+    |
+    */
 
     'migration_mode' => strtoupper((string) env('MIGRATION', 'N')) === 'Y' ? 'Y' : 'N',
 
@@ -70,8 +113,7 @@ return [
     |--------------------------------------------------------------------------
     |
     | Here you may specify the default timezone for your application, which
-    | will be used by the PHP date and date-time functions. We have gone
-    | ahead and set this to a sensible default for you out of the box.
+    | will be used by the PHP date and date-time functions.
     |
     */
 
@@ -83,8 +125,7 @@ return [
     |--------------------------------------------------------------------------
     |
     | The application locale determines the default locale that will be used
-    | by the translation service provider. You are free to set this value
-    | to any of the locales which will be supported by the application.
+    | by the translation service provider.
     |
     */
 
@@ -96,8 +137,7 @@ return [
     |--------------------------------------------------------------------------
     |
     | The fallback locale determines the locale to use when the current one
-    | is not available. You may change the value to correspond to any of
-    | the language folders that are provided through your application.
+    | is not available.
     |
     */
 
@@ -109,8 +149,7 @@ return [
     |--------------------------------------------------------------------------
     |
     | This locale will be used by the Faker PHP library when generating fake
-    | data for your database seeds. For example, this will be used to get
-    | localized telephone numbers, street address information and more.
+    | data for your database seeds.
     |
     */
 
@@ -123,7 +162,7 @@ return [
     |
     | This key is used by the Illuminate encrypter service and should be set
     | to a random, 32 character string, otherwise these encrypted strings
-    | will not be safe. Please do this before deploying an application!
+    | will not be safe.
     |
     */
 
@@ -137,8 +176,7 @@ return [
     |--------------------------------------------------------------------------
     |
     | These configuration options determine the driver used to determine and
-    | manage Laravel's "maintenance mode" status. The "cache" driver will
-    | allow maintenance mode to be controlled across multiple machines.
+    | manage Laravel's "maintenance mode" status.
     |
     | Supported drivers: "file", "cache"
     |
@@ -155,8 +193,7 @@ return [
     |--------------------------------------------------------------------------
     |
     | The service providers listed here will be automatically loaded on the
-    | request to your application. Feel free to add your own services to
-    | this array to grant expanded functionality to your applications.
+    | request to your application.
     |
     */
 
@@ -181,15 +218,13 @@ return [
     |--------------------------------------------------------------------------
     |
     | This array of class aliases will be registered when this application
-    | is started. However, feel free to register as many as you wish as
-    | the aliases are "lazy" loaded so they don't hinder performance.
+    | is started.
     |
     */
 
     'aliases' => Facade::defaultAliases()->merge([
         // 'Example' => App\Facades\Example::class,
-        'Log' => Illuminate\Support\Facades\Log::class, // Add this line
-
+        'Log' => Illuminate\Support\Facades\Log::class,
     ])->toArray(),
 
     /*
@@ -198,11 +233,13 @@ return [
     |--------------------------------------------------------------------------
     |
     | These custom settings allow you to define application-specific
-    | configurations such as ERP and support contacts that can be
-    | globally accessed within your application.
+    | configurations such as ERP and support contacts that can be globally
+    | accessed within your application.
     |
     */
 
     'erp_contact' => env('ERP_CONTACT', '+254 722 400737'),
+
     'sacco_support' => env('SACCO_SUPPORT', '+254 722 400737'),
+
 ];

@@ -2,7 +2,42 @@
 
 @php
     $saccoName = trim((string) ($defaultCompanyName ?? config('app.name', 'SACCO')));
-    $supportPhone = trim((string) env('SACCO_SUPPORT'));
+    $supportPhone = trim((string) config('app.sacco_support', ''));
+
+    /*
+    |--------------------------------------------------------------------------
+    | Optional Application Logo
+    |--------------------------------------------------------------------------
+    |
+    | Reads from config/app.php:
+    |
+    | config('app.logo.enabled')
+    | config('app.logo.folder')
+    | config('app.logo.filename')
+    |
+    | Example expected file:
+    | public/logo/kass_sacco_logo.jpg
+    |
+    */
+
+    $logoEnabled = (bool) config('app.logo.enabled', false);
+    $logoFolder = trim((string) config('app.logo.folder', 'logo'), '/');
+    $logoFilename = ltrim((string) config('app.logo.filename', ''), '/');
+
+    $logoRelativePath = null;
+    $logoPublicPath = null;
+    $logoUrl = null;
+    $showLogo = false;
+
+    if ($logoEnabled && $logoFolder !== '' && $logoFilename !== '') {
+        $logoRelativePath = $logoFolder . '/' . $logoFilename;
+        $logoPublicPath = public_path($logoRelativePath);
+
+        if (file_exists($logoPublicPath)) {
+            $logoUrl = asset($logoRelativePath);
+            $showLogo = true;
+        }
+    }
 @endphp
 
 @section('seo_title', $saccoName . ' Member Login | SACCO Member Portal')
@@ -11,17 +46,28 @@
 
 @section('robots', 'noindex, follow')
 
-@section('content') 
+@section('content')
 <style>
     :root {
-        --fi-primary: #643A28;
-        --fi-primary-dark: #4f2e20;
-        --fi-primary-soft: rgba(100, 58, 40, 0.08);
-        --fi-primary-border: rgba(100, 58, 40, 0.16);
-        --fi-text: #241913;
-        --fi-muted: #756760;
+        --fi-primary: #2454a6;
+        --fi-primary-dark: #183b76;
+        --fi-primary-soft: rgba(36, 84, 166, 0.08);
+        --fi-primary-border: rgba(36, 84, 166, 0.18);
+
+        --fi-text: #0f172a;
+        --fi-muted: #64748b;
+        --fi-muted-strong: #475569;
+
         --fi-panel: #ffffff;
-        --fi-soft-bg: #fcf8f5;
+        --fi-soft-bg: #f8fafc;
+        --fi-soft-bg-2: #eef2f7;
+        --fi-border: #e2e8f0;
+
+        --fi-success: #16a34a;
+        --fi-danger: #dc2626;
+
+        --fi-shadow-soft: 0 18px 50px rgba(15, 23, 42, 0.10);
+        --fi-shadow-strong: 0 28px 80px rgba(15, 23, 42, 0.16);
     }
 
     body {
@@ -29,8 +75,9 @@
         min-height: 100vh;
         min-height: 100svh;
         background:
-            radial-gradient(circle at top left, rgba(100, 58, 40, 0.12), transparent 34%),
-            linear-gradient(135deg, #f8f4f1 0%, #f3ede8 46%, #ffffff 100%);
+            radial-gradient(circle at top left, rgba(36, 84, 166, 0.08), transparent 32%),
+            radial-gradient(circle at bottom right, rgba(15, 23, 42, 0.06), transparent 34%),
+            linear-gradient(135deg, #f8fafc 0%, #f1f5f9 48%, #ffffff 100%);
     }
 
     .fi-login-page {
@@ -57,8 +104,7 @@
         position: relative;
         padding: 24px 20px;
         background:
-            linear-gradient(135deg, rgba(100, 58, 40, 0.98), rgba(79, 46, 32, 0.99)),
-            radial-gradient(circle at top right, rgba(255, 255, 255, 0.24), transparent 36%);
+            linear-gradient(135deg, #0f172a 0%, #1e293b 58%, #334155 100%);
         color: #ffffff;
         overflow: hidden;
     }
@@ -66,23 +112,23 @@
     .fi-brand-panel::before {
         content: "";
         position: absolute;
-        width: 230px;
-        height: 230px;
+        width: 260px;
+        height: 260px;
         border-radius: 50%;
-        background: rgba(255, 255, 255, 0.08);
-        top: -110px;
-        right: -96px;
+        background: rgba(255, 255, 255, 0.07);
+        top: -130px;
+        right: -112px;
     }
 
     .fi-brand-panel::after {
         content: "";
         position: absolute;
-        width: 190px;
-        height: 190px;
+        width: 210px;
+        height: 210px;
         border-radius: 50%;
-        border: 1px solid rgba(255, 255, 255, 0.14);
-        bottom: -105px;
-        left: -86px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        bottom: -118px;
+        left: -96px;
     }
 
     .fi-brand-inner {
@@ -95,8 +141,8 @@
         align-items: center;
         padding: 6px 10px;
         border-radius: 999px;
-        background: rgba(255, 255, 255, 0.12);
-        border: 1px solid rgba(255, 255, 255, 0.18);
+        background: rgba(255, 255, 255, 0.10);
+        border: 1px solid rgba(255, 255, 255, 0.16);
         font-size: 10px;
         font-weight: 900;
         letter-spacing: .08em;
@@ -117,7 +163,7 @@
         margin: 0;
         font-size: 13px;
         line-height: 1.65;
-        color: rgba(255, 255, 255, 0.84);
+        color: rgba(255, 255, 255, 0.78);
     }
 
     .fi-feature-list {
@@ -130,7 +176,8 @@
 
     .fi-form-panel {
         padding: 26px 18px 34px;
-        background: linear-gradient(180deg, #ffffff 0%, var(--fi-soft-bg) 100%);
+        background:
+            linear-gradient(180deg, #ffffff 0%, var(--fi-soft-bg) 100%);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -139,6 +186,36 @@
     .fi-login-card {
         width: 100%;
         max-width: 430px;
+    }
+
+    .fi-login-logo-wrap {
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        margin-bottom: 18px;
+    }
+
+    .fi-login-logo-box {
+        width: auto;
+        max-width: 180px;
+        min-height: 58px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 10px 12px;
+        border-radius: 18px;
+        background: #ffffff;
+        border: 1px solid var(--fi-border);
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.07);
+    }
+
+    .fi-login-logo {
+        display: block;
+        max-width: 150px;
+        max-height: 64px;
+        width: auto;
+        height: auto;
+        object-fit: contain;
     }
 
     .fi-login-top {
@@ -191,7 +268,7 @@
         display: block;
         font-size: 13px;
         font-weight: 800;
-        color: #3d2b23;
+        color: var(--fi-text);
         margin: 0;
     }
 
@@ -215,18 +292,23 @@
         width: 100%;
         height: 50px;
         border-radius: 14px;
-        border: 1px solid var(--fi-primary-border);
+        border: 1px solid var(--fi-border);
         background: #ffffff;
-        color: #2d211c;
+        color: var(--fi-text);
         font-size: 14px;
         padding: 12px 14px;
-        box-shadow: 0 1px 0 rgba(0, 0, 0, 0.02);
-        transition: border-color .18s ease, box-shadow .18s ease;
+        box-shadow: 0 1px 0 rgba(15, 23, 42, 0.02);
+        transition: border-color .18s ease, box-shadow .18s ease, background-color .18s ease;
+    }
+
+    .fi-input-wrap .form-control::placeholder {
+        color: #94a3b8;
     }
 
     .fi-input-wrap .form-control:focus {
-        border-color: rgba(100, 58, 40, 0.72);
-        box-shadow: 0 0 0 4px rgba(100, 58, 40, 0.10);
+        border-color: rgba(36, 84, 166, 0.68);
+        box-shadow: 0 0 0 4px rgba(36, 84, 166, 0.10);
+        background-color: #ffffff;
         outline: none;
     }
 
@@ -239,33 +321,64 @@
         color: #ffffff;
         font-weight: 900;
         font-size: 15px;
-        box-shadow: 0 12px 28px rgba(100, 58, 40, 0.24);
-        transition: transform .16s ease, box-shadow .16s ease, opacity .16s ease;
+        box-shadow: 0 14px 30px rgba(36, 84, 166, 0.22);
+        transition: transform .16s ease, box-shadow .16s ease, opacity .16s ease, filter .16s ease;
     }
 
     .fi-submit-btn:hover {
         transform: translateY(-1px);
-        box-shadow: 0 16px 34px rgba(100, 58, 40, 0.30);
+        box-shadow: 0 18px 38px rgba(36, 84, 166, 0.28);
         color: #ffffff;
+        filter: saturate(1.04);
     }
 
-    .fi-submit-btn:disabled {
-        opacity: .75;
+    .fi-submit-btn:disabled,
+    .fi-submit-btn.is-processing {
+        opacity: .78;
         cursor: not-allowed;
         transform: none;
         box-shadow: none;
+        filter: none;
+    }
+
+    .fi-btn-content {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 9px;
+    }
+
+    .fi-btn-spinner {
+        display: none;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        border: 2px solid rgba(255, 255, 255, 0.45);
+        border-top-color: #ffffff;
+        animation: fi-spin .75s linear infinite;
+    }
+
+    .fi-submit-btn.is-processing .fi-btn-spinner {
+        display: inline-block;
+    }
+
+    @keyframes fi-spin {
+        to {
+            transform: rotate(360deg);
+        }
     }
 
     .fi-apply-box {
         margin-top: 16px;
         padding: 14px;
         border-radius: 16px;
-        background: rgba(100, 58, 40, 0.06);
-        border: 1px solid rgba(100, 58, 40, 0.10);
+        background: #ffffff;
+        border: 1px solid var(--fi-border);
         text-align: center;
         font-size: 13px;
         line-height: 1.45;
-        color: #675951;
+        color: var(--fi-muted-strong);
+        box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
     }
 
     .fi-apply-box a {
@@ -286,15 +399,16 @@
         margin-top: 18px;
         padding: 12px 14px;
         border-radius: 16px;
-        background: #faf6f3;
-        border: 1px solid rgba(0, 0, 0, 0.05);
+        background: #ffffff;
+        border: 1px solid var(--fi-border);
         color: var(--fi-muted);
         font-size: 12px;
         line-height: 1.55;
+        box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
     }
 
     .fi-security-note strong {
-        color: #3d2b23;
+        color: var(--fi-text);
     }
 
     .fi-security-dot {
@@ -303,15 +417,15 @@
         min-width: 9px;
         margin-top: 5px;
         border-radius: 50%;
-        background: #2fb344;
-        box-shadow: 0 0 0 4px rgba(47, 179, 68, 0.12);
+        background: var(--fi-success);
+        box-shadow: 0 0 0 4px rgba(22, 163, 74, 0.12);
     }
 
     .login-footer {
         font-size: 0.86rem;
         text-align: center;
         margin-top: 22px;
-        color: #675951;
+        color: var(--fi-muted);
     }
 
     .login-footer a {
@@ -327,22 +441,23 @@
     .provider-credit {
         margin-top: 12px;
         padding-top: 12px;
-        border-top: 1px solid rgba(100, 58, 40, 0.10);
+        border-top: 1px solid var(--fi-border);
         font-size: 0.82rem;
-        color: #7a6c64;
+        color: var(--fi-muted);
         line-height: 1.45;
     }
 
     .provider-credit strong {
-        color: var(--fi-primary);
+        color: var(--fi-text);
         font-weight: 900;
     }
 
     .recaptcha-note {
         font-size: 0.85rem;
-        color: #666;
+        color: var(--fi-danger);
         margin-top: 0.75rem;
         text-align: center;
+        line-height: 1.45;
     }
 
     @media (min-width: 576px) {
@@ -355,8 +470,8 @@
             min-height: auto;
             max-width: 540px;
             border-radius: 26px;
-            box-shadow: 0 22px 60px rgba(45, 27, 20, 0.16);
-            border: 1px solid rgba(100, 58, 40, 0.08);
+            box-shadow: var(--fi-shadow-soft);
+            border: 1px solid rgba(226, 232, 240, 0.88);
         }
 
         .fi-brand-panel {
@@ -383,7 +498,7 @@
             display: grid;
             grid-template-columns: 1.05fr 0.95fr;
             border-radius: 28px;
-            box-shadow: 0 24px 70px rgba(45, 27, 20, 0.18);
+            box-shadow: var(--fi-shadow-strong);
         }
 
         .fi-brand-panel {
@@ -414,8 +529,8 @@
             gap: 12px;
             padding: 13px 14px;
             border-radius: 16px;
-            background: rgba(255, 255, 255, 0.10);
-            border: 1px solid rgba(255, 255, 255, 0.14);
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.12);
             backdrop-filter: blur(8px);
         }
 
@@ -424,7 +539,7 @@
             height: 28px;
             min-width: 28px;
             border-radius: 50%;
-            background: rgba(255, 255, 255, 0.18);
+            background: rgba(255, 255, 255, 0.14);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -443,7 +558,7 @@
             display: block;
             font-size: 12px;
             line-height: 1.45;
-            color: rgba(255, 255, 255, 0.78);
+            color: rgba(255, 255, 255, 0.72);
         }
 
         .fi-brand-footer {
@@ -451,12 +566,60 @@
             position: relative;
             z-index: 2;
             font-size: 12px;
-            color: rgba(255, 255, 255, 0.72);
+            color: rgba(255, 255, 255, 0.68);
             line-height: 1.6;
         }
 
         .fi-form-panel {
             padding: 44px;
+        }
+    }
+
+    @media (max-width: 575.98px) {
+        .fi-login-shell {
+            min-height: 100vh;
+            min-height: 100svh;
+        }
+
+        .fi-brand-panel {
+            padding: 22px 18px 20px;
+        }
+
+        .fi-brand-title {
+            font-size: 25px;
+        }
+
+        .fi-brand-text {
+            font-size: 12.5px;
+            line-height: 1.6;
+        }
+
+        .fi-form-panel {
+            align-items: flex-start;
+            padding-top: 24px;
+        }
+
+        .fi-login-logo-wrap {
+            justify-content: center;
+            margin-bottom: 16px;
+        }
+
+        .fi-login-top {
+            text-align: center;
+            margin-bottom: 22px;
+        }
+
+        .fi-label-row {
+            align-items: flex-end;
+        }
+
+        .fi-apply-box,
+        .fi-security-note {
+            border-radius: 15px;
+        }
+
+        .login-footer {
+            margin-bottom: 10px;
         }
     }
 
@@ -474,12 +637,17 @@
         }
 
         .fi-brand-title {
-            font-size: 25px;
+            font-size: 24px;
         }
 
         .fi-submit-btn,
         .fi-input-wrap .form-control {
             height: 48px;
+        }
+
+        .fi-login-logo {
+            max-width: 132px;
+            max-height: 56px;
         }
     }
 </style>
@@ -533,6 +701,20 @@
 
         <section class="fi-form-panel">
             <div class="fi-login-card">
+                @if($showLogo)
+                    <div class="fi-login-logo-wrap">
+                        <div class="fi-login-logo-box">
+                            <img
+                                src="{{ $logoUrl }}"
+                                alt="{{ $saccoName }} Logo"
+                                class="fi-login-logo"
+                                loading="eager"
+                                onerror="this.closest('.fi-login-logo-wrap').style.display='none';"
+                            >
+                        </div>
+                    </div>
+                @endif
+
                 <div class="fi-login-top">
                     <div class="fi-login-badge">Member Portal</div>
                     <div class="sacco-brand">{{ $saccoName }}</div>
@@ -589,7 +771,10 @@
 
                     <div class="d-grid mb-3">
                         <button type="submit" class="fi-submit-btn" id="loginBtn">
-                            Login Securely
+                            <span class="fi-btn-content">
+                                <span class="fi-btn-spinner" aria-hidden="true"></span>
+                                <span class="fi-btn-text">Login Securely</span>
+                            </span>
                         </button>
                     </div>
 
@@ -646,46 +831,125 @@
 <script src="https://www.google.com/recaptcha/api.js?render={{ config('services.recaptcha.site_key') }}"></script>
 <script>
 (function() {
-  const SITE_KEY = "{{ config('services.recaptcha.site_key') }}";
-  const form = document.getElementById('loginForm');
-  const tokenInput = document.getElementById('recaptcha_token');
-  const note = document.getElementById('recaptchaNote');
+    const SITE_KEY = "{{ config('services.recaptcha.site_key') }}";
+    const form = document.getElementById('loginForm');
+    const tokenInput = document.getElementById('recaptcha_token');
+    const note = document.getElementById('recaptchaNote');
+    const loginBtn = document.getElementById('loginBtn');
+    const loginBtnText = loginBtn ? loginBtn.querySelector('.fi-btn-text') : null;
 
-  // If user edits fields after token was set, clear it so we always generate a fresh one on submit.
-  const clearToken = () => { tokenInput.value = ''; };
-  document.getElementById('login').addEventListener('input', clearToken);
-  document.getElementById('password').addEventListener('input', clearToken);
+    let submitLocked = false;
+    let unlockTimer = null;
 
-  form.addEventListener('submit', function(e) {
-    // If script blocked, allow submit (backend should reject with clear message)
-    if (typeof grecaptcha === 'undefined') {
-      if (note) note.style.display = 'block';
-      return;
+    function lockSubmitButton() {
+        if (!loginBtn) return;
+
+        submitLocked = true;
+        loginBtn.disabled = true;
+        loginBtn.classList.add('is-processing');
+
+        if (loginBtnText) {
+            loginBtnText.textContent = 'Signing in...';
+        }
+
+        clearTimeout(unlockTimer);
+
+        unlockTimer = setTimeout(function() {
+            unlockSubmitButton();
+        }, 30000);
     }
 
-    // If token already set, allow normal submit
-    if (tokenInput.value) return;
+    function unlockSubmitButton() {
+        if (!loginBtn) return;
 
-    e.preventDefault();
+        submitLocked = false;
+        loginBtn.disabled = false;
+        loginBtn.classList.remove('is-processing');
 
-    grecaptcha.ready(function() {
-      grecaptcha.execute(SITE_KEY, { action: 'login' }).then(function(token) {
-        tokenInput.value = token;
-        form.submit();
-      }).catch(function() {
-        if (note) note.style.display = 'block';
-        // allow submit anyway; backend should handle missing token
-        form.submit();
-      });
+        if (loginBtnText) {
+            loginBtnText.textContent = 'Login Securely';
+        }
+    }
+
+    function showRecaptchaNote() {
+        if (note) {
+            note.style.display = 'block';
+        }
+    }
+
+    function submitNativeForm() {
+        /*
+         * Native form.submit() avoids firing the submit event again,
+         * preventing duplicate reCAPTCHA execution.
+         */
+        HTMLFormElement.prototype.submit.call(form);
+    }
+
+    // If user edits fields after token was set, clear it so we always generate a fresh one on submit.
+    function clearToken() {
+        if (tokenInput) {
+            tokenInput.value = '';
+        }
+    }
+
+    const loginInput = document.getElementById('login');
+    const passwordInput = document.getElementById('password');
+
+    if (loginInput) {
+        loginInput.addEventListener('input', clearToken);
+    }
+
+    if (passwordInput) {
+        passwordInput.addEventListener('input', clearToken);
+    }
+
+    form.addEventListener('submit', function(e) {
+        if (submitLocked) {
+            e.preventDefault();
+            return;
+        }
+
+        lockSubmitButton();
+
+        // If reCAPTCHA script is blocked, allow form submission.
+        // Backend should still validate and return a clear message where needed.
+        if (typeof grecaptcha === 'undefined') {
+            showRecaptchaNote();
+            return;
+        }
+
+        // If token already exists, allow normal submit.
+        if (tokenInput && tokenInput.value) {
+            return;
+        }
+
+        e.preventDefault();
+
+        grecaptcha.ready(function() {
+            grecaptcha.execute(SITE_KEY, { action: 'login' }).then(function(token) {
+                if (tokenInput) {
+                    tokenInput.value = token;
+                }
+
+                submitNativeForm();
+            }).catch(function() {
+                showRecaptchaNote();
+
+                /*
+                 * Submit anyway so the backend can decide what to do.
+                 * The button remains locked to prevent repeated clicks.
+                 */
+                submitNativeForm();
+            });
+        });
     });
-  });
 
-  // Optional: show a hint if token is never generated (slow/blocked)
-  setTimeout(function() {
-    if (typeof grecaptcha === 'undefined') {
-      if (note) note.style.display = 'block';
-    }
-  }, 2500);
+    // Show a helpful note if reCAPTCHA is blocked or slow.
+    setTimeout(function() {
+        if (typeof grecaptcha === 'undefined') {
+            showRecaptchaNote();
+        }
+    }, 2500);
 })();
 </script>
 @endsection
