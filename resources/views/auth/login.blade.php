@@ -97,7 +97,7 @@
         max-width: 1120px;
         min-height: 650px;
         display: grid;
-        grid-template-columns: 1.05fr 0.95fr;
+        grid-template-columns: 0.95fr 1.05fr;
         background: var(--fi-panel);
         border-radius: 32px;
         overflow: hidden;
@@ -175,7 +175,7 @@
     }
 
     .fi-brand-title {
-        font-size: 43px;
+        font-size: 39px;
         line-height: 1.04;
         font-weight: 950;
         letter-spacing: -0.055em;
@@ -261,13 +261,13 @@
 
     .fi-login-card {
         width: 100%;
-        max-width: 430px;
+        max-width: 450px;
     }
 
     .fi-login-logo-wrap {
         display: flex;
         align-items: center;
-        justify-content: flex-start;
+        justify-content: center;
         margin-bottom: 22px;
     }
 
@@ -312,6 +312,7 @@
 
     .fi-login-top {
         margin-bottom: 24px;
+        text-align: center;
     }
 
     .fi-login-badge {
