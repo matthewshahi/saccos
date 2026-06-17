@@ -25,14 +25,17 @@
 
     $words = preg_split('/\s+/', trim($saccoName));
     $initials = '';
+
     foreach ($words as $word) {
         if ($word !== '') {
             $initials .= strtoupper(substr($word, 0, 1));
         }
+
         if (strlen($initials) >= 2) {
             break;
         }
     }
+
     $initials = $initials !== '' ? $initials : 'S';
 
     $recaptchaSiteKey = config('services.recaptcha.site_key');
@@ -47,27 +50,26 @@
 @section('content')
 <style>
     :root {
-        --fi-purple: #7b3fb4;
-        --fi-purple-dark: #4b1f7a;
-        --fi-purple-deep: #2b123f;
-        --fi-purple-soft: rgba(123, 63, 180, 0.10);
-        --fi-purple-border: rgba(123, 63, 180, 0.20);
+        --fi-gold: #b88a2b;
+        --fi-gold-dark: #8a641e;
+        --fi-gold-soft: rgba(184, 138, 43, 0.10);
+        --fi-gold-border: rgba(184, 138, 43, 0.22);
 
-        --fi-green: #7ed957;
-        --fi-green-dark: #45a82e;
-        --fi-green-soft: rgba(126, 217, 87, 0.16);
+        --fi-ink: #111827;
+        --fi-ink-soft: #263142;
+        --fi-muted: #6b7280;
+        --fi-muted-strong: #4b5563;
 
-        --fi-ink: #17102a;
-        --fi-ink-2: #2d2442;
-        --fi-muted: #6b647a;
-        --fi-soft: #f8f6fb;
-        --fi-card: #ffffff;
-        --fi-border: #e8e1ef;
+        --fi-bg: #f8f7f3;
+        --fi-panel: #ffffff;
+        --fi-soft: #fbfaf7;
+        --fi-border: #e7e2d7;
 
+        --fi-success: #3fa34d;
         --fi-danger: #dc2626;
 
-        --fi-shadow: 0 26px 80px rgba(36, 18, 61, 0.20);
-        --fi-shadow-soft: 0 16px 42px rgba(36, 18, 61, 0.10);
+        --fi-shadow: 0 24px 70px rgba(17, 24, 39, 0.13);
+        --fi-shadow-soft: 0 14px 34px rgba(17, 24, 39, 0.08);
     }
 
     body {
@@ -75,9 +77,9 @@
         min-height: 100vh;
         min-height: 100svh;
         background:
-            radial-gradient(circle at top left, rgba(123, 63, 180, 0.16), transparent 34%),
-            radial-gradient(circle at bottom right, rgba(126, 217, 87, 0.18), transparent 30%),
-            linear-gradient(135deg, #fbfaff 0%, #f4eef9 48%, #ffffff 100%);
+            radial-gradient(circle at top left, rgba(184, 138, 43, 0.12), transparent 32%),
+            radial-gradient(circle at bottom right, rgba(17, 24, 39, 0.06), transparent 34%),
+            linear-gradient(135deg, #ffffff 0%, #faf8f2 48%, #f3f0e8 100%);
     }
 
     .fi-login-page {
@@ -93,50 +95,51 @@
     .fi-login-shell {
         width: 100%;
         max-width: 1120px;
-        min-height: 660px;
+        min-height: 650px;
         display: grid;
         grid-template-columns: 1.05fr 0.95fr;
-        background: var(--fi-card);
-        border-radius: 34px;
+        background: var(--fi-panel);
+        border-radius: 32px;
         overflow: hidden;
         box-shadow: var(--fi-shadow);
-        border: 1px solid rgba(255, 255, 255, 0.85);
+        border: 1px solid rgba(255, 255, 255, 0.9);
     }
 
     .fi-brand-panel {
         position: relative;
         padding: 46px;
         background:
-            radial-gradient(circle at top right, rgba(126, 217, 87, 0.20), transparent 32%),
-            radial-gradient(circle at bottom left, rgba(255, 255, 255, 0.14), transparent 34%),
-            linear-gradient(145deg, var(--fi-purple-deep) 0%, var(--fi-purple-dark) 48%, var(--fi-purple) 100%);
-        color: #ffffff;
+            radial-gradient(circle at top right, rgba(184, 138, 43, 0.16), transparent 34%),
+            radial-gradient(circle at bottom left, rgba(255, 255, 255, 0.9), transparent 36%),
+            linear-gradient(145deg, #ffffff 0%, #fbfaf7 44%, #f0eadf 100%);
+        color: var(--fi-ink);
         overflow: hidden;
         display: flex;
         flex-direction: column;
         justify-content: space-between;
+        border-right: 1px solid var(--fi-border);
     }
 
     .fi-brand-panel::before {
         content: "";
         position: absolute;
-        width: 330px;
-        height: 330px;
+        width: 320px;
+        height: 320px;
         border-radius: 50%;
-        background: rgba(255, 255, 255, 0.08);
+        background: rgba(184, 138, 43, 0.08);
         top: -160px;
-        right: -130px;
+        right: -120px;
     }
 
     .fi-brand-panel::after {
         content: "";
         position: absolute;
-        width: 240px;
-        height: 240px;
+        width: 230px;
+        height: 230px;
         border-radius: 50%;
-        border: 1px solid rgba(255, 255, 255, 0.18);
+        border: 1px solid rgba(184, 138, 43, 0.18);
         bottom: -120px;
-        left: -96px;
+        left: -95px;
     }
 
     .fi-brand-inner,
@@ -145,89 +148,43 @@
         z-index: 2;
     }
 
-    .fi-brand-logo-row {
-        display: flex;
-        align-items: center;
-        gap: 14px;
-        margin-bottom: 30px;
-    }
-
-    .fi-brand-logo-box {
-        width: 74px;
-        height: 74px;
-        border-radius: 24px;
-        background: rgba(255, 255, 255, 0.96);
-        border: 1px solid rgba(255, 255, 255, 0.70);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        box-shadow: 0 18px 38px rgba(0, 0, 0, 0.18);
-        overflow: hidden;
-    }
-
-    .fi-brand-logo-box img {
-        max-width: 60px;
-        max-height: 60px;
-        width: auto;
-        height: auto;
-        object-fit: contain;
-        display: block;
-    }
-
-    .fi-brand-fallback {
-        width: 74px;
-        height: 74px;
-        border-radius: 24px;
-        background: rgba(255, 255, 255, 0.13);
-        border: 1px solid rgba(255, 255, 255, 0.22);
-        color: #ffffff;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 22px;
-        font-weight: 950;
-        letter-spacing: -0.04em;
-    }
-
     .fi-brand-kicker {
-        font-size: 11px;
-        line-height: 1;
-        font-weight: 950;
-        text-transform: uppercase;
-        letter-spacing: .12em;
-        color: rgba(255, 255, 255, 0.68);
-        margin-bottom: 7px;
-    }
-
-    .fi-brand-mini-name {
-        font-size: 18px;
-        font-weight: 950;
-        letter-spacing: -0.04em;
-        color: #ffffff;
-        line-height: 1.1;
-    }
-
-    .fi-mini-label {
         display: inline-flex;
         align-items: center;
-        padding: 7px 12px;
+        gap: 8px;
+        padding: 8px 12px;
         border-radius: 999px;
-        background: rgba(255, 255, 255, 0.12);
-        border: 1px solid rgba(255, 255, 255, 0.18);
+        background: #ffffff;
+        border: 1px solid var(--fi-border);
+        box-shadow: 0 10px 24px rgba(17, 24, 39, 0.04);
+        color: var(--fi-gold-dark);
         font-size: 10px;
-        font-weight: 950;
-        letter-spacing: .10em;
+        font-weight: 900;
+        letter-spacing: .11em;
         text-transform: uppercase;
-        margin-bottom: 18px;
+        margin-bottom: 22px;
+    }
+
+    .fi-brand-kicker::before {
+        content: "";
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--fi-success);
+        box-shadow: 0 0 0 4px rgba(63, 163, 77, 0.12);
     }
 
     .fi-brand-title {
-        font-size: 45px;
-        line-height: 1.02;
+        font-size: 43px;
+        line-height: 1.04;
         font-weight: 950;
         letter-spacing: -0.055em;
         margin: 0 0 16px;
-        color: #ffffff;
+        color: var(--fi-ink);
+    }
+
+    .fi-brand-title span {
+        color: var(--fi-gold-dark);
     }
 
     .fi-brand-text {
@@ -235,7 +192,7 @@
         margin: 0;
         font-size: 15px;
         line-height: 1.75;
-        color: rgba(255, 255, 255, 0.80);
+        color: var(--fi-muted-strong);
     }
 
     .fi-feature-list {
@@ -250,9 +207,9 @@
         gap: 13px;
         padding: 15px;
         border-radius: 18px;
-        background: rgba(255, 255, 255, 0.11);
-        border: 1px solid rgba(255, 255, 255, 0.16);
-        backdrop-filter: blur(12px);
+        background: rgba(255, 255, 255, 0.78);
+        border: 1px solid var(--fi-border);
+        box-shadow: 0 12px 28px rgba(17, 24, 39, 0.045);
     }
 
     .fi-feature-icon {
@@ -260,8 +217,8 @@
         height: 31px;
         min-width: 31px;
         border-radius: 50%;
-        background: var(--fi-green-soft);
-        color: #d8ffc8;
+        background: var(--fi-gold-soft);
+        color: var(--fi-gold-dark);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -273,30 +230,30 @@
         display: block;
         font-size: 13px;
         margin-bottom: 3px;
-        color: #ffffff;
+        color: var(--fi-ink);
     }
 
     .fi-feature-item span {
         display: block;
         font-size: 12px;
         line-height: 1.5;
-        color: rgba(255, 255, 255, 0.72);
+        color: var(--fi-muted);
     }
 
     .fi-brand-footer {
         margin-top: 34px;
         padding-top: 18px;
-        border-top: 1px solid rgba(255, 255, 255, 0.16);
+        border-top: 1px solid var(--fi-border);
         font-size: 12px;
-        color: rgba(255, 255, 255, 0.68);
+        color: var(--fi-muted);
         line-height: 1.6;
     }
 
     .fi-form-panel {
         padding: 48px 46px;
         background:
-            radial-gradient(circle at top right, rgba(123, 63, 180, 0.07), transparent 34%),
-            linear-gradient(180deg, #ffffff 0%, #fbfaff 100%);
+            radial-gradient(circle at top right, rgba(184, 138, 43, 0.07), transparent 34%),
+            linear-gradient(180deg, #ffffff 0%, #fbfaf7 100%);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -315,9 +272,9 @@
     }
 
     .fi-login-logo-box {
-        width: 96px;
-        height: 96px;
-        border-radius: 26px;
+        width: 112px;
+        height: 112px;
+        border-radius: 28px;
         background: #ffffff;
         border: 1px solid var(--fi-border);
         display: flex;
@@ -325,29 +282,29 @@
         justify-content: center;
         box-shadow: var(--fi-shadow-soft);
         overflow: hidden;
+        padding: 12px;
     }
 
     .fi-login-logo {
         display: block;
-        max-width: 78px;
-        max-height: 78px;
+        max-width: 92px;
+        max-height: 92px;
         width: auto;
         height: auto;
         object-fit: contain;
     }
 
     .fi-login-fallback-logo {
-        width: 96px;
-        height: 96px;
-        border-radius: 26px;
+        width: 112px;
+        height: 112px;
+        border-radius: 28px;
         background:
-            radial-gradient(circle at top right, rgba(126, 217, 87, 0.28), transparent 38%),
-            linear-gradient(135deg, var(--fi-purple), var(--fi-purple-deep));
+            radial-gradient(circle at top right, rgba(184, 138, 43, 0.32), transparent 38%),
+            linear-gradient(135deg, #2f3746, #111827);
         color: #ffffff;
-        display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 28px;
+        font-size: 30px;
         font-weight: 950;
         letter-spacing: -0.05em;
         box-shadow: var(--fi-shadow-soft);
@@ -362,8 +319,8 @@
         align-items: center;
         padding: 7px 12px;
         border-radius: 999px;
-        background: var(--fi-purple-soft);
-        color: var(--fi-purple-dark);
+        background: var(--fi-gold-soft);
+        color: var(--fi-gold-dark);
         font-size: 10px;
         font-weight: 950;
         text-transform: uppercase;
@@ -408,7 +365,7 @@
     }
 
     .fi-forgot-link {
-        color: var(--fi-purple-dark);
+        color: var(--fi-gold-dark);
         font-size: 12px;
         font-weight: 900;
         text-decoration: none;
@@ -416,7 +373,6 @@
     }
 
     .fi-forgot-link:hover {
-        color: var(--fi-purple);
         text-decoration: underline;
     }
 
@@ -433,17 +389,17 @@
         color: var(--fi-ink);
         font-size: 14px;
         padding: 13px 15px;
-        box-shadow: 0 1px 0 rgba(36, 18, 61, 0.02);
+        box-shadow: 0 1px 0 rgba(17, 24, 39, 0.02);
         transition: border-color .18s ease, box-shadow .18s ease, background-color .18s ease;
     }
 
     .fi-input-wrap .form-control::placeholder {
-        color: #9a92a8;
+        color: #9ca3af;
     }
 
     .fi-input-wrap .form-control:focus {
-        border-color: rgba(123, 63, 180, 0.72);
-        box-shadow: 0 0 0 4px rgba(123, 63, 180, 0.11);
+        border-color: rgba(184, 138, 43, 0.72);
+        box-shadow: 0 0 0 4px rgba(184, 138, 43, 0.12);
         background-color: #ffffff;
         outline: none;
     }
@@ -453,19 +409,19 @@
         height: 54px;
         border-radius: 16px;
         background:
-            radial-gradient(circle at top right, rgba(126, 217, 87, 0.35), transparent 36%),
-            linear-gradient(135deg, var(--fi-purple), var(--fi-purple-deep));
+            radial-gradient(circle at top right, rgba(184, 138, 43, 0.38), transparent 36%),
+            linear-gradient(135deg, #2f3746, #111827);
         border: none;
         color: #ffffff;
         font-weight: 950;
         font-size: 15px;
-        box-shadow: 0 18px 36px rgba(75, 31, 122, 0.28);
+        box-shadow: 0 18px 36px rgba(17, 24, 39, 0.24);
         transition: transform .16s ease, box-shadow .16s ease, opacity .16s ease, filter .16s ease;
     }
 
     .fi-submit-btn:hover {
         transform: translateY(-1px);
-        box-shadow: 0 22px 44px rgba(75, 31, 122, 0.34);
+        box-shadow: 0 22px 44px rgba(17, 24, 39, 0.30);
         color: #ffffff;
         filter: saturate(1.04);
     }
@@ -516,19 +472,18 @@
         font-size: 13px;
         line-height: 1.45;
         color: var(--fi-muted);
-        box-shadow: 0 12px 28px rgba(36, 18, 61, 0.06);
+        box-shadow: 0 12px 28px rgba(17, 24, 39, 0.045);
     }
 
     .fi-apply-box a {
         display: inline-block;
         margin-top: 5px;
-        color: var(--fi-purple-dark);
+        color: var(--fi-gold-dark);
         font-weight: 950;
         text-decoration: none;
     }
 
     .fi-apply-box a:hover {
-        color: var(--fi-purple);
         text-decoration: underline;
     }
 
@@ -543,7 +498,7 @@
         color: var(--fi-muted);
         font-size: 12px;
         line-height: 1.55;
-        box-shadow: 0 12px 28px rgba(36, 18, 61, 0.06);
+        box-shadow: 0 12px 28px rgba(17, 24, 39, 0.045);
     }
 
     .fi-security-note strong {
@@ -556,8 +511,8 @@
         min-width: 10px;
         margin-top: 5px;
         border-radius: 50%;
-        background: var(--fi-green);
-        box-shadow: 0 0 0 4px rgba(126, 217, 87, 0.18);
+        background: var(--fi-success);
+        box-shadow: 0 0 0 4px rgba(63, 163, 77, 0.14);
     }
 
     .login-footer {
@@ -568,13 +523,12 @@
     }
 
     .login-footer a {
-        color: var(--fi-purple-dark);
+        color: var(--fi-gold-dark);
         text-decoration: none;
         font-weight: 850;
     }
 
     .login-footer a:hover {
-        color: var(--fi-purple);
         text-decoration: underline;
     }
 
@@ -588,7 +542,7 @@
     }
 
     .provider-credit strong {
-        color: var(--fi-purple-dark);
+        color: var(--fi-ink);
         font-weight: 950;
     }
 
@@ -612,6 +566,7 @@
             min-height: 100svh;
             border-radius: 0;
             grid-template-columns: 1fr;
+            box-shadow: none;
         }
 
         .fi-form-panel {
@@ -623,10 +578,8 @@
         .fi-brand-panel {
             order: 2;
             padding: 28px 20px 30px;
-        }
-
-        .fi-brand-logo-row {
-            display: none;
+            border-right: 0;
+            border-top: 1px solid var(--fi-border);
         }
 
         .fi-brand-title {
@@ -671,14 +624,14 @@
 
         .fi-login-logo-box,
         .fi-login-fallback-logo {
-            width: 86px;
-            height: 86px;
+            width: 92px;
+            height: 92px;
             border-radius: 24px;
         }
 
         .fi-login-logo {
-            max-width: 70px;
-            max-height: 70px;
+            max-width: 76px;
+            max-height: 76px;
         }
 
         .sacco-brand {
@@ -710,14 +663,14 @@
 
         .fi-login-logo-box,
         .fi-login-fallback-logo {
-            width: 78px;
-            height: 78px;
+            width: 82px;
+            height: 82px;
             border-radius: 22px;
         }
 
         .fi-login-logo {
-            max-width: 64px;
-            max-height: 64px;
+            max-width: 68px;
+            max-height: 68px;
         }
     }
 </style>
@@ -726,35 +679,18 @@
     <div class="fi-login-shell">
         <section class="fi-brand-panel">
             <div class="fi-brand-inner">
-                <div class="fi-brand-logo-row">
-                    @if($showLogo)
-                        <div class="fi-brand-logo-box">
-                            <img
-                                src="{{ $logoUrl }}"
-                                alt="{{ $saccoName }} Logo"
-                                loading="eager"
-                                onerror="this.closest('.fi-brand-logo-box').style.display='none';"
-                            >
-                        </div>
-                    @else
-                        <div class="fi-brand-fallback">{{ $initials }}</div>
-                    @endif
-
-                    <div>
-                        <div class="fi-brand-kicker">Member Banking Portal</div>
-                        <div class="fi-brand-mini-name">{{ $saccoName }}</div>
-                    </div>
+                <div class="fi-brand-kicker">
+                    Secure member access
                 </div>
 
-                <div class="fi-mini-label">Secure Member Access</div>
-
                 <h1 class="fi-brand-title">
-                    Banking-grade access for your SACCO account.
+                    Welcome to<br>
+                    <span>{{ $saccoName }}</span>
                 </h1>
 
                 <p class="fi-brand-text">
-                    Sign in securely to access savings, deposits, capital, loans, statements,
-                    account records and member services from one trusted portal.
+                    Access your SACCO account securely. View savings, deposits, capital,
+                    loans, statements and member services from one trusted portal.
                 </p>
 
                 <div class="fi-feature-list">
@@ -793,17 +729,23 @@
             <div class="fi-login-card">
                 <div class="fi-login-logo-wrap">
                     @if($showLogo)
-                        <div class="fi-login-logo-box">
+                        <div class="fi-login-logo-box" id="loginLogoBox">
                             <img
                                 src="{{ $logoUrl }}"
                                 alt="{{ $saccoName }} Logo"
                                 class="fi-login-logo"
                                 loading="eager"
-                                onerror="this.closest('.fi-login-logo-wrap').innerHTML='<div class=&quot;fi-login-fallback-logo&quot;>{{ $initials }}</div>';"
+                                onerror="document.getElementById('loginLogoBox').style.display='none'; document.getElementById('loginLogoFallback').style.display='flex';"
                             >
                         </div>
+
+                        <div class="fi-login-fallback-logo" id="loginLogoFallback" style="display:none;">
+                            {{ $initials }}
+                        </div>
                     @else
-                        <div class="fi-login-fallback-logo">{{ $initials }}</div>
+                        <div class="fi-login-fallback-logo" style="display:flex;">
+                            {{ $initials }}
+                        </div>
                     @endif
                 </div>
 
