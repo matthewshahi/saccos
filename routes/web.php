@@ -1834,17 +1834,7 @@ Route::prefix('special-savings')
             ->middleware('check_user_rights:special_savings_interest');
     });
     
-    use Illuminate\Support\Str;
-
-Route::get('/reports/sasra/{path?}', function ($path = null) {
-    $reportName = $path
-        ? Str::of($path)->replace(['-', '_', '/'], ' ')->title()
-        : 'SASRA Report';
-
-    return response()->view('reports.sasra.placeholder', [
-        'reportName' => $reportName,
-    ]);
-})->where('path', '.*')->name('reports.sasra.placeholder');
+    
     // =========================
     // LEDGERS (DRILL-DOWN)
     // =========================
