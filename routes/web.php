@@ -1,5 +1,5 @@
 <?php
-
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\Auth\CustomAuthController;
@@ -1834,7 +1834,22 @@ Route::prefix('special-savings')
             ->middleware('check_user_rights:special_savings_interest');
     });
     
-    
+ 
+
+Route::get('/reports/sasra/{path?}', function ($path = null) {
+    $reportName = $path
+        ? \Illuminate\Support\Str::of($path)
+            ->replace(['-', '_', '/'], ' ')
+            ->title()
+        : 'SASRA Report';
+
+    return response()->view('reports.sasra.placeholder', [
+        'reportName' => $reportName,
+    ]);
+})
+    ->where('path', '.*')
+    ->middleware('check_user_rights:rpt_reports')
+    ->name('reports.sasra.placeholder');
     // =========================
     // LEDGERS (DRILL-DOWN)
     // =========================
