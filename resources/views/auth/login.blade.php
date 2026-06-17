@@ -4,22 +4,6 @@
     $saccoName = trim((string) ($defaultCompanyName ?? config('app.name', 'SACCO')));
     $supportPhone = trim((string) config('app.sacco_support', ''));
 
-    /*
-    |--------------------------------------------------------------------------
-    | Optional Application Logo
-    |--------------------------------------------------------------------------
-    |
-    | Reads from config/app.php:
-    |
-    | config('app.logo.enabled')
-    | config('app.logo.folder')
-    | config('app.logo.filename')
-    |
-    | Example expected file:
-    | public/logo/kass_sacco_logo.jpg
-    |
-    */
-
     $logoEnabled = (bool) config('app.logo.enabled', false);
     $logoFolder = trim((string) config('app.logo.folder', 'logo'), '/');
     $logoFilename = ltrim((string) config('app.logo.filename', ''), '/');
@@ -49,25 +33,25 @@
 @section('content')
 <style>
     :root {
-        --fi-primary: #2454a6;
-        --fi-primary-dark: #183b76;
-        --fi-primary-soft: rgba(36, 84, 166, 0.08);
-        --fi-primary-border: rgba(36, 84, 166, 0.18);
+        --fi-accent: #334155;
+        --fi-accent-dark: #0f172a;
+        --fi-accent-soft: rgba(51, 65, 85, 0.07);
+        --fi-accent-border: rgba(51, 65, 85, 0.14);
 
         --fi-text: #0f172a;
         --fi-muted: #64748b;
         --fi-muted-strong: #475569;
 
+        --fi-bg: #f6f8fb;
+        --fi-bg-soft: #f8fafc;
         --fi-panel: #ffffff;
-        --fi-soft-bg: #f8fafc;
-        --fi-soft-bg-2: #eef2f7;
         --fi-border: #e2e8f0;
 
         --fi-success: #16a34a;
         --fi-danger: #dc2626;
 
-        --fi-shadow-soft: 0 18px 50px rgba(15, 23, 42, 0.10);
-        --fi-shadow-strong: 0 28px 80px rgba(15, 23, 42, 0.16);
+        --fi-shadow-soft: 0 18px 50px rgba(15, 23, 42, 0.08);
+        --fi-shadow-strong: 0 28px 80px rgba(15, 23, 42, 0.13);
     }
 
     body {
@@ -75,9 +59,9 @@
         min-height: 100vh;
         min-height: 100svh;
         background:
-            radial-gradient(circle at top left, rgba(36, 84, 166, 0.08), transparent 32%),
-            radial-gradient(circle at bottom right, rgba(15, 23, 42, 0.06), transparent 34%),
-            linear-gradient(135deg, #f8fafc 0%, #f1f5f9 48%, #ffffff 100%);
+            radial-gradient(circle at top left, rgba(148, 163, 184, 0.20), transparent 32%),
+            radial-gradient(circle at bottom right, rgba(203, 213, 225, 0.28), transparent 34%),
+            linear-gradient(135deg, #ffffff 0%, #f8fafc 46%, #eef2f7 100%);
     }
 
     .fi-login-page {
@@ -104,9 +88,11 @@
         position: relative;
         padding: 24px 20px;
         background:
-            linear-gradient(135deg, #0f172a 0%, #1e293b 58%, #334155 100%);
-        color: #ffffff;
+            radial-gradient(circle at top right, rgba(148, 163, 184, 0.24), transparent 36%),
+            linear-gradient(135deg, #ffffff 0%, #f8fafc 48%, #eef2f7 100%);
+        color: var(--fi-text);
         overflow: hidden;
+        border-bottom: 1px solid var(--fi-border);
     }
 
     .fi-brand-panel::before {
@@ -115,7 +101,7 @@
         width: 260px;
         height: 260px;
         border-radius: 50%;
-        background: rgba(255, 255, 255, 0.07);
+        background: rgba(148, 163, 184, 0.14);
         top: -130px;
         right: -112px;
     }
@@ -126,7 +112,7 @@
         width: 210px;
         height: 210px;
         border-radius: 50%;
-        border: 1px solid rgba(255, 255, 255, 0.12);
+        border: 1px solid rgba(148, 163, 184, 0.28);
         bottom: -118px;
         left: -96px;
     }
@@ -141,13 +127,15 @@
         align-items: center;
         padding: 6px 10px;
         border-radius: 999px;
-        background: rgba(255, 255, 255, 0.10);
-        border: 1px solid rgba(255, 255, 255, 0.16);
+        background: #ffffff;
+        border: 1px solid var(--fi-border);
+        color: var(--fi-muted-strong);
         font-size: 10px;
         font-weight: 900;
         letter-spacing: .08em;
         text-transform: uppercase;
         margin-bottom: 14px;
+        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04);
     }
 
     .fi-brand-title {
@@ -156,6 +144,7 @@
         font-weight: 900;
         letter-spacing: -0.035em;
         margin: 0 0 10px;
+        color: var(--fi-text);
     }
 
     .fi-brand-text {
@@ -163,7 +152,7 @@
         margin: 0;
         font-size: 13px;
         line-height: 1.65;
-        color: rgba(255, 255, 255, 0.78);
+        color: var(--fi-muted-strong);
     }
 
     .fi-feature-list {
@@ -176,8 +165,7 @@
 
     .fi-form-panel {
         padding: 26px 18px 34px;
-        background:
-            linear-gradient(180deg, #ffffff 0%, var(--fi-soft-bg) 100%);
+        background: #ffffff;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -197,8 +185,8 @@
 
     .fi-login-logo-box {
         width: auto;
-        max-width: 180px;
-        min-height: 58px;
+        max-width: 190px;
+        min-height: 62px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -206,13 +194,13 @@
         border-radius: 18px;
         background: #ffffff;
         border: 1px solid var(--fi-border);
-        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.07);
+        box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
     }
 
     .fi-login-logo {
         display: block;
-        max-width: 150px;
-        max-height: 64px;
+        max-width: 160px;
+        max-height: 68px;
         width: auto;
         height: auto;
         object-fit: contain;
@@ -227,8 +215,8 @@
         align-items: center;
         padding: 6px 10px;
         border-radius: 999px;
-        background: var(--fi-primary-soft);
-        color: var(--fi-primary);
+        background: var(--fi-accent-soft);
+        color: var(--fi-accent);
         font-size: 10px;
         font-weight: 900;
         text-transform: uppercase;
@@ -273,7 +261,7 @@
     }
 
     .fi-forgot-link {
-        color: var(--fi-primary);
+        color: var(--fi-accent);
         font-size: 12px;
         font-weight: 900;
         text-decoration: none;
@@ -306,8 +294,8 @@
     }
 
     .fi-input-wrap .form-control:focus {
-        border-color: rgba(36, 84, 166, 0.68);
-        box-shadow: 0 0 0 4px rgba(36, 84, 166, 0.10);
+        border-color: rgba(51, 65, 85, 0.58);
+        box-shadow: 0 0 0 4px rgba(51, 65, 85, 0.09);
         background-color: #ffffff;
         outline: none;
     }
@@ -316,18 +304,18 @@
         width: 100%;
         height: 50px;
         border-radius: 14px;
-        background: linear-gradient(135deg, var(--fi-primary), var(--fi-primary-dark));
+        background: linear-gradient(135deg, #1f2937, #0f172a);
         border: none;
         color: #ffffff;
         font-weight: 900;
         font-size: 15px;
-        box-shadow: 0 14px 30px rgba(36, 84, 166, 0.22);
+        box-shadow: 0 14px 30px rgba(15, 23, 42, 0.18);
         transition: transform .16s ease, box-shadow .16s ease, opacity .16s ease, filter .16s ease;
     }
 
     .fi-submit-btn:hover {
         transform: translateY(-1px);
-        box-shadow: 0 18px 38px rgba(36, 84, 166, 0.28);
+        box-shadow: 0 18px 38px rgba(15, 23, 42, 0.24);
         color: #ffffff;
         filter: saturate(1.04);
     }
@@ -384,7 +372,7 @@
     .fi-apply-box a {
         display: inline-block;
         margin-top: 4px;
-        color: var(--fi-primary);
+        color: var(--fi-accent-dark);
         font-weight: 900;
         text-decoration: none;
     }
@@ -429,7 +417,7 @@
     }
 
     .login-footer a {
-        color: var(--fi-primary);
+        color: var(--fi-accent-dark);
         text-decoration: none;
         font-weight: 800;
     }
@@ -506,6 +494,8 @@
             display: flex;
             flex-direction: column;
             justify-content: space-between;
+            border-bottom: 0;
+            border-right: 1px solid var(--fi-border);
         }
 
         .fi-brand-title {
@@ -529,9 +519,9 @@
             gap: 12px;
             padding: 13px 14px;
             border-radius: 16px;
-            background: rgba(255, 255, 255, 0.08);
-            border: 1px solid rgba(255, 255, 255, 0.12);
-            backdrop-filter: blur(8px);
+            background: rgba(255, 255, 255, 0.72);
+            border: 1px solid var(--fi-border);
+            box-shadow: 0 10px 28px rgba(15, 23, 42, 0.04);
         }
 
         .fi-feature-icon {
@@ -539,7 +529,8 @@
             height: 28px;
             min-width: 28px;
             border-radius: 50%;
-            background: rgba(255, 255, 255, 0.14);
+            background: var(--fi-accent-soft);
+            color: var(--fi-accent-dark);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -551,14 +542,14 @@
             display: block;
             font-size: 13px;
             margin-bottom: 2px;
-            color: #ffffff;
+            color: var(--fi-text);
         }
 
         .fi-feature-item span {
             display: block;
             font-size: 12px;
             line-height: 1.45;
-            color: rgba(255, 255, 255, 0.72);
+            color: var(--fi-muted);
         }
 
         .fi-brand-footer {
@@ -566,7 +557,7 @@
             position: relative;
             z-index: 2;
             font-size: 12px;
-            color: rgba(255, 255, 255, 0.68);
+            color: var(--fi-muted);
             line-height: 1.6;
         }
 
@@ -581,22 +572,24 @@
             min-height: 100svh;
         }
 
+        .fi-form-panel {
+            order: 1;
+            align-items: flex-start;
+            padding: 24px 18px 28px;
+        }
+
         .fi-brand-panel {
-            padding: 22px 18px 20px;
+            order: 2;
+            padding: 22px 18px 24px;
         }
 
         .fi-brand-title {
-            font-size: 25px;
+            font-size: 24px;
         }
 
         .fi-brand-text {
             font-size: 12.5px;
             line-height: 1.6;
-        }
-
-        .fi-form-panel {
-            align-items: flex-start;
-            padding-top: 24px;
         }
 
         .fi-login-logo-wrap {
@@ -637,7 +630,7 @@
         }
 
         .fi-brand-title {
-            font-size: 24px;
+            font-size: 23px;
         }
 
         .fi-submit-btn,
@@ -766,7 +759,6 @@
                         @endif
                     </div>
 
-                    {{-- reCAPTCHA v3 token --}}
                     <input type="hidden" name="recaptcha_token" id="recaptcha_token">
 
                     <div class="d-grid mb-3">
@@ -827,7 +819,6 @@
     </div>
 </div>
 
-{{-- reCAPTCHA v3 script --}}
 <script src="https://www.google.com/recaptcha/api.js?render={{ config('services.recaptcha.site_key') }}"></script>
 <script>
 (function() {
@@ -837,6 +828,8 @@
     const note = document.getElementById('recaptchaNote');
     const loginBtn = document.getElementById('loginBtn');
     const loginBtnText = loginBtn ? loginBtn.querySelector('.fi-btn-text') : null;
+
+    if (!form) return;
 
     let submitLocked = false;
     let unlockTimer = null;
@@ -878,14 +871,9 @@
     }
 
     function submitNativeForm() {
-        /*
-         * Native form.submit() avoids firing the submit event again,
-         * preventing duplicate reCAPTCHA execution.
-         */
         HTMLFormElement.prototype.submit.call(form);
     }
 
-    // If user edits fields after token was set, clear it so we always generate a fresh one on submit.
     function clearToken() {
         if (tokenInput) {
             tokenInput.value = '';
@@ -911,14 +899,11 @@
 
         lockSubmitButton();
 
-        // If reCAPTCHA script is blocked, allow form submission.
-        // Backend should still validate and return a clear message where needed.
         if (typeof grecaptcha === 'undefined') {
             showRecaptchaNote();
             return;
         }
 
-        // If token already exists, allow normal submit.
         if (tokenInput && tokenInput.value) {
             return;
         }
@@ -934,17 +919,11 @@
                 submitNativeForm();
             }).catch(function() {
                 showRecaptchaNote();
-
-                /*
-                 * Submit anyway so the backend can decide what to do.
-                 * The button remains locked to prevent repeated clicks.
-                 */
                 submitNativeForm();
             });
         });
     });
 
-    // Show a helpful note if reCAPTCHA is blocked or slow.
     setTimeout(function() {
         if (typeof grecaptcha === 'undefined') {
             showRecaptchaNote();
