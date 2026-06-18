@@ -8,8 +8,6 @@
     $logoFolder = trim((string) config('app.logo.folder', 'logo'), '/');
     $logoFilename = ltrim((string) config('app.logo.filename', ''), '/');
 
-    $logoRelativePath = null;
-    $logoPublicPath = null;
     $logoUrl = null;
     $showLogo = false;
 
@@ -37,14 +35,11 @@
     }
 
     $initials = $initials !== '' ? $initials : 'S';
-
     $recaptchaSiteKey = config('services.recaptcha.site_key');
 @endphp
 
 @section('seo_title', $saccoName . ' Member Login | SACCO Member Portal')
-
 @section('seo_description', $saccoName . ' member login portal for accessing SACCO savings, loans, statements, contributions and member services.')
-
 @section('robots', 'noindex, follow')
 
 @section('content')
@@ -53,21 +48,13 @@
         --fi-gold: #b88a2b;
         --fi-gold-dark: #8a641e;
         --fi-gold-soft: rgba(184, 138, 43, 0.10);
-        --fi-gold-border: rgba(184, 138, 43, 0.22);
-
+        --fi-border: #e7e2d7;
         --fi-ink: #111827;
-        --fi-ink-soft: #263142;
         --fi-muted: #6b7280;
         --fi-muted-strong: #4b5563;
-
-        --fi-bg: #f8f7f3;
         --fi-panel: #ffffff;
-        --fi-soft: #fbfaf7;
-        --fi-border: #e7e2d7;
-
         --fi-success: #3fa34d;
         --fi-danger: #dc2626;
-
         --fi-shadow: 0 24px 70px rgba(17, 24, 39, 0.13);
         --fi-shadow-soft: 0 14px 34px rgba(17, 24, 39, 0.08);
     }
@@ -345,29 +332,6 @@
         margin: 0;
     }
 
-    .fi-login-methods {
-        margin-top: 12px;
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: center;
-        gap: 7px;
-    }
-
-    .fi-login-method-pill {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        padding: 6px 9px;
-        border-radius: 999px;
-        background: #ffffff;
-        border: 1px solid var(--fi-border);
-        color: var(--fi-muted-strong);
-        font-size: 11px;
-        font-weight: 850;
-        line-height: 1;
-        box-shadow: 0 8px 18px rgba(17, 24, 39, 0.04);
-    }
-
     .fi-form-group {
         margin-bottom: 16px;
     }
@@ -385,7 +349,7 @@
         font-size: 13px;
         font-weight: 850;
         color: var(--fi-ink);
-        margin: 0;
+        margin: 0 0 8px;
     }
 
     .fi-forgot-link {
@@ -398,10 +362,6 @@
 
     .fi-forgot-link:hover {
         text-decoration: underline;
-    }
-
-    .fi-input-wrap {
-        position: relative;
     }
 
     .fi-input-wrap .form-control {
@@ -622,10 +582,7 @@
             font-size: 13px;
         }
 
-        .fi-feature-list {
-            display: none;
-        }
-
+        .fi-feature-list,
         .fi-brand-footer {
             display: none;
         }
@@ -634,20 +591,11 @@
             max-width: 460px;
             margin: 0 auto;
         }
-
-        .fi-login-logo-wrap {
-            justify-content: center;
-            margin-bottom: 18px;
-        }
-
-        .fi-login-top {
-            text-align: center;
-        }
     }
 
     @media (max-width: 575.98px) {
         .fi-form-panel {
-            padding: 24px 17px 24px;
+            padding: 24px 17px;
         }
 
         .fi-brand-panel {
@@ -704,11 +652,6 @@
             max-width: 68px;
             max-height: 68px;
         }
-
-        .fi-login-method-pill {
-            font-size: 10.5px;
-            padding: 6px 8px;
-        }
     }
 </style>
 
@@ -716,9 +659,7 @@
     <div class="fi-login-shell">
         <section class="fi-brand-panel">
             <div class="fi-brand-inner">
-                <div class="fi-brand-kicker">
-                    Secure member access
-                </div>
+                <div class="fi-brand-kicker">Secure member access</div>
 
                 <h1 class="fi-brand-title">
                     Welcome to<br>
@@ -726,16 +667,16 @@
                 </h1>
 
                 <p class="fi-brand-text">
-                    Access your SACCO account securely. View savings, deposits, capital,
-                    loans, statements and member services from one trusted portal.
+                    Access your member portal to view savings, deposits, capital, loans,
+                    statements and other SACCO services.
                 </p>
 
                 <div class="fi-feature-list">
                     <div class="fi-feature-item">
                         <div class="fi-feature-icon">✓</div>
                         <div>
-                            <strong>Flexible member login</strong>
-                            <span>Sign in using your registered email, phone number, National ID or SACCO number.</span>
+                            <strong>Member account access</strong>
+                            <span>View your account information and SACCO balances from one secure portal.</span>
                         </div>
                     </div>
 
@@ -750,8 +691,8 @@
                     <div class="fi-feature-item">
                         <div class="fi-feature-icon">✓</div>
                         <div>
-                            <strong>Secure sign-in</strong>
-                            <span>Your login is protected by account validation and automated security checks.</span>
+                            <strong>Protected sign-in</strong>
+                            <span>Your access is validated and logged for account security and compliance.</span>
                         </div>
                     </div>
                 </div>
@@ -790,44 +731,41 @@
                     <div class="fi-login-badge">Member Portal</div>
                     <div class="sacco-brand">{{ $saccoName }}</div>
                     <p class="fi-login-subtitle">
-                        Sign in using your registered email address, phone number, National ID or SACCO number.
+                        Sign in to continue to your account.
                     </p>
-
-                    <div class="fi-login-methods" aria-label="Supported login methods">
-                        <span class="fi-login-method-pill">Email</span>
-                        <span class="fi-login-method-pill">Phone Number</span>
-                        <span class="fi-login-method-pill">National ID</span>
-                        <span class="fi-login-method-pill">SACCO No.</span>
-                    </div>
                 </div>
 
                 <form method="POST" action="{{ route('login') }}" id="loginForm">
                     @csrf
 
                     <div class="fi-form-group">
-                        <label for="login">Email, Phone Number, National ID or SACCO No.</label>
+                        <label for="login">Member Login ID</label>
+
                         <div class="fi-input-wrap">
                             <input type="text"
                                    name="login"
                                    id="login"
                                    class="form-control"
-                                   placeholder="Enter email, phone, National ID or SACCO No."
+                                   placeholder="Enter your login ID"
                                    value="{{ old('login') }}"
                                    autocomplete="username"
                                    inputmode="text"
                                    required>
                         </div>
+
                         <small class="fi-field-help">
-                            Use the details registered on your SACCO member profile.
+                            Use your registered email, phone number, National ID or SACCO number.
                         </small>
+
                         @if ($errors->has('login'))
-                            <small class="text-danger">{{ $errors->first('login') }}</small>
+                            <small class="text-danger d-block mt-1">{{ $errors->first('login') }}</small>
                         @endif
                     </div>
 
                     <div class="fi-form-group">
                         <div class="fi-label-row">
                             <label for="password">Password</label>
+
                             <a href="{{ route('member.password.request') }}" class="fi-forgot-link">
                                 Forgot password?
                             </a>
@@ -842,8 +780,9 @@
                                    autocomplete="current-password"
                                    required>
                         </div>
+
                         @if ($errors->has('password'))
-                            <small class="text-danger">{{ $errors->first('password') }}</small>
+                            <small class="text-danger d-block mt-1">{{ $errors->first('password') }}</small>
                         @endif
                     </div>
 
@@ -865,7 +804,7 @@
                     </div>
 
                     <div class="recaptcha-note" id="recaptchaNote" style="display:none;">
-                        reCAPTCHA is blocked or slow. If login fails, disable any ad-blocker for this site and try again.
+                        Security verification could not load. Disable any ad-blocker for this site and try again.
                     </div>
                 </form>
 
