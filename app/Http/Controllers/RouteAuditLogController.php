@@ -32,10 +32,18 @@ class RouteAuditLogController extends Controller
             ->orderBy('route_audit_log_outcome')
             ->pluck('route_audit_log_outcome');
 
+        $methods = DB::table('sacco_route_audit_logs')
+            ->select('route_audit_log_method')
+            ->whereNotNull('route_audit_log_method')
+            ->distinct()
+            ->orderBy('route_audit_log_method')
+            ->pluck('route_audit_log_method');
+
         return view('admin.route_audit_logs.index', compact(
             'logs',
             'eventTypes',
-            'outcomes'
+            'outcomes',
+            'methods'
         ));
     }
 
