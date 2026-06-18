@@ -1373,298 +1373,298 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
 |--------------------------------------------------------------------------
 */
 
-Route::prefix('special-savings')
-    ->name('special_savings.')
-    ->group(function () {
+    Route::prefix('special-savings')
+        ->name('special_savings.')
+        ->group(function () {
 
-        /*
+            /*
         |--------------------------------------------------------------------------
         | Dashboard / Overview
         |--------------------------------------------------------------------------
         */
-        Route::get('/', [SpecialSavingController::class, 'index'])
-            ->name('index')
-            ->middleware('check_user_rights:special_savings_view');
+            Route::get('/', [SpecialSavingController::class, 'index'])
+                ->name('index')
+                ->middleware('check_user_rights:special_savings_view');
 
-        Route::get('/dashboard', [SpecialSavingController::class, 'dashboard'])
-            ->name('dashboard')
-            ->middleware('check_user_rights:special_savings_view');
+            Route::get('/dashboard', [SpecialSavingController::class, 'dashboard'])
+                ->name('dashboard')
+                ->middleware('check_user_rights:special_savings_view');
 
 
-        /*
+            /*
         |--------------------------------------------------------------------------
         | Categories
         |--------------------------------------------------------------------------
         | Table: sacco_special_saving_categories
         */
-        Route::get('/categories', [SpecialSavingController::class, 'categories'])
-            ->name('categories.index')
-            ->middleware('check_user_rights:special_savings_categories');
+            Route::get('/categories', [SpecialSavingController::class, 'categories'])
+                ->name('categories.index')
+                ->middleware('check_user_rights:special_savings_categories');
 
-        Route::get('/categories/create', [SpecialSavingController::class, 'createCategory'])
-            ->name('categories.create')
-            ->middleware('check_user_rights:special_savings_categories');
+            Route::get('/categories/create', [SpecialSavingController::class, 'createCategory'])
+                ->name('categories.create')
+                ->middleware('check_user_rights:special_savings_categories');
 
-        Route::post('/categories/store', [SpecialSavingController::class, 'storeCategory'])
-            ->name('categories.store')
-            ->middleware('check_user_rights:special_savings_categories');
+            Route::post('/categories/store', [SpecialSavingController::class, 'storeCategory'])
+                ->name('categories.store')
+                ->middleware('check_user_rights:special_savings_categories');
 
-        Route::get('/categories/edit/{id}', [SpecialSavingController::class, 'editCategory'])
-            ->name('categories.edit')
-            ->middleware('check_user_rights:special_savings_categories');
+            Route::get('/categories/edit/{id}', [SpecialSavingController::class, 'editCategory'])
+                ->name('categories.edit')
+                ->middleware('check_user_rights:special_savings_categories');
 
-        Route::post('/categories/update/{id}', [SpecialSavingController::class, 'updateCategory'])
-            ->name('categories.update')
-            ->middleware('check_user_rights:special_savings_categories');
+            Route::post('/categories/update/{id}', [SpecialSavingController::class, 'updateCategory'])
+                ->name('categories.update')
+                ->middleware('check_user_rights:special_savings_categories');
 
-        Route::post('/categories/toggle/{id}', [SpecialSavingController::class, 'toggleCategory'])
-            ->name('categories.toggle')
-            ->middleware('check_user_rights:special_savings_categories');
+            Route::post('/categories/toggle/{id}', [SpecialSavingController::class, 'toggleCategory'])
+                ->name('categories.toggle')
+                ->middleware('check_user_rights:special_savings_categories');
 
 
-        /*
+            /*
         |--------------------------------------------------------------------------
         | Products
         |--------------------------------------------------------------------------
         | Table: sacco_special_saving_products
         | Example Product: FEDHA
         */
-        Route::get('/products', [SpecialSavingController::class, 'products'])
-            ->name('products.index')
-            ->middleware('check_user_rights:special_savings_products');
+            Route::get('/products', [SpecialSavingController::class, 'products'])
+                ->name('products.index')
+                ->middleware('check_user_rights:special_savings_products');
 
-        Route::get('/products/create', [SpecialSavingController::class, 'createProduct'])
-            ->name('products.create')
-            ->middleware('check_user_rights:special_savings_products');
+            Route::get('/products/create', [SpecialSavingController::class, 'createProduct'])
+                ->name('products.create')
+                ->middleware('check_user_rights:special_savings_products');
 
-        Route::post('/products/store', [SpecialSavingController::class, 'storeProduct'])
-            ->name('products.store')
-            ->middleware('check_user_rights:special_savings_products');
+            Route::post('/products/store', [SpecialSavingController::class, 'storeProduct'])
+                ->name('products.store')
+                ->middleware('check_user_rights:special_savings_products');
 
-        Route::get('/products/edit/{id}', [SpecialSavingController::class, 'editProduct'])
-            ->name('products.edit')
-            ->middleware('check_user_rights:special_savings_products');
+            Route::get('/products/edit/{id}', [SpecialSavingController::class, 'editProduct'])
+                ->name('products.edit')
+                ->middleware('check_user_rights:special_savings_products');
 
-        Route::post('/products/update/{id}', [SpecialSavingController::class, 'updateProduct'])
-            ->name('products.update')
-            ->middleware('check_user_rights:special_savings_products');
+            Route::post('/products/update/{id}', [SpecialSavingController::class, 'updateProduct'])
+                ->name('products.update')
+                ->middleware('check_user_rights:special_savings_products');
 
-        Route::post('/products/toggle/{id}', [SpecialSavingController::class, 'toggleProduct'])
-            ->name('products.toggle')
-            ->middleware('check_user_rights:special_savings_products');
+            Route::post('/products/toggle/{id}', [SpecialSavingController::class, 'toggleProduct'])
+                ->name('products.toggle')
+                ->middleware('check_user_rights:special_savings_products');
 
-        Route::get('/products/show/{id}', [SpecialSavingController::class, 'showProduct'])
-            ->name('products.show')
-            ->middleware('check_user_rights:special_savings_products');
+            Route::get('/products/show/{id}', [SpecialSavingController::class, 'showProduct'])
+                ->name('products.show')
+                ->middleware('check_user_rights:special_savings_products');
 
 
-        /*
+            /*
         |--------------------------------------------------------------------------
         | Product Rate Tiers
         |--------------------------------------------------------------------------
         | Table: sacco_special_saving_product_rate_tiers
         */
-        Route::get('/products/{product_id}/rate-tiers', [SpecialSavingController::class, 'rateTiers'])
-            ->name('rate_tiers.index')
-            ->middleware('check_user_rights:special_savings_products');
+            Route::get('/products/{product_id}/rate-tiers', [SpecialSavingController::class, 'rateTiers'])
+                ->name('rate_tiers.index')
+                ->middleware('check_user_rights:special_savings_products');
 
-        Route::get('/products/{product_id}/rate-tiers/create', [SpecialSavingController::class, 'createRateTier'])
-            ->name('rate_tiers.create')
-            ->middleware('check_user_rights:special_savings_products');
+            Route::get('/products/{product_id}/rate-tiers/create', [SpecialSavingController::class, 'createRateTier'])
+                ->name('rate_tiers.create')
+                ->middleware('check_user_rights:special_savings_products');
 
-        Route::post('/products/{product_id}/rate-tiers/store', [SpecialSavingController::class, 'storeRateTier'])
-            ->name('rate_tiers.store')
-            ->middleware('check_user_rights:special_savings_products');
+            Route::post('/products/{product_id}/rate-tiers/store', [SpecialSavingController::class, 'storeRateTier'])
+                ->name('rate_tiers.store')
+                ->middleware('check_user_rights:special_savings_products');
 
-        Route::get('/rate-tiers/edit/{id}', [SpecialSavingController::class, 'editRateTier'])
-            ->name('rate_tiers.edit')
-            ->middleware('check_user_rights:special_savings_products');
+            Route::get('/rate-tiers/edit/{id}', [SpecialSavingController::class, 'editRateTier'])
+                ->name('rate_tiers.edit')
+                ->middleware('check_user_rights:special_savings_products');
 
-        Route::post('/rate-tiers/update/{id}', [SpecialSavingController::class, 'updateRateTier'])
-            ->name('rate_tiers.update')
-            ->middleware('check_user_rights:special_savings_products');
+            Route::post('/rate-tiers/update/{id}', [SpecialSavingController::class, 'updateRateTier'])
+                ->name('rate_tiers.update')
+                ->middleware('check_user_rights:special_savings_products');
 
-        Route::post('/rate-tiers/delete/{id}', [SpecialSavingController::class, 'deleteRateTier'])
-            ->name('rate_tiers.delete')
-            ->middleware('check_user_rights:special_savings_products');
+            Route::post('/rate-tiers/delete/{id}', [SpecialSavingController::class, 'deleteRateTier'])
+                ->name('rate_tiers.delete')
+                ->middleware('check_user_rights:special_savings_products');
 
 
-        /*
+            /*
         |--------------------------------------------------------------------------
         | Member Special Saving Accounts
         |--------------------------------------------------------------------------
         | Table: sacco_special_saving_accounts
         */
-        Route::get('/accounts', [SpecialSavingController::class, 'accounts'])
-            ->name('accounts.index')
-            ->middleware('check_user_rights:special_savings_accounts');
+            Route::get('/accounts', [SpecialSavingController::class, 'accounts'])
+                ->name('accounts.index')
+                ->middleware('check_user_rights:special_savings_accounts');
 
-        Route::get('/accounts/create', [SpecialSavingController::class, 'createAccount'])
-            ->name('accounts.create')
-            ->middleware('check_user_rights:special_savings_accounts');
+            Route::get('/accounts/create', [SpecialSavingController::class, 'createAccount'])
+                ->name('accounts.create')
+                ->middleware('check_user_rights:special_savings_accounts');
 
-        Route::post('/accounts/store', [SpecialSavingController::class, 'storeAccount'])
-            ->name('accounts.store')
-            ->middleware('check_user_rights:special_savings_accounts');
+            Route::post('/accounts/store', [SpecialSavingController::class, 'storeAccount'])
+                ->name('accounts.store')
+                ->middleware('check_user_rights:special_savings_accounts');
 
-        Route::get('/accounts/show/{id}', [SpecialSavingController::class, 'showAccount'])
-            ->name('accounts.show')
-            ->middleware('check_user_rights:special_savings_accounts');
+            Route::get('/accounts/show/{id}', [SpecialSavingController::class, 'showAccount'])
+                ->name('accounts.show')
+                ->middleware('check_user_rights:special_savings_accounts');
 
-        Route::get('/accounts/edit/{id}', [SpecialSavingController::class, 'editAccount'])
-            ->name('accounts.edit')
-            ->middleware('check_user_rights:special_savings_accounts');
+            Route::get('/accounts/edit/{id}', [SpecialSavingController::class, 'editAccount'])
+                ->name('accounts.edit')
+                ->middleware('check_user_rights:special_savings_accounts');
 
-        Route::post('/accounts/update/{id}', [SpecialSavingController::class, 'updateAccount'])
-            ->name('accounts.update')
-            ->middleware('check_user_rights:special_savings_accounts');
+            Route::post('/accounts/update/{id}', [SpecialSavingController::class, 'updateAccount'])
+                ->name('accounts.update')
+                ->middleware('check_user_rights:special_savings_accounts');
 
-        Route::post('/accounts/freeze/{id}', [SpecialSavingController::class, 'freezeAccount'])
-            ->name('accounts.freeze')
-            ->middleware('check_user_rights:special_savings_accounts');
+            Route::post('/accounts/freeze/{id}', [SpecialSavingController::class, 'freezeAccount'])
+                ->name('accounts.freeze')
+                ->middleware('check_user_rights:special_savings_accounts');
 
-        Route::post('/accounts/activate/{id}', [SpecialSavingController::class, 'activateAccount'])
-            ->name('accounts.activate')
-            ->middleware('check_user_rights:special_savings_accounts');
+            Route::post('/accounts/activate/{id}', [SpecialSavingController::class, 'activateAccount'])
+                ->name('accounts.activate')
+                ->middleware('check_user_rights:special_savings_accounts');
 
-        Route::post('/accounts/close/{id}', [SpecialSavingController::class, 'closeAccount'])
-            ->name('accounts.close')
-            ->middleware('check_user_rights:special_savings_accounts');
+            Route::post('/accounts/close/{id}', [SpecialSavingController::class, 'closeAccount'])
+                ->name('accounts.close')
+                ->middleware('check_user_rights:special_savings_accounts');
 
-        Route::get('/accounts/{id}/statement', [SpecialSavingController::class, 'accountStatement'])
-            ->name('accounts.statement')
-            ->middleware('check_user_rights:special_savings_accounts');
+            Route::get('/accounts/{id}/statement', [SpecialSavingController::class, 'accountStatement'])
+                ->name('accounts.statement')
+                ->middleware('check_user_rights:special_savings_accounts');
 
-        Route::get('/accounts/{id}/statement/pdf', [SpecialSavingController::class, 'accountStatementPdf'])
-            ->name('accounts.statement.pdf')
-            ->middleware('check_user_rights:special_savings_accounts');
+            Route::get('/accounts/{id}/statement/pdf', [SpecialSavingController::class, 'accountStatementPdf'])
+                ->name('accounts.statement.pdf')
+                ->middleware('check_user_rights:special_savings_accounts');
 
 
-        /*
+            /*
         |--------------------------------------------------------------------------
         | Member Search / Account Search APIs
         |--------------------------------------------------------------------------
         | Used by account opening, deposits, withdrawals, and transfers.
         */
-        Route::get('/search/members', [SpecialSavingController::class, 'searchMembers'])
-            ->name('search.members')
-            ->middleware('check_user_rights:special_savings_accounts');
+            Route::get('/search/members', [SpecialSavingController::class, 'searchMembers'])
+                ->name('search.members')
+                ->middleware('check_user_rights:special_savings_accounts');
 
-        Route::get('/search/accounts', [SpecialSavingController::class, 'searchAccounts'])
-            ->name('search.accounts')
-            ->middleware('check_user_rights:special_savings_accounts');
+            Route::get('/search/accounts', [SpecialSavingController::class, 'searchAccounts'])
+                ->name('search.accounts')
+                ->middleware('check_user_rights:special_savings_accounts');
 
-        Route::get('/search/sub-accounts', [SpecialSavingController::class, 'searchSubAccounts'])
-            ->name('search.sub_accounts')
-            ->middleware('check_user_rights:special_savings_categories');
+            Route::get('/search/sub-accounts', [SpecialSavingController::class, 'searchSubAccounts'])
+                ->name('search.sub_accounts')
+                ->middleware('check_user_rights:special_savings_categories');
 
 
-        /*
+            /*
         |--------------------------------------------------------------------------
         | Transactions
         |--------------------------------------------------------------------------
         | Table: sacco_special_saving_transactions
         */
-        Route::get('/transactions', [SpecialSavingController::class, 'transactions'])
-            ->name('transactions.index')
-            ->middleware('check_user_rights:special_savings_transactions');
+            Route::get('/transactions', [SpecialSavingController::class, 'transactions'])
+                ->name('transactions.index')
+                ->middleware('check_user_rights:special_savings_transactions');
 
-        Route::get('/transactions/create', [SpecialSavingController::class, 'createTransaction'])
-            ->name('transactions.create')
-            ->middleware('check_user_rights:special_savings_transactions');
+            Route::get('/transactions/create', [SpecialSavingController::class, 'createTransaction'])
+                ->name('transactions.create')
+                ->middleware('check_user_rights:special_savings_transactions');
 
-        Route::post('/transactions/store', [SpecialSavingController::class, 'storeTransaction'])
-            ->name('transactions.store')
-            ->middleware('check_user_rights:special_savings_transactions');
+            Route::post('/transactions/store', [SpecialSavingController::class, 'storeTransaction'])
+                ->name('transactions.store')
+                ->middleware('check_user_rights:special_savings_transactions');
 
-        Route::get('/transactions/show/{id}', [SpecialSavingController::class, 'showTransaction'])
-            ->name('transactions.show')
-            ->middleware('check_user_rights:special_savings_transactions');
+            Route::get('/transactions/show/{id}', [SpecialSavingController::class, 'showTransaction'])
+                ->name('transactions.show')
+                ->middleware('check_user_rights:special_savings_transactions');
 
-        Route::get('/transactions/{id}/receipt', [SpecialSavingController::class, 'transactionReceipt'])
-            ->name('transactions.receipt')
-            ->middleware('check_user_rights:special_savings_transactions');
+            Route::get('/transactions/{id}/receipt', [SpecialSavingController::class, 'transactionReceipt'])
+                ->name('transactions.receipt')
+                ->middleware('check_user_rights:special_savings_transactions');
 
-        Route::post('/transactions/reverse/{id}', [SpecialSavingController::class, 'reverseTransaction'])
-            ->name('transactions.reverse')
-            ->middleware('check_user_rights:special_savings_reverse');
+            Route::post('/transactions/reverse/{id}', [SpecialSavingController::class, 'reverseTransaction'])
+                ->name('transactions.reverse')
+                ->middleware('check_user_rights:special_savings_reverse');
 
 
-        /*
+            /*
         |--------------------------------------------------------------------------
         | Direct Deposits
         |--------------------------------------------------------------------------
         | DEPOSIT / TRANSFER_IN
         */
-        Route::get('/deposits/create', [SpecialSavingController::class, 'createDeposit'])
-            ->name('deposits.create')
-            ->middleware('check_user_rights:special_savings_deposits');
+            Route::get('/deposits/create', [SpecialSavingController::class, 'createDeposit'])
+                ->name('deposits.create')
+                ->middleware('check_user_rights:special_savings_deposits');
 
-        Route::post('/deposits/store', [SpecialSavingController::class, 'storeDeposit'])
-            ->name('deposits.store')
-            ->middleware('check_user_rights:special_savings_deposits');
+            Route::post('/deposits/store', [SpecialSavingController::class, 'storeDeposit'])
+                ->name('deposits.store')
+                ->middleware('check_user_rights:special_savings_deposits');
 
 
-        /*
+            /*
         |--------------------------------------------------------------------------
         | Transfers
         |--------------------------------------------------------------------------
         | Transfer from shares/FOSA/capital/other account into Special Savings,
         | or from Special Savings to another member account if allowed.
         */
-        Route::get('/transfers/create', [SpecialSavingController::class, 'createTransfer'])
-            ->name('transfers.create')
-            ->middleware('check_user_rights:special_savings_transfers');
+            Route::get('/transfers/create', [SpecialSavingController::class, 'createTransfer'])
+                ->name('transfers.create')
+                ->middleware('check_user_rights:special_savings_transfers');
 
-        Route::post('/transfers/store', [SpecialSavingController::class, 'storeTransfer'])
-            ->name('transfers.store')
-            ->middleware('check_user_rights:special_savings_transfers');
+            Route::post('/transfers/store', [SpecialSavingController::class, 'storeTransfer'])
+                ->name('transfers.store')
+                ->middleware('check_user_rights:special_savings_transfers');
 
 
-        /*
+            /*
         |--------------------------------------------------------------------------
         | Withdrawal Requests
         |--------------------------------------------------------------------------
         | Table: sacco_special_saving_withdrawal_requests
         */
-        Route::get('/withdrawals', [SpecialSavingController::class, 'withdrawals'])
-            ->name('withdrawals.index')
-            ->middleware('check_user_rights:special_savings_withdrawals');
+            Route::get('/withdrawals', [SpecialSavingController::class, 'withdrawals'])
+                ->name('withdrawals.index')
+                ->middleware('check_user_rights:special_savings_withdrawals');
 
-        Route::get('/withdrawals/create', [SpecialSavingController::class, 'createWithdrawal'])
-            ->name('withdrawals.create')
-            ->middleware('check_user_rights:special_savings_withdrawals');
+            Route::get('/withdrawals/create', [SpecialSavingController::class, 'createWithdrawal'])
+                ->name('withdrawals.create')
+                ->middleware('check_user_rights:special_savings_withdrawals');
 
-        Route::post('/withdrawals/store', [SpecialSavingController::class, 'storeWithdrawal'])
-            ->name('withdrawals.store')
-            ->middleware('check_user_rights:special_savings_withdrawals');
+            Route::post('/withdrawals/store', [SpecialSavingController::class, 'storeWithdrawal'])
+                ->name('withdrawals.store')
+                ->middleware('check_user_rights:special_savings_withdrawals');
 
-        Route::get('/withdrawals/show/{id}', [SpecialSavingController::class, 'showWithdrawal'])
-            ->name('withdrawals.show')
-            ->middleware('check_user_rights:special_savings_withdrawals');
+            Route::get('/withdrawals/show/{id}', [SpecialSavingController::class, 'showWithdrawal'])
+                ->name('withdrawals.show')
+                ->middleware('check_user_rights:special_savings_withdrawals');
 
-        Route::post('/withdrawals/approve/{id}', [SpecialSavingController::class, 'approveWithdrawal'])
-            ->name('withdrawals.approve')
-            ->middleware('check_user_rights:special_savings_withdrawal_approval');
+            Route::post('/withdrawals/approve/{id}', [SpecialSavingController::class, 'approveWithdrawal'])
+                ->name('withdrawals.approve')
+                ->middleware('check_user_rights:special_savings_withdrawal_approval');
 
-        Route::post('/withdrawals/reject/{id}', [SpecialSavingController::class, 'rejectWithdrawal'])
-            ->name('withdrawals.reject')
-            ->middleware('check_user_rights:special_savings_withdrawal_approval');
+            Route::post('/withdrawals/reject/{id}', [SpecialSavingController::class, 'rejectWithdrawal'])
+                ->name('withdrawals.reject')
+                ->middleware('check_user_rights:special_savings_withdrawal_approval');
 
-        Route::post('/withdrawals/pay/{id}', [SpecialSavingController::class, 'payWithdrawal'])
-            ->name('withdrawals.pay')
-            ->middleware('check_user_rights:special_savings_withdrawal_payment');
+            Route::post('/withdrawals/pay/{id}', [SpecialSavingController::class, 'payWithdrawal'])
+                ->name('withdrawals.pay')
+                ->middleware('check_user_rights:special_savings_withdrawal_payment');
 
-        Route::post('/withdrawals/cancel/{id}', [SpecialSavingController::class, 'cancelWithdrawal'])
-            ->name('withdrawals.cancel')
-            ->middleware('check_user_rights:special_savings_withdrawals');
+            Route::post('/withdrawals/cancel/{id}', [SpecialSavingController::class, 'cancelWithdrawal'])
+                ->name('withdrawals.cancel')
+                ->middleware('check_user_rights:special_savings_withdrawals');
 
-        Route::get('/withdrawals/{id}/voucher', [SpecialSavingController::class, 'withdrawalVoucher'])
-            ->name('withdrawals.voucher')
-            ->middleware('check_user_rights:special_savings_withdrawals');
+            Route::get('/withdrawals/{id}/voucher', [SpecialSavingController::class, 'withdrawalVoucher'])
+                ->name('withdrawals.voucher')
+                ->middleware('check_user_rights:special_savings_withdrawals');
 
 
-        /*
+            /*
         |--------------------------------------------------------------------------
         | Interest Processing
         |--------------------------------------------------------------------------
@@ -1672,184 +1672,198 @@ Route::prefix('special-savings')
         | sacco_special_saving_interest_runs
         | sacco_special_saving_interest_run_items
         */
-        Route::get('/interest', [SpecialSavingController::class, 'interestRuns'])
-            ->name('interest.index')
-            ->middleware('check_user_rights:special_savings_interest');
+            Route::get('/interest', [SpecialSavingController::class, 'interestRuns'])
+                ->name('interest.index')
+                ->middleware('check_user_rights:special_savings_interest');
 
-        Route::get('/interest/create', [SpecialSavingController::class, 'createInterestRun'])
-            ->name('interest.create')
-            ->middleware('check_user_rights:special_savings_interest');
+            Route::get('/interest/create', [SpecialSavingController::class, 'createInterestRun'])
+                ->name('interest.create')
+                ->middleware('check_user_rights:special_savings_interest');
 
-        Route::post('/interest/preview', [SpecialSavingController::class, 'previewInterestRun'])
-            ->name('interest.preview')
-            ->middleware('check_user_rights:special_savings_interest');
+            Route::post('/interest/preview', [SpecialSavingController::class, 'previewInterestRun'])
+                ->name('interest.preview')
+                ->middleware('check_user_rights:special_savings_interest');
 
-        Route::post('/interest/process', [SpecialSavingController::class, 'processInterestRun'])
-            ->name('interest.process')
-            ->middleware('check_user_rights:special_savings_interest');
+            Route::post('/interest/process', [SpecialSavingController::class, 'processInterestRun'])
+                ->name('interest.process')
+                ->middleware('check_user_rights:special_savings_interest');
 
-        Route::get('/interest/show/{id}', [SpecialSavingController::class, 'showInterestRun'])
-            ->name('interest.show')
-            ->middleware('check_user_rights:special_savings_interest');
+            Route::get('/interest/show/{id}', [SpecialSavingController::class, 'showInterestRun'])
+                ->name('interest.show')
+                ->middleware('check_user_rights:special_savings_interest');
 
-        Route::get('/interest/items/{run_id}', [SpecialSavingController::class, 'interestRunItems'])
-            ->name('interest.items')
-            ->middleware('check_user_rights:special_savings_interest');
+            Route::get('/interest/items/{run_id}', [SpecialSavingController::class, 'interestRunItems'])
+                ->name('interest.items')
+                ->middleware('check_user_rights:special_savings_interest');
 
-        Route::post('/interest/post/{id}', [SpecialSavingController::class, 'postInterestRun'])
-            ->name('interest.post')
-            ->middleware('check_user_rights:special_savings_interest');
+            Route::post('/interest/post/{id}', [SpecialSavingController::class, 'postInterestRun'])
+                ->name('interest.post')
+                ->middleware('check_user_rights:special_savings_interest');
 
-        Route::post('/interest/reverse/{id}', [SpecialSavingController::class, 'reverseInterestRun'])
-            ->name('interest.reverse')
-            ->middleware('check_user_rights:special_savings_interest_reverse');
+            Route::post('/interest/reverse/{id}', [SpecialSavingController::class, 'reverseInterestRun'])
+                ->name('interest.reverse')
+                ->middleware('check_user_rights:special_savings_interest_reverse');
 
-        Route::post('/interest/cancel/{id}', [SpecialSavingController::class, 'cancelInterestRun'])
-            ->name('interest.cancel')
-            ->middleware('check_user_rights:special_savings_interest');
+            Route::post('/interest/cancel/{id}', [SpecialSavingController::class, 'cancelInterestRun'])
+                ->name('interest.cancel')
+                ->middleware('check_user_rights:special_savings_interest');
 
 
-        /*
+            /*
         |--------------------------------------------------------------------------
         | Interest Vesting
         |--------------------------------------------------------------------------
         | Converts accrued interest to available interest after 6 months.
         */
-        Route::get('/vesting', [SpecialSavingController::class, 'vesting'])
-            ->name('vesting.index')
-            ->middleware('check_user_rights:special_savings_interest');
+            Route::get('/vesting', [SpecialSavingController::class, 'vesting'])
+                ->name('vesting.index')
+                ->middleware('check_user_rights:special_savings_interest');
 
-        Route::post('/vesting/preview', [SpecialSavingController::class, 'previewVesting'])
-            ->name('vesting.preview')
-            ->middleware('check_user_rights:special_savings_interest');
+            Route::post('/vesting/preview', [SpecialSavingController::class, 'previewVesting'])
+                ->name('vesting.preview')
+                ->middleware('check_user_rights:special_savings_interest');
 
-        Route::post('/vesting/process', [SpecialSavingController::class, 'processVesting'])
-            ->name('vesting.process')
-            ->middleware('check_user_rights:special_savings_interest');
+            Route::post('/vesting/process', [SpecialSavingController::class, 'processVesting'])
+                ->name('vesting.process')
+                ->middleware('check_user_rights:special_savings_interest');
 
 
-        /*
+            /*
         |--------------------------------------------------------------------------
         | End Month Processing Shortcut
         |--------------------------------------------------------------------------
         | For FEDHA monthly interest processing.
         */
-        Route::get('/end-month', [SpecialSavingController::class, 'endMonth'])
-            ->name('end_month.index')
-            ->middleware('check_user_rights:special_savings_end_month');
+            Route::get('/end-month', [SpecialSavingController::class, 'endMonth'])
+                ->name('end_month.index')
+                ->middleware('check_user_rights:special_savings_end_month');
 
-        Route::post('/end-month/process', [SpecialSavingController::class, 'processEndMonth'])
-            ->name('end_month.process')
-            ->middleware('check_user_rights:special_savings_end_month');
+            Route::post('/end-month/process', [SpecialSavingController::class, 'processEndMonth'])
+                ->name('end_month.process')
+                ->middleware('check_user_rights:special_savings_end_month');
 
 
-        /*
+            /*
         |--------------------------------------------------------------------------
         | Imports
         |--------------------------------------------------------------------------
         | Optional but useful for payroll/MPA-style special saving contributions.
         */
-        Route::get('/import', [SpecialSavingController::class, 'importForm'])
-            ->name('import.form')
-            ->middleware('check_user_rights:special_savings_import');
+            Route::get('/import', [SpecialSavingController::class, 'importForm'])
+                ->name('import.form')
+                ->middleware('check_user_rights:special_savings_import');
 
-        Route::post('/import/preview', [SpecialSavingController::class, 'importPreview'])
-            ->name('import.preview')
-            ->middleware('check_user_rights:special_savings_import');
+            Route::post('/import/preview', [SpecialSavingController::class, 'importPreview'])
+                ->name('import.preview')
+                ->middleware('check_user_rights:special_savings_import');
 
-        Route::post('/import/process', [SpecialSavingController::class, 'importProcess'])
-            ->name('import.process')
-            ->middleware('check_user_rights:special_savings_import');
+            Route::post('/import/process', [SpecialSavingController::class, 'importProcess'])
+                ->name('import.process')
+                ->middleware('check_user_rights:special_savings_import');
 
-        Route::post('/import/cancel', [SpecialSavingController::class, 'importCancel'])
-            ->name('import.cancel')
-            ->middleware('check_user_rights:special_savings_import');
+            Route::post('/import/cancel', [SpecialSavingController::class, 'importCancel'])
+                ->name('import.cancel')
+                ->middleware('check_user_rights:special_savings_import');
 
-        Route::get('/import/sample', [SpecialSavingController::class, 'importSample'])
-            ->name('import.sample')
-            ->middleware('check_user_rights:special_savings_import');
+            Route::get('/import/sample', [SpecialSavingController::class, 'importSample'])
+                ->name('import.sample')
+                ->middleware('check_user_rights:special_savings_import');
 
 
-        /*
+            /*
         |--------------------------------------------------------------------------
         | Reports
         |--------------------------------------------------------------------------
         */
-        Route::get('/reports/balances', [SpecialSavingController::class, 'reportBalances'])
-            ->name('reports.balances')
-            ->middleware('check_user_rights:special_savings_reports');
+            Route::get('/reports/balances', [SpecialSavingController::class, 'reportBalances'])
+                ->name('reports.balances')
+                ->middleware('check_user_rights:special_savings_reports');
 
-        Route::get('/reports/balances/export', [SpecialSavingController::class, 'exportBalances'])
-            ->name('reports.balances.export')
-            ->middleware('check_user_rights:special_savings_reports');
+            Route::get('/reports/balances/export', [SpecialSavingController::class, 'exportBalances'])
+                ->name('reports.balances.export')
+                ->middleware('check_user_rights:special_savings_reports');
 
-        Route::get('/reports/transactions', [SpecialSavingController::class, 'reportTransactions'])
-            ->name('reports.transactions')
-            ->middleware('check_user_rights:special_savings_reports');
+            Route::get('/reports/transactions', [SpecialSavingController::class, 'reportTransactions'])
+                ->name('reports.transactions')
+                ->middleware('check_user_rights:special_savings_reports');
 
-        Route::get('/reports/transactions/export', [SpecialSavingController::class, 'exportTransactions'])
-            ->name('reports.transactions.export')
-            ->middleware('check_user_rights:special_savings_reports');
+            Route::get('/reports/transactions/export', [SpecialSavingController::class, 'exportTransactions'])
+                ->name('reports.transactions.export')
+                ->middleware('check_user_rights:special_savings_reports');
 
-        Route::get('/reports/interest', [SpecialSavingController::class, 'reportInterest'])
-            ->name('reports.interest')
-            ->middleware('check_user_rights:special_savings_reports');
+            Route::get('/reports/interest', [SpecialSavingController::class, 'reportInterest'])
+                ->name('reports.interest')
+                ->middleware('check_user_rights:special_savings_reports');
 
-        Route::get('/reports/interest/export', [SpecialSavingController::class, 'exportInterest'])
-            ->name('reports.interest.export')
-            ->middleware('check_user_rights:special_savings_reports');
+            Route::get('/reports/interest/export', [SpecialSavingController::class, 'exportInterest'])
+                ->name('reports.interest.export')
+                ->middleware('check_user_rights:special_savings_reports');
 
-        Route::get('/reports/withdrawals', [SpecialSavingController::class, 'reportWithdrawals'])
-            ->name('reports.withdrawals')
-            ->middleware('check_user_rights:special_savings_reports');
+            Route::get('/reports/withdrawals', [SpecialSavingController::class, 'reportWithdrawals'])
+                ->name('reports.withdrawals')
+                ->middleware('check_user_rights:special_savings_reports');
 
-        Route::get('/reports/withdrawals/export', [SpecialSavingController::class, 'exportWithdrawals'])
-            ->name('reports.withdrawals.export')
-            ->middleware('check_user_rights:special_savings_reports');
+            Route::get('/reports/withdrawals/export', [SpecialSavingController::class, 'exportWithdrawals'])
+                ->name('reports.withdrawals.export')
+                ->middleware('check_user_rights:special_savings_reports');
 
 
-        /*
+            /*
         |--------------------------------------------------------------------------
         | AJAX / Utility Endpoints
         |--------------------------------------------------------------------------
         */
-        Route::get('/ajax/account-summary/{account_id}', [SpecialSavingController::class, 'ajaxAccountSummary'])
-            ->name('ajax.account_summary')
-            ->middleware('check_user_rights:special_savings_accounts');
+            Route::get('/ajax/account-summary/{account_id}', [SpecialSavingController::class, 'ajaxAccountSummary'])
+                ->name('ajax.account_summary')
+                ->middleware('check_user_rights:special_savings_accounts');
 
-        Route::get('/ajax/member-accounts/{member_id}', [SpecialSavingController::class, 'ajaxMemberAccounts'])
-            ->name('ajax.member_accounts')
-            ->middleware('check_user_rights:special_savings_accounts');
+            Route::get('/ajax/member-accounts/{member_id}', [SpecialSavingController::class, 'ajaxMemberAccounts'])
+                ->name('ajax.member_accounts')
+                ->middleware('check_user_rights:special_savings_accounts');
 
-        Route::get('/ajax/product-rules/{product_id}', [SpecialSavingController::class, 'ajaxProductRules'])
-            ->name('ajax.product_rules')
-            ->middleware('check_user_rights:special_savings_products');
+            Route::get('/ajax/product-rules/{product_id}', [SpecialSavingController::class, 'ajaxProductRules'])
+                ->name('ajax.product_rules')
+                ->middleware('check_user_rights:special_savings_products');
 
-        Route::get('/ajax/withdrawal-preview/{account_id}', [SpecialSavingController::class, 'ajaxWithdrawalPreview'])
-            ->name('ajax.withdrawal_preview')
-            ->middleware('check_user_rights:special_savings_withdrawals');
+            Route::get('/ajax/withdrawal-preview/{account_id}', [SpecialSavingController::class, 'ajaxWithdrawalPreview'])
+                ->name('ajax.withdrawal_preview')
+                ->middleware('check_user_rights:special_savings_withdrawals');
 
-        Route::get('/ajax/interest-preview/{account_id}', [SpecialSavingController::class, 'ajaxInterestPreview'])
-            ->name('ajax.interest_preview')
-            ->middleware('check_user_rights:special_savings_interest');
+            Route::get('/ajax/interest-preview/{account_id}', [SpecialSavingController::class, 'ajaxInterestPreview'])
+                ->name('ajax.interest_preview')
+                ->middleware('check_user_rights:special_savings_interest');
+        });
+
+
+    Route::middleware(['auth', 'check_member_position'])->group(function () {
+
+        Route::prefix('admin/route-audit-logs')
+            ->name('route.audit.logs.')
+            ->middleware('check_user_rights:view_system_logs')
+            ->group(function () {
+                Route::get('/', [RouteAuditLogController::class, 'index'])
+                    ->name('index');
+
+                Route::get('/data', [RouteAuditLogController::class, 'data'])
+                    ->name('data');
+            });
     });
-    
- 
 
-Route::get('/reports/sasra/{path?}', function ($path = null) {
-    $reportName = $path
-        ? \Illuminate\Support\Str::of($path)
+
+    Route::get('/reports/sasra/{path?}', function ($path = null) {
+        $reportName = $path
+            ? \Illuminate\Support\Str::of($path)
             ->replace(['-', '_', '/'], ' ')
             ->title()
-        : 'SASRA Report';
+            : 'SASRA Report';
 
-    return response()->view('reports.sasra.placeholder', [
-        'reportName' => $reportName,
-    ]);
-})
-    ->where('path', '.*')
-    ->middleware('check_user_rights:rpt_reports')
-    ->name('reports.sasra.placeholder');
+        return response()->view('reports.sasra.placeholder', [
+            'reportName' => $reportName,
+        ]);
+    })
+        ->where('path', '.*')
+        ->middleware('check_user_rights:rpt_reports')
+        ->name('reports.sasra.placeholder');
     // =========================
     // LEDGERS (DRILL-DOWN)
     // =========================
