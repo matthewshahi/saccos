@@ -32,7 +32,7 @@ class RouteAuditLogController extends Controller
             ->orderBy('route_audit_log_outcome')
             ->pluck('route_audit_log_outcome');
 
-        return view('route_audit_logs.index', compact(
+        return view('admin.route_audit_logs.index', compact(
             'logs',
             'eventTypes',
             'outcomes'
@@ -45,9 +45,19 @@ class RouteAuditLogController extends Controller
 
         $this->applyFilters($query, $request);
 
+        $limit = (int) $request->input('limit', 100);
+
+        if ($limit < 1) {
+            $limit = 100;
+        }
+
+        if ($limit > 500) {
+            $limit = 500;
+        }
+
         $logs = $query
             ->orderByDesc('route_audit_log_id')
-            ->limit((int) $request->input('limit', 100))
+            ->limit($limit)
             ->get();
 
         return response()->json([
@@ -65,7 +75,7 @@ class RouteAuditLogController extends Controller
 
         abort_if(!$log, 404);
 
-        return view('route_audit_logs.show', compact('log'));
+        return view('admin.route_audit_logs.show', compact('log'));
     }
 
     private function baseQuery()
