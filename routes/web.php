@@ -71,6 +71,7 @@ use App\Http\Controllers\MinimumCapitalContributionController;
 use App\Http\Controllers\Auth\MemberPasswordResetController;
 use App\Http\Controllers\SpecialSavingController;
 use App\Http\Controllers\RouteAuditLogController;
+ 
 
 /* good imports
 Route::prefix('kass')->group(function () {
@@ -1836,19 +1837,21 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
         });
 
 
-    Route::middleware(['auth', 'check_member_position'])->group(function () {
+Route::middleware(['auth', 'check_member_position'])->group(function () {
+    Route::prefix('admin/route-audit-logs')
+        ->name('route.audit.logs.')
+        ->middleware('check_user_rights:view_system_logs')
+        ->group(function () {
+            Route::get('/', [RouteAuditLogController::class, 'index'])
+                ->name('index');
 
-        Route::prefix('admin/route-audit-logs')
-            ->name('route.audit.logs.')
-            ->middleware('check_user_rights:view_system_logs')
-            ->group(function () {
-                Route::get('/', [RouteAuditLogController::class, 'index'])
-                    ->name('index');
+            Route::get('/data', [RouteAuditLogController::class, 'data'])
+                ->name('data');
 
-                Route::get('/data', [RouteAuditLogController::class, 'data'])
-                    ->name('data');
-            });
-    });
+            Route::get('/{id}', [RouteAuditLogController::class, 'show'])
+                ->name('show');
+        });
+});
 
 
     Route::get('/reports/sasra/{path?}', function ($path = null) {
