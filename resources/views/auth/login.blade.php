@@ -345,6 +345,29 @@
         margin: 0;
     }
 
+    .fi-login-methods {
+        margin-top: 12px;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 7px;
+    }
+
+    .fi-login-method-pill {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 6px 9px;
+        border-radius: 999px;
+        background: #ffffff;
+        border: 1px solid var(--fi-border);
+        color: var(--fi-muted-strong);
+        font-size: 11px;
+        font-weight: 850;
+        line-height: 1;
+        box-shadow: 0 8px 18px rgba(17, 24, 39, 0.04);
+    }
+
     .fi-form-group {
         margin-bottom: 16px;
     }
@@ -403,6 +426,14 @@
         box-shadow: 0 0 0 4px rgba(184, 138, 43, 0.12);
         background-color: #ffffff;
         outline: none;
+    }
+
+    .fi-field-help {
+        display: block;
+        margin-top: 7px;
+        color: var(--fi-muted);
+        font-size: 11.5px;
+        line-height: 1.45;
     }
 
     .fi-submit-btn {
@@ -673,6 +704,11 @@
             max-width: 68px;
             max-height: 68px;
         }
+
+        .fi-login-method-pill {
+            font-size: 10.5px;
+            padding: 6px 8px;
+        }
     }
 </style>
 
@@ -698,8 +734,8 @@
                     <div class="fi-feature-item">
                         <div class="fi-feature-icon">✓</div>
                         <div>
-                            <strong>Member self-service</strong>
-                            <span>View key account services, balances and records from one secure portal.</span>
+                            <strong>Flexible member login</strong>
+                            <span>Sign in using your registered email, phone number, National ID or SACCO number.</span>
                         </div>
                     </div>
 
@@ -754,26 +790,36 @@
                     <div class="fi-login-badge">Member Portal</div>
                     <div class="sacco-brand">{{ $saccoName }}</div>
                     <p class="fi-login-subtitle">
-                        Sign in using your registered email address or phone number.
+                        Sign in using your registered email address, phone number, National ID or SACCO number.
                     </p>
+
+                    <div class="fi-login-methods" aria-label="Supported login methods">
+                        <span class="fi-login-method-pill">Email</span>
+                        <span class="fi-login-method-pill">Phone Number</span>
+                        <span class="fi-login-method-pill">National ID</span>
+                        <span class="fi-login-method-pill">SACCO No.</span>
+                    </div>
                 </div>
 
                 <form method="POST" action="{{ route('login') }}" id="loginForm">
                     @csrf
 
                     <div class="fi-form-group">
-                        <label for="login">Email or Phone Number</label>
+                        <label for="login">Email, Phone Number, National ID or SACCO No.</label>
                         <div class="fi-input-wrap">
                             <input type="text"
                                    name="login"
                                    id="login"
                                    class="form-control"
-                                   placeholder="Enter email or phone"
+                                   placeholder="Enter email, phone, National ID or SACCO No."
                                    value="{{ old('login') }}"
                                    autocomplete="username"
-                                   inputmode="email"
+                                   inputmode="text"
                                    required>
                         </div>
+                        <small class="fi-field-help">
+                            Use the details registered on your SACCO member profile.
+                        </small>
                         @if ($errors->has('login'))
                             <small class="text-danger">{{ $errors->first('login') }}</small>
                         @endif
