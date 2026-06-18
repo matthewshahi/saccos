@@ -70,6 +70,7 @@ use App\Http\Controllers\MpesaStatementReconciliationController;
 use App\Http\Controllers\MinimumCapitalContributionController;
 use App\Http\Controllers\Auth\MemberPasswordResetController;
 use App\Http\Controllers\SpecialSavingController;
+use App\Http\Controllers\RouteAuditLogController;
 
 /* good imports
 Route::prefix('kass')->group(function () {
