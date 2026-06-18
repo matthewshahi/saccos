@@ -36,12 +36,26 @@ class Kernel extends HttpKernel
             \Illuminate\View\Middleware\ShareErrorsFromSession::class,
             \App\Http\Middleware\VerifyCsrfToken::class,
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
-            
+
+            /*
+             * SACCO route-level audit logging.
+             *
+             * Keep this inside the web group so it captures:
+             * - login requests
+             * - failed login route attempts
+             * - logout requests
+             * - authenticated route access
+             * - form submissions
+             * - imports/exports
+             * - approvals/reversals
+             * - failed route actions/exceptions
+             */
+            \App\Http\Middleware\SaccoRouteAuditLog::class,
         ],
 
         'api' => [
             // \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
-            \Illuminate\Routing\Middleware\ThrottleRequests::class.':api',
+            \Illuminate\Routing\Middleware\ThrottleRequests::class . ':api',
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
         ],
     ];
@@ -65,10 +79,22 @@ class Kernel extends HttpKernel
         'signed' => \App\Http\Middleware\ValidateSignature::class,
         'throttle' => \Illuminate\Routing\Middleware\ThrottleRequests::class,
         'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
+
+        /*
+         * Custom SACCO middleware.
+         */
         'check_user_rights' => \App\Http\Middleware\CheckUserRights::class,
         'check_member_position' => \App\Http\Middleware\CheckMemberPosition::class,
         'safaricom.ip' => \App\Http\Middleware\CheckSafaricomIP::class,
         'auth.api' => \App\Http\Middleware\ApiAuthenticate::class,
 
+        /*
+         * Optional alias for selective audit logging.
+         *
+         * Since SaccoRouteAuditLog is already inside the web group above,
+         * do not also add this alias to the same web routes unless you remove
+         * it from the web group.
+         */
+        'sacco.route.audit' => \App\Http\Middleware\SaccoRouteAuditLog::class,
     ];
 }

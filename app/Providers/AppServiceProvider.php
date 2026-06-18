@@ -2,13 +2,20 @@
 
 namespace App\Providers;
 
-use Illuminate\Support\ServiceProvider;
-use Illuminate\Support\Facades\View;
-use App\Http\ViewComposers\CurrentPeriodComposer;
 use App\Http\ViewComposers\CompanyNameComposer;
+use App\Http\ViewComposers\CurrentPeriodComposer;
+use App\Listeners\LogSaccoFailedLogin;
+use App\Listeners\LogSaccoLoginLockout;
+use App\Listeners\LogSaccoLogout;
+use App\Listeners\LogSaccoSuccessfulLogin;
+use Illuminate\Auth\Events\Failed;
+use Illuminate\Auth\Events\Lockout;
+use Illuminate\Auth\Events\Login;
+use Illuminate\Auth\Events\Logout;
 use Illuminate\Pagination\Paginator;
-
-
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\View;
+use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -17,7 +24,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        // You can bind classes into the service container here if needed
+        // Bind classes into the service container here if needed.
     }
 
     /**
@@ -25,20 +32,33 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        // Attach the CurrentPeriodComposer to all views
+        /**
+         * Global view composers.
+         */
         View::composer('*', CurrentPeriodComposer::class);
-
-        // Attach the CompanyNameComposer to all views
         View::composer('*', CompanyNameComposer::class);
 
-        // Share ERP contact globally with all views
+        /**
+         * Global shared view variables.
+         */
         View::share('erpContact', config('app.erp_contact'));
-
-        // Share Sacco support contact globally with all views
         View::share('saccoSupport', config('app.sacco_support'));
 
-         Paginator::useBootstrap();
-    }
+        /**
+         * Bootstrap pagination styling.
+         */
+        Paginator::useBootstrap();
 
-    
+        /**
+         * SACCO route/security audit event listeners.
+         *
+         * Important:
+         * If these listeners are already registered in EventServiceProvider,
+         * do not register them here again, otherwise logs may be duplicated.
+         */
+        Event::listen(Login::class, LogSaccoSuccessfulLogin::class);
+        Event::listen(Failed::class, LogSaccoFailedLogin::class);
+        Event::listen(Logout::class, LogSaccoLogout::class);
+        Event::listen(Lockout::class, LogSaccoLoginLockout::class);
+    }
 }
