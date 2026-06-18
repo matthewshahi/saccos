@@ -1,165 +1,215 @@
-<?php
+@extends('layouts.app')
 
-namespace App\Http\Controllers;
+@section('content')
+<div class="container-fluid">
+    <div class="card shadow-sm border-0">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <div>
+                <h5 class="mb-0">Route Audit Logs</h5>
+                <small class="text-muted">
+                    Login, logout, failed login, page access, form submission and route activity logs.
+                </small>
+            </div>
 
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+            <a href="{{ route('route.audit.logs.data') }}"
+               target="_blank"
+               class="btn btn-sm btn-outline-secondary">
+                JSON Data
+            </a>
+        </div>
 
-class RouteAuditLogController extends Controller
-{
-    public function index(Request $request)
-    {
-        $query = $this->baseQuery();
+        <div class="card-body">
+            <form method="GET" action="{{ route('route.audit.logs.index') }}" class="row g-2 mb-3">
+                <div class="col-md-3">
+                    <input type="text"
+                           name="search"
+                           class="form-control"
+                           placeholder="Search user, login, route, IP..."
+                           value="{{ request('search') }}">
+                </div>
 
-        $this->applyFilters($query, $request);
+                <div class="col-md-2">
+                    <select name="event_type" class="form-control">
+                        <option value="">All Events</option>
+                        @foreach(($eventTypes ?? []) as $eventType)
+                            <option value="{{ $eventType }}" @selected(request('event_type') === $eventType)>
+                                {{ $eventType }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
 
-        $logs = $query
-            ->orderByDesc('route_audit_log_id')
-            ->paginate(50)
-            ->withQueryString();
+                <div class="col-md-2">
+                    <select name="outcome" class="form-control">
+                        <option value="">All Outcomes</option>
+                        @foreach(($outcomes ?? []) as $outcome)
+                            <option value="{{ $outcome }}" @selected(request('outcome') === $outcome)>
+                                {{ $outcome }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
 
-        $eventTypes = DB::table('sacco_route_audit_logs')
-            ->select('route_audit_log_event_type')
-            ->whereNotNull('route_audit_log_event_type')
-            ->distinct()
-            ->orderBy('route_audit_log_event_type')
-            ->pluck('route_audit_log_event_type');
+                <div class="col-md-1">
+                    <select name="method" class="form-control">
+                        <option value="">Method</option>
+                        @foreach(($methods ?? ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']) as $method)
+                            <option value="{{ $method }}" @selected(request('method') === $method)>
+                                {{ $method }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
 
-        $outcomes = DB::table('sacco_route_audit_logs')
-            ->select('route_audit_log_outcome')
-            ->whereNotNull('route_audit_log_outcome')
-            ->distinct()
-            ->orderBy('route_audit_log_outcome')
-            ->pluck('route_audit_log_outcome');
+                <div class="col-md-2">
+                    <input type="date"
+                           name="date_from"
+                           class="form-control"
+                           value="{{ request('date_from') }}">
+                </div>
 
-        $methods = DB::table('sacco_route_audit_logs')
-            ->select('route_audit_log_method')
-            ->whereNotNull('route_audit_log_method')
-            ->distinct()
-            ->orderBy('route_audit_log_method')
-            ->pluck('route_audit_log_method');
+                <div class="col-md-2">
+                    <input type="date"
+                           name="date_to"
+                           class="form-control"
+                           value="{{ request('date_to') }}">
+                </div>
 
-        return view('admin.route_audit_logs.index', compact(
-            'logs',
-            'eventTypes',
-            'outcomes',
-            'methods'
-        ));
-    }
+                <div class="col-md-12 d-flex gap-2 mt-2">
+                    <button type="submit" class="btn btn-primary">
+                        Filter
+                    </button>
 
-    public function data(Request $request)
-    {
-        $query = $this->baseQuery();
+                    <a href="{{ route('route.audit.logs.index') }}" class="btn btn-outline-secondary">
+                        Reset
+                    </a>
+                </div>
+            </form>
 
-        $this->applyFilters($query, $request);
+            <div class="table-responsive">
+                <table class="table table-sm table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>#</th>
+                            <th>Date</th>
+                            <th>Event</th>
+                            <th>Outcome</th>
+                            <th>User</th>
+                            <th>Attempted Login</th>
+                            <th>Method</th>
+                            <th>Route</th>
+                            <th>Path</th>
+                            <th>Status</th>
+                            <th>IP</th>
+                            <th>Duration</th>
+                            <th></th>
+                        </tr>
+                    </thead>
 
-        $limit = (int) $request->input('limit', 100);
+                    <tbody>
+                        @forelse($logs as $log)
+                            @php
+                                $outcomeClass = match($log->route_audit_log_outcome) {
+                                    'SUCCESS' => 'bg-success',
+                                    'FAILED', 'ERROR', 'FORBIDDEN', 'UNAUTHENTICATED', 'LOCKED' => 'bg-danger',
+                                    'REDIRECT' => 'bg-warning text-dark',
+                                    'NOT_FOUND' => 'bg-dark',
+                                    default => 'bg-secondary',
+                                };
 
-        if ($limit < 1) {
-            $limit = 100;
-        }
+                                $eventClass = match($log->route_audit_log_event_type) {
+                                    'LOGIN_SUCCESS' => 'bg-success',
+                                    'LOGIN_FAILED', 'LOGIN_LOCKOUT', 'LOGIN_RECAPTCHA_REJECTED', 'LOGIN_RECAPTCHA_LOW_SCORE' => 'bg-danger',
+                                    'LOGOUT' => 'bg-dark',
+                                    'FORM_SUBMIT', 'UPDATE_REQUEST', 'DELETE_REQUEST' => 'bg-primary',
+                                    default => 'bg-secondary',
+                                };
+                            @endphp
 
-        if ($limit > 500) {
-            $limit = 500;
-        }
+                            <tr>
+                                <td>{{ $log->route_audit_log_id }}</td>
 
-        $logs = $query
-            ->orderByDesc('route_audit_log_id')
-            ->limit($limit)
-            ->get();
+                                <td style="white-space: nowrap;">
+                                    <small>{{ $log->route_audit_log_created_at }}</small>
+                                </td>
 
-        return response()->json([
-            'status' => 'success',
-            'count' => $logs->count(),
-            'data' => $logs,
-        ]);
-    }
+                                <td>
+                                    <span class="badge {{ $eventClass }}">
+                                        {{ $log->route_audit_log_event_type }}
+                                    </span>
+                                </td>
 
-    public function show($id)
-    {
-        $log = DB::table('sacco_route_audit_logs')
-            ->where('route_audit_log_id', $id)
-            ->first();
+                                <td>
+                                    <span class="badge {{ $outcomeClass }}">
+                                        {{ $log->route_audit_log_outcome }}
+                                    </span>
+                                </td>
 
-        abort_if(!$log, 404);
+                                <td>
+                                    @if($log->route_audit_log_user_name)
+                                        <strong>{{ $log->route_audit_log_user_name }}</strong><br>
+                                        <small class="text-muted">ID: {{ $log->route_audit_log_user_id }}</small>
+                                    @elseif($log->route_audit_log_user_id)
+                                        <small class="text-muted">ID: {{ $log->route_audit_log_user_id }}</small>
+                                    @else
+                                        <small class="text-muted">Guest</small>
+                                    @endif
+                                </td>
 
-        return view('admin.route_audit_logs.show', compact('log'));
-    }
+                                <td>
+                                    <small>{{ $log->route_audit_log_attempted_login }}</small>
+                                </td>
 
-    private function baseQuery()
-    {
-        return DB::table('sacco_route_audit_logs')
-            ->select([
-                'route_audit_log_id',
-                'route_audit_log_request_id',
-                'route_audit_log_event_type',
-                'route_audit_log_outcome',
-                'route_audit_log_user_id',
-                'route_audit_log_user_name',
-                'route_audit_log_user_email',
-                'route_audit_log_attempted_login',
-                'route_audit_log_route_name',
-                'route_audit_log_controller_action',
-                'route_audit_log_method',
-                'route_audit_log_path',
-                'route_audit_log_url',
-                'route_audit_log_referer',
-                'route_audit_log_status_code',
-                'route_audit_log_ip_address',
-                'route_audit_log_user_agent',
-                'route_audit_log_payload',
-                'route_audit_log_files',
-                'route_audit_log_exception_class',
-                'route_audit_log_exception_message',
-                'route_audit_log_duration_ms',
-                'route_audit_log_created_at',
-            ]);
-    }
+                                <td>
+                                    <small>{{ $log->route_audit_log_method }}</small>
+                                </td>
 
-    private function applyFilters($query, Request $request): void
-    {
-        if ($request->filled('event_type')) {
-            $query->where('route_audit_log_event_type', $request->event_type);
-        }
+                                <td>
+                                    <small>{{ $log->route_audit_log_route_name }}</small>
+                                </td>
 
-        if ($request->filled('outcome')) {
-            $query->where('route_audit_log_outcome', $request->outcome);
-        }
+                                <td>
+                                    <small>{{ $log->route_audit_log_path }}</small>
+                                </td>
 
-        if ($request->filled('method')) {
-            $query->where('route_audit_log_method', $request->method);
-        }
+                                <td>
+                                    <small>{{ $log->route_audit_log_status_code }}</small>
+                                </td>
 
-        if ($request->filled('user_id')) {
-            $query->where('route_audit_log_user_id', $request->user_id);
-        }
+                                <td>
+                                    <small>{{ $log->route_audit_log_ip_address }}</small>
+                                </td>
 
-        if ($request->filled('ip_address')) {
-            $query->where('route_audit_log_ip_address', $request->ip_address);
-        }
+                                <td>
+                                    @if($log->route_audit_log_duration_ms !== null)
+                                        <small>{{ $log->route_audit_log_duration_ms }}ms</small>
+                                    @else
+                                        <small>-</small>
+                                    @endif
+                                </td>
 
-        if ($request->filled('search')) {
-            $search = trim((string) $request->search);
+                                <td>
+                                    <a href="{{ route('route.audit.logs.show', $log->route_audit_log_id) }}"
+                                       class="btn btn-sm btn-outline-primary">
+                                        View
+                                    </a>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="13" class="text-center text-muted py-4">
+                                    No route audit logs found.
+                                </td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
 
-            $query->where(function ($q) use ($search) {
-                $q->where('route_audit_log_user_name', 'LIKE', "%{$search}%")
-                    ->orWhere('route_audit_log_user_email', 'LIKE', "%{$search}%")
-                    ->orWhere('route_audit_log_attempted_login', 'LIKE', "%{$search}%")
-                    ->orWhere('route_audit_log_route_name', 'LIKE', "%{$search}%")
-                    ->orWhere('route_audit_log_controller_action', 'LIKE', "%{$search}%")
-                    ->orWhere('route_audit_log_path', 'LIKE', "%{$search}%")
-                    ->orWhere('route_audit_log_url', 'LIKE', "%{$search}%")
-                    ->orWhere('route_audit_log_ip_address', 'LIKE', "%{$search}%")
-                    ->orWhere('route_audit_log_exception_message', 'LIKE', "%{$search}%");
-            });
-        }
-
-        if ($request->filled('date_from')) {
-            $query->whereDate('route_audit_log_created_at', '>=', $request->date_from);
-        }
-
-        if ($request->filled('date_to')) {
-            $query->whereDate('route_audit_log_created_at', '<=', $request->date_to);
-        }
-    }
-}
+            <div class="mt-3">
+                {{ $logs->links() }}
+            </div>
+        </div>
+    </div>
+</div>
+@endsection
