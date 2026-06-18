@@ -146,8 +146,32 @@ class SaccoRouteAuditLogger
             return 'APPROVAL_REQUEST';
         }
 
+        if (str_contains($routeName, 'approval') || str_contains($path, 'approval')) {
+            return 'APPROVAL_REQUEST';
+        }
+
         if (str_contains($routeName, 'reverse') || str_contains($path, 'reverse')) {
             return 'REVERSAL_REQUEST';
+        }
+
+        if (str_contains($routeName, 'reversal') || str_contains($path, 'reversal')) {
+            return 'REVERSAL_REQUEST';
+        }
+
+        if (str_contains($routeName, 'delete') || str_contains($path, 'delete')) {
+            return 'DELETE_REQUEST';
+        }
+
+        if (str_contains($routeName, 'remove') || str_contains($path, 'remove')) {
+            return 'DELETE_REQUEST';
+        }
+
+        if (str_contains($routeName, 'report') || str_contains($path, 'report')) {
+            return 'REPORT_REQUEST';
+        }
+
+        if (str_contains($routeName, 'sasra') || str_contains($path, 'sasra')) {
+            return 'SASRA_REQUEST';
         }
 
         if ($request->isMethod('GET')) {
@@ -230,26 +254,32 @@ class SaccoRouteAuditLogger
         $blocked = [
             '_token',
             '_method',
+
             'password',
             'password_confirmation',
             'current_password',
             'old_password',
             'new_password',
+
             'token',
             'remember_token',
             'api_token',
             'access_token',
             'refresh_token',
+
             'otp',
             'pin',
             'secret',
             'private_key',
+
+            'recaptcha_token',
+            'g-recaptcha-response',
         ];
 
         $payload = $request->except($blocked);
 
         /**
-         * Avoid storing massive payloads.
+         * Avoid storing very large request payloads.
          */
         return collect($payload)
             ->take(100)
@@ -287,7 +317,8 @@ class SaccoRouteAuditLogger
 
     private function getAttemptedLogin(Request $request): ?string
     {
-        return $request->input('email')
+        return $request->input('login')
+            ?? $request->input('email')
             ?? $request->input('username')
             ?? $request->input('user_name')
             ?? $request->input('phone')
@@ -304,6 +335,9 @@ class SaccoRouteAuditLogger
 
         return $user->id
             ?? $user->user_id
+            ?? $user->admin_id
+            ?? $user->staff_id
+            ?? $user->member_id
             ?? null;
     }
 
@@ -318,6 +352,10 @@ class SaccoRouteAuditLogger
             ?? $user->username
             ?? $user->full_name
             ?? $user->user_full_name
+            ?? $user->user_fullname
+            ?? $user->admin_name
+            ?? $user->staff_name
+            ?? $user->member_name
             ?? null;
     }
 
@@ -329,6 +367,9 @@ class SaccoRouteAuditLogger
 
         return $user->email
             ?? $user->user_email
+            ?? $user->admin_email
+            ?? $user->staff_email
+            ?? $user->member_email
             ?? null;
     }
 }
