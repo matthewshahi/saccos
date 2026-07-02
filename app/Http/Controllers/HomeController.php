@@ -6492,18 +6492,51 @@ public function storeLoanType(Request $request)
         return redirect()->route('accounts.main')->with('success', 'Main account updated successfully.');
     }
 
-    private function generateMainAccountCode($type)
-    {
-        $firstChar = strtoupper($type[0]);
-        $lastCode = DB::table('sacco_main_account')
-            ->where('main_account_type', $type)
-            ->max('main_account_code');
+   private function generateMainAccountCode($type)
+{
+    $type = strtoupper(trim($type));
 
-        $lastNumber = $lastCode ? (int)substr($lastCode, 1) : 0;
-        $newNumber = str_pad($lastNumber + 1, 3, '0', STR_PAD_LEFT);
+    $prefixMap = [
+        'ASSET - FIXED'      => ['prefix' => 'A', 'base' => 100],
+        'ASSETS - CURRENT'  => ['prefix' => 'A', 'base' => 100],
+        'LIABILITIES - SHORT' => ['prefix' => 'L', 'base' => 200],
+        'CAPITAL'           => ['prefix' => 'C', 'base' => 300],
+        'INCOME'            => ['prefix' => 'I', 'base' => 400],
+        'EXPENSE'           => ['prefix' => 'E', 'base' => 500],
+    ];
 
-        return $firstChar . $newNumber;
+    if (!isset($prefixMap[$type])) {
+        throw new \InvalidArgumentException('Unsupported account type.');
     }
+
+    $prefix = $prefixMap[$type]['prefix'];
+    $base   = $prefixMap[$type]['base'];
+
+    $existingCodes = DB::table('sacco_main_account')
+        ->where('main_account_deleted', '<>', 'Y')
+        ->where('main_account_code', 'LIKE', $prefix . '%')
+        ->pluck('main_account_code')
+        ->map(function ($code) use ($prefix) {
+            return (int) substr($code, strlen($prefix));
+        })
+        ->filter(function ($number) use ($base) {
+            return $number >= $base && $number <= 999;
+        })
+        ->unique()
+        ->sort()
+        ->values()
+        ->toArray();
+
+    $used = array_flip($existingCodes);
+
+    for ($i = $base; $i <= 999; $i++) {
+        if (!isset($used[$i])) {
+            return $prefix . str_pad($i, 3, '0', STR_PAD_LEFT);
+        }
+    }
+
+    throw new \RuntimeException('No available main account codes remain for this account class.');
+}
 
 
 

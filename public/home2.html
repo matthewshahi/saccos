@@ -1,221 +1,660 @@
-<!DOCTYPE html>
+{{-- resources/views/auth/login.blade.php --}}
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>iSave SACCO</title>
-    <!-- Bootstrap CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- FontAwesome Icons -->
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Sign In | iSacco</title>
+
+    <meta name="description" content="Secure iSacco login for members, staff and administrators.">
+    <meta name="robots" content="noindex, nofollow">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+
     <style>
-        /* General Styles */
+        :root {
+            --isacco-primary: #663399;
+            --isacco-primary-dark: #4b2375;
+            --isacco-green: #0f5f55;
+            --isacco-green-dark: #0a4640;
+            --isacco-lime: #c9ff64;
+            --isacco-bg: #dfecea;
+            --isacco-text: #253044;
+            --isacco-muted: #6b7280;
+            --isacco-input: #edf3ff;
+            --isacco-card: rgba(255, 255, 255, 0.92);
+            --isacco-border: rgba(15, 95, 85, 0.12);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
         body {
-            font-family: 'Poppins', sans-serif;
-            background-color: #f7f3e8;
+            min-height: 100%;
         }
 
-        /* Navbar */
-        .navbar {
-            background-color: #a0522d;
-            position: sticky;
-            top: 0;
-            z-index: 1000;
-        }
-        .navbar-brand img {
-            height: 50px;
-            width: auto; /* Maintain aspect ratio */
-        }
-        .nav-link {
-            color: #ffffff !important;
-        }
-        .nav-link:hover {
-            color: #f7c28e !important;
+        body {
+            margin: 0;
+            font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            color: var(--isacco-text);
+            background:
+                radial-gradient(circle at 10% 15%, rgba(102, 51, 153, 0.12), transparent 32%),
+                radial-gradient(circle at 85% 75%, rgba(15, 95, 85, 0.16), transparent 36%),
+                linear-gradient(135deg, #e6f0ef 0%, #d8e8e5 45%, #edf3f1 100%);
+            overflow-x: hidden;
         }
 
-        /* Hero Section */
-        .hero-section {
+        .isacco-page {
             position: relative;
-            height: 400px; /* Default height for desktop */
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 32px 16px;
             overflow: hidden;
         }
-        @media (max-width: 768px) {
-            .hero-section {
-                height: 250px; /* Fixed height for mobile */
-            }
-        }
-        .carousel-item img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover; /* Ensure the image covers the section and maintains aspect ratio */
-        }
-        .carousel-caption {
-            position: absolute;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 2;
-            text-align: center;
-            color: white;
-            text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.5);
-            padding: 10px;
-            width: 90%; /* Ensures it scales well on mobile */
-        }
-        @media (max-width: 768px) {
-            .carousel-caption h1 {
-                font-size: 1.5rem; /* Reduce font size on mobile */
-            }
-            .carousel-caption p {
-                font-size: 0.9rem; /* Reduce font size on mobile */
-            }
-            .cta-button {
-                font-size: 0.9rem; /* Smaller button for mobile */
-                padding: 8px 15px; /* Adjust button padding */
-            }
+
+        .isacco-page::before,
+        .isacco-page::after {
+            content: "";
+            position: fixed;
+            border-radius: 999px;
+            pointer-events: none;
+            opacity: 0.58;
+            z-index: 0;
+            will-change: transform;
         }
 
-        /* Navigation Arrows */
-        .carousel-control-prev, .carousel-control-next {
-            top: 30%;
-            transform: translateY(-50%);
-            width: 50px;
-            height: 50px;
-            z-index: 3; /* Ensure they appear above the images */
-        }
-        .carousel-control-prev-icon, .carousel-control-next-icon {
-            background-color: rgba(0, 0, 0, 0.5); /* Add a semi-transparent background for better visibility */
-            border-radius: 50%; /* Make the icons circular */
-        }
-        @media (max-width: 768px) {
-            .carousel-control-prev, .carousel-control-next {
-                width: 40px; /* Smaller arrows for mobile */
-                height: 40px;
-            }
+        .isacco-page::before {
+            width: 680px;
+            height: 680px;
+            left: -210px;
+            top: -170px;
+            background: rgba(15, 95, 85, 0.12);
+            animation: blobOne 16s ease-in-out infinite alternate;
         }
 
-        /* Buttons */
-        .cta-button {
-            display: inline-block;
-            padding: 10px 20px;
-            border: 2px solid #a0522d;
-            color: #a0522d;
+        .isacco-page::after {
+            width: 760px;
+            height: 760px;
+            right: -280px;
+            bottom: -280px;
+            background: rgba(102, 51, 153, 0.10);
+            animation: blobTwo 18s ease-in-out infinite alternate;
+        }
+
+        .isacco-blob {
+            position: fixed;
+            border-radius: 48% 52% 68% 32% / 35% 46% 54% 65%;
+            background: rgba(255, 255, 255, 0.32);
+            z-index: 0;
+            pointer-events: none;
+            will-change: transform, border-radius;
+        }
+
+        .isacco-blob.one {
+            width: 420px;
+            height: 420px;
+            left: 22%;
+            top: -90px;
+            animation: morphFloat 14s ease-in-out infinite;
+        }
+
+        .isacco-blob.two {
+            width: 360px;
+            height: 360px;
+            right: 12%;
+            top: 28%;
+            animation: morphFloat 17s ease-in-out infinite reverse;
+        }
+
+        .isacco-blob.three {
+            width: 310px;
+            height: 310px;
+            left: 18%;
+            bottom: -130px;
+            animation: morphFloat 20s ease-in-out infinite;
+        }
+
+        .isacco-logo {
+            position: fixed;
+            top: 24px;
+            left: 28px;
+            z-index: 3;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 900;
+            font-size: 25px;
+            letter-spacing: -0.06em;
+            color: #1f2937;
             text-decoration: none;
-            border-radius: 5px;
-            transition: all 0.3s ease;
-        }
-        .cta-button:hover {
-            background-color: #a0522d;
-            color: #ffffff;
         }
 
-        /* Footer */
-        .footer {
-            background-color: #a0522d;
-            color: #ffffff;
-            padding: 20px;
+        .isacco-logo-mark {
+            width: 34px;
+            height: 34px;
+            border-radius: 12px;
+            display: grid;
+            place-items: center;
+            color: #fff;
+            background: linear-gradient(135deg, var(--isacco-primary), var(--isacco-green));
+            box-shadow: 0 14px 35px rgba(102, 51, 153, 0.25);
+        }
+
+        .login-shell {
+            position: relative;
+            z-index: 2;
+            width: min(100%, 486px);
+        }
+
+        .login-card {
+            width: 100%;
+            border: 1px solid rgba(255, 255, 255, 0.75);
+            border-radius: 20px;
+            background: var(--isacco-card);
+            backdrop-filter: blur(18px);
+            box-shadow:
+                0 34px 90px rgba(31, 41, 55, 0.16),
+                inset 0 1px 0 rgba(255, 255, 255, 0.95);
+            padding: 30px 32px 24px;
+        }
+
+        .login-tabs {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 4px;
+            padding: 4px;
+            margin-bottom: 28px;
+            border-radius: 12px;
+            background: #eef1f5;
+        }
+
+        .login-tab {
+            border: 0;
+            border-radius: 10px;
+            background: transparent;
+            color: #4b5563;
+            font-weight: 600;
+            font-size: 14px;
+            padding: 11px 8px;
+            transition: all 0.22s ease;
+        }
+
+        .login-tab.active {
+            color: var(--isacco-green-dark);
+            background: #fff;
+            box-shadow:
+                0 2px 8px rgba(31, 41, 55, 0.10),
+                inset 0 0 0 1px rgba(15, 95, 85, 0.08);
+        }
+
+        .product-header {
             text-align: center;
+            margin-bottom: 26px;
+        }
+
+        .product-title {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin: 0 0 10px;
+            font-size: clamp(28px, 4vw, 36px);
+            font-weight: 900;
+            letter-spacing: -0.06em;
+            color: var(--isacco-green);
+            line-height: 1.05;
+        }
+
+        .product-title .highlight {
+            display: inline-block;
+            padding: 4px 10px 6px;
+            border-radius: 5px;
+            background: var(--isacco-lime);
+            color: var(--isacco-green-dark);
+            font-weight: 800;
+            letter-spacing: -0.04em;
+        }
+
+        .product-description {
+            max-width: 390px;
+            margin: 0 auto;
+            color: #4b5563;
+            font-size: 15px;
+            line-height: 1.48;
+        }
+
+        .form-label {
+            margin-bottom: 7px;
+            font-size: 14px;
+            font-weight: 650;
+            color: #344054;
+        }
+
+        .password-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .forgot-link {
+            color: #667085;
+            font-size: 13px;
+            text-decoration: none;
+        }
+
+        .forgot-link:hover {
+            color: var(--isacco-primary);
+            text-decoration: underline;
+        }
+
+        .form-control {
+            min-height: 46px;
+            border-radius: 11px;
+            border: 1px solid #d9e2f1;
+            background: var(--isacco-input);
+            color: #111827;
+            font-size: 14px;
+            box-shadow: inset 0 1px 2px rgba(31, 41, 55, 0.03);
+        }
+
+        .form-control:focus {
+            border-color: rgba(102, 51, 153, 0.45);
+            background: #fff;
+            box-shadow:
+                0 0 0 4px rgba(102, 51, 153, 0.10),
+                inset 0 1px 2px rgba(31, 41, 55, 0.03);
+        }
+
+        .input-group-text {
+            border-radius: 11px 0 0 11px;
+            border-color: #d9e2f1;
+            background: var(--isacco-input);
+            color: #667085;
+        }
+
+        .input-group .form-control {
+            border-left: 0;
+            border-radius: 0 11px 11px 0;
+        }
+
+        .form-check-label {
+            color: #4b5563;
+            font-size: 14px;
+        }
+
+        .form-check-input {
+            width: 18px;
+            height: 18px;
+            border-color: #aeb8c7;
+        }
+
+        .form-check-input:checked {
+            background-color: var(--isacco-primary);
+            border-color: var(--isacco-primary);
+        }
+
+        .btn-isacco {
+            width: 100%;
+            min-height: 48px;
+            border: 0;
+            border-radius: 11px;
+            background: linear-gradient(135deg, var(--isacco-green), var(--isacco-green-dark));
+            color: #fff;
+            font-weight: 800;
+            font-size: 14px;
+            box-shadow: 0 12px 24px rgba(15, 95, 85, 0.22);
+            transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+        }
+
+        .btn-isacco:hover {
+            color: #fff;
+            transform: translateY(-1px);
+            filter: brightness(1.04);
+            box-shadow: 0 16px 28px rgba(15, 95, 85, 0.26);
+        }
+
+        .btn-otp {
+            width: 100%;
+            min-height: 46px;
+            border-radius: 11px;
+            border: 1px solid #dfe5ee;
+            background: #fff;
+            color: #344054;
+            font-weight: 700;
+            font-size: 14px;
+        }
+
+        .divider {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 18px 0;
+            color: #98a2b3;
+            font-size: 13px;
+        }
+
+        .divider::before,
+        .divider::after {
+            content: "";
+            flex: 1;
+            height: 1px;
+            background: #e5e7eb;
+        }
+
+        .security-note {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            margin-top: 18px;
+            padding: 13px 14px;
+            border-radius: 13px;
+            background: rgba(102, 51, 153, 0.07);
+            color: #475467;
+            font-size: 13px;
+            line-height: 1.45;
+        }
+
+        .security-note i {
+            color: var(--isacco-primary);
+            font-size: 17px;
+            margin-top: 1px;
+        }
+
+        .support-link {
+            margin-top: 18px;
+            text-align: center;
+            color: #667085;
+            font-size: 14px;
+        }
+
+        .support-link a {
+            color: var(--isacco-primary);
+            font-weight: 700;
+            text-decoration: none;
+        }
+
+        .support-link a:hover {
+            text-decoration: underline;
+        }
+
+        .alert {
+            border-radius: 12px;
+            font-size: 14px;
+        }
+
+        @keyframes blobOne {
+            0% {
+                transform: translate3d(0, 0, 0) scale(1);
+            }
+            100% {
+                transform: translate3d(90px, 70px, 0) scale(1.08);
+            }
+        }
+
+        @keyframes blobTwo {
+            0% {
+                transform: translate3d(0, 0, 0) scale(1);
+            }
+            100% {
+                transform: translate3d(-90px, -60px, 0) scale(1.1);
+            }
+        }
+
+        @keyframes morphFloat {
+            0% {
+                transform: translate3d(0, 0, 0) rotate(0deg);
+                border-radius: 48% 52% 68% 32% / 35% 46% 54% 65%;
+            }
+            50% {
+                transform: translate3d(38px, 26px, 0) rotate(8deg);
+                border-radius: 62% 38% 44% 56% / 52% 32% 68% 48%;
+            }
+            100% {
+                transform: translate3d(-26px, 44px, 0) rotate(-7deg);
+                border-radius: 42% 58% 36% 64% / 64% 48% 52% 36%;
+            }
+        }
+
+        @media (max-width: 575.98px) {
+            .isacco-page {
+                align-items: flex-start;
+                padding: 86px 14px 24px;
+            }
+
+            .isacco-logo {
+                top: 20px;
+                left: 18px;
+                font-size: 23px;
+            }
+
+            .login-card {
+                padding: 22px 18px 20px;
+                border-radius: 18px;
+            }
+
+            .login-tabs {
+                margin-bottom: 24px;
+            }
+
+            .login-tab {
+                font-size: 13px;
+                padding: 10px 4px;
+            }
+
+            .product-description {
+                font-size: 14px;
+            }
+
+            .isacco-blob.one {
+                left: -160px;
+                top: 20px;
+            }
+
+            .isacco-blob.two {
+                right: -190px;
+                top: 30%;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *,
+            *::before,
+            *::after {
+                animation: none !important;
+                transition: none !important;
+            }
         }
     </style>
 </head>
+
 <body>
-    <!-- Navbar -->
-    <nav class="navbar navbar-expand-lg">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="#"><img src="https://accounts.isave.or.ke/new_app/image/logo.jpg" alt="iSave SACCO Logo"></a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav ms-auto">
-                    <li class="nav-item"><a class="nav-link" href="#home">Home</a></li>
-                    <li class="nav-item"><a class="nav-link" href="#about">About Us</a></li>
-                    <li class="nav-item"><a class="nav-link" href="#services">Our Services</a></li>
-                    <li class="nav-item"><a class="nav-link" href="#membership">Membership</a></li>
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="dummyMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            More
-                        </a>
-                        <ul class="dropdown-menu" aria-labelledby="dummyMenu">
-                            <li><a class="dropdown-item" href="#">Option 1</a></li>
-                            <li><a class="dropdown-item" href="#">Option 2</a></li>
-                            <li><a class="dropdown-item" href="#">Option 3</a></li>
-                        </ul>
-                    </li>
-                    <li class="nav-item"><a class="nav-link" href="#faqs">FAQs</a></li>
-                    <li class="nav-item"><a class="nav-link" href="#resources">Resources</a></li>
-                    <li class="nav-item"><a class="nav-link" href="#news">News & Updates</a></li>
-                    <li class="nav-item"><a class="nav-link" href="#testimonials">Testimonials</a></li>
-                    <li class="nav-item"><a class="nav-link" href="#contact">Contact Us</a></li>
-                </ul>
+    <main class="isacco-page">
+        <a href="{{ url('/') }}" class="isacco-logo" aria-label="iSacco home">
+            <span class="isacco-logo-mark">
+                <i class="bi bi-shield-lock-fill"></i>
+            </span>
+            <span>iSacco</span>
+        </a>
+
+        <div class="isacco-blob one"></div>
+        <div class="isacco-blob two"></div>
+        <div class="isacco-blob three"></div>
+
+        <section class="login-shell">
+            <div class="login-card">
+                <div class="login-tabs" role="tablist" aria-label="Login type">
+                    <button type="button" class="login-tab active" data-login-type="member">Member</button>
+                    <button type="button" class="login-tab" data-login-type="staff">Staff</button>
+                    <button type="button" class="login-tab" data-login-type="admin">Admin</button>
+                </div>
+
+                <div class="product-header">
+                    <h1 class="product-title">
+                        <span>iSacco:</span>
+                        <span class="highlight">secure access</span>
+                    </h1>
+                    <p class="product-description">
+                        Sign in to manage member accounts, savings, loans, payroll, reports and SACCO operations.
+                    </p>
+                </div>
+
+                @if (session('status'))
+                    <div class="alert alert-success">
+                        {{ session('status') }}
+                    </div>
+                @endif
+
+                @if ($errors->any())
+                    <div class="alert alert-danger">
+                        {{ $errors->first() }}
+                    </div>
+                @endif
+
+                <form method="POST" action="{{ route('login') }}" autocomplete="on">
+                    @csrf
+
+                    <input type="hidden" name="login_type" id="loginType" value="{{ old('login_type', 'member') }}">
+
+                    <div class="mb-3">
+                        <label for="login" class="form-label" id="loginLabel">
+                            Email, phone, ID or SACCO number
+                        </label>
+                        <div class="input-group">
+                            <span class="input-group-text">
+                                <i class="bi bi-person"></i>
+                            </span>
+                            <input
+                                type="text"
+                                id="login"
+                                name="login"
+                                class="form-control @error('login') is-invalid @enderror"
+                                value="{{ old('login') }}"
+                                placeholder="e.g. 0700000000 or KASS001"
+                                autocomplete="username"
+                                required
+                                autofocus
+                            >
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="password-row">
+                            <label for="password" class="form-label mb-0">Password</label>
+
+                            @if (Route::has('password.request'))
+                                <a class="forgot-link" href="{{ route('password.request') }}">
+                                    Forgot password?
+                                </a>
+                            @endif
+                        </div>
+
+                        <div class="input-group mt-2">
+                            <span class="input-group-text">
+                                <i class="bi bi-lock"></i>
+                            </span>
+                            <input
+                                type="password"
+                                id="password"
+                                name="password"
+                                class="form-control @error('password') is-invalid @enderror"
+                                placeholder="Enter your password"
+                                autocomplete="current-password"
+                                required
+                            >
+                        </div>
+                    </div>
+
+                    <div class="d-flex align-items-center justify-content-between mb-4">
+                        <div class="form-check">
+                            <input
+                                class="form-check-input"
+                                type="checkbox"
+                                name="remember"
+                                id="remember"
+                                value="1"
+                                {{ old('remember') ? 'checked' : '' }}
+                            >
+                            <label class="form-check-label" for="remember">
+                                Keep me signed in
+                            </label>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-isacco">
+                        Sign In
+                    </button>
+
+                    <div class="divider">
+                        <span>or</span>
+                    </div>
+
+                    <button type="button" class="btn btn-otp" onclick="alert('OTP login can be connected to your SMS module.');">
+                        <i class="bi bi-phone me-1"></i>
+                        Request one-time login code
+                    </button>
+                </form>
+
+                <div class="security-note">
+                    <i class="bi bi-shield-check"></i>
+                    <span>
+                        Protected access for SACCO data. Always sign out when using a shared computer.
+                    </span>
+                </div>
             </div>
-        </div>
-    </nav>
 
-    <!-- Hero Section -->
-    <section id="home" class="hero-section">
-        <div id="heroCarousel" class="carousel slide" data-bs-ride="carousel" data-bs-interval="5000">
-            <div class="carousel-inner">
-                <!-- Image 1 -->
-                <div class="carousel-item active">
-                    <img src="https://picsum.photos/1600/900?random=1" alt="Hero Image 1">
-                    <div class="carousel-caption">
-                        <h1>Empowering Members Towards Financial Freedom</h1>
-                        <p>iSave SACCO - Building Financial Success Together</p>
-                        <a href="#membership" class="cta-button mt-3">Join Now</a>
-                    </div>
-                </div>
-                <!-- Image 2 -->
-                <div class="carousel-item">
-                    <img src="https://picsum.photos/1600/900?random=2" alt="Hero Image 2">
-                    <div class="carousel-caption">
-                        <h1>Join Our Community</h1>
-                        <p>Be part of a financially empowered network.</p>
-                        <a href="#membership" class="cta-button mt-3">Join Now</a>
-                    </div>
-                </div>
-                <!-- Image 3 -->
-                <div class="carousel-item">
-                    <img src="https://picsum.photos/1600/900?random=3" alt="Hero Image 3">
-                    <div class="carousel-caption">
-                        <h1>Secure Your Financial Future</h1>
-                        <p>Let us help you achieve your financial goals.</p>
-                        <a href="#membership" class="cta-button mt-3">Join Now</a>
-                    </div>
-                </div>
-                <!-- Image 4 -->
-                <div class="carousel-item">
-                    <img src="https://picsum.photos/1600/900?random=4" alt="Hero Image 4">
-                    <div class="carousel-caption">
-                        <h1>Innovative Financial Solutions</h1>
-                        <p>Tailored to meet your unique needs.</p>
-                        <a href="#membership" class="cta-button mt-3">Join Now</a>
-                    </div>
-                </div>
+            <div class="support-link">
+                Need help? <a href="mailto:support@shahi.co.ke">Contact Support</a>
             </div>
-            <!-- Carousel Controls -->
-            <button class="carousel-control-prev" type="button" data-bs-target="#heroCarousel" data-bs-slide="prev">
-                <span class="carousel-control-prev-icon" aria-hidden="true"></span>
-                <span class="visually-hidden">Previous</span>
-            </button>
-            <button class="carousel-control-next" type="button" data-bs-target="#heroCarousel" data-bs-slide="next">
-                <span class="carousel-control-next-icon" aria-hidden="true"></span>
-                <span class="visually-hidden">Next</span>
-            </button>
-        </div>
-    </section>
+        </section>
+    </main>
 
-    <!-- Footer -->
-    <footer class="footer mt-5">
-        <p>&copy; 2024 iSave SACCO. All Rights Reserved.</p>
-        <div>
-            <a href="https://www.facebook.com/isavesacco/" target="_blank" class="text-light"><i class="fab fa-facebook-f"></i></a>
-        </div>
-    </footer>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const tabs = document.querySelectorAll('.login-tab');
+            const loginType = document.getElementById('loginType');
+            const loginLabel = document.getElementById('loginLabel');
+            const loginInput = document.getElementById('login');
 
-    <!-- Bootstrap JS -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+            const labels = {
+                member: {
+                    label: 'Email, phone, ID or SACCO number',
+                    placeholder: 'e.g. 0700000000 or KASS001'
+                },
+                staff: {
+                    label: 'Staff email or staff number',
+                    placeholder: 'e.g. staff@isacco.co.ke'
+                },
+                admin: {
+                    label: 'Administrator email',
+                    placeholder: 'e.g. admin@isacco.co.ke'
+                }
+            };
+
+            function activateTab(type) {
+                tabs.forEach(tab => {
+                    tab.classList.toggle('active', tab.dataset.loginType === type);
+                });
+
+                loginType.value = type;
+                loginLabel.textContent = labels[type].label;
+                loginInput.placeholder = labels[type].placeholder;
+            }
+
+            tabs.forEach(tab => {
+                tab.addEventListener('click', function () {
+                    activateTab(this.dataset.loginType);
+                });
+            });
+
+            activateTab(loginType.value || 'member');
+        });
+    </script>
 </body>
 </html>
