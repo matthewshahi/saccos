@@ -758,7 +758,7 @@ class ProcessTransactionsJob implements ShouldQueue
     'created_at'       => now(),
     'updated_at'       => now(),
 ]);
-
+ 
     // 4. Rewrite reference → SACCO internal format (NO NAME IN REFERENCE)
     switch ($prefix) {
 

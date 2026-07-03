@@ -44,12 +44,16 @@ class MpesaStatementReconciliationController extends Controller
             'updated_existing_stk_response' => 0,
             'already_existing_c2b' => 0,
             'already_existing_stk_response' => 0,
+            'inserted_direct_c2b' => 0,
+            'already_existing_direct_c2b' => 0,
+            'normalized_operator_references' => 0,
 
             'skipped_missing_data' => 0,
             'skipped_no_matching_stk' => 0,
             'skipped_conflict' => 0,
             'skipped_not_completed' => 0,
             'skipped_not_paybill' => 0,
+            'skipped_invalid_operator_reference' => 0,
             'errors' => 0,
 
             'rows' => [],
@@ -94,7 +98,8 @@ class MpesaStatementReconciliationController extends Controller
                         continue;
                     }
 
-                    $accountReference = $this->extractAccountReference($details);
+                    $rawAccountReference = $this->extractRawAccountReference($details);
+                    $accountReference = $this->normalizeAccountReference($rawAccountReference);
                     $maskedPhone = $this->extractMaskedPhone($details);
                     $customerName = $this->extractCustomerName($details);
                     $shortcode = $this->extractShortcode($otherParty);
@@ -103,6 +108,16 @@ class MpesaStatementReconciliationController extends Controller
                         $summary['skipped_missing_data']++;
                         $this->addRowResult($summary, $rowNumber, $receipt, $accountReference, $paidIn, 'skipped_missing_data', 'Receipt, completion time, account reference or amount is missing.');
                         continue;
+                    }
+
+                    if ($this->looksLikeOperatorReference($accountReference) && !$this->isOperatorReference($accountReference)) {
+                        $summary['skipped_invalid_operator_reference']++;
+                        $this->addRowResult($summary, $rowNumber, $receipt, $accountReference, $paidIn, 'skipped_invalid_operator_reference', 'Operator reference is incomplete or invalid. Expected format like OPM-65, OPSH-65, OPCA-65 or OPLN-65-12.');
+                        continue;
+                    }
+
+                    if ($rawAccountReference && $accountReference !== strtoupper(trim((string) $rawAccountReference)) && $this->isOperatorReference($accountReference)) {
+                        $summary['normalized_operator_references']++;
                     }
 
                     $summary['valid_paybill_rows']++;
@@ -116,6 +131,75 @@ class MpesaStatementReconciliationController extends Controller
                     );
 
                     if (!$stkLog) {
+                        if ($this->isOperatorReference($accountReference)) {
+                            $directResult = DB::transaction(function () use (
+                                $receipt,
+                                $completionTime,
+                                $paidIn,
+                                $balance,
+                                $accountReference,
+                                $customerName,
+                                $details,
+                                $otherParty,
+                                $shortcode,
+                                $maskedPhone
+                            ) {
+                                $existingC2B = DB::table('c2b_payments')
+                                    ->where('transaction_id', $receipt)
+                                    ->first();
+
+                                if ($existingC2B) {
+                                    return [
+                                        'c2b_payment_id' => (int) $existingC2B->id,
+                                        'inserted_c2b' => false,
+                                    ];
+                                }
+
+                                $c2bPaymentId = $this->insertC2BPaymentFromStatement([
+                                    'receipt' => $receipt,
+                                    'transaction_time' => $completionTime['eat_string'],
+                                    'amount' => $paidIn,
+                                    'balance' => $balance,
+                                    'shortcode' => $shortcode,
+                                    'account_reference' => $accountReference,
+                                    'phone_number' => $this->fallbackPhoneFromMaskedPhone($maskedPhone),
+                                    'customer_name' => $customerName,
+                                    'details' => $details,
+                                    'other_party' => $otherParty,
+                                    'source' => 'mpesa_business_statement_direct_operator_import',
+                                ]);
+
+                                if (!$c2bPaymentId) {
+                                    throw new Exception('Unable to insert direct operator c2b_payments record safely.');
+                                }
+
+                                return [
+                                    'c2b_payment_id' => $c2bPaymentId,
+                                    'inserted_c2b' => true,
+                                ];
+                            });
+
+                            if ($directResult['inserted_c2b']) {
+                                $summary['inserted_c2b']++;
+                                $summary['inserted_direct_c2b']++;
+                            } else {
+                                $summary['already_existing_c2b']++;
+                                $summary['already_existing_direct_c2b']++;
+                            }
+
+                            $this->addRowResult(
+                                $summary,
+                                $rowNumber,
+                                $receipt,
+                                $accountReference,
+                                $paidIn,
+                                'imported_direct_operator_c2b',
+                                'No matching STK log found, but operator reference was imported directly into c2b_payments as processed=No/picked=No.'
+                            );
+
+                            continue;
+                        }
+
                         $summary['skipped_no_matching_stk']++;
                         $this->addRowResult($summary, $rowNumber, $receipt, $accountReference, $paidIn, 'skipped_no_matching_stk', 'No matching STK log found by account, amount and time.');
                         continue;
@@ -605,15 +689,93 @@ class MpesaStatementReconciliationController extends Controller
 
     private function extractAccountReference(string $details): ?string
     {
-        if (preg_match('/\bAcc\.?\s*([A-Za-z0-9\-\/]+)/i', $details, $matches)) {
-            return strtoupper(trim($matches[1]));
+        return $this->normalizeAccountReference($this->extractRawAccountReference($details));
+    }
+
+    private function extractRawAccountReference(string $details): ?string
+    {
+        $raw = null;
+
+        if (preg_match('/\bAcc\.?\s*[:\-]?\s*(.+)$/i', $details, $matches)) {
+            $raw = $matches[1];
+        } elseif (preg_match('/\bAccount\.?\s*[:\-]?\s*(.+)$/i', $details, $matches)) {
+            $raw = $matches[1];
         }
 
-        if (preg_match('/\bAccount\.?\s*[:\-]?\s*([A-Za-z0-9\-\/]+)/i', $details, $matches)) {
-            return strtoupper(trim($matches[1]));
+        if ($raw === null) {
+            return null;
         }
 
-        return null;
+        $raw = trim((string) $raw);
+
+        /*
+         * Business statement rows usually end at the reference, for example:
+         *   Acc. OPSH 65
+         * SMS-style text can continue after the reference, for example:
+         *   account OPSH-65 on 23/5/26 at 10:26 AM New M-PESA balance...
+         */
+        $parts = preg_split('/\s+(?:on|new\s+m[\-\s]?pesa|transaction\s+cost|amount\s+you\s+can|save\s+frequent)\b/i', $raw, 2);
+        $raw = trim($parts[0] ?? $raw);
+
+        return rtrim($raw, " \t\n\r\0\x0B.,;");
+    }
+
+    private function normalizeAccountReference($reference): ?string
+    {
+        if ($reference === null) {
+            return null;
+        }
+
+        $reference = strtoupper(trim((string) $reference));
+        $reference = str_replace("\xC2\xA0", ' ', $reference);
+        $reference = preg_replace('/\s+/', ' ', $reference);
+        $reference = preg_replace('/[^A-Z0-9\-\/\s_]+/', '', $reference);
+        $reference = trim($reference, " -/_\t\n\r\0\x0B");
+
+        if ($reference === '') {
+            return null;
+        }
+
+        $withDashes = preg_replace('/[\s\/_]+/', '-', $reference);
+        $withDashes = preg_replace('/-+/', '-', $withDashes);
+        $withDashes = trim($withDashes, '-');
+
+        /*
+         * Canonical OP format:
+         *   OPM-65
+         *   OPSH-65
+         *   OPCA-65
+         *   OPLN-65-12
+         * Accept common dirty formats:
+         *   OPM 65, OPSH 65, OP SH 65, OPSH/65, OPSH65
+         */
+        if (preg_match('/^OP-?([A-Z]+)-(\d+)(?:-(\d+))?$/', $withDashes, $matches)) {
+            return 'OP' . $matches[1] . '-' . $matches[2] . (!empty($matches[3]) ? '-' . $matches[3] : '');
+        }
+
+        $compact = preg_replace('/[^A-Z0-9]+/', '', $reference);
+
+        if (preg_match('/^OP([A-Z]+)(\d+)$/', $compact, $matches)) {
+            return 'OP' . $matches[1] . '-' . $matches[2];
+        }
+
+        /*
+         * Do not guess missing operator IDs. OPSH/OPM alone must be rejected,
+         * not posted to member 0 or a wrong fallback account.
+         */
+        if (preg_match('/^OP[A-Z]+$/', $compact)) {
+            return $compact;
+        }
+
+        /*
+         * Light cleanup for ordinary member references when users type spaces:
+         * SH 192 -> SH192, CA 323 -> CA323, REG 39199929 -> REG39199929.
+         */
+        if (preg_match('/^(SH|CA|WE|RE|LN|REG|RF|FA|FO|SS)-?(\d+)$/', $withDashes, $matches)) {
+            return $matches[1] . $matches[2];
+        }
+
+        return $withDashes;
     }
 
     private function extractMaskedPhone(string $details): ?string
@@ -627,7 +789,7 @@ class MpesaStatementReconciliationController extends Controller
 
     private function extractCustomerName(string $details): ?string
     {
-        if (preg_match('/-\s*(.*?)\s+Acc\.?/i', $details, $matches)) {
+        if (preg_match('/-\s*(.*?)\s+(?:Acc\.?|Account\.?)/i', $details, $matches)) {
             return trim($matches[1]);
         }
 
@@ -659,10 +821,12 @@ class MpesaStatementReconciliationController extends Controller
         $utcStart = $utc->copy()->subMinutes(30)->format('Y-m-d H:i:s');
         $utcEnd = $utc->copy()->addMinutes(30)->format('Y-m-d H:i:s');
 
+        $accountReferenceVariants = $this->accountReferenceSearchVariants($accountReference);
+
         $query = DB::table('stk_push_logs')
-            ->where(function ($q) use ($accountReference) {
-                $q->where('unique_number', $accountReference)
-                    ->orWhere('account_reference', $accountReference);
+            ->where(function ($q) use ($accountReferenceVariants) {
+                $q->whereIn('unique_number', $accountReferenceVariants)
+                    ->orWhereIn('account_reference', $accountReferenceVariants);
             })
             ->whereBetween('amount', [$amount - 0.01, $amount + 0.01])
             ->whereNotNull('checkout_request_id')
@@ -731,6 +895,108 @@ class MpesaStatementReconciliationController extends Controller
         return null;
     }
 
+    private function isOperatorReference(string $reference): bool
+    {
+        $reference = $this->normalizeAccountReference($reference);
+
+        return $reference !== null && (bool) preg_match('/^OP[A-Z]+-\d+(-\d+)?$/', $reference);
+    }
+
+    private function looksLikeOperatorReference(?string $reference): bool
+    {
+        $reference = $this->normalizeAccountReference($reference);
+
+        return $reference !== null && str_starts_with($reference, 'OP');
+    }
+
+    private function accountReferenceSearchVariants(string $accountReference): array
+    {
+        $normalized = $this->normalizeAccountReference($accountReference) ?: strtoupper(trim($accountReference));
+        $variants = [$normalized];
+
+        if (preg_match('/^(OP[A-Z]+)-(\d+)(?:-(\d+))?$/', $normalized, $matches)) {
+            $prefix = $matches[1];
+            $operatorId = $matches[2];
+            $extraId = $matches[3] ?? null;
+
+            $variants[] = $prefix . ' ' . $operatorId . ($extraId ? ' ' . $extraId : '');
+            $variants[] = $prefix . '/' . $operatorId . ($extraId ? '/' . $extraId : '');
+            $variants[] = $prefix . $operatorId . ($extraId ? '-' . $extraId : '');
+            $variants[] = 'OP ' . substr($prefix, 2) . ' ' . $operatorId . ($extraId ? ' ' . $extraId : '');
+        }
+
+        return array_values(array_unique(array_filter($variants)));
+    }
+
+    private function fallbackPhoneFromMaskedPhone(?string $maskedPhone): ?string
+    {
+        $suffix = $this->extractPhoneSuffix($maskedPhone);
+
+        if ($suffix) {
+            return '25400000' . $suffix;
+        }
+
+        return null;
+    }
+
+    private function resolveStatementPhoneNumber($phoneNumber): string
+    {
+        $phoneNumber = preg_replace('/\D+/', '', (string) $phoneNumber);
+
+        if ($phoneNumber !== '') {
+            if (strlen($phoneNumber) === 9 && str_starts_with($phoneNumber, '7')) {
+                return '254' . $phoneNumber;
+            }
+
+            if (strlen($phoneNumber) === 10 && str_starts_with($phoneNumber, '0')) {
+                return '254' . substr($phoneNumber, 1);
+            }
+
+            return $phoneNumber;
+        }
+
+        return '254000000000';
+    }
+
+    private function resolveBusinessShortcode($shortcode): string
+    {
+        $shortcode = trim((string) $shortcode);
+
+        if ($shortcode !== '') {
+            return $shortcode;
+        }
+
+        foreach ([
+            'mpesa_business_shortcode',
+            'mpesa_shortcode',
+            'paybill_number',
+            'default_mpesa_shortcode',
+            'default_paybill_no',
+        ] as $defaultName) {
+            $value = DB::table('sacco_defaults')
+                ->where('default_name', $defaultName)
+                ->value('default_value');
+
+            if ($value !== null && trim((string) $value) !== '') {
+                return trim((string) $value);
+            }
+        }
+
+        if (Schema::hasTable('mpesa_configs')) {
+            foreach (['shortcode', 'business_shortcode', 'business_short_code', 'paybill_number'] as $column) {
+                if (Schema::hasColumn('mpesa_configs', $column)) {
+                    $value = DB::table('mpesa_configs')->value($column);
+
+                    if ($value !== null && trim((string) $value) !== '') {
+                        return trim((string) $value);
+                    }
+                }
+            }
+        }
+
+        return 'STATEMENT';
+    }
+
     private function insertC2BPaymentFromStatement(array $data): ?int
     {
         $receipt = $this->normalizeReceipt($data['receipt'] ?? null);
@@ -754,19 +1020,20 @@ class MpesaStatementReconciliationController extends Controller
         }
 
         $transactionTime = $data['transaction_time'] ?? null;
-        $accountReference = strtoupper(trim((string) ($data['account_reference'] ?? '')));
-        $shortcode = trim((string) ($data['shortcode'] ?? ''));
-        $phoneNumber = trim((string) ($data['phone_number'] ?? ''));
+        $accountReference = $this->normalizeAccountReference($data['account_reference'] ?? null);
+        $shortcode = $this->resolveBusinessShortcode($data['shortcode'] ?? null);
+        $phoneNumber = $this->resolveStatementPhoneNumber($data['phone_number'] ?? null);
         $customerName = trim((string) ($data['customer_name'] ?? ''));
+        $source = trim((string) ($data['source'] ?? 'mpesa_business_statement_import'));
 
-        if (!$transactionTime || !$accountReference || !$shortcode || !$phoneNumber) {
+        if (!$transactionTime || !$accountReference) {
             return null;
         }
 
         [$firstName, $middleName, $lastName] = $this->splitCustomerName($customerName);
 
         $rawPayload = [
-            'source' => 'mpesa_business_statement_import',
+            'source' => $source,
             'TransactionType' => 'Pay Bill',
             'TransID' => $receipt,
             'TransTime' => Carbon::parse($transactionTime, 'Africa/Nairobi')->format('YmdHis'),
