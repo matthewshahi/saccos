@@ -30,8 +30,8 @@ class LoanEndMonthController extends Controller
         // Retrieve search input with default values
         $searchInstitution = $request->input('search_institution', '');
         $searchLoanType = $request->input('search_loan_type', '');
-        $cutOffDate = $this->getCutOffDate();
         $periodName = $this->currentPeriod->period_name;
+$cutOffDate = $this->getCutOffDate($periodName);
         $minLoanAmountBillable = $this->getDefaultAccountValue('min_loan_amount_bill_able') ?? 1;
 
         try {
@@ -180,31 +180,64 @@ class LoanEndMonthController extends Controller
     // }
 
     // Retrieve the cut-off date from defaults, using today's date if it doesn't exist
-    private function getCutOffDate()
-    {
-        $cutOffDate = DB::table('sacco_defaults')
-            ->where('default_name', 'cut_off_date')
-            ->value('default_value');
+    private function getCutOffDate($periodName = null)
+{
+    /*
+    |--------------------------------------------------------------------------
+    | Loan end-month cutoff
+    |--------------------------------------------------------------------------
+    | sacco_defaults.cut_off_date must be a DAY NUMBER only.
+    |
+    | Valid:
+    |   28  => active period 202606 becomes 2026-06-28
+    |
+    | Invalid / missing / full date:
+    |   NULL       => use 28
+    |   2025-10-28 => ignore and use 28
+    |   abc        => use 28
+    */
 
-        // ✅ If missing, insert new record with date = 28th of current month
-        if (is_null($cutOffDate)) {
-            $newCutOff = Carbon::now()->startOfMonth()->addDays(27)->toDateString(); // always 28th day
+    $periodName = $periodName ?: optional($this->currentPeriod)->period_name;
 
-            DB::table('sacco_defaults')->insert([
-                'default_name'      => 'cut_off_date',
-                'default_value'     => $newCutOff,
-                'default_transdate' => now(),
-                'default_userid'    => auth()->id() ?? 1,
-                'default_ip'        => request()->ip(),
-            ]);
-
-            Log::warning("Default 'cut_off_date' missing — inserted {$newCutOff}.");
-            $cutOffDate = $newCutOff; // use it immediately
-        }
-
-        // ✅ Return valid date
-        return Carbon::parse($cutOffDate)->toDateString();
+    if (empty($periodName) || !preg_match('/^\d{6}$/', (string) $periodName)) {
+        throw new \RuntimeException('Invalid SACCO period for loan cutoff date.');
     }
+
+    $rawCutoffDay = DB::table('sacco_defaults')
+        ->where('default_name', 'cut_off_date')
+        ->value('default_value');
+
+    $cutoffDay = 28;
+
+    if ($rawCutoffDay === null || trim((string) $rawCutoffDay) === '') {
+        DB::table('sacco_defaults')->insert([
+            'default_name'      => 'cut_off_date',
+            'default_value'     => 28,
+            'default_transdate' => now(),
+            'default_userid'    => auth()->id() ?? 1,
+            'default_ip'        => request()->ip(),
+        ]);
+
+        Log::warning("Default 'cut_off_date' missing — inserted day 28.");
+    } else {
+        $rawCutoffDay = trim((string) $rawCutoffDay);
+
+        // Accept day number only. Full dates like 2025-10-28 are ignored.
+        if (ctype_digit($rawCutoffDay)) {
+            $cutoffDay = (int) $rawCutoffDay;
+        }
+    }
+
+    // February-safe: maximum allowed cutoff day is 28.
+    $cutoffDay = max(1, min($cutoffDay, 28));
+
+    $periodMonth = Carbon::createFromFormat('Ym', (string) $periodName)->startOfMonth();
+
+    return $periodMonth
+        ->copy()
+        ->day($cutoffDay)
+        ->toDateString();
+}
 
     // Retrieve default account values based on the account name
     private function getDefaultAccountValue($accountName)
@@ -436,7 +469,7 @@ class LoanEndMonthController extends Controller
         $minLoanAmountBillable = 1;
     }
 
-    $cutOffDate = $this->getCutOffDate();
+    $cutOffDate = $this->getCutOffDate($period);
 
     // Step 1: Fetch loan type info
     $loanType = DB::table('sacco_loan_types')
@@ -631,7 +664,7 @@ if ($actualCashPaid <= 0 && $interest > 0) {
     //         $minLoanAmountBillable = 1; // fallback immediately
     //     }
 
-    //     $cutOffDate = $this->getCutOffDate();
+    //     $cutOffDate = $this->getCutOffDate($period);
 
     //     // Step 1: Fetch loan type once (instead of querying multiple times)
     //     $loanType = DB::table('sacco_loan_types')
