@@ -126,31 +126,77 @@ class BulkSmsConfigService
 
         return $out;
     }
+public function readiness(): array
+{
+    $provider = $this->provider();
 
-    public function readiness(): array
-    {
-        $provider = $this->provider();
+    $issues = [];
 
-        $issues = [];
+    if (!$this->isEnabled()) {
+        $issues[] = 'Bulk SMS is disabled in sacco_defaults.';
+    }
 
-        if (!$this->isEnabled()) {
-            $issues[] = 'Bulk SMS is disabled in sacco_defaults.';
+    if (!$provider) {
+        $issues[] = 'Selected Bulk SMS provider does not exist.';
+    }
+
+    if ($provider && strtoupper((string) $provider->provider_enabled) !== 'Y') {
+        $issues[] = 'Selected Bulk SMS provider is disabled.';
+    }
+
+    if ($provider && empty($provider->provider_send_url)) {
+        $issues[] = 'Provider SMS send URL is not configured.';
+    }
+
+    $providerCode = $this->providerCode();
+
+    /*
+     * ADTEL supports Basic Authorization for token generation.
+     * This can be supplied either as:
+     * 1. CLIENT_ID + CLIENT_SECRET, or
+     * 2. BASIC_AUTH_TOKEN
+     */
+    if ($providerCode === 'adtel') {
+        $authUrl = $this->providerConfig('AUTH_URL');
+        $sendUrl = $this->providerConfig('SEND_URL');
+        $username = $this->providerConfig('USERNAME');
+        $password = $this->providerConfig('PASSWORD');
+        $clientId = $this->providerConfig('CLIENT_ID');
+        $clientSecret = $this->providerConfig('CLIENT_SECRET');
+        $basicAuthToken = $this->providerConfig('BASIC_AUTH_TOKEN');
+        $senderId = $this->providerConfig('SENDER_ID') ?: $this->defaultSenderId();
+        $actionResponseUrl = $this->providerConfig('ACTION_RESPONSE_URL');
+
+        if (!$authUrl) {
+            $issues[] = 'Missing required provider config: AUTH_URL.';
         }
 
-        if (!$provider) {
-            $issues[] = 'Selected Bulk SMS provider does not exist.';
+        if (!$sendUrl && $provider && empty($provider->provider_send_url)) {
+            $issues[] = 'Missing required provider config: SEND_URL.';
         }
 
-        if ($provider && strtoupper((string) $provider->provider_enabled) !== 'Y') {
-            $issues[] = 'Selected Bulk SMS provider is disabled.';
+        if (!$username) {
+            $issues[] = 'Missing required provider config: USERNAME.';
         }
 
-        if ($provider && empty($provider->provider_send_url)) {
-            $issues[] = 'Provider SMS send URL is not configured.';
+        if (!$password) {
+            $issues[] = 'Missing required provider config: PASSWORD.';
         }
 
+        if (!$basicAuthToken && (!$clientId || !$clientSecret)) {
+            $issues[] = 'Missing ADTEL Basic Auth credentials: provide either BASIC_AUTH_TOKEN or CLIENT_ID and CLIENT_SECRET.';
+        }
+
+        if (!$senderId) {
+            $issues[] = 'Missing ADTEL sender ID. Set SENDER_ID or BULK_SMS_DEFAULT_SENDER_ID.';
+        }
+
+        if (!$actionResponseUrl) {
+            $issues[] = 'Missing required provider config: ACTION_RESPONSE_URL.';
+        }
+    } else {
         $requiredConfigs = DB::table('sacco_bulk_sms_provider_configs')
-            ->where('provider_code', $this->providerCode())
+            ->where('provider_code', $providerCode)
             ->where('config_is_required', 'Y')
             ->get();
 
@@ -161,17 +207,18 @@ class BulkSmsConfigService
                 $issues[] = "Missing required provider config: {$config->config_key}.";
             }
         }
-
-        return [
-            'enabled' => $this->isEnabled(),
-            'demo_mode' => $this->isDemoMode(),
-            'provider_code' => $this->providerCode(),
-            'provider_exists' => $provider !== null,
-            'provider_enabled' => $this->providerIsEnabled(),
-            'default_network' => $this->defaultNetwork(),
-            'default_sender_id' => $this->defaultSenderId(),
-            'ready_to_send' => empty($issues),
-            'issues' => $issues,
-        ];
     }
+
+    return [
+        'enabled' => $this->isEnabled(),
+        'demo_mode' => $this->isDemoMode(),
+        'provider_code' => $providerCode,
+        'provider_exists' => $provider !== null,
+        'provider_enabled' => $this->providerIsEnabled(),
+        'default_network' => $this->defaultNetwork(),
+        'default_sender_id' => $this->defaultSenderId(),
+        'ready_to_send' => empty($issues),
+        'issues' => $issues,
+    ];
+}
 }
