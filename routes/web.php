@@ -71,7 +71,8 @@ use App\Http\Controllers\MinimumCapitalContributionController;
 use App\Http\Controllers\Auth\MemberPasswordResetController;
 use App\Http\Controllers\SpecialSavingController;
 use App\Http\Controllers\RouteAuditLogController;
- 
+
+use App\Http\Controllers\BulkSmsController;
 
 /* good imports
 Route::prefix('kass')->group(function () {
@@ -567,6 +568,172 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
     Route::post('/emails/bulk/send', [EmailController::class, 'sendBulk'])
         ->name('emails.bulk.send')
         ->middleware('check_user_rights:bulk_emails_send');
+
+  /*
+|--------------------------------------------------------------------------
+| Bulk SMS Module
+|--------------------------------------------------------------------------
+| Module: Communications > Bulk SMS
+|--------------------------------------------------------------------------
+*/
+Route::prefix('communications/bulk-sms')
+    ->name('bulk_sms.')
+    ->middleware('check_user_rights:bulk_sms')
+    ->group(function () {
+
+        /*
+        |--------------------------------------------------------------------------
+        | Dashboard / Overview
+        |--------------------------------------------------------------------------
+        */
+        Route::get('/', [BulkSmsController::class, 'index'])
+            ->name('index');
+
+        /*
+        |--------------------------------------------------------------------------
+        | Global Settings
+        |--------------------------------------------------------------------------
+        */
+        Route::get('/settings', [BulkSmsController::class, 'settings'])
+            ->name('settings')
+            ->middleware('check_user_rights:bulk_sms_settings');
+
+        Route::post('/settings/update', [BulkSmsController::class, 'updateSettings'])
+            ->name('settings.update')
+            ->middleware('check_user_rights:bulk_sms_settings');
+
+        /*
+        |--------------------------------------------------------------------------
+        | Providers
+        |--------------------------------------------------------------------------
+        */
+        Route::get('/providers', [BulkSmsController::class, 'providers'])
+            ->name('providers')
+            ->middleware('check_user_rights:bulk_sms_settings');
+
+        Route::get('/providers/create', [BulkSmsController::class, 'createProvider'])
+            ->name('providers.create')
+            ->middleware('check_user_rights:bulk_sms_settings');
+
+        Route::post('/providers/store', [BulkSmsController::class, 'storeProvider'])
+            ->name('providers.store')
+            ->middleware('check_user_rights:bulk_sms_settings');
+
+        Route::get('/providers/{provider}/edit', [BulkSmsController::class, 'editProvider'])
+            ->name('providers.edit')
+            ->middleware('check_user_rights:bulk_sms_settings')
+            ->where('provider', '[A-Za-z0-9_\-]+');
+
+        Route::post('/providers/{provider}/update', [BulkSmsController::class, 'updateProvider'])
+            ->name('providers.update')
+            ->middleware('check_user_rights:bulk_sms_settings')
+            ->where('provider', '[A-Za-z0-9_\-]+');
+
+        Route::post('/providers/{provider}/toggle', [BulkSmsController::class, 'toggleProvider'])
+            ->name('providers.toggle')
+            ->middleware('check_user_rights:bulk_sms_settings')
+            ->where('provider', '[A-Za-z0-9_\-]+');
+
+        /*
+        |--------------------------------------------------------------------------
+        | Provider Configs
+        |--------------------------------------------------------------------------
+        */
+        Route::get('/providers/{provider}/configs', [BulkSmsController::class, 'providerConfigs'])
+            ->name('provider_configs')
+            ->middleware('check_user_rights:bulk_sms_settings')
+            ->where('provider', '[A-Za-z0-9_\-]+');
+
+        Route::post('/provider-configs/{config}/update', [BulkSmsController::class, 'updateProviderConfig'])
+            ->name('provider_configs.update')
+            ->middleware('check_user_rights:bulk_sms_settings')
+            ->whereNumber('config');
+
+        /*
+        |--------------------------------------------------------------------------
+        | Provider Networks
+        |--------------------------------------------------------------------------
+        */
+        Route::get('/providers/{provider}/networks', [BulkSmsController::class, 'providerNetworks'])
+            ->name('provider_networks')
+            ->middleware('check_user_rights:bulk_sms_settings')
+            ->where('provider', '[A-Za-z0-9_\-]+');
+
+        Route::post('/providers/{provider}/networks/store', [BulkSmsController::class, 'storeProviderNetwork'])
+            ->name('provider_networks.store')
+            ->middleware('check_user_rights:bulk_sms_settings')
+            ->where('provider', '[A-Za-z0-9_\-]+');
+
+        Route::post('/provider-networks/{network}/update', [BulkSmsController::class, 'updateProviderNetwork'])
+            ->name('provider_networks.update')
+            ->middleware('check_user_rights:bulk_sms_settings')
+            ->whereNumber('network');
+
+        Route::post('/provider-networks/{network}/toggle', [BulkSmsController::class, 'toggleProviderNetwork'])
+            ->name('provider_networks.toggle')
+            ->middleware('check_user_rights:bulk_sms_settings')
+            ->whereNumber('network');
+
+        /*
+        |--------------------------------------------------------------------------
+        | Messages / Outbox
+        |--------------------------------------------------------------------------
+        */
+        Route::get('/messages', [BulkSmsController::class, 'messages'])
+            ->name('messages');
+
+        Route::post('/messages/dispatch-queued', [BulkSmsController::class, 'dispatchQueued'])
+            ->name('messages.dispatch_queued')
+            ->middleware('check_user_rights:bulk_sms_send');
+
+        Route::get('/messages/{sms}', [BulkSmsController::class, 'showMessage'])
+            ->name('messages.show')
+            ->whereNumber('sms');
+
+        Route::post('/messages/{sms}/dispatch', [BulkSmsController::class, 'dispatchMessage'])
+            ->name('messages.dispatch')
+            ->middleware('check_user_rights:bulk_sms_send')
+            ->whereNumber('sms');
+
+        /*
+        |--------------------------------------------------------------------------
+        | Manual Test
+        |--------------------------------------------------------------------------
+        */
+        Route::get('/test', [BulkSmsController::class, 'testForm'])
+            ->name('test')
+            ->middleware('check_user_rights:bulk_sms_send');
+
+        Route::post('/test', [BulkSmsController::class, 'sendTest'])
+            ->name('test.send')
+            ->middleware('check_user_rights:bulk_sms_send');
+
+        /*
+        |--------------------------------------------------------------------------
+        | Diagnostics
+        |--------------------------------------------------------------------------
+        */
+        Route::get('/diagnostics', [BulkSmsController::class, 'diagnostics'])
+            ->name('diagnostics')
+            ->middleware('check_user_rights:bulk_sms_settings');
+
+        Route::get('/diagnostics/json', [BulkSmsController::class, 'diagnosticsJson'])
+            ->name('diagnostics.json')
+            ->middleware('check_user_rights:bulk_sms_settings');
+
+        /*
+        |--------------------------------------------------------------------------
+        | Reports
+        |--------------------------------------------------------------------------
+        */
+        Route::get('/reports/summary', [BulkSmsController::class, 'reportSummary'])
+            ->name('reports.summary')
+            ->middleware('check_user_rights:bulk_sms_reports');
+
+        Route::get('/reports/export', [BulkSmsController::class, 'exportMessages'])
+            ->name('reports.export')
+            ->middleware('check_user_rights:bulk_sms_reports');
+    });
 
     Route::get('/proc/recalc/loans', [TempLoanCalController::class, 'recalcAllLoansAndMembers'])
         ->name('proc.recalc.loans.process')
@@ -1183,6 +1350,10 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
     Route::get('/admin/user-types', [HomeController::class, 'adminUserTypes'])->name('admin.user-types')->middleware('check_user_rights:modify_useraccessrights');
 
     Route::get('/admin/defaults', [HomeController::class, 'adminDefaults'])->name('admin.defaults')->middleware('check_user_rights:add_default');
+
+
+
+
     Route::post('/admin/defaults/update', [HomeController::class, 'updateDefaults'])->name('admin.defaults.update')->middleware('check_user_rights:add_default');
     Route::post('/admin/defaults/store', [HomeController::class, 'storeDefault'])->name('admin.defaults.store')->middleware('check_user_rights:add_default');
     Route::delete('/admin/defaults/{id}', [HomeController::class, 'destroyDefault'])
@@ -1205,7 +1376,7 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
     Route::get('/files/download/{file}', [FileUploadController::class, 'download'])->name('file.download')->middleware('check_user_rights:file_upload');
     Route::delete('/files/delete/{file}', [FileUploadController::class, 'delete'])->name('file.delete')->middleware('check_user_rights:file_delete');
 
-    Route::get('/reports/transport/mpesa', [TransportReportsController::class, 'mpesa'])->name('reports.transport.mpesa')->middleware('check_user_rights:rpt_transport_mpesa');
+    // Route::get('/reports/transport/mpesa', [TransportReportsController::class, 'mpesa'])->name('reports.transport.mpesa')->middleware('check_user_rights:rpt_transport_mpesa');
 
     Route::get('/reports/fosa-members', [FosaMembersReportController::class, 'index'])->name('reports.fosa.members')->middleware('check_user_rights:list_fosa_report');
 
@@ -1837,21 +2008,21 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
         });
 
 
-Route::middleware(['auth', 'check_member_position'])->group(function () {
-    Route::prefix('admin/route-audit-logs')
-        ->name('route.audit.logs.')
-        ->middleware('check_user_rights:view_system_logs')
-        ->group(function () {
-            Route::get('/', [RouteAuditLogController::class, 'index'])
-                ->name('index');
+    Route::middleware(['auth', 'check_member_position'])->group(function () {
+        Route::prefix('admin/route-audit-logs')
+            ->name('route.audit.logs.')
+            ->middleware('check_user_rights:view_system_logs')
+            ->group(function () {
+                Route::get('/', [RouteAuditLogController::class, 'index'])
+                    ->name('index');
 
-            Route::get('/data', [RouteAuditLogController::class, 'data'])
-                ->name('data');
+                Route::get('/data', [RouteAuditLogController::class, 'data'])
+                    ->name('data');
 
-            Route::get('/{id}', [RouteAuditLogController::class, 'show'])
-                ->name('show');
-        });
-});
+                Route::get('/{id}', [RouteAuditLogController::class, 'show'])
+                    ->name('show');
+            });
+    });
 
 
     Route::get('/reports/sasra/{path?}', function ($path = null) {

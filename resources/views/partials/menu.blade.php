@@ -663,269 +663,276 @@ $defaultLogoPath = '/image/logo.jpg'; // Default logo
 
 
                             <li class="Ul_li--hover">
-    <a class="has-arrow" href="#">
-        <i class="i-Bar-Chart text-20 me-2" style="color: #663399;"></i>
-        <span class="item-name text-15 text-muted">SASRA</span>
-    </a>
+                                <a class="has-arrow" href="#">
+                                    <i class="i-Bar-Chart text-20 me-2" style="color: #663399;"></i>
+                                    <span class="item-name text-15 text-muted">SASRA</span>
+                                </a>
 
-    <ul class="mm-collapse">
+                                <ul class="mm-collapse">
 
-        {{-- SASRA Regulatory Returns --}}
-        <li class="Ul_li--hover">
-            <a class="has-arrow" href="#">
-                <i class="i-File-Clipboard-File--Text text-15 me-2" style="color: #663399;"></i>
-                <span class="text-muted">Regulatory Returns</span>
-            </a>
+                                    {{-- SASRA Regulatory Returns --}}
+                                    <li class="Ul_li--hover">
+                                        <a class="has-arrow" href="#">
+                                            <i class="i-File-Clipboard-File--Text text-15 me-2"
+                                                style="color: #663399;"></i>
+                                            <span class="text-muted">Regulatory Returns</span>
+                                        </a>
 
-            <ul class="mm-collapse">
-                <li class="item-name">
-                    <a href="{{ url('/reports/sasra/capital-adequacy') }}">
-                        <span class="text-muted">Capital Adequacy</span>
-                    </a>
-                </li>
+                                        <ul class="mm-collapse">
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/sasra/capital-adequacy') }}">
+                                                    <span class="text-muted">Capital Adequacy</span>
+                                                </a>
+                                            </li>
 
-                <li class="item-name">
-                    <a href="{{ url('/reports/sasra/liquidity-statement') }}">
-                        <span class="text-muted">Liquidity Statement</span>
-                    </a>
-                </li>
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/sasra/liquidity-statement') }}">
+                                                    <span class="text-muted">Liquidity Statement</span>
+                                                </a>
+                                            </li>
 
-                <li class="item-name">
-                    <a href="{{ url('/reports/sasra/deposit-return') }}">
-                        <span class="text-muted">Deposit Return</span>
-                    </a>
-                </li>
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/sasra/deposit-return') }}">
+                                                    <span class="text-muted">Deposit Return</span>
+                                                </a>
+                                            </li>
 
-                <li class="item-name">
-                    <a href="{{ url('/reports/sasra/risk-classification-provisioning') }}">
-                        <span class="text-muted">Risk Classification &amp; Provisioning</span>
-                    </a>
-                </li>
+                                            <li class="item-name">
+                                                <a
+                                                    href="{{ url('/reports/sasra/risk-classification-provisioning') }}">
+                                                    <span class="text-muted">Risk Classification &amp;
+                                                        Provisioning</span>
+                                                </a>
+                                            </li>
 
-                <li class="item-name">
-                    <a href="{{ url('/reports/sasra/investment-return') }}">
-                        <span class="text-muted">Investment Return</span>
-                    </a>
-                </li>
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/sasra/investment-return') }}">
+                                                    <span class="text-muted">Investment Return</span>
+                                                </a>
+                                            </li>
 
-                <li class="item-name">
-                    <a href="{{ url('/reports/final-accounts/balance-sheet') }}">
-                        <span class="text-muted">Statement of Financial Position</span>
-                    </a>
-                </li>
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/final-accounts/balance-sheet') }}">
+                                                    <span class="text-muted">Statement of Financial Position</span>
+                                                </a>
+                                            </li>
 
-                <li class="item-name">
-                    <a href="{{ url('/reports/final-accounts/profit-loss') }}">
-                        <span class="text-muted">Statement of Comprehensive Income</span>
-                    </a>
-                </li>
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/final-accounts/profit-loss') }}">
+                                                    <span class="text-muted">Statement of Comprehensive Income</span>
+                                                </a>
+                                            </li>
 
-                <li class="item-name">
-                    <a href="{{ url('/reports/final-accounts/trial-balance') }}">
-                        <span class="text-muted">Trial Balance</span>
-                    </a>
-                </li>
-            </ul>
-        </li>
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/final-accounts/trial-balance') }}">
+                                                    <span class="text-muted">Trial Balance</span>
+                                                </a>
+                                            </li>
+                                        </ul>
+                                    </li>
 
-        {{-- SASRA Loans and Credit Risk --}}
-        <li class="Ul_li--hover">
-            <a class="has-arrow" href="#">
-                <i class="i-File-Clipboard-File--Text text-15 me-2" style="color: #663399;"></i>
-                <span class="text-muted">Loans &amp; Credit Risk</span>
-            </a>
+                                    {{-- SASRA Loans and Credit Risk --}}
+                                    <li class="Ul_li--hover">
+                                        <a class="has-arrow" href="#">
+                                            <i class="i-File-Clipboard-File--Text text-15 me-2"
+                                                style="color: #663399;"></i>
+                                            <span class="text-muted">Loans &amp; Credit Risk</span>
+                                        </a>
 
-            <ul class="mm-collapse">
-                <li class="item-name">
-                    <a href="{{ url('/reports/sasra/loan-portfolio-summary') }}">
-                        <span class="text-muted">Loan Portfolio Summary</span>
-                    </a>
-                </li>
+                                        <ul class="mm-collapse">
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/sasra/loan-portfolio-summary') }}">
+                                                    <span class="text-muted">Loan Portfolio Summary</span>
+                                                </a>
+                                            </li>
 
-                <li class="item-name">
-                    <a href="{{ url('/reports/sasra/outstandingloans/y/active') }}">
-                        <span class="text-muted">Outstanding Loans - Active Members</span>
-                    </a>
-                </li>
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/sasra/outstandingloans/y/active') }}">
+                                                    <span class="text-muted">Outstanding Loans - Active Members</span>
+                                                </a>
+                                            </li>
 
-                <li class="item-name">
-                    <a href="{{ url('/reports/sasra/outstandingloans/n/active') }}">
-                        <span class="text-muted">Outstanding Loans - Inactive Members</span>
-                    </a>
-                </li>
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/sasra/outstandingloans/n/active') }}">
+                                                    <span class="text-muted">Outstanding Loans - Inactive
+                                                        Members</span>
+                                                </a>
+                                            </li>
 
-                <li class="item-name">
-                    <a href="{{ url('/reports/sasra/outstandingloans/n') }}">
-                        <span class="text-muted">Fully Paid Loans</span>
-                    </a>
-                </li>
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/sasra/outstandingloans/n') }}">
+                                                    <span class="text-muted">Fully Paid Loans</span>
+                                                </a>
+                                            </li>
 
-                <li class="item-name">
-                    <a href="{{ url('/reports/sasra/loan-arrears-aging') }}">
-                        <span class="text-muted">Loan Arrears Aging</span>
-                    </a>
-                </li>
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/sasra/loan-arrears-aging') }}">
+                                                    <span class="text-muted">Loan Arrears Aging</span>
+                                                </a>
+                                            </li>
 
-                <li class="item-name">
-                    <a href="{{ url('/reports/sasra/non-performing-loans') }}">
-                        <span class="text-muted">Non-Performing Loans</span>
-                    </a>
-                </li>
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/sasra/non-performing-loans') }}">
+                                                    <span class="text-muted">Non-Performing Loans</span>
+                                                </a>
+                                            </li>
 
-                <li class="item-name">
-                    <a href="{{ url('/reports/sasra/loan-provisioning') }}">
-                        <span class="text-muted">Loan Provisioning</span>
-                    </a>
-                </li>
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/sasra/loan-provisioning') }}">
+                                                    <span class="text-muted">Loan Provisioning</span>
+                                                </a>
+                                            </li>
 
-                <li class="item-name">
-                    <a href="{{ url('/reports/sasra/loan_performance') }}">
-                        <span class="text-muted">Loan Risk Classification</span>
-                    </a>
-                </li>
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/sasra/loan_performance') }}">
+                                                    <span class="text-muted">Loan Risk Classification</span>
+                                                </a>
+                                            </li>
 
-                <li class="item-name">
-                    <a href="{{ url('/reports/sasra/loan_performance/1') }}">
-                        <span class="text-muted">Insider / Official Loans</span>
-                    </a>
-                </li>
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/sasra/loan_performance/1') }}">
+                                                    <span class="text-muted">Insider / Official Loans</span>
+                                                </a>
+                                            </li>
 
-                <li class="item-name">
-                    <a href="{{ url('/reports/sasra/loan-repayment-performance') }}">
-                        <span class="text-muted">Loan Repayment Performance</span>
-                    </a>
-                </li>
-            </ul>
-        </li>
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/sasra/loan-repayment-performance') }}">
+                                                    <span class="text-muted">Loan Repayment Performance</span>
+                                                </a>
+                                            </li>
+                                        </ul>
+                                    </li>
 
-        {{-- SASRA Savings and Deposits --}}
-        <li class="Ul_li--hover">
-            <a class="has-arrow" href="#">
-                <i class="i-Money-Bag text-15 me-2" style="color: #663399;"></i>
-                <span class="text-muted">Savings &amp; Deposits</span>
-            </a>
+                                    {{-- SASRA Savings and Deposits --}}
+                                    <li class="Ul_li--hover">
+                                        <a class="has-arrow" href="#">
+                                            <i class="i-Money-Bag text-15 me-2" style="color: #663399;"></i>
+                                            <span class="text-muted">Savings &amp; Deposits</span>
+                                        </a>
 
-            <ul class="mm-collapse">
-                <li class="item-name">
-                    <a href="{{ url('/reports/sasra/share') }}">
-                        <span class="text-muted">Shares / Deposits Balances</span>
-                    </a>
-                </li>
+                                        <ul class="mm-collapse">
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/sasra/share') }}">
+                                                    <span class="text-muted">Shares / Deposits Balances</span>
+                                                </a>
+                                            </li>
 
-                <li class="item-name">
-                    <a href="{{ url('/reports/sasra/member_contributions/data') }}">
-                        <span class="text-muted">Monthly Savings</span>
-                    </a>
-                </li>
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/sasra/member_contributions/data') }}">
+                                                    <span class="text-muted">Monthly Savings</span>
+                                                </a>
+                                            </li>
 
-                <li class="item-name">
-                    <a href="{{ url('/reports/sasra/share_compliance') }}">
-                        <span class="text-muted">Savings Compliance</span>
-                    </a>
-                </li>
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/sasra/share_compliance') }}">
+                                                    <span class="text-muted">Savings Compliance</span>
+                                                </a>
+                                            </li>
 
-                <li class="item-name">
-                    <a href="{{ url('/reports/sasra/deposit-movement') }}">
-                        <span class="text-muted">Deposit Movement</span>
-                    </a>
-                </li>
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/sasra/deposit-movement') }}">
+                                                    <span class="text-muted">Deposit Movement</span>
+                                                </a>
+                                            </li>
 
-                <li class="item-name">
-                    <a href="{{ url('/reports/sasra/member-deposits-summary') }}">
-                        <span class="text-muted">Member Deposits Summary</span>
-                    </a>
-                </li>
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/sasra/member-deposits-summary') }}">
+                                                    <span class="text-muted">Member Deposits Summary</span>
+                                                </a>
+                                            </li>
 
-                <li class="item-name">
-                    <a href="{{ url('/reports/sasra/withdrawable-deposits') }}">
-                        <span class="text-muted">Withdrawable Deposits</span>
-                    </a>
-                </li>
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/sasra/withdrawable-deposits') }}">
+                                                    <span class="text-muted">Withdrawable Deposits</span>
+                                                </a>
+                                            </li>
 
-                <li class="item-name">
-                    <a href="{{ url('/reports/sasra/non-withdrawable-deposits') }}">
-                        <span class="text-muted">Non-withdrawable Deposits</span>
-                    </a>
-                </li>
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/sasra/non-withdrawable-deposits') }}">
+                                                    <span class="text-muted">Non-withdrawable Deposits</span>
+                                                </a>
+                                            </li>
 
-                <li class="item-name">
-                    <a href="{{ url('/reports/sasra/dormant-deposits') }}">
-                        <span class="text-muted">Dormant / Inactive Deposits</span>
-                    </a>
-                </li>
-            </ul>
-        </li>
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/sasra/dormant-deposits') }}">
+                                                    <span class="text-muted">Dormant / Inactive Deposits</span>
+                                                </a>
+                                            </li>
+                                        </ul>
+                                    </li>
 
-        {{-- SASRA Investments and Financial Performance --}}
-        <li class="Ul_li--hover">
-            <a class="has-arrow" href="#">
-                <i class="i-Financial text-15 me-2" style="color: #663399;"></i>
-                <span class="text-muted">Investments &amp; Performance</span>
-            </a>
+                                    {{-- SASRA Investments and Financial Performance --}}
+                                    <li class="Ul_li--hover">
+                                        <a class="has-arrow" href="#">
+                                            <i class="i-Financial text-15 me-2" style="color: #663399;"></i>
+                                            <span class="text-muted">Investments &amp; Performance</span>
+                                        </a>
 
-            <ul class="mm-collapse">
-                <li class="item-name">
-                    <a href="{{ url('/reports/sasra/investment-register') }}">
-                        <span class="text-muted">Investment Register</span>
-                    </a>
-                </li>
+                                        <ul class="mm-collapse">
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/sasra/investment-register') }}">
+                                                    <span class="text-muted">Investment Register</span>
+                                                </a>
+                                            </li>
 
-                <li class="item-name">
-                    <a href="{{ url('/reports/sasra/investment-income') }}">
-                        <span class="text-muted">Investment Income</span>
-                    </a>
-                </li>
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/sasra/investment-income') }}">
+                                                    <span class="text-muted">Investment Income</span>
+                                                </a>
+                                            </li>
 
-                <li class="item-name">
-                    <a href="{{ url('/reports/sasra/investment-return') }}">
-                        <span class="text-muted">Investment Return</span>
-                    </a>
-                </li>
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/sasra/investment-return') }}">
+                                                    <span class="text-muted">Investment Return</span>
+                                                </a>
+                                            </li>
 
-                <li class="item-name">
-                    <a href="{{ url('/reports/profit_and_loss') }}">
-                        <span class="text-muted">Financial Performance / ROI</span>
-                    </a>
-                </li>
-            </ul>
-        </li>
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/profit_and_loss') }}">
+                                                    <span class="text-muted">Financial Performance / ROI</span>
+                                                </a>
+                                            </li>
+                                        </ul>
+                                    </li>
 
-        {{-- SASRA Governance and Complaints --}}
-        <li class="Ul_li--hover">
-            <a class="has-arrow" href="#">
-                <i class="i-Administrator text-15 me-2" style="color: #663399;"></i>
-                <span class="text-muted">Governance &amp; Complaints</span>
-            </a>
+                                    {{-- SASRA Governance and Complaints --}}
+                                    <li class="Ul_li--hover">
+                                        <a class="has-arrow" href="#">
+                                            <i class="i-Administrator text-15 me-2" style="color: #663399;"></i>
+                                            <span class="text-muted">Governance &amp; Complaints</span>
+                                        </a>
 
-            <ul class="mm-collapse">
-                <li class="item-name">
-                    <a href="{{ url('/reports/sasra/complaints-register') }}">
-                        <span class="text-muted">Complaints Register</span>
-                    </a>
-                </li>
+                                        <ul class="mm-collapse">
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/sasra/complaints-register') }}">
+                                                    <span class="text-muted">Complaints Register</span>
+                                                </a>
+                                            </li>
 
-                <li class="item-name">
-                    <a href="{{ url('/reports/sasra/complaints-summary') }}">
-                        <span class="text-muted">Complaints Summary</span>
-                    </a>
-                </li>
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/sasra/complaints-summary') }}">
+                                                    <span class="text-muted">Complaints Summary</span>
+                                                </a>
+                                            </li>
 
-                <li class="item-name">
-                    <a href="{{ url('/reports/sasra/complaints-source-report') }}">
-                        <span class="text-muted">Complaints Source Report</span>
-                    </a>
-                </li>
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/sasra/complaints-source-report') }}">
+                                                    <span class="text-muted">Complaints Source Report</span>
+                                                </a>
+                                            </li>
 
-                <li class="item-name">
-                    <a href="{{ url('/reports/sasra/complaints-monitoring-evaluation') }}">
-                        <span class="text-muted">Complaints Monitoring &amp; Evaluation</span>
-                    </a>
-                </li>
-            </ul>
-        </li>
+                                            <li class="item-name">
+                                                <a
+                                                    href="{{ url('/reports/sasra/complaints-monitoring-evaluation') }}">
+                                                    <span class="text-muted">Complaints Monitoring &amp;
+                                                        Evaluation</span>
+                                                </a>
+                                            </li>
+                                        </ul>
+                                    </li>
 
-    </ul>
-</li>
+                                </ul>
+                            </li>
                         </ul>
                     </li>
 
@@ -951,7 +958,7 @@ $defaultLogoPath = '/image/logo.jpg'; // Default logo
 
                             </li>
                             <li class="item-name">
-                                <a href="?}">
+                                <a href="{{ route('bulk_sms.index') }}">
                                     <i class="i-Speach-Bubble-3 text-15 me-2" style="color: #663399;"></i>
                                     <span class="text-muted">Bulk SMS</span>
                                 </a>
@@ -983,6 +990,11 @@ $defaultLogoPath = '/image/logo.jpg'; // Default logo
                                         </a>
                                     </li>
                                 </ul>
+                            </li>
+                            <li class="item-name has-arrow">
+                                <a href="{{ url('/admin/route-audit-logs') }}">
+                                    <span class="text-muted">Audit Logs (1)</span>
+                                </a>
                             </li>
                             <li class="item-name has-arrow">
                                 <a href="{{ url('/admin/defaults') }}">
@@ -1038,7 +1050,7 @@ $defaultLogoPath = '/image/logo.jpg'; // Default logo
                                     @csrf
                                 </form>
                             </li>
-                        </ul>
+                        </ul> 
                     </li>
                 </ul>
             </div>
