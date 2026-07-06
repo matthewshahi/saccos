@@ -13,7 +13,7 @@
 </div>
 
 <div class="separator-breadcrumb border-top"></div>
-
+@include('bulk_sms.partials.nav')
 @if (session('success'))
     <div class="alert alert-success">
         {{ session('success') }}
