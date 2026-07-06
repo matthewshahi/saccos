@@ -2,12 +2,14 @@
 
 namespace App\Services\BulkSms;
 
+use App\Services\BulkSms\Providers\AdtelBulkSmsProvider;
 use Illuminate\Support\Facades\DB;
 
 class BulkSmsDispatchService
 {
     public function __construct(
-        protected BulkSmsConfigService $config
+        protected BulkSmsConfigService $config,
+        protected AdtelBulkSmsProvider $adtel
     ) {
     }
 
@@ -68,20 +70,19 @@ class BulkSmsDispatchService
             );
         }
 
-        /*
-         * Real provider sending will be added here after we confirm:
-         * - provider send URL
-         * - request payload format
-         * - success response format
-         * - error response format
-         * - delivery callback format
-         */
+        $providerCode = strtolower((string) $sms->provider_code);
+
+        if ($providerCode === 'adtel') {
+            $result = $this->adtel->send($sms);
+
+            return $this->applyProviderResult($smsId, $result);
+        }
 
         return $this->markStopped(
             $smsId,
             'failed',
-            'PROVIDER_SEND_NOT_IMPLEMENTED',
-            'Provider send function has not yet been implemented.',
+            'UNSUPPORTED_SMS_PROVIDER',
+            'Unsupported SMS provider: ' . $providerCode,
             $readiness
         );
     }
@@ -108,6 +109,45 @@ class BulkSmsDispatchService
         ];
     }
 
+    protected function applyProviderResult(int $smsId, array $result): array
+    {
+        $sent = (bool) ($result['sent'] ?? false);
+        $status = $sent ? 'sent' : 'failed';
+
+        $update = [
+            'sms_status' => $status,
+            'provider_message_id' => $result['provider_message_id'] ?? null,
+            'request_payload' => $result['request_payload'] ?? null,
+            'response_payload' => $result['response_payload'] ?? null,
+            'error_code' => $sent ? null : ($result['error_code'] ?? 'SMS_SEND_FAILED'),
+            'error_message' => $sent ? null : ($result['error_message'] ?? 'SMS send failed.'),
+            'attempt_count' => DB::raw('COALESCE(attempt_count, 0) + 1'),
+            'updated_at' => now(),
+        ];
+
+        if ($sent) {
+            $update['sent_at'] = now();
+            $update['failed_at'] = null;
+        } else {
+            $update['failed_at'] = now();
+        }
+
+        DB::table('sacco_bulk_sms_messages')
+            ->where('sms_id', $smsId)
+            ->update($update);
+
+        return [
+            'success' => $sent,
+            'sent' => $sent,
+            'sms_id' => $smsId,
+            'status' => $status,
+            'provider_message_id' => $result['provider_message_id'] ?? null,
+            'http_status' => $result['http_status'] ?? null,
+            'error_code' => $sent ? null : ($result['error_code'] ?? 'SMS_SEND_FAILED'),
+            'error_message' => $sent ? null : ($result['error_message'] ?? 'SMS send failed.'),
+        ];
+    }
+
     protected function markStopped(
         int $smsId,
         string $status,
@@ -122,6 +162,7 @@ class BulkSmsDispatchService
             'response_payload' => json_encode([
                 'readiness' => $readiness,
             ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+            'attempt_count' => DB::raw('COALESCE(attempt_count, 0) + 1'),
             'updated_at' => now(),
         ];
 
