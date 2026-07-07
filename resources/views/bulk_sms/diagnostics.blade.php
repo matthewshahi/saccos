@@ -18,6 +18,8 @@
             <div class="card-header d-flex align-items-center">
                 <h3 class="w-50 float-start card-title m-0">Readiness Check</h3>
 
+
+
                 <div class="text-end w-50 float-end">
                     <a href="{{ route('bulk_sms.settings') }}" class="btn btn-sm btn-outline-secondary">
                         Settings
@@ -25,6 +27,17 @@
                     <a href="{{ route('bulk_sms.diagnostics.json') }}" target="_blank" class="btn btn-sm btn-outline-primary">
                         JSON
                     </a>
+
+                    <form action="{{ route('bulk_sms.diagnostics.adtel_token_test') }}"
+      method="POST"
+      style="display:inline-block;"
+      onsubmit="return confirm('Run ADTEL token test only? This will not send SMS.');">
+    @csrf
+    <button type="submit" class="btn btn-sm btn-outline-success">
+        Test ADTEL Token
+    </button>
+</form>
+
                 </div>
             </div>
 

@@ -675,4 +675,29 @@ class BulkSmsController extends Controller
 
         return $providerRow;
     }
+
+    public function adtelTokenTest()
+{
+    try {
+        $provider = app(\App\Services\BulkSms\Providers\AdtelBulkSmsProvider::class);
+
+        $result = $provider->getAccessToken();
+
+        if (($result['success'] ?? false) === true) {
+            return redirect()
+                ->route('bulk_sms.diagnostics')
+                ->with('success', 'ADTEL token test successful. Token received. Expires in: ' . ($result['expires_in'] ?? 'unknown') . ' seconds.');
+        }
+
+        return redirect()
+            ->route('bulk_sms.diagnostics')
+            ->with('error', 'ADTEL token test failed: ' . ($result['error_message'] ?? 'Unknown error.'));
+    } catch (\Throwable $e) {
+        return redirect()
+            ->route('bulk_sms.diagnostics')
+            ->with('error', 'ADTEL token test exception: ' . $e->getMessage());
+    }
+}
+
+
 }

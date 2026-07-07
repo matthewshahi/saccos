@@ -716,6 +716,11 @@ Route::prefix('communications/bulk-sms')
         Route::get('/diagnostics', [BulkSmsController::class, 'diagnostics'])
             ->name('diagnostics')
             ->middleware('check_user_rights:bulk_sms_settings');
+        
+            Route::post('/diagnostics/adtel-token-test', [BulkSmsController::class, 'adtelTokenTest'])
+    ->name('diagnostics.adtel_token_test')
+    ->middleware('check_user_rights:bulk_sms_settings');
+    
 
         Route::get('/diagnostics/json', [BulkSmsController::class, 'diagnosticsJson'])
             ->name('diagnostics.json')
