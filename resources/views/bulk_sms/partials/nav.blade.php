@@ -167,3 +167,43 @@
         </div>
     </div>
 </div>
+
+{{-- Bulk SMS flash messages --}}
+@if (session('success'))
+    <div class="alert alert-success alert-dismissible fade show mb-3" role="alert">
+        <strong>Success:</strong> {{ session('success') }}
+        <button type="button"
+                class="close btn-close"
+                data-dismiss="alert"
+                data-bs-dismiss="alert"
+                aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+        </button>
+    </div>
+@endif
+
+@if (session('error'))
+    <div class="alert alert-danger alert-dismissible fade show mb-3" role="alert">
+        <strong>Error:</strong> {{ session('error') }}
+        <button type="button"
+                class="close btn-close"
+                data-dismiss="alert"
+                data-bs-dismiss="alert"
+                aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+        </button>
+    </div>
+@endif
+
+@if (session('warning'))
+    <div class="alert alert-warning alert-dismissible fade show mb-3" role="alert">
+        <strong>Warning:</strong> {{ session('warning') }}
+        <button type="button"
+                class="close btn-close"
+                data-dismiss="alert"
+                data-bs-dismiss="alert"
+                aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+        </button>
+    </div>
+@endif

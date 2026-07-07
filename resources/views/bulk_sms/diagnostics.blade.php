@@ -12,6 +12,8 @@
 
 <div class="separator-breadcrumb border-top"></div>
 @include('bulk_sms.partials.nav')
+
+
 <div class="row">
     <div class="col-md-7">
         <div class="card o-hidden mb-4">
