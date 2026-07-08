@@ -73,6 +73,8 @@ use App\Http\Controllers\SpecialSavingController;
 use App\Http\Controllers\RouteAuditLogController;
 
 use App\Http\Controllers\BulkSmsController;
+use App\Http\Controllers\SaccoBankIpnController;
+use App\Http\Middleware\VerifyCsrfToken;
 
 /* good imports
 Route::prefix('kass')->group(function () {
@@ -266,6 +268,67 @@ Route::get('/members/update-totals', action: [\App\Http\Controllers\MemberTotals
 // Route::view('/members/import-kin-form', 'import.next_of_kin')->name('members.import.kin.form');
 // Route::post('/members/import-next-of-kin', [MemberImportController::class, 'importNextOfKin'])->name('members.import.kin');
 //=============
+
+/*
+|--------------------------------------------------------------------------
+| Bank IPN Callback Routes
+|--------------------------------------------------------------------------
+| These routes are public because banks call them server-to-server.
+| They are NOT protected by auth.
+| They are protected by:
+| 1. bank_ipn_ip middleware - checks allowed bank source IPs
+| 2. bank-specific validation inside controller - e.g. SBM AES/password validation
+|--------------------------------------------------------------------------
+*/
+
+Route::post('/sbm', [SaccoBankIpnController::class, 'sbm'])
+    ->name('bank.ipn.sbm')
+    ->middleware([
+        'throttle:120,1',
+        'bank_ipn_ip:SBM',
+    ])
+    ->withoutMiddleware([
+        VerifyCsrfToken::class,
+    ]);
+
+/*
+|--------------------------------------------------------------------------
+| Future Bank IPNs
+|--------------------------------------------------------------------------
+| Keep these commented until we receive real IPN specifications from each bank.
+|--------------------------------------------------------------------------
+*/
+
+// Route::post('/kcb', [SaccoBankIpnController::class, 'kcb'])
+//     ->name('bank.ipn.kcb')
+//     ->middleware([
+//         'throttle:120,1',
+//         'bank_ipn_ip:KCB',
+//     ])
+//     ->withoutMiddleware([
+//         VerifyCsrfToken::class,
+//     ]);
+
+// Route::post('/ncba', [SaccoBankIpnController::class, 'ncba'])
+//     ->name('bank.ipn.ncba')
+//     ->middleware([
+//         'throttle:120,1',
+//         'bank_ipn_ip:NCBA',
+//     ])
+//     ->withoutMiddleware([
+//         VerifyCsrfToken::class,
+//     ]);
+
+// Route::post('/coop', [SaccoBankIpnController::class, 'coop'])
+//     ->name('bank.ipn.coop')
+//     ->middleware([
+//         'throttle:120,1',
+//         'bank_ipn_ip:COOP',
+//     ])
+//     ->withoutMiddleware([
+//         VerifyCsrfToken::class,
+//     ]);
+
 
 Route::get('/home', [HomeController::class, 'redirectBasedOnAuth'])->name('home');
 Route::get('/', [HomeController::class, 'redirectBasedOnAuth'])->name('home1');

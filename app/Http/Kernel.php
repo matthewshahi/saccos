@@ -87,6 +87,7 @@ class Kernel extends HttpKernel
         'check_member_position' => \App\Http\Middleware\CheckMemberPosition::class,
         'safaricom.ip' => \App\Http\Middleware\CheckSafaricomIP::class,
         'auth.api' => \App\Http\Middleware\ApiAuthenticate::class,
+        'bank_ipn_ip' => \App\Http\Middleware\BankIpnIpMiddleware::class,
 
         /*
          * Optional alias for selective audit logging.
