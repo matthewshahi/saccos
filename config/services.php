@@ -37,4 +37,20 @@ return [
     'mpesa' => [
         'env' => env('MPESA_ENV', 'sandbox'),
     ],
+
+    'ncba' => [
+        'enabled' => env('NCBA_ENABLED', false),
+        'dry_run' => env('NCBA_DRY_RUN', true),
+
+        'base_url' => rtrim(env('NCBA_BASE_URL', ''), '/'),
+        'user_id' => env('NCBA_USER_ID'),
+        'password' => env('NCBA_PASSWORD'),
+        'subscription_key' => env('NCBA_SUBSCRIPTION_KEY'),
+
+        'debit_account' => env('NCBA_DEBIT_ACCOUNT'),
+        'country_code' => env('NCBA_COUNTRY_CODE', 'KE'),
+        'sender_country' => env('NCBA_SENDER_COUNTRY', 'Kenya'),
+        'currency' => env('NCBA_CURRENCY', 'KES'),
+    ],
+
 ];
