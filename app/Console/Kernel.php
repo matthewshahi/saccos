@@ -24,7 +24,7 @@ class Kernel extends ConsoleKernel
             ->timezone('Africa/Nairobi');
             // ->runInBackground();
 
-        // NCBA loan disbursements - DRY RUN by default
+        // NCBA loan disbursements - DRY RUN by default.
         // This processes only rows marked READY_TO_SEND.
         // It will NOT send money unless --live is added and .env allows live mode.
         $schedule->command('ncba:process-loan-disbursements --limit=1')
@@ -33,6 +33,14 @@ class Kernel extends ConsoleKernel
             ->onOneServer()
             ->timezone('Africa/Nairobi');
             // ->runInBackground();
+
+        // Confirm NCBA disbursements already sent to bank.
+        // This does not send money; it only checks transaction status.
+        $schedule->command('ncba:confirm-loan-disbursements --limit=10')
+            ->everyFiveMinutes()
+            ->withoutOverlapping()
+            ->onOneServer()
+            ->timezone('Africa/Nairobi');
 
         // Welcome emails
         $schedule->job(new \App\Jobs\SendWelcomeEmailJob())
