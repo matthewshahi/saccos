@@ -6545,121 +6545,323 @@ class HomeController extends Controller
             'incomeLiabilityAccounts'
         ));
     }
+
     public function updateLoanType(Request $request, $id)
     {
+        /*
+    |--------------------------------------------------------------------------
+    | Retrieve loan type
+    |--------------------------------------------------------------------------
+    */
         $loanType = DB::table('sacco_loan_types')
             ->where('loan_type_id', $id)
             ->where('loan_type_deleted', '<>', 'Y')
             ->first();
 
         if (!$loanType) {
-            return redirect()->route('loans.types')->with('error', 'Loan type not found.');
+            return redirect()
+                ->route('loans.types')
+                ->with('error', 'Loan type not found.');
         }
 
+        /*
+    |--------------------------------------------------------------------------
+    | Validate submitted data
+    |--------------------------------------------------------------------------
+    */
         $validated = $request->validate([
-            'loan_type_name'                     => 'required|string|max:250|unique:sacco_loan_types,loan_type_name,' . $id . ',loan_type_id',
-            'loan_type_code'                     => 'required|string|max:100|unique:sacco_loan_types,loan_type_code,' . $id . ',loan_type_id',
+            'loan_type_name' => [
+                'required',
+                'string',
+                'max:250',
+                Rule::unique(
+                    'sacco_loan_types',
+                    'loan_type_name'
+                )->ignore($id, 'loan_type_id'),
+            ],
 
-            'loan_type_active'                   => 'required|in:0,1',
+            'loan_type_code' => [
+                'required',
+                'string',
+                'max:100',
+                Rule::unique(
+                    'sacco_loan_types',
+                    'loan_type_code'
+                )->ignore($id, 'loan_type_id'),
+            ],
 
-            'loan_type_interest'                 => 'required|numeric|min:0',
-            'loan_type_interest_type'            => 'required|string|max:100',
-            'loan_type_duration'                 => 'required|integer|min:1',
-            'loan_type_max_amount'               => 'required|numeric|min:0',
+            'loan_type_active' => [
+                'required',
+                'boolean',
+            ],
 
-            'loan_type_share_factor'             => 'required|numeric|min:0',
-            'loan_type_guaranteable_percent'     => 'required|integer|min:0|max:100',
-            'loan_type_insurable'                => 'required|in:Y,N',
-            'loan_type_insurance_effect'         => 'nullable|in:ADD_TO_LOAN,DEDUCT_FROM_DISBURSEMENT',
+            /*
+        |--------------------------------------------------------------------------
+        | Interest configuration
+        |--------------------------------------------------------------------------
+        */
+            'loan_type_interest' => [
+                'required',
+                'numeric',
+                'min:0',
+            ],
 
-            'loan_type_qualification_period'     => 'required|integer|min:0',
-            'loan_type_max_qualification_period' => 'nullable|integer|min:0',
+            'loan_type_interest_type' => [
+                'required',
+                'string',
+                'max:100',
+            ],
 
-            // 'loan_type_instant_qualification'    => 'nullable|in:1',
+            'loan_type_auto_interest_on_period_change' => [
+                'required',
+                'boolean',
+            ],
 
-            'loan_type_instant_qualification' => 'required|boolean',
-            'loan_type_instant_disbursement'  => 'required|boolean',
+            'loan_type_duration' => [
+                'required',
+                'integer',
+                'min:1',
+            ],
 
-            'loan_type_crb_required'             => 'required|in:Y,N',
-            'loan_type_crb_charge'               => 'nullable|numeric|min:0',
-            'loan_type_crb_effect'               => 'nullable|in:ADD_TO_LOAN,DEDUCT_FROM_DISBURSEMENT',
+            'loan_type_max_amount' => [
+                'required',
+                'numeric',
+                'min:0',
+            ],
 
-            'loan_type_commission_required'      => 'required|in:Y,N',
-            'loan_type_commission_type'          => 'nullable|in:FIXED,PERCENT',
-            'loan_type_commission_value'         => 'nullable|numeric|min:0',
-            'loan_type_commission_effect'        => 'nullable|in:ADD_TO_LOAN,DEDUCT_FROM_DISBURSEMENT',
+            /*
+        |--------------------------------------------------------------------------
+        | Qualification and security
+        |--------------------------------------------------------------------------
+        */
+            'loan_type_share_factor' => [
+                'required',
+                'numeric',
+                'min:0',
+            ],
 
-            'loan_type_acount'                   => 'required|integer|exists:sacco_sub_account,sub_account_id',
-            'loan_type_int_account'              => 'required|integer|exists:sacco_sub_account,sub_account_id',
-            'loan_type_comm_account'             => 'required|integer|exists:sacco_sub_account,sub_account_id',
+            'loan_type_guaranteable_percent' => [
+                'required',
+                'integer',
+                'min:0',
+                'max:100',
+            ],
+
+            'loan_type_insurable' => [
+                'required',
+                'in:Y,N',
+            ],
+
+            'loan_type_insurance_effect' => [
+                'nullable',
+                'in:ADD_TO_LOAN,DEDUCT_FROM_DISBURSEMENT',
+            ],
+
+            'loan_type_qualification_period' => [
+                'required',
+                'integer',
+                'min:0',
+            ],
+
+            'loan_type_max_qualification_period' => [
+                'nullable',
+                'integer',
+                'min:0',
+            ],
+
+            /*
+        |--------------------------------------------------------------------------
+        | Instant processing settings
+        |--------------------------------------------------------------------------
+        | These settings are independent.
+        |--------------------------------------------------------------------------
+        */
+            'loan_type_instant_qualification' => [
+                'required',
+                'boolean',
+            ],
+
+            'loan_type_instant_disbursement' => [
+                'required',
+                'boolean',
+            ],
+
+            /*
+        |--------------------------------------------------------------------------
+        | CRB configuration
+        |--------------------------------------------------------------------------
+        */
+            'loan_type_crb_required' => [
+                'required',
+                'in:Y,N',
+            ],
+
+            'loan_type_crb_charge' => [
+                'nullable',
+                'numeric',
+                'min:0',
+            ],
+
+            'loan_type_crb_effect' => [
+                'nullable',
+                'in:ADD_TO_LOAN,DEDUCT_FROM_DISBURSEMENT',
+            ],
+
+            /*
+        |--------------------------------------------------------------------------
+        | Commission configuration
+        |--------------------------------------------------------------------------
+        */
+            'loan_type_commission_required' => [
+                'required',
+                'in:Y,N',
+            ],
+
+            'loan_type_commission_type' => [
+                'nullable',
+                'in:FIXED,PERCENT',
+            ],
+
+            'loan_type_commission_value' => [
+                'nullable',
+                'numeric',
+                'min:0',
+            ],
+
+            'loan_type_commission_effect' => [
+                'nullable',
+                'in:ADD_TO_LOAN,DEDUCT_FROM_DISBURSEMENT',
+            ],
+
+            /*
+        |--------------------------------------------------------------------------
+        | Accounting configuration
+        |--------------------------------------------------------------------------
+        */
+            'loan_type_acount' => [
+                'required',
+                'integer',
+                'exists:sacco_sub_account,sub_account_id',
+            ],
+
+            'loan_type_int_account' => [
+                'required',
+                'integer',
+                'exists:sacco_sub_account,sub_account_id',
+            ],
+
+            'loan_type_comm_account' => [
+                'required',
+                'integer',
+                'exists:sacco_sub_account,sub_account_id',
+            ],
         ]);
 
+        /*
+    |--------------------------------------------------------------------------
+    | Normalise Boolean Settings
+    |--------------------------------------------------------------------------
+    */
         $instantQualification = (int) $validated['loan_type_instant_qualification'];
-$instantDisbursement  = (int) $validated['loan_type_instant_disbursement'];
 
-/*
-|--------------------------------------------------------------------------
-| Instant-disbursement dependency
-|--------------------------------------------------------------------------
-| A loan cannot be disbursed automatically unless it is also configured
-| for instant qualification.
-*/
-if ($instantDisbursement === 1 && $instantQualification !== 1) {
-    return back()
-        ->withErrors([
-            'loan_type_instant_disbursement' =>
-                'Instant disbursement requires instant qualification to be enabled.',
-        ])
-        ->withInput();
-}
+        $instantDisbursement = (int) $validated['loan_type_instant_disbursement'];
+
+        $autoInterestOnPeriodChange = (int) $validated['loan_type_auto_interest_on_period_change'];
+
+        /*
+    |--------------------------------------------------------------------------
+    | Validate Qualification Period Range
+    |--------------------------------------------------------------------------
+    */
+        $minimumQualificationPeriod = (int) $validated['loan_type_qualification_period'];
+
+        $maximumQualificationPeriod =
+            $validated['loan_type_max_qualification_period'] ?? null;
 
         if (
-            !is_null($validated['loan_type_max_qualification_period']) &&
-            (int) $validated['loan_type_max_qualification_period'] < (int) $validated['loan_type_qualification_period']
+            $maximumQualificationPeriod !== null
+            && (int) $maximumQualificationPeriod
+            < $minimumQualificationPeriod
         ) {
             return back()
                 ->withErrors([
-                    'loan_type_max_qualification_period' => 'Maximum months in SACCO cannot be less than minimum months in SACCO.'
+                    'loan_type_max_qualification_period' =>
+                    'Maximum months in SACCO cannot be less than minimum months in SACCO.',
                 ])
                 ->withInput();
         }
 
+        /*
+    |--------------------------------------------------------------------------
+    | Validate Insurance Configuration
+    |--------------------------------------------------------------------------
+    */
+        $insurable = $validated['loan_type_insurable'];
+
         if (
-            $validated['loan_type_insurable'] === 'Y' &&
-            empty($validated['loan_type_insurance_effect'])
+            $insurable === 'Y'
+            && empty($validated['loan_type_insurance_effect'])
         ) {
             return back()
                 ->withErrors([
-                    'loan_type_insurance_effect' => 'Please select insurance treatment when this loan type is insurable.'
+                    'loan_type_insurance_effect' =>
+                    'Please select insurance treatment when this loan type is insurable.',
                 ])
                 ->withInput();
         }
 
+        /*
+    |--------------------------------------------------------------------------
+    | Validate CRB Configuration
+    |--------------------------------------------------------------------------
+    */
+        $crbRequired = $validated['loan_type_crb_required'];
+
+        $crbCharge = $crbRequired === 'Y'
+            ? (float) ($validated['loan_type_crb_charge'] ?? 0)
+            : 0;
+
         if (
-            $validated['loan_type_crb_required'] === 'Y' &&
-            (float) ($validated['loan_type_crb_charge'] ?? 0) > 0 &&
-            empty($validated['loan_type_crb_effect'])
+            $crbRequired === 'Y'
+            && $crbCharge > 0
+            && empty($validated['loan_type_crb_effect'])
         ) {
             return back()
                 ->withErrors([
-                    'loan_type_crb_effect' => 'Please select CRB charge treatment when CRB charge is greater than zero.'
+                    'loan_type_crb_effect' =>
+                    'Please select CRB charge treatment when the CRB charge is greater than zero.',
                 ])
                 ->withInput();
         }
 
-        if ($validated['loan_type_commission_required'] === 'Y') {
+        /*
+    |--------------------------------------------------------------------------
+    | Validate Commission Configuration
+    |--------------------------------------------------------------------------
+    */
+        $commissionRequired = $validated['loan_type_commission_required'];
+
+        if ($commissionRequired === 'Y') {
             if (empty($validated['loan_type_commission_type'])) {
                 return back()
                     ->withErrors([
-                        'loan_type_commission_type' => 'Please select commission type when commission is required.'
+                        'loan_type_commission_type' =>
+                        'Please select commission type when commission is required.',
                     ])
                     ->withInput();
             }
 
-            if (!isset($validated['loan_type_commission_value']) || (float) $validated['loan_type_commission_value'] < 0) {
+            if (
+                !array_key_exists(
+                    'loan_type_commission_value',
+                    $validated
+                )
+                || $validated['loan_type_commission_value'] === null
+            ) {
                 return back()
                     ->withErrors([
-                        'loan_type_commission_value' => 'Please provide a valid commission value when commission is required.'
+                        'loan_type_commission_value' =>
+                        'Please provide a valid commission value when commission is required.',
                     ])
                     ->withInput();
             }
@@ -6667,85 +6869,186 @@ if ($instantDisbursement === 1 && $instantQualification !== 1) {
             if (empty($validated['loan_type_commission_effect'])) {
                 return back()
                     ->withErrors([
-                        'loan_type_commission_effect' => 'Please select commission treatment when commission is required.'
+                        'loan_type_commission_effect' =>
+                        'Please select commission treatment when commission is required.',
                     ])
                     ->withInput();
             }
         }
 
-        $crbRequired        = $validated['loan_type_crb_required'];
-        $commissionRequired = $validated['loan_type_commission_required'];
-        $insurable          = $validated['loan_type_insurable'];
+        /*
+    |--------------------------------------------------------------------------
+    | Prepare Conditional Values
+    |--------------------------------------------------------------------------
+    */
+        $insuranceEffect = $insurable === 'Y'
+            ? $validated['loan_type_insurance_effect']
+            : 'ADD_TO_LOAN';
 
-        $crbCharge = $crbRequired === 'Y'
-            ? (float) ($validated['loan_type_crb_charge'] ?? 0)
-            : 0;
-
-        $crbEffect = ($crbRequired === 'Y' && $crbCharge > 0)
+        $crbEffect = (
+            $crbRequired === 'Y'
+            && $crbCharge > 0
+        )
             ? $validated['loan_type_crb_effect']
             : null;
 
-        $commissionValue = $commissionRequired === 'Y'
-            ? (float) ($validated['loan_type_commission_value'] ?? 0)
-            : 0;
-
         $commissionType = $commissionRequired === 'Y'
-            ? ($validated['loan_type_commission_type'] ?? null)
+            ? $validated['loan_type_commission_type']
             : null;
 
+        $commissionValue = $commissionRequired === 'Y'
+            ? (float) $validated['loan_type_commission_value']
+            : 0;
+
         $commissionEffect = $commissionRequired === 'Y'
-            ? ($validated['loan_type_commission_effect'] ?? null)
+            ? $validated['loan_type_commission_effect']
             : 'ADD_TO_LOAN';
 
-        $insuranceEffect = $insurable === 'Y'
-            ? ($validated['loan_type_insurance_effect'] ?? 'ADD_TO_LOAN')
-            : 'ADD_TO_LOAN';
-
+        /*
+    |--------------------------------------------------------------------------
+    | Update Loan Type
+    |--------------------------------------------------------------------------
+    | The automatic-interest field is configuration only at this stage.
+    | This method does not calculate or post any interest.
+    |--------------------------------------------------------------------------
+    */
         DB::table('sacco_loan_types')
             ->where('loan_type_id', $id)
+            ->where('loan_type_deleted', '<>', 'Y')
             ->update([
-                'loan_type_name'                     => strtoupper(trim($validated['loan_type_name'])),
-                'loan_type_code'                     => strtoupper(trim($validated['loan_type_code'])),
-                'loan_type_active'                   => (int) $validated['loan_type_active'],
+                'loan_type_name' =>
+                strtoupper(trim($validated['loan_type_name'])),
 
-                'loan_type_interest'                 => (float) $validated['loan_type_interest'],
-                'loan_type_interest_type'            => strtoupper(trim($validated['loan_type_interest_type'])),
-                'loan_type_duration'                 => (int) $validated['loan_type_duration'],
-                'loan_type_max_amount'               => (float) $validated['loan_type_max_amount'],
+                'loan_type_code' =>
+                strtoupper(trim($validated['loan_type_code'])),
 
-                'loan_type_share_factor'             => (float) $validated['loan_type_share_factor'],
-                'loan_type_guaranteable_percent'     => (int) $validated['loan_type_guaranteable_percent'],
-                'loan_type_insurable'                => $insurable,
-                'loan_type_insurance_effect'         => $insuranceEffect,
+                'loan_type_active' =>
+                (int) $validated['loan_type_active'],
 
-                'loan_type_qualification_period'     => (int) $validated['loan_type_qualification_period'],
-                'loan_type_max_qualification_period' => $validated['loan_type_max_qualification_period'] !== null
-                    ? (int) $validated['loan_type_max_qualification_period']
+                /*
+            |--------------------------------------------------------------------------
+            | Interest configuration
+            |--------------------------------------------------------------------------
+            */
+                'loan_type_interest' =>
+                (float) $validated['loan_type_interest'],
+
+                'loan_type_interest_type' =>
+                strtoupper(trim(
+                    $validated['loan_type_interest_type']
+                )),
+
+                'loan_type_auto_interest_on_period_change' =>
+                $autoInterestOnPeriodChange,
+
+                'loan_type_duration' =>
+                (int) $validated['loan_type_duration'],
+
+                'loan_type_max_amount' =>
+                (float) $validated['loan_type_max_amount'],
+
+                /*
+            |--------------------------------------------------------------------------
+            | Qualification and security
+            |--------------------------------------------------------------------------
+            */
+                'loan_type_share_factor' =>
+                (float) $validated['loan_type_share_factor'],
+
+                'loan_type_guaranteable_percent' =>
+                (int) $validated['loan_type_guaranteable_percent'],
+
+                'loan_type_insurable' =>
+                $insurable,
+
+                'loan_type_insurance_effect' =>
+                $insuranceEffect,
+
+                'loan_type_qualification_period' =>
+                $minimumQualificationPeriod,
+
+                'loan_type_max_qualification_period' =>
+                $maximumQualificationPeriod !== null
+                    ? (int) $maximumQualificationPeriod
                     : null,
-                // 'loan_type_instant_qualification'    => $request->has('loan_type_instant_qualification') ? 1 : 0,
 
-                'loan_type_instant_qualification' => $instantQualification,
-'loan_type_instant_disbursement'  => $instantDisbursement,
+                /*
+            |--------------------------------------------------------------------------
+            | Instant processing
+            |--------------------------------------------------------------------------
+            */
+                'loan_type_instant_qualification' =>
+                $instantQualification,
 
-                'loan_type_crb_required'             => $crbRequired,
-                'loan_type_crb_charge'               => $crbCharge,
-                'loan_type_crb_effect'               => $crbEffect,
+                'loan_type_instant_disbursement' =>
+                $instantDisbursement,
 
-                'loan_type_commission_required'      => $commissionRequired,
-                'loan_type_commission_type'          => $commissionType,
-                'loan_type_commission_value'         => $commissionValue,
-                'loan_type_commission_effect'        => $commissionEffect,
+                /*
+            |--------------------------------------------------------------------------
+            | CRB
+            |--------------------------------------------------------------------------
+            */
+                'loan_type_crb_required' =>
+                $crbRequired,
 
-                'loan_type_acount'                   => (int) $validated['loan_type_acount'],
-                'loan_type_int_account'              => (int) $validated['loan_type_int_account'],
-                'loan_type_comm_account'             => (int) $validated['loan_type_comm_account'],
+                'loan_type_crb_charge' =>
+                $crbCharge,
 
-                'loan_type_by'                       => auth()->id(),
-                'loan_type_ip'                       => $request->ip(),
-                'loan_type_transdate'                => now(),
+                'loan_type_crb_effect' =>
+                $crbEffect,
+
+                /*
+            |--------------------------------------------------------------------------
+            | Commission
+            |--------------------------------------------------------------------------
+            */
+                'loan_type_commission_required' =>
+                $commissionRequired,
+
+                'loan_type_commission_type' =>
+                $commissionType,
+
+                'loan_type_commission_value' =>
+                $commissionValue,
+
+                'loan_type_commission_effect' =>
+                $commissionEffect,
+
+                /*
+            |--------------------------------------------------------------------------
+            | Accounts
+            |--------------------------------------------------------------------------
+            */
+                'loan_type_acount' =>
+                (int) $validated['loan_type_acount'],
+
+                'loan_type_int_account' =>
+                (int) $validated['loan_type_int_account'],
+
+                'loan_type_comm_account' =>
+                (int) $validated['loan_type_comm_account'],
+
+                /*
+            |--------------------------------------------------------------------------
+            | Audit
+            |--------------------------------------------------------------------------
+            */
+                'loan_type_by' =>
+                auth()->id(),
+
+                'loan_type_ip' =>
+                $request->ip(),
+
+                'loan_type_transdate' =>
+                now(),
             ]);
 
-        return redirect()->route('loans.types')->with('success', 'Loan type updated successfully.');
+        return redirect()
+            ->route('loans.types')
+            ->with(
+                'success',
+                'Loan type updated successfully.'
+            );
     }
     public function createLoanType()
     {
@@ -6811,167 +7114,491 @@ if ($instantDisbursement === 1 && $instantQualification !== 1) {
     }
     public function storeLoanType(Request $request)
     {
+        /*
+    |--------------------------------------------------------------------------
+    | Validate Submitted Loan-Type Data
+    |--------------------------------------------------------------------------
+    */
         $validated = $request->validate([
-            'loan_type_name'                     => 'required|string|max:250|unique:sacco_loan_types,loan_type_name',
-            'loan_type_code'                     => 'required|string|max:100|unique:sacco_loan_types,loan_type_code',
+            'loan_type_name' => [
+                'required',
+                'string',
+                'max:250',
+                Rule::unique(
+                    'sacco_loan_types',
+                    'loan_type_name'
+                ),
+            ],
 
-            'loan_type_active'                   => 'required|in:0,1',
+            'loan_type_code' => [
+                'required',
+                'string',
+                'max:100',
+                Rule::unique(
+                    'sacco_loan_types',
+                    'loan_type_code'
+                ),
+            ],
 
-            'loan_type_interest'                 => 'required|numeric|min:0',
-            'loan_type_interest_type'            => 'required|string|max:100',
-            'loan_type_duration'                 => 'required|integer|min:1',
-            'loan_type_max_amount'               => 'required|numeric|min:0',
+            'loan_type_active' => [
+                'required',
+                'boolean',
+            ],
 
-            'loan_type_share_factor'             => 'required|numeric|min:0',
-            'loan_type_guaranteable_percent'     => 'required|integer|min:0|max:100',
-            'loan_type_insurable'                => 'required|in:Y,N',
-            'loan_type_insurance_effect'         => 'nullable|in:ADD_TO_LOAN,DEDUCT_FROM_DISBURSEMENT',
+            /*
+        |--------------------------------------------------------------------------
+        | Interest Configuration
+        |--------------------------------------------------------------------------
+        */
+            'loan_type_interest' => [
+                'required',
+                'numeric',
+                'min:0',
+            ],
 
-            'loan_type_qualification_period'     => 'required|integer|min:0',
-            'loan_type_max_qualification_period' => 'nullable|integer|min:0',
+            'loan_type_interest_type' => [
+                'required',
+                'string',
+                'max:100',
+            ],
 
-            // 'loan_type_instant_qualification'    => 'nullable|in:1',
+            'loan_type_auto_interest_on_period_change' => [
+                'required',
+                'boolean',
+            ],
 
-            'loan_type_instant_qualification' => 'required|boolean',
-            'loan_type_instant_disbursement'  => 'required|boolean',
+            'loan_type_duration' => [
+                'required',
+                'integer',
+                'min:1',
+            ],
 
+            'loan_type_max_amount' => [
+                'required',
+                'numeric',
+                'min:0',
+            ],
 
-            'loan_type_crb_required'             => 'required|in:Y,N',
-            'loan_type_crb_charge'               => 'nullable|numeric|min:0',
-            'loan_type_crb_effect'               => 'nullable|in:ADD_TO_LOAN,DEDUCT_FROM_DISBURSEMENT',
+            /*
+        |--------------------------------------------------------------------------
+        | Qualification and Security
+        |--------------------------------------------------------------------------
+        */
+            'loan_type_share_factor' => [
+                'required',
+                'numeric',
+                'min:0',
+            ],
 
-            'loan_type_commission_required'      => 'required|in:Y,N',
-            'loan_type_commission_type'          => 'nullable|in:FIXED,PERCENT',
-            'loan_type_commission_value'         => 'nullable|numeric|min:0',
-            'loan_type_commission_effect'        => 'nullable|in:ADD_TO_LOAN,DEDUCT_FROM_DISBURSEMENT',
+            'loan_type_guaranteable_percent' => [
+                'required',
+                'integer',
+                'min:0',
+                'max:100',
+            ],
 
-            'loan_type_acount'                   => 'required|integer|exists:sacco_sub_account,sub_account_id',
-            'loan_type_int_account'              => 'required|integer|exists:sacco_sub_account,sub_account_id',
-            'loan_type_comm_account'             => 'required|integer|exists:sacco_sub_account,sub_account_id',
+            'loan_type_insurable' => [
+                'required',
+                'in:Y,N',
+            ],
+
+            'loan_type_insurance_effect' => [
+                'nullable',
+                'in:ADD_TO_LOAN,DEDUCT_FROM_DISBURSEMENT',
+            ],
+
+            'loan_type_qualification_period' => [
+                'required',
+                'integer',
+                'min:0',
+            ],
+
+            'loan_type_max_qualification_period' => [
+                'nullable',
+                'integer',
+                'min:0',
+            ],
+
+            /*
+        |--------------------------------------------------------------------------
+        | Instant Processing Settings
+        |--------------------------------------------------------------------------
+        | Instant qualification and instant disbursement are independent.
+        |--------------------------------------------------------------------------
+        */
+            'loan_type_instant_qualification' => [
+                'required',
+                'boolean',
+            ],
+
+            'loan_type_instant_disbursement' => [
+                'required',
+                'boolean',
+            ],
+
+            /*
+        |--------------------------------------------------------------------------
+        | CRB Configuration
+        |--------------------------------------------------------------------------
+        */
+            'loan_type_crb_required' => [
+                'required',
+                'in:Y,N',
+            ],
+
+            'loan_type_crb_charge' => [
+                'nullable',
+                'numeric',
+                'min:0',
+            ],
+
+            'loan_type_crb_effect' => [
+                'nullable',
+                'in:ADD_TO_LOAN,DEDUCT_FROM_DISBURSEMENT',
+            ],
+
+            /*
+        |--------------------------------------------------------------------------
+        | Commission Configuration
+        |--------------------------------------------------------------------------
+        */
+            'loan_type_commission_required' => [
+                'required',
+                'in:Y,N',
+            ],
+
+            'loan_type_commission_type' => [
+                'nullable',
+                'in:FIXED,PERCENT',
+            ],
+
+            'loan_type_commission_value' => [
+                'nullable',
+                'numeric',
+                'min:0',
+            ],
+
+            'loan_type_commission_effect' => [
+                'nullable',
+                'in:ADD_TO_LOAN,DEDUCT_FROM_DISBURSEMENT',
+            ],
+
+            /*
+        |--------------------------------------------------------------------------
+        | Accounting Configuration
+        |--------------------------------------------------------------------------
+        */
+            'loan_type_acount' => [
+                'required',
+                'integer',
+                'exists:sacco_sub_account,sub_account_id',
+            ],
+
+            'loan_type_int_account' => [
+                'required',
+                'integer',
+                'exists:sacco_sub_account,sub_account_id',
+            ],
+
+            'loan_type_comm_account' => [
+                'required',
+                'integer',
+                'exists:sacco_sub_account,sub_account_id',
+            ],
         ]);
 
+        /*
+    |--------------------------------------------------------------------------
+    | Normalise Boolean Values
+    |--------------------------------------------------------------------------
+    */
         $instantQualification = (int) $validated['loan_type_instant_qualification'];
-$instantDisbursement  = (int) $validated['loan_type_instant_disbursement'];
 
-/*
-|--------------------------------------------------------------------------
-| Instant-disbursement dependency
-|--------------------------------------------------------------------------
-| A loan cannot be disbursed automatically unless it is also configured
-| for instant qualification.
-*/
-if ($instantDisbursement === 1 && $instantQualification !== 1) {
-    return back()
-        ->withErrors([
-            'loan_type_instant_disbursement' =>
-                'Instant disbursement requires instant qualification to be enabled.',
-        ])
-        ->withInput();
-}
+        $instantDisbursement = (int) $validated['loan_type_instant_disbursement'];
 
+        $autoInterestOnPeriodChange = (int) $validated['loan_type_auto_interest_on_period_change'];
+
+        /*
+    |--------------------------------------------------------------------------
+    | Validate Qualification Period Range
+    |--------------------------------------------------------------------------
+    */
+        $minimumQualificationPeriod = (int) $validated['loan_type_qualification_period'];
+
+        $maximumQualificationPeriod =
+            $validated['loan_type_max_qualification_period'] ?? null;
 
         if (
-            !is_null($validated['loan_type_max_qualification_period']) &&
-            $validated['loan_type_max_qualification_period'] < $validated['loan_type_qualification_period']
+            $maximumQualificationPeriod !== null
+            && (int) $maximumQualificationPeriod
+            < $minimumQualificationPeriod
         ) {
             return back()
-                ->withErrors(['loan_type_max_qualification_period' => 'Maximum months in SACCO cannot be less than minimum months in SACCO.'])
+                ->withErrors([
+                    'loan_type_max_qualification_period' =>
+                    'Maximum months in SACCO cannot be less than minimum months in SACCO.',
+                ])
                 ->withInput();
         }
 
+        /*
+    |--------------------------------------------------------------------------
+    | Validate Insurance Configuration
+    |--------------------------------------------------------------------------
+    */
+        $insurable = $validated['loan_type_insurable'];
+
         if (
-            $validated['loan_type_insurable'] === 'Y' &&
-            empty($validated['loan_type_insurance_effect'])
+            $insurable === 'Y'
+            && empty($validated['loan_type_insurance_effect'])
         ) {
             return back()
-                ->withErrors(['loan_type_insurance_effect' => 'Please select insurance treatment when this loan type is insurable.'])
+                ->withErrors([
+                    'loan_type_insurance_effect' =>
+                    'Please select insurance treatment when this loan type is insurable.',
+                ])
                 ->withInput();
         }
 
+        /*
+    |--------------------------------------------------------------------------
+    | Validate CRB Configuration
+    |--------------------------------------------------------------------------
+    */
+        $crbRequired = $validated['loan_type_crb_required'];
+
+        $crbCharge = $crbRequired === 'Y'
+            ? (float) ($validated['loan_type_crb_charge'] ?? 0)
+            : 0;
+
         if (
-            $validated['loan_type_crb_required'] === 'Y' &&
-            (float) ($validated['loan_type_crb_charge'] ?? 0) > 0 &&
-            empty($validated['loan_type_crb_effect'])
+            $crbRequired === 'Y'
+            && $crbCharge > 0
+            && empty($validated['loan_type_crb_effect'])
         ) {
             return back()
-                ->withErrors(['loan_type_crb_effect' => 'Please select CRB charge treatment when CRB charge is greater than zero.'])
+                ->withErrors([
+                    'loan_type_crb_effect' =>
+                    'Please select CRB charge treatment when the CRB charge is greater than zero.',
+                ])
                 ->withInput();
         }
 
-        if ($validated['loan_type_commission_required'] === 'Y') {
+        /*
+    |--------------------------------------------------------------------------
+    | Validate Commission Configuration
+    |--------------------------------------------------------------------------
+    */
+        $commissionRequired = $validated['loan_type_commission_required'];
+
+        if ($commissionRequired === 'Y') {
             if (empty($validated['loan_type_commission_type'])) {
                 return back()
-                    ->withErrors(['loan_type_commission_type' => 'Please select commission type when commission is required.'])
+                    ->withErrors([
+                        'loan_type_commission_type' =>
+                        'Please select commission type when commission is required.',
+                    ])
                     ->withInput();
             }
 
-            if (!isset($validated['loan_type_commission_value']) || (float) $validated['loan_type_commission_value'] < 0) {
+            if (
+                !array_key_exists(
+                    'loan_type_commission_value',
+                    $validated
+                )
+                || $validated['loan_type_commission_value'] === null
+            ) {
                 return back()
-                    ->withErrors(['loan_type_commission_value' => 'Please provide a valid commission value when commission is required.'])
+                    ->withErrors([
+                        'loan_type_commission_value' =>
+                        'Please provide a valid commission value when commission is required.',
+                    ])
                     ->withInput();
             }
 
             if (empty($validated['loan_type_commission_effect'])) {
                 return back()
-                    ->withErrors(['loan_type_commission_effect' => 'Please select commission treatment when commission is required.'])
+                    ->withErrors([
+                        'loan_type_commission_effect' =>
+                        'Please select commission treatment when commission is required.',
+                    ])
                     ->withInput();
             }
         }
 
-        $crbCharge = (float) ($validated['loan_type_crb_charge'] ?? 0);
-        $commissionValue = (float) ($validated['loan_type_commission_value'] ?? 0);
+        /*
+    |--------------------------------------------------------------------------
+    | Prepare Conditional Values
+    |--------------------------------------------------------------------------
+    */
+        $insuranceEffect = $insurable === 'Y'
+            ? $validated['loan_type_insurance_effect']
+            : 'ADD_TO_LOAN';
 
+        $crbEffect = (
+            $crbRequired === 'Y'
+            && $crbCharge > 0
+        )
+            ? $validated['loan_type_crb_effect']
+            : null;
+
+        $commissionType = $commissionRequired === 'Y'
+            ? $validated['loan_type_commission_type']
+            : null;
+
+        $commissionValue = $commissionRequired === 'Y'
+            ? (float) $validated['loan_type_commission_value']
+            : 0;
+
+        $commissionEffect = $commissionRequired === 'Y'
+            ? $validated['loan_type_commission_effect']
+            : 'ADD_TO_LOAN';
+
+        /*
+    |--------------------------------------------------------------------------
+    | Insert Loan Type
+    |--------------------------------------------------------------------------
+    | The automatic-interest field is only stored as configuration here.
+    | No interest calculation or loan posting occurs in this method.
+    |--------------------------------------------------------------------------
+    */
         DB::table('sacco_loan_types')->insert([
-            'loan_type_name'                     => strtoupper(trim($validated['loan_type_name'])),
-            'loan_type_code'                     => strtoupper(trim($validated['loan_type_code'])),
-            'loan_type_active'                   => (int) $validated['loan_type_active'],
+            'loan_type_name' =>
+            strtoupper(trim($validated['loan_type_name'])),
 
-            'loan_type_interest'                 => $validated['loan_type_interest'],
-            'loan_type_interest_type'            => strtoupper(trim($validated['loan_type_interest_type'])),
-            'loan_type_duration'                 => $validated['loan_type_duration'],
-            'loan_type_max_amount'               => $validated['loan_type_max_amount'],
+            'loan_type_code' =>
+            strtoupper(trim($validated['loan_type_code'])),
 
-            'loan_type_share_factor'             => $validated['loan_type_share_factor'],
-            'loan_type_guaranteable_percent'     => $validated['loan_type_guaranteable_percent'],
-            'loan_type_insurable'                => $validated['loan_type_insurable'],
-            'loan_type_insurance_effect'         => $validated['loan_type_insurable'] === 'Y'
-                ? ($validated['loan_type_insurance_effect'] ?? null)
+            'loan_type_active' =>
+            (int) $validated['loan_type_active'],
+
+            /*
+        |--------------------------------------------------------------------------
+        | Interest
+        |--------------------------------------------------------------------------
+        */
+            'loan_type_interest' =>
+            (float) $validated['loan_type_interest'],
+
+            'loan_type_interest_type' =>
+            strtoupper(trim(
+                $validated['loan_type_interest_type']
+            )),
+
+            'loan_type_auto_interest_on_period_change' =>
+            $autoInterestOnPeriodChange,
+
+            'loan_type_duration' =>
+            (int) $validated['loan_type_duration'],
+
+            'loan_type_max_amount' =>
+            (float) $validated['loan_type_max_amount'],
+
+            /*
+        |--------------------------------------------------------------------------
+        | Qualification and Security
+        |--------------------------------------------------------------------------
+        */
+            'loan_type_share_factor' =>
+            (float) $validated['loan_type_share_factor'],
+
+            'loan_type_guaranteable_percent' =>
+            (int) $validated['loan_type_guaranteable_percent'],
+
+            'loan_type_insurable' =>
+            $insurable,
+
+            'loan_type_insurance_effect' =>
+            $insuranceEffect,
+
+            'loan_type_qualification_period' =>
+            $minimumQualificationPeriod,
+
+            'loan_type_max_qualification_period' =>
+            $maximumQualificationPeriod !== null
+                ? (int) $maximumQualificationPeriod
                 : null,
 
-            'loan_type_qualification_period'     => $validated['loan_type_qualification_period'],
-            'loan_type_max_qualification_period' => $validated['loan_type_max_qualification_period'] ?? null,
-            // 'loan_type_instant_qualification'    => $request->has('loan_type_instant_qualification') ? 1 : 0,
-            'loan_type_instant_qualification' => $instantQualification,
-'loan_type_instant_disbursement'  => $instantDisbursement,
+            /*
+        |--------------------------------------------------------------------------
+        | Instant Processing
+        |--------------------------------------------------------------------------
+        */
+            'loan_type_instant_qualification' =>
+            $instantQualification,
 
-            'loan_type_crb_required'             => $validated['loan_type_crb_required'],
-            'loan_type_crb_charge'               => $crbCharge,
-            'loan_type_crb_effect'               => $validated['loan_type_crb_required'] === 'Y'
-                ? ($validated['loan_type_crb_effect'] ?? null)
-                : null,
+            'loan_type_instant_disbursement' =>
+            $instantDisbursement,
 
-            'loan_type_commission_required'      => $validated['loan_type_commission_required'],
-            'loan_type_commission_type'          => $validated['loan_type_commission_required'] === 'Y'
-                ? ($validated['loan_type_commission_type'] ?? null)
-                : null,
-            'loan_type_commission_value'         => $validated['loan_type_commission_required'] === 'Y'
-                ? $commissionValue
-                : 0,
-            'loan_type_commission_effect'        => $validated['loan_type_commission_required'] === 'Y'
-                ? ($validated['loan_type_commission_effect'] ?? null)
-                : null,
+            /*
+        |--------------------------------------------------------------------------
+        | CRB
+        |--------------------------------------------------------------------------
+        */
+            'loan_type_crb_required' =>
+            $crbRequired,
 
-            'loan_type_acount'                   => $validated['loan_type_acount'],
-            'loan_type_int_account'              => $validated['loan_type_int_account'],
-            'loan_type_comm_account'             => $validated['loan_type_comm_account'],
+            'loan_type_crb_charge' =>
+            $crbCharge,
 
-            'loan_type_deleted'                  => 'N',
-            'loan_type_by'                       => auth()->id(),
-            'loan_type_ip'                       => $request->ip(),
-            'loan_type_transdate'                => now(),
+            'loan_type_crb_effect' =>
+            $crbEffect,
+
+            /*
+        |--------------------------------------------------------------------------
+        | Commission
+        |--------------------------------------------------------------------------
+        */
+            'loan_type_commission_required' =>
+            $commissionRequired,
+
+            'loan_type_commission_type' =>
+            $commissionType,
+
+            'loan_type_commission_value' =>
+            $commissionValue,
+
+            'loan_type_commission_effect' =>
+            $commissionEffect,
+
+            /*
+        |--------------------------------------------------------------------------
+        | Accounts
+        |--------------------------------------------------------------------------
+        */
+            'loan_type_acount' =>
+            (int) $validated['loan_type_acount'],
+
+            'loan_type_int_account' =>
+            (int) $validated['loan_type_int_account'],
+
+            'loan_type_comm_account' =>
+            (int) $validated['loan_type_comm_account'],
+
+            /*
+        |--------------------------------------------------------------------------
+        | Status and Audit
+        |--------------------------------------------------------------------------
+        */
+            'loan_type_deleted' =>
+            'N',
+
+            'loan_type_by' =>
+            auth()->id(),
+
+            'loan_type_ip' =>
+            $request->ip(),
+
+            'loan_type_transdate' =>
+            now(),
         ]);
 
-        return redirect()->route('loans.types')->with('success', 'Loan type added successfully.');
+        return redirect()
+            ->route('loans.types')
+            ->with(
+                'success',
+                'Loan type added successfully.'
+            );
     }
 
     public function deleteLoanType($id)
