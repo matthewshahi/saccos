@@ -879,11 +879,11 @@ $dataProtectionUrl = $legalPageUrl . '#privacy';
 
                     <p class="member-login-legal">
                         By signing in, you agree to the
-                        <a href="../terms_privacy.html" target="_blank" rel="noopener">Terms of Use</a>
+                        <a href="terms_privacy.html" target="_blank" rel="noopener">Terms of Use</a>
                         and acknowledge the
-                        <a href="../terms_privacy.html" target="_blank" rel="noopener">Privacy Policy</a>
+                        <a href="terms_privacy.html" target="_blank" rel="noopener">Privacy Policy</a>
                         and
-                        <a href="../terms_privacy.html" target="_blank" rel="noopener">Data Protection Notice</a>.
+                        <a href="terms_privacy.html" target="_blank" rel="noopener">Data Protection Notice</a>.
                     </p>
 
                     <div
