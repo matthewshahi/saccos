@@ -75,7 +75,7 @@ use App\Http\Controllers\RouteAuditLogController;
 use App\Http\Controllers\BulkSmsController;
 use App\Http\Controllers\SaccoBankIpnController;
 use App\Http\Middleware\VerifyCsrfToken;
-use App\Http\Middleware\MemberLoanLimitController;
+use App\Http\Controllers\MemberLoanLimitController;
 
 /* good imports
 Route::prefix('kass')->group(function () {
