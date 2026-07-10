@@ -747,7 +747,7 @@ $dataProtectionUrl = $legalPageUrl . '#privacy';
                     @if($showLogo)
                         <div class="member-login-logo-box" id="memberLoginLogoBox">
                             <img
-                                src="{{ $logoUrl }}"
+                                src="{{ $logoUrl }}?x=1"
                                 alt="{{ $saccoName }} logo"
                                 class="member-login-logo"
                                 id="memberLoginLogo"
