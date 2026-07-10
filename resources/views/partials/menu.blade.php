@@ -386,6 +386,13 @@ $defaultLogoPath = '/image/logo.jpg'; // Default logo
                                 </a>
                             </li>
                             <li class="item-name">
+    <a href="{{ route('loans.member_limits.index') }}">
+        <span class="text-muted">
+            Individual Loan Limits
+        </span>
+    </a>
+</li>
+                            <li class="item-name">
                                 <a href="{{ route('loans.deduction-types') }}">
                                     <span class="text-muted">Loan Deduction Types</span>
                                 </a>
