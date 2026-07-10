@@ -6575,7 +6575,10 @@ class HomeController extends Controller
             'loan_type_qualification_period'     => 'required|integer|min:0',
             'loan_type_max_qualification_period' => 'nullable|integer|min:0',
 
-            'loan_type_instant_qualification'    => 'nullable|in:1',
+            // 'loan_type_instant_qualification'    => 'nullable|in:1',
+
+            'loan_type_instant_qualification' => 'required|boolean',
+            'loan_type_instant_disbursement'  => 'required|boolean',
 
             'loan_type_crb_required'             => 'required|in:Y,N',
             'loan_type_crb_charge'               => 'nullable|numeric|min:0',
@@ -6590,6 +6593,25 @@ class HomeController extends Controller
             'loan_type_int_account'              => 'required|integer|exists:sacco_sub_account,sub_account_id',
             'loan_type_comm_account'             => 'required|integer|exists:sacco_sub_account,sub_account_id',
         ]);
+
+        $instantQualification = (int) $validated['loan_type_instant_qualification'];
+$instantDisbursement  = (int) $validated['loan_type_instant_disbursement'];
+
+/*
+|--------------------------------------------------------------------------
+| Instant-disbursement dependency
+|--------------------------------------------------------------------------
+| A loan cannot be disbursed automatically unless it is also configured
+| for instant qualification.
+*/
+if ($instantDisbursement === 1 && $instantQualification !== 1) {
+    return back()
+        ->withErrors([
+            'loan_type_instant_disbursement' =>
+                'Instant disbursement requires instant qualification to be enabled.',
+        ])
+        ->withInput();
+}
 
         if (
             !is_null($validated['loan_type_max_qualification_period']) &&
@@ -6700,7 +6722,10 @@ class HomeController extends Controller
                 'loan_type_max_qualification_period' => $validated['loan_type_max_qualification_period'] !== null
                     ? (int) $validated['loan_type_max_qualification_period']
                     : null,
-                'loan_type_instant_qualification'    => $request->has('loan_type_instant_qualification') ? 1 : 0,
+                // 'loan_type_instant_qualification'    => $request->has('loan_type_instant_qualification') ? 1 : 0,
+
+                'loan_type_instant_qualification' => $instantQualification,
+'loan_type_instant_disbursement'  => $instantDisbursement,
 
                 'loan_type_crb_required'             => $crbRequired,
                 'loan_type_crb_charge'               => $crbCharge,
@@ -6805,7 +6830,11 @@ class HomeController extends Controller
             'loan_type_qualification_period'     => 'required|integer|min:0',
             'loan_type_max_qualification_period' => 'nullable|integer|min:0',
 
-            'loan_type_instant_qualification'    => 'nullable|in:1',
+            // 'loan_type_instant_qualification'    => 'nullable|in:1',
+
+            'loan_type_instant_qualification' => 'required|boolean',
+            'loan_type_instant_disbursement'  => 'required|boolean',
+
 
             'loan_type_crb_required'             => 'required|in:Y,N',
             'loan_type_crb_charge'               => 'nullable|numeric|min:0',
@@ -6820,6 +6849,26 @@ class HomeController extends Controller
             'loan_type_int_account'              => 'required|integer|exists:sacco_sub_account,sub_account_id',
             'loan_type_comm_account'             => 'required|integer|exists:sacco_sub_account,sub_account_id',
         ]);
+
+        $instantQualification = (int) $validated['loan_type_instant_qualification'];
+$instantDisbursement  = (int) $validated['loan_type_instant_disbursement'];
+
+/*
+|--------------------------------------------------------------------------
+| Instant-disbursement dependency
+|--------------------------------------------------------------------------
+| A loan cannot be disbursed automatically unless it is also configured
+| for instant qualification.
+*/
+if ($instantDisbursement === 1 && $instantQualification !== 1) {
+    return back()
+        ->withErrors([
+            'loan_type_instant_disbursement' =>
+                'Instant disbursement requires instant qualification to be enabled.',
+        ])
+        ->withInput();
+}
+
 
         if (
             !is_null($validated['loan_type_max_qualification_period']) &&
@@ -6891,7 +6940,9 @@ class HomeController extends Controller
 
             'loan_type_qualification_period'     => $validated['loan_type_qualification_period'],
             'loan_type_max_qualification_period' => $validated['loan_type_max_qualification_period'] ?? null,
-            'loan_type_instant_qualification'    => $request->has('loan_type_instant_qualification') ? 1 : 0,
+            // 'loan_type_instant_qualification'    => $request->has('loan_type_instant_qualification') ? 1 : 0,
+            'loan_type_instant_qualification' => $instantQualification,
+'loan_type_instant_disbursement'  => $instantDisbursement,
 
             'loan_type_crb_required'             => $validated['loan_type_crb_required'],
             'loan_type_crb_charge'               => $crbCharge,
