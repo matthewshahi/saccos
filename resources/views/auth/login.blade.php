@@ -43,9 +43,9 @@
     | These may be overridden in config/app.php:
     |
     | 'legal' => [
-    |     'terms_url' => '/terms-and-conditions',
-    |     'privacy_url' => '/privacy-policy',
-    |     'data_protection_url' => '/data-protection',
+    |     'terms_url' => '/terms_privacy.html',
+    |     'privacy_url' => '/terms_privacy.html',
+    |     'data_protection_url' => '/terms_privacy.html',
     | ],
     */
     $termsUrl = url((string) config('app.legal.terms_url', '/terms-and-conditions'));
