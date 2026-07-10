@@ -15,952 +15,1060 @@
         $logoRelativePath = $logoFolder . '/' . $logoFilename;
         $logoPublicPath = public_path($logoRelativePath);
 
-        if (file_exists($logoPublicPath)) {
+        if (is_file($logoPublicPath)) {
             $logoUrl = asset($logoRelativePath);
             $showLogo = true;
         }
     }
 
-    $words = preg_split('/\s+/', trim($saccoName));
+    $words = preg_split('/\s+/', $saccoName, -1, PREG_SPLIT_NO_EMPTY);
     $initials = '';
 
     foreach ($words as $word) {
-        if ($word !== '') {
-            $initials .= strtoupper(substr($word, 0, 1));
-        }
+        $initials .= strtoupper(mb_substr($word, 0, 1));
 
-        if (strlen($initials) >= 2) {
+        if (mb_strlen($initials) >= 2) {
             break;
         }
     }
 
     $initials = $initials !== '' ? $initials : 'S';
-    $recaptchaSiteKey = config('services.recaptcha.site_key');
+
+    $recaptchaSiteKey = trim((string) config('services.recaptcha.site_key', ''));
+
+    /*
+    |--------------------------------------------------------------------------
+    | Legal URLs
+    |--------------------------------------------------------------------------
+    | These may be overridden in config/app.php:
+    |
+    | 'legal' => [
+    |     'terms_url' => '/terms-and-conditions',
+    |     'privacy_url' => '/privacy-policy',
+    |     'data_protection_url' => '/data-protection',
+    | ],
+    */
+    $termsUrl = url((string) config('app.legal.terms_url', '/terms-and-conditions'));
+    $privacyUrl = url((string) config('app.legal.privacy_url', '/privacy-policy'));
+    $dataProtectionUrl = url((string) config('app.legal.data_protection_url', '/data-protection'));
+
+    $forgotPasswordUrl = Route::has('member.password.request')
+        ? route('member.password.request')
+        : (Route::has('password.request') ? route('password.request') : null);
+
+    $registrationUrl = Route::has('register')
+        ? route('register')
+        : url('/register');
+
+    $supportDialNumber = preg_replace('/[^0-9+]/', '', $supportPhone);
 @endphp
 
-@section('seo_title', $saccoName . ' Member Login | SACCO Member Portal')
-@section('seo_description', $saccoName . ' member login portal for accessing SACCO savings, loans, statements, contributions and member services.')
-@section('robots', 'noindex, follow')
+@section('seo_title', $saccoName . ' Member Login')
+@section('seo_description', 'Secure member login for ' . $saccoName . '.')
+@section('robots', 'noindex, nofollow')
 
 @section('content')
 <style>
     :root {
-        --fi-gold: #b88a2b;
-        --fi-gold-dark: #8a641e;
-        --fi-gold-soft: rgba(184, 138, 43, 0.10);
-        --fi-border: #e7e2d7;
-        --fi-ink: #111827;
-        --fi-muted: #6b7280;
-        --fi-muted-strong: #4b5563;
-        --fi-panel: #ffffff;
-        --fi-success: #3fa34d;
-        --fi-danger: #dc2626;
-        --fi-shadow: 0 24px 70px rgba(17, 24, 39, 0.13);
-        --fi-shadow-soft: 0 14px 34px rgba(17, 24, 39, 0.08);
+        --login-accent: #9a7423;
+        --login-accent-dark: #745416;
+        --login-accent-soft: rgba(154, 116, 35, 0.10);
+        --login-ink: #111827;
+        --login-muted: #667085;
+        --login-border: #e5e7eb;
+        --login-surface: #ffffff;
+        --login-background: #f7f5ef;
+        --login-success: #238636;
+        --login-danger: #b42318;
+        --login-focus: rgba(154, 116, 35, 0.16);
+        --login-shadow: 0 18px 55px rgba(17, 24, 39, 0.12);
+    }
+
+    *,
+    *::before,
+    *::after {
+        box-sizing: border-box;
     }
 
     body {
         margin: 0;
+        min-width: 320px;
         min-height: 100vh;
         min-height: 100svh;
+        color: var(--login-ink);
         background:
-            radial-gradient(circle at top left, rgba(184, 138, 43, 0.12), transparent 32%),
-            radial-gradient(circle at bottom right, rgba(17, 24, 39, 0.06), transparent 34%),
-            linear-gradient(135deg, #ffffff 0%, #faf8f2 48%, #f3f0e8 100%);
+            radial-gradient(circle at 10% 0%, rgba(154, 116, 35, 0.12), transparent 32%),
+            linear-gradient(180deg, #ffffff 0%, var(--login-background) 100%);
     }
 
-    .fi-login-page {
+    .member-login-page {
         width: 100%;
         min-height: 100vh;
         min-height: 100svh;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 28px 18px;
-    }
-
-    .fi-login-shell {
-        width: 100%;
-        max-width: 1120px;
-        min-height: 650px;
-        display: grid;
-        grid-template-columns: 0.95fr 1.05fr;
-        background: var(--fi-panel);
-        border-radius: 32px;
-        overflow: hidden;
-        box-shadow: var(--fi-shadow);
-        border: 1px solid rgba(255, 255, 255, 0.9);
-    }
-
-    .fi-brand-panel {
-        position: relative;
-        padding: 46px;
-        background:
-            radial-gradient(circle at top right, rgba(184, 138, 43, 0.16), transparent 34%),
-            radial-gradient(circle at bottom left, rgba(255, 255, 255, 0.9), transparent 36%),
-            linear-gradient(145deg, #ffffff 0%, #fbfaf7 44%, #f0eadf 100%);
-        color: var(--fi-ink);
-        overflow: hidden;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-        border-right: 1px solid var(--fi-border);
-    }
-
-    .fi-brand-panel::before {
-        content: "";
-        position: absolute;
-        width: 320px;
-        height: 320px;
-        border-radius: 50%;
-        background: rgba(184, 138, 43, 0.08);
-        top: -160px;
-        right: -120px;
-    }
-
-    .fi-brand-panel::after {
-        content: "";
-        position: absolute;
-        width: 230px;
-        height: 230px;
-        border-radius: 50%;
-        border: 1px solid rgba(184, 138, 43, 0.18);
-        bottom: -120px;
-        left: -95px;
-    }
-
-    .fi-brand-inner,
-    .fi-brand-footer {
-        position: relative;
-        z-index: 2;
-    }
-
-    .fi-brand-kicker {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        padding: 8px 12px;
-        border-radius: 999px;
-        background: #ffffff;
-        border: 1px solid var(--fi-border);
-        box-shadow: 0 10px 24px rgba(17, 24, 39, 0.04);
-        color: var(--fi-gold-dark);
-        font-size: 10px;
-        font-weight: 900;
-        letter-spacing: .11em;
-        text-transform: uppercase;
-        margin-bottom: 22px;
-    }
-
-    .fi-brand-kicker::before {
-        content: "";
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        background: var(--fi-success);
-        box-shadow: 0 0 0 4px rgba(63, 163, 77, 0.12);
-    }
-
-    .fi-brand-title {
-        font-size: 39px;
-        line-height: 1.04;
-        font-weight: 950;
-        letter-spacing: -0.055em;
-        margin: 0 0 16px;
-        color: var(--fi-ink);
-    }
-
-    .fi-brand-title span {
-        color: var(--fi-gold-dark);
-    }
-
-    .fi-brand-text {
-        max-width: 520px;
-        margin: 0;
-        font-size: 15px;
-        line-height: 1.75;
-        color: var(--fi-muted-strong);
-    }
-
-    .fi-feature-list {
-        display: grid;
-        gap: 13px;
-        margin-top: 30px;
-    }
-
-    .fi-feature-item {
         display: flex;
         align-items: flex-start;
-        gap: 13px;
-        padding: 15px;
-        border-radius: 18px;
-        background: rgba(255, 255, 255, 0.78);
-        border: 1px solid var(--fi-border);
-        box-shadow: 0 12px 28px rgba(17, 24, 39, 0.045);
-    }
-
-    .fi-feature-icon {
-        width: 31px;
-        height: 31px;
-        min-width: 31px;
-        border-radius: 50%;
-        background: var(--fi-gold-soft);
-        color: var(--fi-gold-dark);
-        display: flex;
-        align-items: center;
         justify-content: center;
-        font-size: 14px;
-        font-weight: 950;
+        padding: 18px 14px;
     }
 
-    .fi-feature-item strong {
-        display: block;
-        font-size: 13px;
-        margin-bottom: 3px;
-        color: var(--fi-ink);
-    }
-
-    .fi-feature-item span {
-        display: block;
-        font-size: 12px;
-        line-height: 1.5;
-        color: var(--fi-muted);
-    }
-
-    .fi-brand-footer {
-        margin-top: 34px;
-        padding-top: 18px;
-        border-top: 1px solid var(--fi-border);
-        font-size: 12px;
-        color: var(--fi-muted);
-        line-height: 1.6;
-    }
-
-    .fi-form-panel {
-        padding: 48px 46px;
-        background:
-            radial-gradient(circle at top right, rgba(184, 138, 43, 0.07), transparent 34%),
-            linear-gradient(180deg, #ffffff 0%, #fbfaf7 100%);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-
-    .fi-login-card {
+    .member-login-shell {
         width: 100%;
-        max-width: 450px;
+        max-width: 480px;
     }
 
-    .fi-login-logo-wrap {
+    .member-login-brand-panel {
+        display: none;
+    }
+
+    .member-login-form-panel {
+        width: 100%;
+        padding: 22px 18px;
+        border: 1px solid rgba(229, 231, 235, 0.92);
+        border-radius: 24px;
+        background: rgba(255, 255, 255, 0.96);
+        box-shadow: var(--login-shadow);
+    }
+
+    .member-login-card {
+        width: 100%;
+        max-width: 430px;
+        margin: 0 auto;
+    }
+
+    .member-login-logo-wrap {
+        display: flex;
+        justify-content: center;
+        margin-bottom: 14px;
+    }
+
+    .member-login-logo-box,
+    .member-login-logo-fallback {
+        width: 78px;
+        height: 78px;
+        border-radius: 20px;
+        border: 1px solid var(--login-border);
+        box-shadow: 0 10px 28px rgba(17, 24, 39, 0.08);
+    }
+
+    .member-login-logo-box {
         display: flex;
         align-items: center;
         justify-content: center;
-        margin-bottom: 22px;
-    }
-
-    .fi-login-logo-box {
-        width: 112px;
-        height: 112px;
-        border-radius: 28px;
-        background: #ffffff;
-        border: 1px solid var(--fi-border);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        box-shadow: var(--fi-shadow-soft);
+        padding: 9px;
         overflow: hidden;
-        padding: 12px;
+        background: #ffffff;
     }
 
-    .fi-login-logo {
+    .member-login-logo {
         display: block;
-        max-width: 92px;
-        max-height: 92px;
+        max-width: 62px;
+        max-height: 62px;
         width: auto;
         height: auto;
         object-fit: contain;
     }
 
-    .fi-login-fallback-logo {
-        width: 112px;
-        height: 112px;
-        border-radius: 28px;
-        background:
-            radial-gradient(circle at top right, rgba(184, 138, 43, 0.32), transparent 38%),
-            linear-gradient(135deg, #2f3746, #111827);
-        color: #ffffff;
+    .member-login-logo-fallback {
+        display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 30px;
-        font-weight: 950;
+        color: #ffffff;
+        background:
+            radial-gradient(circle at top right, rgba(184, 138, 43, 0.42), transparent 38%),
+            linear-gradient(135deg, #323b4a, #111827);
+        font-size: 23px;
+        font-weight: 900;
         letter-spacing: -0.05em;
-        box-shadow: var(--fi-shadow-soft);
     }
 
-    .fi-login-top {
-        margin-bottom: 24px;
+    .member-login-header {
+        margin-bottom: 21px;
         text-align: center;
     }
 
-    .fi-login-badge {
+    .member-login-eyebrow {
         display: inline-flex;
         align-items: center;
-        padding: 7px 12px;
-        border-radius: 999px;
-        background: var(--fi-gold-soft);
-        color: var(--fi-gold-dark);
+        gap: 7px;
+        margin-bottom: 9px;
+        color: var(--login-accent-dark);
         font-size: 10px;
-        font-weight: 950;
+        font-weight: 800;
+        letter-spacing: 0.10em;
         text-transform: uppercase;
-        letter-spacing: .10em;
-        margin-bottom: 14px;
     }
 
-    .sacco-brand {
-        font-size: 31px;
-        font-weight: 950;
-        color: var(--fi-ink);
-        letter-spacing: -0.055em;
-        line-height: 1.1;
-        margin-bottom: 8px;
+    .member-login-eyebrow::before {
+        content: "";
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--login-success);
+        box-shadow: 0 0 0 4px rgba(35, 134, 54, 0.11);
     }
 
-    .fi-login-subtitle {
-        font-size: 13.5px;
-        color: var(--fi-muted);
-        line-height: 1.6;
+    .member-login-title {
         margin: 0;
+        color: var(--login-ink);
+        font-size: clamp(25px, 8vw, 31px);
+        font-weight: 900;
+        line-height: 1.12;
+        letter-spacing: -0.045em;
+        overflow-wrap: anywhere;
     }
 
-    .fi-form-group {
+    .member-login-subtitle {
+        margin: 7px 0 0;
+        color: var(--login-muted);
+        font-size: 13px;
+        line-height: 1.5;
+    }
+
+    .member-login-alert {
+        margin-bottom: 16px;
+        padding: 11px 13px;
+        border: 1px solid transparent;
+        border-radius: 13px;
+        font-size: 13px;
+        line-height: 1.45;
+    }
+
+    .member-login-alert-success {
+        border-color: rgba(35, 134, 54, 0.20);
+        color: #166534;
+        background: #f0fdf4;
+    }
+
+    .member-login-alert-danger {
+        border-color: rgba(180, 35, 24, 0.18);
+        color: var(--login-danger);
+        background: #fff5f4;
+    }
+
+    .member-login-group {
         margin-bottom: 16px;
     }
 
-    .fi-label-row {
+    .member-login-label-row {
         display: flex;
         align-items: center;
         justify-content: space-between;
         gap: 12px;
-        margin-bottom: 8px;
+        margin-bottom: 7px;
     }
 
-    .fi-form-group label {
+    .member-login-label {
         display: block;
+        margin: 0 0 7px;
+        color: var(--login-ink);
         font-size: 13px;
-        font-weight: 850;
-        color: var(--fi-ink);
-        margin: 0 0 8px;
+        font-weight: 800;
     }
 
-    .fi-forgot-link {
-        color: var(--fi-gold-dark);
+    .member-login-label-row .member-login-label {
+        margin-bottom: 0;
+    }
+
+    .member-login-forgot {
+        color: var(--login-accent-dark);
         font-size: 12px;
-        font-weight: 900;
+        font-weight: 800;
         text-decoration: none;
         white-space: nowrap;
     }
 
-    .fi-forgot-link:hover {
+    .member-login-forgot:hover,
+    .member-login-forgot:focus-visible {
         text-decoration: underline;
     }
 
-    .fi-input-wrap .form-control {
+    .member-login-input-wrap {
+        position: relative;
+    }
+
+    .member-login-input {
+        display: block;
         width: 100%;
-        height: 54px;
-        border-radius: 16px;
-        border: 1px solid var(--fi-border);
+        min-height: 52px;
+        padding: 13px 14px;
+        border: 1px solid var(--login-border);
+        border-radius: 14px;
+        outline: none;
         background: #ffffff;
-        color: var(--fi-ink);
-        font-size: 14px;
-        padding: 13px 15px;
-        box-shadow: 0 1px 0 rgba(17, 24, 39, 0.02);
-        transition: border-color .18s ease, box-shadow .18s ease, background-color .18s ease;
+        color: var(--login-ink);
+        font: inherit;
+        font-size: 16px;
+        transition:
+            border-color 0.18s ease,
+            box-shadow 0.18s ease,
+            background-color 0.18s ease;
     }
 
-    .fi-input-wrap .form-control::placeholder {
-        color: #9ca3af;
+    .member-login-input::placeholder {
+        color: #98a2b3;
     }
 
-    .fi-input-wrap .form-control:focus {
-        border-color: rgba(184, 138, 43, 0.72);
-        box-shadow: 0 0 0 4px rgba(184, 138, 43, 0.12);
-        background-color: #ffffff;
+    .member-login-input:focus {
+        border-color: rgba(154, 116, 35, 0.72);
+        box-shadow: 0 0 0 4px var(--login-focus);
+    }
+
+    .member-login-input.is-invalid {
+        border-color: rgba(180, 35, 24, 0.62);
+    }
+
+    .member-login-input.is-invalid:focus {
+        box-shadow: 0 0 0 4px rgba(180, 35, 24, 0.10);
+    }
+
+    .member-login-password-input {
+        padding-right: 52px;
+    }
+
+    .member-login-password-toggle {
+        position: absolute;
+        top: 50%;
+        right: 7px;
+        width: 40px;
+        height: 40px;
+        transform: translateY(-50%);
+        border: 0;
+        border-radius: 10px;
+        background: transparent;
+        color: var(--login-muted);
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 800;
+    }
+
+    .member-login-password-toggle:hover,
+    .member-login-password-toggle:focus-visible {
+        color: var(--login-ink);
+        background: #f3f4f6;
         outline: none;
     }
 
-    .fi-field-help {
+    .member-login-help,
+    .member-login-error {
         display: block;
-        margin-top: 7px;
-        color: var(--fi-muted);
+        margin-top: 6px;
         font-size: 11.5px;
-        line-height: 1.45;
+        line-height: 1.4;
     }
 
-    .fi-submit-btn {
+    .member-login-help {
+        color: var(--login-muted);
+    }
+
+    .member-login-error {
+        color: var(--login-danger);
+        font-weight: 600;
+    }
+
+    .member-login-submit {
         width: 100%;
-        height: 54px;
-        border-radius: 16px;
+        min-height: 52px;
+        margin-top: 2px;
+        border: 0;
+        border-radius: 14px;
+        color: #ffffff;
         background:
-            radial-gradient(circle at top right, rgba(184, 138, 43, 0.38), transparent 36%),
-            linear-gradient(135deg, #2f3746, #111827);
-        border: none;
-        color: #ffffff;
-        font-weight: 950;
-        font-size: 15px;
-        box-shadow: 0 18px 36px rgba(17, 24, 39, 0.24);
-        transition: transform .16s ease, box-shadow .16s ease, opacity .16s ease, filter .16s ease;
+            radial-gradient(circle at top right, rgba(184, 138, 43, 0.42), transparent 35%),
+            linear-gradient(135deg, #303947, #111827);
+        box-shadow: 0 14px 30px rgba(17, 24, 39, 0.22);
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 900;
+        transition:
+            transform 0.16s ease,
+            box-shadow 0.16s ease,
+            opacity 0.16s ease;
     }
 
-    .fi-submit-btn:hover {
+    .member-login-submit:hover {
         transform: translateY(-1px);
-        box-shadow: 0 22px 44px rgba(17, 24, 39, 0.30);
-        color: #ffffff;
-        filter: saturate(1.04);
+        box-shadow: 0 18px 36px rgba(17, 24, 39, 0.28);
     }
 
-    .fi-submit-btn:disabled,
-    .fi-submit-btn.is-processing {
-        opacity: .78;
-        cursor: not-allowed;
+    .member-login-submit:focus-visible {
+        outline: 3px solid rgba(154, 116, 35, 0.30);
+        outline-offset: 3px;
+    }
+
+    .member-login-submit:disabled,
+    .member-login-submit.is-processing {
+        opacity: 0.72;
+        cursor: wait;
         transform: none;
         box-shadow: none;
-        filter: none;
     }
 
-    .fi-btn-content {
+    .member-login-submit-content {
         display: inline-flex;
         align-items: center;
         justify-content: center;
         gap: 9px;
     }
 
-    .fi-btn-spinner {
+    .member-login-spinner {
         display: none;
         width: 16px;
         height: 16px;
-        border-radius: 50%;
-        border: 2px solid rgba(255, 255, 255, 0.45);
+        border: 2px solid rgba(255, 255, 255, 0.42);
         border-top-color: #ffffff;
-        animation: fi-spin .75s linear infinite;
+        border-radius: 50%;
+        animation: member-login-spin 0.75s linear infinite;
     }
 
-    .fi-submit-btn.is-processing .fi-btn-spinner {
+    .member-login-submit.is-processing .member-login-spinner {
         display: inline-block;
     }
 
-    @keyframes fi-spin {
+    @keyframes member-login-spin {
         to {
             transform: rotate(360deg);
         }
     }
 
-    .fi-apply-box {
-        margin-top: 16px;
-        padding: 15px;
-        border-radius: 18px;
-        background: #ffffff;
-        border: 1px solid var(--fi-border);
-        text-align: center;
-        font-size: 13px;
-        line-height: 1.45;
-        color: var(--fi-muted);
-        box-shadow: 0 12px 28px rgba(17, 24, 39, 0.045);
-    }
-
-    .fi-apply-box a {
-        display: inline-block;
-        margin-top: 5px;
-        color: var(--fi-gold-dark);
-        font-weight: 950;
-        text-decoration: none;
-    }
-
-    .fi-apply-box a:hover {
-        text-decoration: underline;
-    }
-
-    .fi-security-note {
-        display: flex;
-        gap: 11px;
-        margin-top: 18px;
-        padding: 13px 15px;
-        border-radius: 18px;
-        background: #ffffff;
-        border: 1px solid var(--fi-border);
-        color: var(--fi-muted);
-        font-size: 12px;
+    .member-login-legal {
+        margin: 11px 2px 0;
+        color: var(--login-muted);
+        font-size: 10.5px;
         line-height: 1.55;
-        box-shadow: 0 12px 28px rgba(17, 24, 39, 0.045);
-    }
-
-    .fi-security-note strong {
-        color: var(--fi-ink);
-    }
-
-    .fi-security-dot {
-        width: 10px;
-        height: 10px;
-        min-width: 10px;
-        margin-top: 5px;
-        border-radius: 50%;
-        background: var(--fi-success);
-        box-shadow: 0 0 0 4px rgba(63, 163, 77, 0.14);
-    }
-
-    .login-footer {
-        font-size: 0.86rem;
         text-align: center;
-        margin-top: 22px;
-        color: var(--fi-muted);
     }
 
-    .login-footer a {
-        color: var(--fi-gold-dark);
+    .member-login-legal a {
+        color: var(--login-accent-dark);
+        font-weight: 700;
+        text-decoration: underline;
+        text-decoration-thickness: 1px;
+        text-underline-offset: 2px;
+    }
+
+    .member-login-security {
+        display: flex;
+        align-items: flex-start;
+        gap: 9px;
+        margin-top: 15px;
+        padding: 11px 12px;
+        border: 1px solid var(--login-border);
+        border-radius: 14px;
+        color: var(--login-muted);
+        background: #fafafa;
+        font-size: 11.5px;
+        line-height: 1.45;
+    }
+
+    .member-login-security-dot {
+        width: 8px;
+        height: 8px;
+        min-width: 8px;
+        margin-top: 4px;
+        border-radius: 50%;
+        background: var(--login-success);
+        box-shadow: 0 0 0 3px rgba(35, 134, 54, 0.11);
+    }
+
+    .member-login-actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: center;
+        gap: 6px 11px;
+        margin-top: 16px;
+        color: var(--login-muted);
+        font-size: 12px;
+        line-height: 1.45;
+        text-align: center;
+    }
+
+    .member-login-actions a {
+        color: var(--login-accent-dark);
+        font-weight: 800;
         text-decoration: none;
-        font-weight: 850;
     }
 
-    .login-footer a:hover {
+    .member-login-actions a:hover,
+    .member-login-actions a:focus-visible {
         text-decoration: underline;
     }
 
-    .provider-credit {
+    .member-login-divider {
+        width: 3px;
+        height: 3px;
+        border-radius: 50%;
+        background: #c4c8cf;
+    }
+
+    .member-login-credit {
         margin-top: 13px;
-        padding-top: 13px;
-        border-top: 1px solid var(--fi-border);
-        font-size: 0.82rem;
-        color: var(--fi-muted);
+        padding-top: 12px;
+        border-top: 1px solid var(--login-border);
+        color: var(--login-muted);
+        font-size: 10.5px;
         line-height: 1.45;
-    }
-
-    .provider-credit strong {
-        color: var(--fi-ink);
-        font-weight: 950;
-    }
-
-    .recaptcha-note {
-        font-size: 0.85rem;
-        color: var(--fi-danger);
-        margin-top: 0.75rem;
         text-align: center;
-        line-height: 1.45;
     }
 
-    @media (max-width: 991.98px) {
-        .fi-login-page {
-            align-items: stretch;
-            padding: 0;
+    .member-login-credit a {
+        color: var(--login-ink);
+        font-weight: 800;
+        text-decoration: none;
+    }
+
+    .member-login-recaptcha-note {
+        display: none;
+        margin-top: 11px;
+        color: var(--login-danger);
+        font-size: 11.5px;
+        line-height: 1.45;
+        text-align: center;
+    }
+
+    @media (min-width: 576px) {
+        .member-login-page {
+            align-items: center;
+            padding: 28px;
         }
 
-        .fi-login-shell {
-            max-width: none;
-            min-height: 100vh;
-            min-height: 100svh;
+        .member-login-form-panel {
+            padding: 32px;
+        }
+    }
+
+    @media (min-width: 992px) {
+        .member-login-shell {
+            display: grid;
+            grid-template-columns: minmax(0, 0.88fr) minmax(0, 1.12fr);
+            max-width: 1020px;
+            min-height: 610px;
+            overflow: hidden;
+            border: 1px solid rgba(229, 231, 235, 0.90);
+            border-radius: 30px;
+            background: #ffffff;
+            box-shadow: var(--login-shadow);
+        }
+
+        .member-login-brand-panel {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 44px;
+            overflow: hidden;
+            border-right: 1px solid var(--login-border);
+            background:
+                radial-gradient(circle at top right, rgba(154, 116, 35, 0.18), transparent 34%),
+                linear-gradient(145deg, #ffffff 0%, #f5f1e7 100%);
+        }
+
+        .member-login-brand-panel::before,
+        .member-login-brand-panel::after {
+            content: "";
+            position: absolute;
+            border-radius: 50%;
+            pointer-events: none;
+        }
+
+        .member-login-brand-panel::before {
+            width: 280px;
+            height: 280px;
+            top: -150px;
+            right: -110px;
+            background: rgba(154, 116, 35, 0.08);
+        }
+
+        .member-login-brand-panel::after {
+            width: 210px;
+            height: 210px;
+            left: -100px;
+            bottom: -110px;
+            border: 1px solid rgba(154, 116, 35, 0.18);
+        }
+
+        .member-login-brand-content,
+        .member-login-brand-footer {
+            position: relative;
+            z-index: 1;
+        }
+
+        .member-login-brand-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 22px;
+            padding: 8px 11px;
+            border: 1px solid var(--login-border);
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.82);
+            color: var(--login-accent-dark);
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: 0.10em;
+            text-transform: uppercase;
+        }
+
+        .member-login-brand-badge::before {
+            content: "";
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--login-success);
+        }
+
+        .member-login-brand-title {
+            margin: 0;
+            color: var(--login-ink);
+            font-size: 39px;
+            font-weight: 900;
+            line-height: 1.06;
+            letter-spacing: -0.05em;
+        }
+
+        .member-login-brand-title span {
+            display: block;
+            margin-top: 7px;
+            color: var(--login-accent-dark);
+            overflow-wrap: anywhere;
+        }
+
+        .member-login-brand-text {
+            max-width: 390px;
+            margin: 16px 0 0;
+            color: #4b5563;
+            font-size: 14px;
+            line-height: 1.65;
+        }
+
+        .member-login-brand-points {
+            display: grid;
+            gap: 11px;
+            margin-top: 28px;
+        }
+
+        .member-login-brand-point {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #374151;
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .member-login-brand-check {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 24px;
+            height: 24px;
+            min-width: 24px;
+            border-radius: 50%;
+            color: var(--login-accent-dark);
+            background: var(--login-accent-soft);
+            font-size: 12px;
+            font-weight: 900;
+        }
+
+        .member-login-brand-footer {
+            color: var(--login-muted);
+            font-size: 11.5px;
+            line-height: 1.55;
+        }
+
+        .member-login-form-panel {
+            display: flex;
+            align-items: center;
+            padding: 44px 48px;
+            border: 0;
             border-radius: 0;
-            grid-template-columns: 1fr;
+            background:
+                radial-gradient(circle at top right, rgba(154, 116, 35, 0.06), transparent 32%),
+                #ffffff;
             box-shadow: none;
         }
 
-        .fi-form-panel {
-            order: 1;
-            padding: 30px 20px 24px;
-            align-items: flex-start;
-        }
-
-        .fi-brand-panel {
-            order: 2;
-            padding: 28px 20px 30px;
-            border-right: 0;
-            border-top: 1px solid var(--fi-border);
-        }
-
-        .fi-brand-title {
-            font-size: 30px;
-        }
-
-        .fi-brand-text {
-            font-size: 13px;
-        }
-
-        .fi-feature-list,
-        .fi-brand-footer {
-            display: none;
-        }
-
-        .fi-login-card {
-            max-width: 460px;
-            margin: 0 auto;
-        }
-    }
-
-    @media (max-width: 575.98px) {
-        .fi-form-panel {
-            padding: 24px 17px;
-        }
-
-        .fi-brand-panel {
-            padding: 24px 17px 28px;
-        }
-
-        .fi-login-logo-box,
-        .fi-login-fallback-logo {
+        .member-login-logo-box,
+        .member-login-logo-fallback {
             width: 92px;
             height: 92px;
             border-radius: 24px;
         }
 
-        .fi-login-logo {
-            max-width: 76px;
-            max-height: 76px;
-        }
-
-        .sacco-brand {
-            font-size: 28px;
-        }
-
-        .fi-login-subtitle {
-            font-size: 13px;
-        }
-
-        .fi-input-wrap .form-control,
-        .fi-submit-btn {
-            height: 52px;
+        .member-login-logo {
+            max-width: 74px;
+            max-height: 74px;
         }
     }
 
-    @media (max-width: 360px) {
-        .fi-form-panel {
-            padding: 22px 15px 24px;
-        }
-
-        .sacco-brand {
-            font-size: 25px;
-        }
-
-        .fi-brand-title {
-            font-size: 26px;
-        }
-
-        .fi-login-logo-box,
-        .fi-login-fallback-logo {
-            width: 82px;
-            height: 82px;
-            border-radius: 22px;
-        }
-
-        .fi-login-logo {
-            max-width: 68px;
-            max-height: 68px;
+    @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+            scroll-behavior: auto !important;
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.01ms !important;
         }
     }
 </style>
 
-<div class="fi-login-page">
-    <div class="fi-login-shell">
-        <section class="fi-brand-panel">
-            <div class="fi-brand-inner">
-                <div class="fi-brand-kicker">Secure member access</div>
+<main class="member-login-page">
+    <div class="member-login-shell">
+        <aside class="member-login-brand-panel" aria-label="{{ $saccoName }} member portal">
+            <div class="member-login-brand-content">
+                <div class="member-login-brand-badge">Secure member access</div>
 
-                <h1 class="fi-brand-title">
-                    Welcome to<br>
+                <h1 class="member-login-brand-title">
+                    Welcome to
                     <span>{{ $saccoName }}</span>
                 </h1>
 
-                <p class="fi-brand-text">
-                    Access your member portal to view savings, deposits, capital, loans,
-                    statements and other SACCO services.
+                <p class="member-login-brand-text">
+                    Access your savings, loans and statements securely.
                 </p>
 
-                <div class="fi-feature-list">
-                    <div class="fi-feature-item">
-                        <div class="fi-feature-icon">✓</div>
-                        <div>
-                            <strong>Member account access</strong>
-                            <span>View your account information and SACCO balances from one secure portal.</span>
-                        </div>
+                <div class="member-login-brand-points" aria-label="Portal services">
+                    <div class="member-login-brand-point">
+                        <span class="member-login-brand-check" aria-hidden="true">✓</span>
+                        <span>Savings and deposits</span>
                     </div>
 
-                    <div class="fi-feature-item">
-                        <div class="fi-feature-icon">✓</div>
-                        <div>
-                            <strong>Savings and loans visibility</strong>
-                            <span>Access contribution, deposit, loan and statement information with confidence.</span>
-                        </div>
+                    <div class="member-login-brand-point">
+                        <span class="member-login-brand-check" aria-hidden="true">✓</span>
+                        <span>Loans and statements</span>
                     </div>
 
-                    <div class="fi-feature-item">
-                        <div class="fi-feature-icon">✓</div>
-                        <div>
-                            <strong>Protected sign-in</strong>
-                            <span>Your access is validated and logged for account security and compliance.</span>
-                        </div>
+                    <div class="member-login-brand-point">
+                        <span class="member-login-brand-check" aria-hidden="true">✓</span>
+                        <span>Secure account access</span>
                     </div>
                 </div>
             </div>
 
-            <div class="fi-brand-footer">
-                Use this portal only if you are a registered member or applicant of {{ $saccoName }}.
+            <div class="member-login-brand-footer">
+                Authorised members only.
             </div>
-        </section>
+        </aside>
 
-        <section class="fi-form-panel">
-            <div class="fi-login-card">
-                <div class="fi-login-logo-wrap">
+        <section class="member-login-form-panel" aria-labelledby="memberLoginTitle">
+            <div class="member-login-card">
+                <div class="member-login-logo-wrap">
                     @if($showLogo)
-                        <div class="fi-login-logo-box" id="loginLogoBox">
+                        <div class="member-login-logo-box" id="memberLoginLogoBox">
                             <img
                                 src="{{ $logoUrl }}"
-                                alt="{{ $saccoName }} Logo"
-                                class="fi-login-logo"
+                                alt="{{ $saccoName }} logo"
+                                class="member-login-logo"
+                                id="memberLoginLogo"
                                 loading="eager"
-                                onerror="document.getElementById('loginLogoBox').style.display='none'; document.getElementById('loginLogoFallback').style.display='flex';"
+                                decoding="async"
                             >
                         </div>
 
-                        <div class="fi-login-fallback-logo" id="loginLogoFallback" style="display:none;">
+                        <div
+                            class="member-login-logo-fallback"
+                            id="memberLoginLogoFallback"
+                            style="display:none;"
+                            aria-hidden="true"
+                        >
                             {{ $initials }}
                         </div>
                     @else
-                        <div class="fi-login-fallback-logo" style="display:flex;">
+                        <div class="member-login-logo-fallback" aria-hidden="true">
                             {{ $initials }}
                         </div>
                     @endif
                 </div>
 
-                <div class="fi-login-top">
-                    <div class="fi-login-badge">Member Portal</div>
-                    <div class="sacco-brand">{{ $saccoName }}</div>
-                    <p class="fi-login-subtitle">
-                        Sign in to continue to your account.
-                    </p>
-                </div>
+                <header class="member-login-header">
+                    <div class="member-login-eyebrow">Member Portal</div>
+                    <h2 class="member-login-title" id="memberLoginTitle">{{ $saccoName }}</h2>
+                    <p class="member-login-subtitle">Sign in to your account.</p>
+                </header>
 
-                <form method="POST" action="{{ route('login') }}" id="loginForm">
+                @if(session('status'))
+                    <div class="member-login-alert member-login-alert-success" role="status">
+                        {{ session('status') }}
+                    </div>
+                @endif
+
+                @if($errors->any())
+                    <div class="member-login-alert member-login-alert-danger" role="alert">
+                        {{ $errors->first() }}
+                    </div>
+                @endif
+
+                <form method="POST" action="{{ route('login') }}" id="memberLoginForm" novalidate>
                     @csrf
 
-                    <div class="fi-form-group">
-                        <label for="login">Member Login ID</label>
+                    <div class="member-login-group">
+                        <label class="member-login-label" for="login">Login ID</label>
 
-                        <div class="fi-input-wrap">
-                            <input type="text"
-                                   name="login"
-                                   id="login"
-                                   class="form-control"
-                                   placeholder="Enter your login ID"
-                                   value="{{ old('login') }}"
-                                   autocomplete="username"
-                                   inputmode="text"
-                                   required>
+                        <div class="member-login-input-wrap">
+                            <input
+                                type="text"
+                                name="login"
+                                id="login"
+                                class="member-login-input @error('login') is-invalid @enderror"
+                                value="{{ old('login') }}"
+                                placeholder="Email, phone, ID or SACCO number"
+                                autocomplete="username"
+                                autocapitalize="none"
+                                spellcheck="false"
+                                inputmode="text"
+                                aria-describedby="loginHelp @error('login') loginError @enderror"
+                                aria-invalid="@error('login') true @else false @enderror"
+                                required
+                                autofocus
+                            >
                         </div>
 
-                        <small class="fi-field-help">
-                            Use your registered email, phone number, National ID or SACCO number.
+                        <small class="member-login-help" id="loginHelp">
+                            Use your registered member details.
                         </small>
 
-                        @if ($errors->has('login'))
-                            <small class="text-danger d-block mt-1">{{ $errors->first('login') }}</small>
-                        @endif
+                        @error('login')
+                            <small class="member-login-error" id="loginError" role="alert">
+                                {{ $message }}
+                            </small>
+                        @enderror
                     </div>
 
-                    <div class="fi-form-group">
-                        <div class="fi-label-row">
-                            <label for="password">Password</label>
+                    <div class="member-login-group">
+                        <div class="member-login-label-row">
+                            <label class="member-login-label" for="password">Password</label>
 
-                            <a href="{{ route('member.password.request') }}" class="fi-forgot-link">
-                                Forgot password?
-                            </a>
+                            @if($forgotPasswordUrl)
+                                <a href="{{ $forgotPasswordUrl }}" class="member-login-forgot">
+                                    Forgot password?
+                                </a>
+                            @endif
                         </div>
 
-                        <div class="fi-input-wrap">
-                            <input type="password"
-                                   name="password"
-                                   id="password"
-                                   class="form-control"
-                                   placeholder="Enter password"
-                                   autocomplete="current-password"
-                                   required>
+                        <div class="member-login-input-wrap">
+                            <input
+                                type="password"
+                                name="password"
+                                id="password"
+                                class="member-login-input member-login-password-input @error('password') is-invalid @enderror"
+                                placeholder="Enter your password"
+                                autocomplete="current-password"
+                                aria-describedby="@error('password') passwordError @enderror"
+                                aria-invalid="@error('password') true @else false @enderror"
+                                required
+                            >
+
+                            <button
+                                type="button"
+                                class="member-login-password-toggle"
+                                id="memberLoginPasswordToggle"
+                                aria-controls="password"
+                                aria-label="Show password"
+                                aria-pressed="false"
+                            >
+                                Show
+                            </button>
                         </div>
 
-                        @if ($errors->has('password'))
-                            <small class="text-danger d-block mt-1">{{ $errors->first('password') }}</small>
-                        @endif
+                        @error('password')
+                            <small class="member-login-error" id="passwordError" role="alert">
+                                {{ $message }}
+                            </small>
+                        @enderror
                     </div>
 
                     <input type="hidden" name="recaptcha_token" id="recaptcha_token">
 
-                    <div class="d-grid mb-3">
-                        <button type="submit" class="fi-submit-btn" id="loginBtn">
-                            <span class="fi-btn-content">
-                                <span class="fi-btn-spinner" aria-hidden="true"></span>
-                                <span class="fi-btn-text">Login Securely</span>
-                            </span>
-                        </button>
-                    </div>
+                    <button type="submit" class="member-login-submit" id="memberLoginButton">
+                        <span class="member-login-submit-content">
+                            <span class="member-login-spinner" aria-hidden="true"></span>
+                            <span class="member-login-button-text">Sign In</span>
+                        </span>
+                    </button>
 
-                    <div class="fi-apply-box">
-                        Not yet a member?
-                        <br>
-                        <a href="{{ url('/register') }}">Apply for SACCO membership</a>
-                    </div>
+                    <p class="member-login-legal">
+                        By signing in, you agree to the
+                        <a href="{{ $termsUrl }}" target="_blank" rel="noopener">Terms of Use</a>
+                        and acknowledge the
+                        <a href="{{ $privacyUrl }}" target="_blank" rel="noopener">Privacy Policy</a>
+                        and
+                        <a href="{{ $dataProtectionUrl }}" target="_blank" rel="noopener">Data Protection Notice</a>.
+                    </p>
 
-                    <div class="recaptcha-note" id="recaptchaNote" style="display:none;">
-                        Security verification could not load. Disable any ad-blocker for this site and try again.
+                    <div
+                        class="member-login-recaptcha-note"
+                        id="memberLoginRecaptchaNote"
+                        role="alert"
+                    >
+                        Security verification is unavailable. Refresh the page and try again.
                     </div>
                 </form>
 
-                <div class="fi-security-note">
-                    <span class="fi-security-dot"></span>
-                    <div>
-                        <strong>Security reminder:</strong>
-                        Do not share your password, OTP, PIN or login details with anyone.
-                    </div>
+                <div class="member-login-security">
+                    <span class="member-login-security-dot" aria-hidden="true"></span>
+                    <span>Never share your password, PIN or OTP.</span>
                 </div>
 
-                <div class="login-footer">
+                <div class="member-login-actions">
+                    <span>Not a member?</span>
+                    <a href="{{ $registrationUrl }}">Apply now</a>
+
                     @if($supportPhone !== '')
-                        <div>
-                            <strong>Need Help?</strong><br>
-                            Call or WhatsApp:
-                            <a href="tel:{{ preg_replace('/\s+/', '', $supportPhone) }}">
-                                {{ $supportPhone }}
-                            </a>
-                        </div>
+                        <span class="member-login-divider" aria-hidden="true"></span>
+                        <a href="tel:{{ $supportDialNumber }}">Get help</a>
                     @endif
-
-                    <div class="provider-credit">
-                        <div>
-                            <strong>iSacco</strong> system by
-                            <a href="https://shahi.co.ke" target="_blank" rel="noopener">
-                                Shahi Services
-                            </a>
-                        </div>
-                        <div>
-                            <a href="https://shahi.co.ke" target="_blank" rel="noopener">
-                                shahi.co.ke
-                            </a>
-                        </div>
-                    </div>
                 </div>
+
+                <footer class="member-login-credit">
+                    <strong>iSacco</strong> by
+                    <a href="https://shahi.co.ke" target="_blank" rel="noopener noreferrer">
+                        Shahi Services
+                    </a>
+                </footer>
             </div>
         </section>
     </div>
-</div>
+</main>
 
-@if(!empty($recaptchaSiteKey))
-<script src="https://www.google.com/recaptcha/api.js?render={{ $recaptchaSiteKey }}"></script>
+@if($recaptchaSiteKey !== '')
+    <script
+        src="https://www.google.com/recaptcha/api.js?render={{ urlencode($recaptchaSiteKey) }}"
+        async
+        defer
+    ></script>
 @endif
 
 <script>
-(function() {
-    const SITE_KEY = "{{ $recaptchaSiteKey }}";
-    const form = document.getElementById('loginForm');
+(function () {
+    'use strict';
+
+    const siteKey = @json($recaptchaSiteKey);
+    const form = document.getElementById('memberLoginForm');
+    const loginInput = document.getElementById('login');
+    const passwordInput = document.getElementById('password');
+    const passwordToggle = document.getElementById('memberLoginPasswordToggle');
     const tokenInput = document.getElementById('recaptcha_token');
-    const note = document.getElementById('recaptchaNote');
-    const loginBtn = document.getElementById('loginBtn');
-    const loginBtnText = loginBtn ? loginBtn.querySelector('.fi-btn-text') : null;
+    const submitButton = document.getElementById('memberLoginButton');
+    const submitText = submitButton
+        ? submitButton.querySelector('.member-login-button-text')
+        : null;
+    const recaptchaNote = document.getElementById('memberLoginRecaptchaNote');
+    const logo = document.getElementById('memberLoginLogo');
+    const logoBox = document.getElementById('memberLoginLogoBox');
+    const logoFallback = document.getElementById('memberLoginLogoFallback');
 
-    if (!form) return;
+    if (logo && logoBox && logoFallback) {
+        logo.addEventListener('error', function () {
+            logoBox.style.display = 'none';
+            logoFallback.style.display = 'flex';
+        });
+    }
 
-    let submitLocked = false;
-    let unlockTimer = null;
+    if (passwordInput && passwordToggle) {
+        passwordToggle.addEventListener('click', function () {
+            const shouldShow = passwordInput.type === 'password';
 
-    function lockSubmitButton() {
-        if (!loginBtn) return;
+            passwordInput.type = shouldShow ? 'text' : 'password';
+            passwordToggle.textContent = shouldShow ? 'Hide' : 'Show';
+            passwordToggle.setAttribute(
+                'aria-label',
+                shouldShow ? 'Hide password' : 'Show password'
+            );
+            passwordToggle.setAttribute('aria-pressed', shouldShow ? 'true' : 'false');
+        });
+    }
 
-        submitLocked = true;
-        loginBtn.disabled = true;
-        loginBtn.classList.add('is-processing');
+    if (!form || !submitButton) {
+        return;
+    }
 
-        if (loginBtnText) {
-            loginBtnText.textContent = 'Signing in...';
+    let submitting = false;
+
+    function setSubmittingState(isSubmitting) {
+        submitting = isSubmitting;
+        submitButton.disabled = isSubmitting;
+        submitButton.classList.toggle('is-processing', isSubmitting);
+
+        if (submitText) {
+            submitText.textContent = isSubmitting ? 'Signing in...' : 'Sign In';
         }
-
-        clearTimeout(unlockTimer);
-
-        unlockTimer = setTimeout(function() {
-            unlockSubmitButton();
-        }, 30000);
     }
 
-    function unlockSubmitButton() {
-        if (!loginBtn) return;
-
-        submitLocked = false;
-        loginBtn.disabled = false;
-        loginBtn.classList.remove('is-processing');
-
-        if (loginBtnText) {
-            loginBtnText.textContent = 'Login Securely';
-        }
-    }
-
-    function showRecaptchaNote() {
-        if (note) {
-            note.style.display = 'block';
-        }
-    }
-
-    function submitNativeForm() {
-        HTMLFormElement.prototype.submit.call(form);
-    }
-
-    function clearToken() {
+    function clearRecaptchaToken() {
         if (tokenInput) {
             tokenInput.value = '';
         }
+
+        if (recaptchaNote) {
+            recaptchaNote.style.display = 'none';
+        }
     }
 
-    const loginInput = document.getElementById('login');
-    const passwordInput = document.getElementById('password');
+    function showRecaptchaError() {
+        if (recaptchaNote) {
+            recaptchaNote.style.display = 'block';
+        }
+    }
 
     if (loginInput) {
-        loginInput.addEventListener('input', clearToken);
+        loginInput.addEventListener('input', clearRecaptchaToken);
     }
 
     if (passwordInput) {
-        passwordInput.addEventListener('input', clearToken);
+        passwordInput.addEventListener('input', clearRecaptchaToken);
     }
 
-    form.addEventListener('submit', function(e) {
-        if (submitLocked) {
-            e.preventDefault();
+    form.addEventListener('submit', function (event) {
+        if (submitting) {
+            event.preventDefault();
             return;
         }
 
-        lockSubmitButton();
-
-        if (!SITE_KEY || typeof grecaptcha === 'undefined') {
-            if (SITE_KEY) {
-                showRecaptchaNote();
-            }
+        if (!form.checkValidity()) {
+            event.preventDefault();
+            form.reportValidity();
             return;
         }
 
-        if (tokenInput && tokenInput.value) {
+        setSubmittingState(true);
+
+        /*
+         * When reCAPTCHA is not configured, submit normally.
+         */
+        if (!siteKey) {
             return;
         }
 
-        e.preventDefault();
+        event.preventDefault();
 
-        grecaptcha.ready(function() {
-            grecaptcha.execute(SITE_KEY, { action: 'login' }).then(function(token) {
-                if (tokenInput) {
-                    tokenInput.value = token;
-                }
+        if (typeof window.grecaptcha === 'undefined') {
+            setSubmittingState(false);
+            showRecaptchaError();
+            return;
+        }
 
-                submitNativeForm();
-            }).catch(function() {
-                showRecaptchaNote();
-                submitNativeForm();
-            });
+        window.grecaptcha.ready(function () {
+            window.grecaptcha
+                .execute(siteKey, { action: 'login' })
+                .then(function (token) {
+                    if (!token) {
+                        throw new Error('Empty reCAPTCHA token.');
+                    }
+
+                    if (tokenInput) {
+                        tokenInput.value = token;
+                    }
+
+                    HTMLFormElement.prototype.submit.call(form);
+                })
+                .catch(function () {
+                    setSubmittingState(false);
+                    clearRecaptchaToken();
+                    showRecaptchaError();
+                });
         });
     });
-
-    setTimeout(function() {
-        if (SITE_KEY && typeof grecaptcha === 'undefined') {
-            showRecaptchaNote();
-        }
-    }, 2500);
 })();
 </script>
 @endsection
