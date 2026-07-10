@@ -1388,6 +1388,19 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
             ])
                 ->whereNumber('id')
                 ->name('destroy');
+
+                /*
+|--------------------------------------------------------------------------
+| AJAX member search
+|--------------------------------------------------------------------------
+*/
+Route::get('/members/search', [
+    MemberLoanLimitController::class,
+    'searchMembers'
+])
+    ->middleware('throttle:60,1')
+    ->name('members.search');
+    
         });
     Route::get('/reports/members/status', [HomeController::class, 'reportsMembersStatus'])->name('reports.members.status')->middleware('check_user_rights:list_member_statement');
     Route::get('/reports/loans/issued', [HomeController::class, 'reportsLoansIssued'])->name('reports.loans.issued')->middleware('check_user_rights:rpt_loans_issued');
