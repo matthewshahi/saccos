@@ -20,7 +20,7 @@ class BankIpnIpMiddleware
         | While waiting for official bank IPs, allow all requests.
         | Set BANK_IPN_ALLOW_ALL=false later in production.
         */
-        if (filter_var(env('BANK_IPN_ALLOW_ALL', true), FILTER_VALIDATE_BOOLEAN)) {
+        if (filter_var(env('BANK_IPN_ALLOW_ALL', false), FILTER_VALIDATE_BOOLEAN)) {
             Log::info('Bank IPN IP check bypassed for testing', [
                 'bank_code' => $bankCode,
                 'client_ip' => $clientIp,

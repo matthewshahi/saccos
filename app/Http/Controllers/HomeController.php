@@ -15,6 +15,8 @@ use DateTime;
 use Illuminate\Support\Facades\Route;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\LoansIssuedExport;
+use App\Http\Middleware\CheckUserRights;
+use Illuminate\Validation\Rule;
 
 class HomeController extends Controller
 {
@@ -436,75 +438,75 @@ class HomeController extends Controller
         ]);
     }
     private function getMembersListFiltered(
-    $orderby = 'member_name',
-    $sort_order = 'asc',
-    $search = '',
-    $limit = null,
-    $memberActive = null,
-    $isJunior = null,
-    $memberDeleted = null
-) {
-    if (is_null($limit)) {
-        $limit = $this->recordLimit;
-    }
+        $orderby = 'member_name',
+        $sort_order = 'asc',
+        $search = '',
+        $limit = null,
+        $memberActive = null,
+        $isJunior = null,
+        $memberDeleted = null
+    ) {
+        if (is_null($limit)) {
+            $limit = $this->recordLimit;
+        }
 
-    $search = trim((string) $search);
-    $normalizedSearch = preg_replace('/\s+/', ' ', $search);
+        $search = trim((string) $search);
+        $normalizedSearch = preg_replace('/\s+/', ' ', $search);
 
-    /*
+        /*
      * Split name search into words.
      * Example:
      * "mwangi maina" => ["mwangi", "maina"]
      * "maina peter mwangi" => ["maina", "peter", "mwangi"]
      */
-    $nameTokens = [];
-    if ($normalizedSearch !== '') {
-        $nameTokens = preg_split('/\s+/', $normalizedSearch);
+        $nameTokens = [];
+        if ($normalizedSearch !== '') {
+            $nameTokens = preg_split('/\s+/', $normalizedSearch);
 
-        // Ignore very tiny noise words unless the whole search is short.
-        $nameTokens = array_values(array_filter($nameTokens, function ($word) use ($normalizedSearch) {
-            return strlen($word) >= 2 || strlen($normalizedSearch) <= 2;
-        }));
-    }
+            // Ignore very tiny noise words unless the whole search is short.
+            $nameTokens = array_values(array_filter($nameTokens, function ($word) use ($normalizedSearch) {
+                return strlen($word) >= 2 || strlen($normalizedSearch) <= 2;
+            }));
+        }
 
-    // Protect orderBy from request injection / wrong columns
-    $allowedOrderColumns = [
-        'member_name'        => 'sacco_members.member_name',
-        'member_sacco_id'    => 'sacco_members.member_sacco_id',
-        'member_national_id' => 'sacco_members.member_national_id',
-        'member_date_joined' => 'sacco_members.member_date_joined',
-        'company_name'       => 'sacco_company.company_name',
-        'department_name'    => 'sacco_department.department_name',
-        'position_name'      => 'sacco_position.position_name',
-        'member_active'      => 'sacco_members.member_active',
-    ];
+        // Protect orderBy from request injection / wrong columns
+        $allowedOrderColumns = [
+            'member_name'        => 'sacco_members.member_name',
+            'member_sacco_id'    => 'sacco_members.member_sacco_id',
+            'member_national_id' => 'sacco_members.member_national_id',
+            'member_date_joined' => 'sacco_members.member_date_joined',
+            'company_name'       => 'sacco_company.company_name',
+            'department_name'    => 'sacco_department.department_name',
+            'position_name'      => 'sacco_position.position_name',
+            'member_active'      => 'sacco_members.member_active',
+        ];
 
-    $orderbyColumn = $allowedOrderColumns[$orderby] ?? 'sacco_members.member_name';
-    $sort_order = strtolower($sort_order) === 'desc' ? 'desc' : 'asc';
+        $orderbyColumn = $allowedOrderColumns[$orderby] ?? 'sacco_members.member_name';
+        $sort_order = strtolower($sort_order) === 'desc' ? 'desc' : 'asc';
 
-    $query = DB::table('sacco_members')
-        ->join('sacco_department', 'sacco_members.member_dept', '=', 'sacco_department.department_id')
-        ->join('sacco_company', 'sacco_department.department_company_id', '=', 'sacco_company.company_id')
-        ->join('sacco_position', 'sacco_members.member_position', '=', 'sacco_position.position_id');
+        $query = DB::table('sacco_members')
+            ->join('sacco_department', 'sacco_members.member_dept', '=', 'sacco_department.department_id')
+            ->join('sacco_company', 'sacco_department.department_company_id', '=', 'sacco_company.company_id')
+            ->join('sacco_position', 'sacco_members.member_position', '=', 'sacco_position.position_id');
 
-    if ($normalizedSearch !== '') {
-        $likeSearch       = '%' . $normalizedSearch . '%';
-        $startsWithSearch = $normalizedSearch . '%';
+        if ($normalizedSearch !== '') {
+            $likeSearch       = '%' . $normalizedSearch . '%';
+            $startsWithSearch = $normalizedSearch . '%';
 
-        $query->where(function ($q) use ($normalizedSearch, $likeSearch, $startsWithSearch, $nameTokens) {
-            // Normal field search
-            $q->where('sacco_members.member_sacco_id', 'like', $likeSearch)
-                ->orWhere('sacco_members.member_national_id', 'like', $likeSearch)
-                ->orWhere('sacco_members.member_phone_no', 'like', $likeSearch)
-                ->orWhere('sacco_members.member_email', 'like', $likeSearch)
-                ->orWhere('sacco_company.company_name', 'like', $likeSearch)
-                ->orWhere('sacco_department.department_name', 'like', $likeSearch)
-                ->orWhere('sacco_position.position_name', 'like', $likeSearch)
+            $query->where(function ($q) use ($normalizedSearch, $likeSearch, $startsWithSearch, $nameTokens) {
+                // Normal field search
+                $q->where('sacco_members.member_sacco_id', 'like', $likeSearch)
+                    ->orWhere('sacco_members.member_national_id', 'like', $likeSearch)
+                    ->orWhere('sacco_members.member_phone_no', 'like', $likeSearch)
+                    ->orWhere('sacco_members.member_email', 'like', $likeSearch)
+                    ->orWhere('sacco_company.company_name', 'like', $likeSearch)
+                    ->orWhere('sacco_department.department_name', 'like', $likeSearch)
+                    ->orWhere('sacco_position.position_name', 'like', $likeSearch)
 
-                // Full name phrase search
-                ->orWhere('sacco_members.member_name', 'like', $likeSearch);
+                    // Full name phrase search
+                    ->orWhere('sacco_members.member_name', 'like', $likeSearch);
 
-            /*
+                /*
              * Smart name token search:
              * This means all typed name words must appear somewhere in the name,
              * regardless of order.
@@ -512,39 +514,39 @@ class HomeController extends Controller
              * Search: "mwangi maina"
              * Matches: "MAINA MWANGI", "MWANGI PETER MAINA", etc.
              */
-            if (count($nameTokens) >= 2) {
-                $q->orWhere(function ($nameQ) use ($nameTokens) {
-                    foreach ($nameTokens as $token) {
-                        $nameQ->where('sacco_members.member_name', 'like', '%' . $token . '%');
-                    }
-                });
-            }
+                if (count($nameTokens) >= 2) {
+                    $q->orWhere(function ($nameQ) use ($nameTokens) {
+                        foreach ($nameTokens as $token) {
+                            $nameQ->where('sacco_members.member_name', 'like', '%' . $token . '%');
+                        }
+                    });
+                }
 
-            /*
+                /*
              * Partial fallback:
              * Useful where user types one name only.
              */
-            if (count($nameTokens) === 1) {
-                $q->orWhere('sacco_members.member_name', 'like', '%' . $nameTokens[0] . '%');
-            }
-        });
+                if (count($nameTokens) === 1) {
+                    $q->orWhere('sacco_members.member_name', 'like', '%' . $nameTokens[0] . '%');
+                }
+            });
 
-        /*
+            /*
          * Build dynamic SQL for "all name words exist".
          * Example:
          * member_name LIKE '%mwangi%' AND member_name LIKE '%maina%'
          */
-        $allNameTokensSql = '';
-        $allNameTokensBindings = [];
+            $allNameTokensSql = '';
+            $allNameTokensBindings = [];
 
-        if (count($nameTokens) >= 2) {
-            $allNameTokensSql = '(' . implode(' AND ', array_fill(0, count($nameTokens), 'sacco_members.member_name LIKE ?')) . ')';
-            foreach ($nameTokens as $token) {
-                $allNameTokensBindings[] = '%' . $token . '%';
+            if (count($nameTokens) >= 2) {
+                $allNameTokensSql = '(' . implode(' AND ', array_fill(0, count($nameTokens), 'sacco_members.member_name LIKE ?')) . ')';
+                foreach ($nameTokens as $token) {
+                    $allNameTokensBindings[] = '%' . $token . '%';
+                }
             }
-        }
 
-        $caseSql = "
+            $caseSql = "
             CASE
                 WHEN sacco_members.member_sacco_id = ? THEN 1
                 WHEN sacco_members.member_national_id = ? THEN 2
@@ -559,26 +561,26 @@ class HomeController extends Controller
                 WHEN sacco_members.member_name LIKE ? THEN 9
         ";
 
-        $caseBindings = [
-            $normalizedSearch,
-            $normalizedSearch,
-            $normalizedSearch,
+            $caseBindings = [
+                $normalizedSearch,
+                $normalizedSearch,
+                $normalizedSearch,
 
-            $startsWithSearch,
-            $startsWithSearch,
-            $startsWithSearch,
+                $startsWithSearch,
+                $startsWithSearch,
+                $startsWithSearch,
 
-            $normalizedSearch,
-            $startsWithSearch,
-            $likeSearch,
-        ];
+                $normalizedSearch,
+                $startsWithSearch,
+                $likeSearch,
+            ];
 
-        if ($allNameTokensSql !== '') {
-            $caseSql .= " WHEN {$allNameTokensSql} THEN 10 ";
-            $caseBindings = array_merge($caseBindings, $allNameTokensBindings);
-        }
+            if ($allNameTokensSql !== '') {
+                $caseSql .= " WHEN {$allNameTokensSql} THEN 10 ";
+                $caseBindings = array_merge($caseBindings, $allNameTokensBindings);
+            }
 
-        $caseSql .= "
+            $caseSql .= "
                 WHEN sacco_company.company_name LIKE ? THEN 20
                 WHEN sacco_department.department_name LIKE ? THEN 21
                 WHEN sacco_position.position_name LIKE ? THEN 22
@@ -588,41 +590,41 @@ class HomeController extends Controller
             END ASC
         ";
 
-        $caseBindings = array_merge($caseBindings, [
-            $likeSearch,
-            $likeSearch,
-            $likeSearch,
-            $likeSearch,
-        ]);
+            $caseBindings = array_merge($caseBindings, [
+                $likeSearch,
+                $likeSearch,
+                $likeSearch,
+                $likeSearch,
+            ]);
 
-        $query->orderByRaw($caseSql, $caseBindings);
+            $query->orderByRaw($caseSql, $caseBindings);
+        }
+
+        // Optional filters
+        if (!is_null($memberActive) && $memberActive !== '') {
+            $query->where('sacco_members.member_active', '=', $memberActive);
+        }
+
+        if (!is_null($isJunior) && $isJunior !== '') {
+            $query->where('sacco_members.member_is_junior', '=', (int) $isJunior);
+        }
+
+        if (!is_null($memberDeleted) && $memberDeleted !== '') {
+            $query->where('sacco_members.member_deleted', '=', $memberDeleted);
+        }
+
+        return $query
+            ->orderBy($orderbyColumn, $sort_order)
+            ->orderBy('sacco_members.member_name', 'asc')
+            ->select(
+                'sacco_members.*',
+                'sacco_company.company_name',
+                'sacco_department.department_name',
+                'sacco_position.position_name'
+            )
+            ->limit($limit)
+            ->get();
     }
-
-    // Optional filters
-    if (!is_null($memberActive) && $memberActive !== '') {
-        $query->where('sacco_members.member_active', '=', $memberActive);
-    }
-
-    if (!is_null($isJunior) && $isJunior !== '') {
-        $query->where('sacco_members.member_is_junior', '=', (int) $isJunior);
-    }
-
-    if (!is_null($memberDeleted) && $memberDeleted !== '') {
-        $query->where('sacco_members.member_deleted', '=', $memberDeleted);
-    }
-
-    return $query
-        ->orderBy($orderbyColumn, $sort_order)
-        ->orderBy('sacco_members.member_name', 'asc')
-        ->select(
-            'sacco_members.*',
-            'sacco_company.company_name',
-            'sacco_department.department_name',
-            'sacco_position.position_name'
-        )
-        ->limit($limit)
-        ->get();
-}
     public function membersActive($status, Request $request)
     {
         $orderby = $request->input('orderby', 'member_name');
@@ -669,61 +671,283 @@ class HomeController extends Controller
 
     public function storeNewMember(Request $request)
     {
-        $validator = Validator::make($request->all(), [
-            'member_name' => 'required|string|max:100',
-            'member_date_joined' => 'required|date',
-            'member_sacco_id' => 'required|string|max:100|unique:sacco_members',
-            'member_national_id' => 'required|string|max:100|unique:sacco_members',
-            'member_email' => 'required|email|max:100|unique:sacco_members',
-            'member_dept' => 'required|integer',
-            'member_position' => 'required|integer',
-            'member_phone_no' => 'nullable|string|max:100',
-            'member_postal_address' => 'nullable|string',
-            'member_gender' => 'required|string|in:M,F',
-            'member_kra_pin' => 'nullable|string|max:255',
-            'member_dob' => 'nullable|date',
-            // 'member_dob' => 'nullable|date|before_or_equal:' . now()->subYears($this->minAge)->format('Y-m-d'),
-            'bank_name' => 'nullable|string|max:255',
-            'bank_branch' => 'nullable|string|max:255',
-            'bank_account_number' => 'nullable|string|max:255',
-            'member_is_junior' => 'required|in:0,1',
-            'member_guardian_id' => 'nullable|exists:sacco_members,member_id',
+        /*
+    |--------------------------------------------------------------------------
+    | Normalise key identity and contact fields before validation
+    |--------------------------------------------------------------------------
+    */
+        $submittedEmail = mb_strtolower(trim(
+            (string) $request->input('member_email')
+        ));
 
+        $rawPhone = trim((string) $request->input(
+            'member_phone_no',
+            ''
+        ));
+
+        $submittedPhone = $this->normalizeKenyanMobileNumber($rawPhone);
+
+        /*
+     * The phone field is optional, but when supplied it must be a valid
+     * Kenyan mobile number.
+     */
+        if ($rawPhone !== '' && $submittedPhone === null) {
+            return redirect()
+                ->back()
+                ->withErrors([
+                    'member_phone_no' =>
+                    'Enter a valid Kenyan mobile number, for example 0722400737, 722400737 or +254722400737.',
+                ])
+                ->withInput();
+        }
+
+        /*
+     * Clean identifiers before uniqueness validation.
+     */
+        $submittedSaccoId = strtoupper(trim(
+            (string) $request->input('member_sacco_id')
+        ));
+
+        $submittedNationalId = strtoupper(trim(
+            (string) $request->input('member_national_id')
+        ));
+
+        /*
+     * Replace submitted values with their canonical versions.
+     */
+        $request->merge([
+            'member_email'       => $submittedEmail,
+            'member_phone_no'    => $submittedPhone,
+            'member_sacco_id'    => $submittedSaccoId,
+            'member_national_id' => $submittedNationalId,
+        ]);
+
+        /*
+    |--------------------------------------------------------------------------
+    | Validate new member
+    |--------------------------------------------------------------------------
+    */
+        $validator = Validator::make($request->all(), [
+            'member_name' => [
+                'required',
+                'string',
+                'max:100',
+            ],
+
+            'member_date_joined' => [
+                'required',
+                'date',
+            ],
+
+            'member_sacco_id' => [
+                'required',
+                'string',
+                'max:100',
+                'unique:sacco_members,member_sacco_id',
+            ],
+
+            'member_national_id' => [
+                'required',
+                'string',
+                'max:100',
+                'unique:sacco_members,member_national_id',
+            ],
+
+            'member_email' => [
+                'required',
+                'string',
+                'email:rfc',
+                'max:100',
+                'unique:sacco_members,member_email',
+            ],
+
+            'member_phone_no' => [
+                'nullable',
+                'string',
+                'max:16',
+                'regex:/^\+254(?:7\d{8}|1\d{8})$/',
+            ],
+
+            'member_dept' => [
+                'required',
+                'integer',
+                'exists:sacco_department,department_id',
+            ],
+
+            'member_position' => [
+                'required',
+                'integer',
+                'exists:sacco_position,position_id',
+            ],
+
+            'member_postal_address' => [
+                'nullable',
+                'string',
+            ],
+
+            'member_gender' => [
+                'required',
+                'string',
+                'in:M,F',
+            ],
+
+            'member_kra_pin' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'member_dob' => [
+                'nullable',
+                'date',
+            ],
+
+            'bank_name' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'bank_branch' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'bank_account_number' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'member_is_junior' => [
+                'required',
+                'in:0,1',
+            ],
+
+            'member_guardian_id' => [
+                'nullable',
+                'integer',
+                'exists:sacco_members,member_id',
+            ],
+        ], [
+            'member_phone_no.regex' =>
+            'Enter a valid Kenyan mobile number, for example 0722400737 or +254722400737.',
+
+            'member_email.email' =>
+            'Enter a valid email address.',
+
+            'member_email.unique' =>
+            'That email address is already assigned to another member.',
+
+            'member_sacco_id.unique' =>
+            'That SACCO member number already exists.',
+
+            'member_national_id.unique' =>
+            'That national ID already exists.',
         ]);
 
         if ($validator->fails()) {
-            return redirect()->back()->withErrors($validator)->withInput();
+            return redirect()
+                ->back()
+                ->withErrors($validator)
+                ->withInput();
         }
 
-        $data = $request->only([
-            'member_name',
-            'member_date_joined',
-            'member_dept',
-            'member_sacco_id',
-            'member_national_id',
-            'member_postal_address',
-            'member_phone_no',
-            'member_gender',
-            'member_email',
-            'member_position',
-            'member_kra_pin',
-            'member_dob',
-            'bank_name',
-            'bank_branch',
-            'bank_account_number',
+        /*
+    |--------------------------------------------------------------------------
+    | Prepare clean database values
+    |--------------------------------------------------------------------------
+    */
+        $data = [
+            'member_name' => strtoupper(trim(
+                (string) $request->input('member_name')
+            )),
 
-        ]);
+            'member_date_joined' => $request->input(
+                'member_date_joined'
+            ),
 
-        $data['member_active'] = 'Y';
-        $data['member_ip'] = $request->ip();
-        $data['member_user_id'] = auth()->id();
-        $data['member_is_junior'] = $request->input('member_is_junior', 0);
-        $data['member_guardian_id'] = $request->input('member_guardian_id');
+            'member_dept' => $request->input(
+                'member_dept'
+            ),
 
+            'member_sacco_id' => $submittedSaccoId,
+
+            'member_national_id' => $submittedNationalId,
+
+            'member_postal_address' => $request->filled(
+                'member_postal_address'
+            )
+                ? strtoupper(trim(
+                    (string) $request->input('member_postal_address')
+                ))
+                : null,
+
+            'member_phone_no' => $submittedPhone,
+
+            'member_gender' => strtoupper(trim(
+                (string) $request->input('member_gender')
+            )),
+
+            'member_email' => $submittedEmail,
+
+            'member_position' => $request->input(
+                'member_position'
+            ),
+
+            'member_kra_pin' => $request->filled('member_kra_pin')
+                ? strtoupper(trim(
+                    (string) $request->input('member_kra_pin')
+                ))
+                : null,
+
+            'member_dob' => $request->filled('member_dob')
+                ? $request->input('member_dob')
+                : null,
+
+            'bank_name' => $request->filled('bank_name')
+                ? strtoupper(trim(
+                    (string) $request->input('bank_name')
+                ))
+                : null,
+
+            'bank_branch' => $request->filled('bank_branch')
+                ? strtoupper(trim(
+                    (string) $request->input('bank_branch')
+                ))
+                : null,
+
+            'bank_account_number' => $request->filled(
+                'bank_account_number'
+            )
+                ? strtoupper(trim(
+                    (string) $request->input('bank_account_number')
+                ))
+                : null,
+
+            'member_is_junior' => (int) $request->input(
+                'member_is_junior',
+                0
+            ),
+
+            'member_guardian_id' => $request->filled(
+                'member_guardian_id'
+            )
+                ? $request->input('member_guardian_id')
+                : null,
+
+            'member_active' => 'Y',
+            'member_deleted' => 'N',
+            'member_ip' => $request->ip(),
+            'member_user_id' => Auth::user()->member_id,
+        ];
 
         DB::table('sacco_members')->insert($data);
 
-        return redirect()->route('members.listing')->with('success', 'Member added successfully.');
+        return redirect()
+            ->route('members.listing')
+            ->with('success', 'Member added successfully.');
     }
 
     private function getMembers($orderby = 'member_name', $sort_order = 'asc', $search = '', $limit = null, $status = null)
@@ -802,64 +1026,490 @@ class HomeController extends Controller
 
     public function updateMember(Request $request, $id)
     {
+        /*
+    |--------------------------------------------------------------------------
+    | Normalise protected contact details before validation
+    |--------------------------------------------------------------------------
+    */
+        $rawEmail = trim((string) $request->input('member_email'));
+
+        /*
+     * Email addresses are stored in lowercase so that:
+     * MEMBER@EXAMPLE.COM
+     * member@example.com
+     *
+     * are not stored or treated as different addresses.
+     */
+        $submittedEmail = mb_strtolower($rawEmail);
+
+        $rawPhone = trim((string) $request->input(
+            'member_phone_no',
+            ''
+        ));
+
+        $submittedPhone = $this->normalizeKenyanMobileNumber($rawPhone);
+
+        /*
+     * Blank phone numbers are permitted because the field is nullable.
+     * A supplied but invalid number is rejected.
+     */
+        if ($rawPhone !== '' && $submittedPhone === null) {
+            return redirect()
+                ->back()
+                ->withErrors([
+                    'member_phone_no' =>
+                    'Enter a valid Kenyan mobile number, for example 0722400737, 722400737 or +254722400737.',
+                ])
+                ->withInput();
+        }
+
+        /*
+     * Replace the request values with their canonical versions.
+     */
+        $request->merge([
+            'member_email'    => $submittedEmail,
+            'member_phone_no' => $submittedPhone,
+        ]);
+
+        /*
+    |--------------------------------------------------------------------------
+    | Validate submitted member information
+    |--------------------------------------------------------------------------
+    */
         $validator = Validator::make($request->all(), [
-            'member_name' => 'required|string|max:255',
-            'member_sacco_id' => 'required|string|max:255',
-            'member_national_id' => 'required|string|max:255',
-            'member_email' => 'required|email|max:255',
-            'member_date_joined' => 'required|date',
-            'member_gender' => 'nullable|string|max:1',
-            'member_dob' => 'nullable|date',
-            'member_kra_pin' => 'nullable|string|max:255',
-            'member_phone_no' => 'nullable|string|max:255',
-            'member_postal_address' => 'nullable|string',
-            'member_dept' => 'required|integer|exists:sacco_department,department_id',
-            'member_position' => 'required|integer|exists:sacco_position,position_id',
-            'bank_name' => 'nullable|string|max:255',
-            'bank_branch' => 'nullable|string|max:255',
-            'bank_account_number' => 'nullable|string|max:255',
-            'member_active' => 'required|in:Y,N',
-            'member_deleted' => 'required|in:Y,N',
-            'member_is_junior' => 'nullable|boolean',
-            'member_guardian_id' => 'nullable|integer|exists:sacco_members,member_id',
+            'member_name' => [
+                'required',
+                'string',
+                'max:255',
+            ],
 
+            'member_sacco_id' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique(
+                    'sacco_members',
+                    'member_sacco_id'
+                )->ignore($id, 'member_id'),
+            ],
 
+            'member_national_id' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique(
+                    'sacco_members',
+                    'member_national_id'
+                )->ignore($id, 'member_id'),
+            ],
+
+            'member_email' => [
+                'required',
+                'string',
+                'email:rfc',
+                'max:255',
+                Rule::unique(
+                    'sacco_members',
+                    'member_email'
+                )->ignore($id, 'member_id'),
+            ],
+
+            'member_phone_no' => [
+                'nullable',
+                'string',
+                'max:16',
+                Rule::unique(
+                    'sacco_members',
+                    'member_phone_no'
+                )->ignore($id, 'member_id'),
+            ],
+
+            'member_date_joined' => [
+                'required',
+                'date',
+            ],
+
+            'member_gender' => [
+                'nullable',
+                'string',
+                'in:M,F',
+            ],
+
+            'member_dob' => [
+                'nullable',
+                'date',
+            ],
+
+            'member_kra_pin' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'member_postal_address' => [
+                'nullable',
+                'string',
+            ],
+
+            'member_dept' => [
+                'required',
+                'integer',
+                'exists:sacco_department,department_id',
+            ],
+
+            'member_position' => [
+                'required',
+                'integer',
+                'exists:sacco_position,position_id',
+            ],
+
+            'bank_name' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'bank_branch' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'bank_account_number' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'member_active' => [
+                'required',
+                'in:Y,N',
+            ],
+
+            'member_deleted' => [
+                'required',
+                'in:Y,N',
+            ],
+
+            'member_is_junior' => [
+                'nullable',
+                'boolean',
+            ],
+
+            'member_guardian_id' => [
+                'nullable',
+                'integer',
+                'exists:sacco_members,member_id',
+            ],
         ]);
 
         if ($validator->fails()) {
-            return redirect()->back()->withErrors($validator)->withInput();
+            return redirect()
+                ->back()
+                ->withErrors($validator)
+                ->withInput();
         }
 
-        // dd($request->input('member_dob'));
-        DB::table('sacco_members')
-            ->where('member_id', $id)
-            ->update([
-                'member_name' => strtoupper($request->input('member_name')),
-                'member_sacco_id' => strtoupper($request->input('member_sacco_id')),
-                'member_national_id' => strtoupper($request->input('member_national_id')),
-                'member_email' => $request->input('member_email'),
+        $submittedActive = strtoupper(trim((string) $request->input(
+            'member_active'
+        )));
 
-                'member_date_joined' => $request->input('member_date_joined'),
-                'member_gender' => $request->input('member_gender'),
-                'member_dob' => $request->input('member_dob'),
-                'member_kra_pin' => strtoupper($request->input('member_kra_pin')),
-                'member_phone_no' => $request->input('member_phone_no'),
-                'member_postal_address' => strtoupper($request->input('member_postal_address')),
-                'member_dept' => $request->input('member_dept'),
-                'member_position' => $request->input('member_position'),
-                'bank_name' => strtoupper($request->input('bank_name')),
-                'bank_branch' => strtoupper($request->input('bank_branch')),
-                'bank_account_number' => strtoupper($request->input('bank_account_number')),
-                'member_active' => $request->input('member_active'),
-                'member_deleted' => $request->input('member_deleted'),
-                'member_is_junior' => $request->input('member_is_junior', 0),
-                'member_guardian_id' => $request->input('member_guardian_id'),
+        $submittedDeleted = strtoupper(trim((string) $request->input(
+            'member_deleted'
+        )));
 
-            ]);
+        /*
+    |--------------------------------------------------------------------------
+    | Lock, compare and update atomically
+    |--------------------------------------------------------------------------
+    */
+        return DB::transaction(function () use (
+            $request,
+            $id,
+            $submittedEmail,
+            $submittedPhone,
+            $submittedActive,
+            $submittedDeleted
+        ) {
+            $member = DB::table('sacco_members')
+                ->where('member_id', $id)
+                ->lockForUpdate()
+                ->first();
 
-        return redirect()->route('members.listing')->with('success', 'Member updated successfully.');
+            if (!$member) {
+                return redirect()
+                    ->route('members.listing')
+                    ->with('error', 'Member not found.');
+            }
+
+            /*
+        |--------------------------------------------------------------------------
+        | Normalise the existing values before comparing
+        |--------------------------------------------------------------------------
+        | This prevents formatting-only corrections from triggering rights.
+        |
+        | Example:
+        | Existing: 0722 400 737
+        | Submitted: +254722400737
+        |
+        | Both represent the same number, so ChangePhone is not called.
+        */
+            $currentEmail = mb_strtolower(trim(
+                (string) ($member->member_email ?? '')
+            ));
+
+            $currentRawPhone = trim(
+                (string) ($member->member_phone_no ?? '')
+            );
+
+            $currentPhone = $this->normalizeKenyanMobileNumber(
+                $currentRawPhone
+            );
+
+            /*
+         * Preserve an invalid historical value for comparison until the user
+         * replaces or clears it.
+         */
+            if ($currentPhone === null && $currentRawPhone !== '') {
+                $currentPhone = $currentRawPhone;
+            }
+
+            $currentActive = strtoupper(trim(
+                (string) ($member->member_active ?? 'N')
+            ));
+
+            $currentDeleted = strtoupper(trim(
+                (string) ($member->member_deleted ?? 'N')
+            ));
+
+            /*
+        |--------------------------------------------------------------------------
+        | Detect substantive changes
+        |--------------------------------------------------------------------------
+        */
+            $emailChanged = $currentEmail !== $submittedEmail;
+
+            $phoneChanged = $currentPhone !== $submittedPhone;
+
+            $makingMemberInactive =
+                $currentActive === 'Y'
+                && $submittedActive === 'N';
+
+            $deletingMember =
+                $currentDeleted !== 'Y'
+                && $submittedDeleted === 'Y';
+
+            /*
+        |--------------------------------------------------------------------------
+        | Call only rights corresponding to actual changes
+        |--------------------------------------------------------------------------
+        */
+            $permissionErrors = [];
+
+            if (
+                $emailChanged
+                && !CheckUserRights::userHasRight('ChangeEmail')
+            ) {
+                $permissionErrors['member_email'] =
+                    'You do not have permission to change a member email address.';
+            }
+
+            if (
+                $phoneChanged
+                && !CheckUserRights::userHasRight('ChangePhone')
+            ) {
+                $permissionErrors['member_phone_no'] =
+                    'You do not have permission to change a member phone number.';
+            }
+
+            if (
+                $makingMemberInactive
+                && !CheckUserRights::userHasRight('MakeMemberInActive')
+            ) {
+                $permissionErrors['member_active'] =
+                    'You do not have permission to make a member inactive.';
+            }
+
+            if (
+                $deletingMember
+                && !CheckUserRights::userHasRight('DeleteMember')
+            ) {
+                $permissionErrors['member_deleted'] =
+                    'You do not have permission to delete a member.';
+            }
+
+            if (!empty($permissionErrors)) {
+                return redirect()
+                    ->back()
+                    ->withErrors($permissionErrors)
+                    ->withInput();
+            }
+
+            /*
+        |--------------------------------------------------------------------------
+        | Update member
+        |--------------------------------------------------------------------------
+        */
+            DB::table('sacco_members')
+                ->where('member_id', $id)
+                ->update([
+                    'member_name' => strtoupper(trim(
+                        (string) $request->input('member_name')
+                    )),
+
+                    'member_sacco_id' => strtoupper(trim(
+                        (string) $request->input('member_sacco_id')
+                    )),
+
+                    'member_national_id' => strtoupper(trim(
+                        (string) $request->input('member_national_id')
+                    )),
+
+                    'member_email' => $submittedEmail,
+
+                    'member_date_joined' => $request->input(
+                        'member_date_joined'
+                    ),
+
+                    'member_gender' => $request->input(
+                        'member_gender'
+                    ),
+
+                    'member_dob' => $request->input(
+                        'member_dob'
+                    ),
+
+                    'member_kra_pin' => strtoupper(trim(
+                        (string) $request->input('member_kra_pin', '')
+                    )),
+
+                    'member_phone_no' => $submittedPhone,
+
+                    'member_postal_address' => strtoupper(trim(
+                        (string) $request->input(
+                            'member_postal_address',
+                            ''
+                        )
+                    )),
+
+                    'member_dept' => $request->input(
+                        'member_dept'
+                    ),
+
+                    'member_position' => $request->input(
+                        'member_position'
+                    ),
+
+                    'bank_name' => strtoupper(trim(
+                        (string) $request->input('bank_name', '')
+                    )),
+
+                    'bank_branch' => strtoupper(trim(
+                        (string) $request->input('bank_branch', '')
+                    )),
+
+                    'bank_account_number' => strtoupper(trim(
+                        (string) $request->input(
+                            'bank_account_number',
+                            ''
+                        )
+                    )),
+
+                    'member_active' => $submittedActive,
+
+                    'member_deleted' => $submittedDeleted,
+
+                    'member_is_junior' => $request->input(
+                        'member_is_junior',
+                        0
+                    ),
+
+                    'member_guardian_id' => $request->input(
+                        'member_guardian_id'
+                    ),
+                ]);
+
+            return redirect()
+                ->route('members.listing')
+                ->with('success', 'Member updated successfully.');
+        });
     }
+    private function normalizeKenyanMobileNumber(?string $phone): ?string
+    {
+        $phone = trim((string) $phone);
 
+        if ($phone === '') {
+            return null;
+        }
+
+        /*
+     * Reject letters rather than silently removing them.
+     */
+        if (preg_match('/[a-z]/i', $phone)) {
+            return null;
+        }
+
+        /*
+     * Remove spaces, brackets, hyphens and other formatting characters.
+     */
+        $digits = preg_replace('/\D+/', '', $phone);
+
+        if ($digits === '') {
+            return null;
+        }
+
+        /*
+     * Convert 00254XXXXXXXXX to 254XXXXXXXXX.
+     */
+        if (str_starts_with($digits, '00254')) {
+            $digits = substr($digits, 2);
+        }
+
+        /*
+     * Correct entries such as:
+     * +254 0722 400 737
+     * 2540722400737
+     *
+     * The zero after 254 is the Kenyan local trunk prefix and must be removed.
+     */
+        if (str_starts_with($digits, '2540')) {
+            $digits = '254' . substr($digits, 4);
+        }
+
+        /*
+     * Convert local format:
+     * 0722400737 => 254722400737
+     * 0112345678 => 254112345678
+     */ elseif (
+            strlen($digits) === 10
+            && str_starts_with($digits, '0')
+        ) {
+            $digits = '254' . substr($digits, 1);
+        }
+
+        /*
+     * No prefix supplied: assume Kenya.
+     *
+     * 722400737 => 254722400737
+     * 112345678 => 254112345678
+     */ elseif (
+            strlen($digits) === 9
+            && in_array(substr($digits, 0, 1), ['7', '1'], true)
+        ) {
+            $digits = '254' . $digits;
+        }
+
+        /*
+     * Accept Kenyan international mobile numbers only:
+     * 2547XXXXXXXX
+     * 2541XXXXXXXX
+     */
+        if (!preg_match('/^254(?:7\d{8}|1\d{8})$/', $digits)) {
+            return null;
+        }
+
+        return '+' . $digits;
+    }
     // Status
     public function editStatus($id)
     {
@@ -953,139 +1603,139 @@ class HomeController extends Controller
     }
 
     public function listInstitutions()
-{
-    $institutions = DB::table('sacco_company')
-        ->leftJoin('sacco_sub_account', 'sacco_company.company_account', '=', 'sacco_sub_account.sub_account_id')
-        ->leftJoin('sacco_main_account', 'sacco_sub_account.sub_account_main_account', '=', 'sacco_main_account.main_account_id')
-        ->leftJoin('sacco_department', function ($join) {
-            $join->on('sacco_company.company_id', '=', 'sacco_department.department_company_id')
-                 ->where('sacco_department.department_deleted', '<>', 'Y');
-        })
-        ->where('sacco_company.company_deleted', '<>', 'Y')
-        ->select(
-            'sacco_company.company_id',
-            'sacco_company.company_name',
-            'sacco_company.company_details',
-            'sacco_company.company_account',
-            'sacco_main_account.main_account_code',
-            'sacco_sub_account.sub_account_code',
-            'sacco_sub_account.sub_account_name',
-            DB::raw("GROUP_CONCAT(DISTINCT sacco_department.department_name ORDER BY sacco_department.department_name SEPARATOR ', ') as department_name")
-        )
-        ->groupBy(
-            'sacco_company.company_id',
-            'sacco_company.company_name',
-            'sacco_company.company_details',
-            'sacco_company.company_account',
-            'sacco_main_account.main_account_code',
-            'sacco_sub_account.sub_account_code',
-            'sacco_sub_account.sub_account_name'
-        )
-        ->orderBy('sacco_company.company_name')
-        ->get();
+    {
+        $institutions = DB::table('sacco_company')
+            ->leftJoin('sacco_sub_account', 'sacco_company.company_account', '=', 'sacco_sub_account.sub_account_id')
+            ->leftJoin('sacco_main_account', 'sacco_sub_account.sub_account_main_account', '=', 'sacco_main_account.main_account_id')
+            ->leftJoin('sacco_department', function ($join) {
+                $join->on('sacco_company.company_id', '=', 'sacco_department.department_company_id')
+                    ->where('sacco_department.department_deleted', '<>', 'Y');
+            })
+            ->where('sacco_company.company_deleted', '<>', 'Y')
+            ->select(
+                'sacco_company.company_id',
+                'sacco_company.company_name',
+                'sacco_company.company_details',
+                'sacco_company.company_account',
+                'sacco_main_account.main_account_code',
+                'sacco_sub_account.sub_account_code',
+                'sacco_sub_account.sub_account_name',
+                DB::raw("GROUP_CONCAT(DISTINCT sacco_department.department_name ORDER BY sacco_department.department_name SEPARATOR ', ') as department_name")
+            )
+            ->groupBy(
+                'sacco_company.company_id',
+                'sacco_company.company_name',
+                'sacco_company.company_details',
+                'sacco_company.company_account',
+                'sacco_main_account.main_account_code',
+                'sacco_sub_account.sub_account_code',
+                'sacco_sub_account.sub_account_name'
+            )
+            ->orderBy('sacco_company.company_name')
+            ->get();
 
-    return view('institutions.list', ['data' => ['institutions' => $institutions]]);
-}
-public function editInstitution($id)
-{
-    $institution = DB::table('sacco_company')
-        ->where('company_id', $id)
-        ->where('company_deleted', '<>', 'Y')
-        ->first();
-
-    if (!$institution) {
-        return redirect()->route('institutions.list')->with('error', 'Institution not found.');
+        return view('institutions.list', ['data' => ['institutions' => $institutions]]);
     }
+    public function editInstitution($id)
+    {
+        $institution = DB::table('sacco_company')
+            ->where('company_id', $id)
+            ->where('company_deleted', '<>', 'Y')
+            ->first();
 
-    $departments = DB::table('sacco_department')
-        ->where('department_company_id', $id)
-        ->where('department_deleted', '<>', 'Y')
-        ->orderBy('department_name')
-        ->get();
-
-    $accounts = $this->getAccounts();
-
-    return view('institutions.edit', [
-        'data' => [
-            'institution' => $institution,
-            'departments' => $departments,
-            'accounts' => $accounts,
-        ]
-    ]);
-}
-
-public function updateInstitution(Request $request, $id)
-{
-    $institution = DB::table('sacco_company')
-        ->where('company_id', $id)
-        ->where('company_deleted', '<>', 'Y')
-        ->first();
-
-    if (!$institution) {
-        return redirect()->route('institutions.list')->with('error', 'Institution not found.');
-    }
-
-    $validator = Validator::make($request->all(), [
-        'company_name' => 'required|string|max:255|unique:sacco_company,company_name,' . $id . ',company_id',
-        'company_details' => 'nullable|string|max:1000',
-        'sub_account_id' => 'required|integer|exists:sacco_sub_account,sub_account_id',
-        'existing_departments' => 'nullable|array',
-        'existing_departments.*' => 'nullable|string|max:255',
-        'new_department_name' => 'nullable|string|max:255',
-    ]);
-
-    if ($validator->fails()) {
-        return redirect()->back()->withErrors($validator)->withInput();
-    }
-
-    DB::table('sacco_company')
-        ->where('company_id', $id)
-        ->update([
-            'company_name' => strtoupper($request->input('company_name')),
-            'company_details' => $request->input('company_details'),
-            'company_account' => $request->input('sub_account_id'),
-            'company_transdate' => now(),
-        ]);
-
-    if ($request->has('existing_departments')) {
-        foreach ($request->input('existing_departments') as $departmentId => $departmentName) {
-            if (!empty(trim($departmentName))) {
-                DB::table('sacco_department')
-                    ->where('department_id', $departmentId)
-                    ->where('department_company_id', $id)
-                    ->update([
-                        'department_name' => strtoupper(trim($departmentName)),
-                        'department_user_id' => auth()->id(),
-                        'department_ip' => $request->ip(),
-                        'department_transdate' => now(),
-                    ]);
-            }
+        if (!$institution) {
+            return redirect()->route('institutions.list')->with('error', 'Institution not found.');
         }
-    }
 
-    if ($request->filled('new_department_name')) {
-        $newDepartmentName = strtoupper(trim($request->input('new_department_name')));
-
-        $exists = DB::table('sacco_department')
+        $departments = DB::table('sacco_department')
             ->where('department_company_id', $id)
             ->where('department_deleted', '<>', 'Y')
-            ->whereRaw('UPPER(department_name) = ?', [$newDepartmentName])
-            ->exists();
+            ->orderBy('department_name')
+            ->get();
 
-        if (!$exists) {
-            DB::table('sacco_department')->insert([
-                'department_name' => $newDepartmentName,
-                'department_company_id' => $id,
-                'department_deleted' => 'N',
-                'department_user_id' => auth()->id(),
-                'department_ip' => $request->ip(),
-                'department_transdate' => now(),
-            ]);
-        }
+        $accounts = $this->getAccounts();
+
+        return view('institutions.edit', [
+            'data' => [
+                'institution' => $institution,
+                'departments' => $departments,
+                'accounts' => $accounts,
+            ]
+        ]);
     }
 
-    return redirect()->route('institutions.list')->with('success', 'Institution updated successfully.');
-}
+    public function updateInstitution(Request $request, $id)
+    {
+        $institution = DB::table('sacco_company')
+            ->where('company_id', $id)
+            ->where('company_deleted', '<>', 'Y')
+            ->first();
+
+        if (!$institution) {
+            return redirect()->route('institutions.list')->with('error', 'Institution not found.');
+        }
+
+        $validator = Validator::make($request->all(), [
+            'company_name' => 'required|string|max:255|unique:sacco_company,company_name,' . $id . ',company_id',
+            'company_details' => 'nullable|string|max:1000',
+            'sub_account_id' => 'required|integer|exists:sacco_sub_account,sub_account_id',
+            'existing_departments' => 'nullable|array',
+            'existing_departments.*' => 'nullable|string|max:255',
+            'new_department_name' => 'nullable|string|max:255',
+        ]);
+
+        if ($validator->fails()) {
+            return redirect()->back()->withErrors($validator)->withInput();
+        }
+
+        DB::table('sacco_company')
+            ->where('company_id', $id)
+            ->update([
+                'company_name' => strtoupper($request->input('company_name')),
+                'company_details' => $request->input('company_details'),
+                'company_account' => $request->input('sub_account_id'),
+                'company_transdate' => now(),
+            ]);
+
+        if ($request->has('existing_departments')) {
+            foreach ($request->input('existing_departments') as $departmentId => $departmentName) {
+                if (!empty(trim($departmentName))) {
+                    DB::table('sacco_department')
+                        ->where('department_id', $departmentId)
+                        ->where('department_company_id', $id)
+                        ->update([
+                            'department_name' => strtoupper(trim($departmentName)),
+                            'department_user_id' => auth()->id(),
+                            'department_ip' => $request->ip(),
+                            'department_transdate' => now(),
+                        ]);
+                }
+            }
+        }
+
+        if ($request->filled('new_department_name')) {
+            $newDepartmentName = strtoupper(trim($request->input('new_department_name')));
+
+            $exists = DB::table('sacco_department')
+                ->where('department_company_id', $id)
+                ->where('department_deleted', '<>', 'Y')
+                ->whereRaw('UPPER(department_name) = ?', [$newDepartmentName])
+                ->exists();
+
+            if (!$exists) {
+                DB::table('sacco_department')->insert([
+                    'department_name' => $newDepartmentName,
+                    'department_company_id' => $id,
+                    'department_deleted' => 'N',
+                    'department_user_id' => auth()->id(),
+                    'department_ip' => $request->ip(),
+                    'department_transdate' => now(),
+                ]);
+            }
+        }
+
+        return redirect()->route('institutions.list')->with('success', 'Institution updated successfully.');
+    }
     public function editNextOfKin($id)
     {
         $member = DB::table('sacco_members')
@@ -1498,7 +2148,7 @@ public function updateInstitution(Request $request, $id)
     public function viewStatement($id = null)
     {
 
-     $migrationMode = config('app.migration_mode', 'N');
+        $migrationMode = config('app.migration_mode', 'N');
         $user = auth()->user();
 
         // If the user is not an official or no ID is provided, use the authenticated user's ID
@@ -1515,20 +2165,20 @@ public function updateInstitution(Request $request, $id)
             return back()->withErrors(['error' => 'Member not found.']);
         }
 
-       // Statement filters
-$period_from = request('period_from', '000000');
-$period_to = request('period_to', '999999');
+        // Statement filters
+        $period_from = request('period_from', '000000');
+        $period_to = request('period_to', '999999');
 
-// Default: show only loans outstanding as at selected period_to.
-$cleared_loans = request('cleared_loans', 'uncleared');
+        // Default: show only loans outstanding as at selected period_to.
+        $cleared_loans = request('cleared_loans', 'uncleared');
 
-if (!in_array($cleared_loans, ['uncleared', 'cleared', 'all'], true)) {
-    $cleared_loans = 'uncleared';
-}
+        if (!in_array($cleared_loans, ['uncleared', 'cleared', 'all'], true)) {
+            $cleared_loans = 'uncleared';
+        }
 
-// For statement loan filtering only.
-// User requirement: outstanding loans with balance greater than 0.10.
-$statementLoanBalanceThreshold = 0.10;
+        // For statement loan filtering only.
+        // User requirement: outstanding loans with balance greater than 0.10.
+        $statementLoanBalanceThreshold = 0.10;
 
         // Fetch the threshold amount for determining cleared loans
         $threshold = DB::table('sacco_defaults')
@@ -1565,25 +2215,25 @@ $statementLoanBalanceThreshold = 0.10;
 | FEDHA now lives in sacco_special_saving_* tables.
 | This prevents the old FEDHA/FOSA records from showing under Other Contributions.
 */
-$specialSavingProductCodes = DB::table('sacco_special_saving_products')
-    ->where('special_saving_product_deleted', 'N')
-    ->pluck('special_saving_product_code')
-    ->map(fn ($code) => strtoupper(trim((string) $code)))
-    ->filter()
-    ->values()
-    ->all();
+        $specialSavingProductCodes = DB::table('sacco_special_saving_products')
+            ->where('special_saving_product_deleted', 'N')
+            ->pluck('special_saving_product_code')
+            ->map(fn($code) => strtoupper(trim((string) $code)))
+            ->filter()
+            ->values()
+            ->all();
 
-$fosaContributions = $fosaContributions->reject(function ($row) use ($specialSavingProductCodes) {
-    $typeName = strtoupper(trim((string) ($row->type_name ?? '')));
-    $typePrefix = strtoupper(trim((string) ($row->type_prefix ?? '')));
+        $fosaContributions = $fosaContributions->reject(function ($row) use ($specialSavingProductCodes) {
+            $typeName = strtoupper(trim((string) ($row->type_name ?? '')));
+            $typePrefix = strtoupper(trim((string) ($row->type_prefix ?? '')));
 
-    return in_array($typeName, $specialSavingProductCodes, true)
-        || in_array($typePrefix, $specialSavingProductCodes, true);
-})->values();
+            return in_array($typeName, $specialSavingProductCodes, true)
+                || in_array($typePrefix, $specialSavingProductCodes, true);
+        })->values();
 
-$fosaGrouped = $fosaContributions->groupBy(function ($row) {
-    return $row->type_name ?: 'UNSPECIFIED';
-});
+        $fosaGrouped = $fosaContributions->groupBy(function ($row) {
+            return $row->type_name ?: 'UNSPECIFIED';
+        });
 
 
 
@@ -1648,49 +2298,49 @@ $fosaGrouped = $fosaContributions->groupBy(function ($row) {
 |   Balance is calculated from actual repayments up to period_to,
 |   not just the current loan_loan_paid value. This keeps period filters correct.
 */
-$loanPaidToPeriodSub = DB::table('sacco_loan_payments')
-    ->select(
-        'loan_payments_loan_id',
-        DB::raw('SUM(COALESCE(loan_payments_amount, 0)) as paid_to_period')
-    )
-    ->where('loan_payments_period', '<=', $period_to)
-    ->groupBy('loan_payments_loan_id');
+        $loanPaidToPeriodSub = DB::table('sacco_loan_payments')
+            ->select(
+                'loan_payments_loan_id',
+                DB::raw('SUM(COALESCE(loan_payments_amount, 0)) as paid_to_period')
+            )
+            ->where('loan_payments_period', '<=', $period_to)
+            ->groupBy('loan_payments_loan_id');
 
-$loansQuery = DB::table('sacco_loans')
-    ->join('sacco_loan_types', 'sacco_loans.loan_loan_type', '=', 'sacco_loan_types.loan_type_id')
-    ->join('sacco_loan_category', 'sacco_loans.loan_loan_category', '=', 'sacco_loan_category.loan_category_id')
-    ->leftJoinSub($loanPaidToPeriodSub, 'paid_period', function ($join) {
-        $join->on('sacco_loans.loan_id', '=', 'paid_period.loan_payments_loan_id');
-    })
-    ->where('sacco_loans.loan_member', $id)
-    ->where('sacco_loans.loan_taken_period', '<=', $period_to)
-    ->select(
-        'sacco_loans.*',
-        'sacco_loan_types.loan_type_name',
-        'sacco_loan_category.loan_category_name',
-        DB::raw('COALESCE(paid_period.paid_to_period, 0) as paid_as_at_period_to'),
-        DB::raw('(COALESCE(sacco_loans.loan_amount, 0) - COALESCE(paid_period.paid_to_period, 0)) as balance_as_at_period_to')
-    );
+        $loansQuery = DB::table('sacco_loans')
+            ->join('sacco_loan_types', 'sacco_loans.loan_loan_type', '=', 'sacco_loan_types.loan_type_id')
+            ->join('sacco_loan_category', 'sacco_loans.loan_loan_category', '=', 'sacco_loan_category.loan_category_id')
+            ->leftJoinSub($loanPaidToPeriodSub, 'paid_period', function ($join) {
+                $join->on('sacco_loans.loan_id', '=', 'paid_period.loan_payments_loan_id');
+            })
+            ->where('sacco_loans.loan_member', $id)
+            ->where('sacco_loans.loan_taken_period', '<=', $period_to)
+            ->select(
+                'sacco_loans.*',
+                'sacco_loan_types.loan_type_name',
+                'sacco_loan_category.loan_category_name',
+                DB::raw('COALESCE(paid_period.paid_to_period, 0) as paid_as_at_period_to'),
+                DB::raw('(COALESCE(sacco_loans.loan_amount, 0) - COALESCE(paid_period.paid_to_period, 0)) as balance_as_at_period_to')
+            );
 
-if ($cleared_loans === 'uncleared') {
-    $loansQuery->whereRaw(
-        '(COALESCE(sacco_loans.loan_amount, 0) - COALESCE(paid_period.paid_to_period, 0)) > ?',
-        [$statementLoanBalanceThreshold]
-    );
-}
+        if ($cleared_loans === 'uncleared') {
+            $loansQuery->whereRaw(
+                '(COALESCE(sacco_loans.loan_amount, 0) - COALESCE(paid_period.paid_to_period, 0)) > ?',
+                [$statementLoanBalanceThreshold]
+            );
+        }
 
-if ($cleared_loans === 'cleared') {
-    $loansQuery->whereRaw(
-        '(COALESCE(sacco_loans.loan_amount, 0) - COALESCE(paid_period.paid_to_period, 0)) <= ?',
-        [$statementLoanBalanceThreshold]
-    );
-}
+        if ($cleared_loans === 'cleared') {
+            $loansQuery->whereRaw(
+                '(COALESCE(sacco_loans.loan_amount, 0) - COALESCE(paid_period.paid_to_period, 0)) <= ?',
+                [$statementLoanBalanceThreshold]
+            );
+        }
 
-$loans = $loansQuery
-    ->orderBy('sacco_loans.loan_taken_period', 'asc')
-    ->orderBy('sacco_loans.loan_on', 'asc')
-    ->orderBy('sacco_loans.loan_loan_type', 'asc')
-    ->get();
+        $loans = $loansQuery
+            ->orderBy('sacco_loans.loan_taken_period', 'asc')
+            ->orderBy('sacco_loans.loan_on', 'asc')
+            ->orderBy('sacco_loans.loan_loan_type', 'asc')
+            ->get();
 
 
         // Fetch all loan payments
@@ -1741,64 +2391,64 @@ $loans = $loansQuery
 | Pulls FEDHA and any future special saving product from the new module.
 | It respects period_from / period_to and uses transaction balance-after fields.
 */
-$specialSavingAccounts = DB::table('sacco_special_saving_accounts as a')
-    ->leftJoin('sacco_special_saving_products as p', 'p.special_saving_product_id', '=', 'a.special_saving_account_product_id')
-    ->where('a.special_saving_account_member_id', $id)
-    ->where('a.special_saving_account_deleted', 'N')
-    ->select(
-        'a.*',
-        'p.special_saving_product_name',
-        'p.special_saving_product_code'
-    )
-    ->orderBy('p.special_saving_product_name')
-    ->orderBy('a.special_saving_account_number')
-    ->get();
+        $specialSavingAccounts = DB::table('sacco_special_saving_accounts as a')
+            ->leftJoin('sacco_special_saving_products as p', 'p.special_saving_product_id', '=', 'a.special_saving_account_product_id')
+            ->where('a.special_saving_account_member_id', $id)
+            ->where('a.special_saving_account_deleted', 'N')
+            ->select(
+                'a.*',
+                'p.special_saving_product_name',
+                'p.special_saving_product_code'
+            )
+            ->orderBy('p.special_saving_product_name')
+            ->orderBy('a.special_saving_account_number')
+            ->get();
 
-$specialSavings = $specialSavingAccounts->map(function ($account) use ($period_from, $period_to) {
-    $openingTxn = DB::table('sacco_special_saving_transactions')
-        ->where('special_saving_transaction_account_id', $account->special_saving_account_id)
-        ->where('special_saving_transaction_deleted', 'N')
-        ->where(function ($q) {
-            $q->where('special_saving_transaction_reversed', 'N')
-              ->orWhereNull('special_saving_transaction_reversed');
-        })
-        ->where('special_saving_transaction_period', '<', $period_from)
-        ->orderByDesc('special_saving_transaction_period')
-        ->orderByDesc('special_saving_transaction_date')
-        ->orderByDesc('special_saving_transaction_id')
-        ->first();
+        $specialSavings = $specialSavingAccounts->map(function ($account) use ($period_from, $period_to) {
+            $openingTxn = DB::table('sacco_special_saving_transactions')
+                ->where('special_saving_transaction_account_id', $account->special_saving_account_id)
+                ->where('special_saving_transaction_deleted', 'N')
+                ->where(function ($q) {
+                    $q->where('special_saving_transaction_reversed', 'N')
+                        ->orWhereNull('special_saving_transaction_reversed');
+                })
+                ->where('special_saving_transaction_period', '<', $period_from)
+                ->orderByDesc('special_saving_transaction_period')
+                ->orderByDesc('special_saving_transaction_date')
+                ->orderByDesc('special_saving_transaction_id')
+                ->first();
 
-    $transactions = DB::table('sacco_special_saving_transactions')
-        ->where('special_saving_transaction_account_id', $account->special_saving_account_id)
-        ->where('special_saving_transaction_deleted', 'N')
-        ->where(function ($q) {
-            $q->where('special_saving_transaction_reversed', 'N')
-              ->orWhereNull('special_saving_transaction_reversed');
-        })
-        ->whereBetween('special_saving_transaction_period', [$period_from, $period_to])
-        ->orderBy('special_saving_transaction_period')
-        ->orderBy('special_saving_transaction_date')
-        ->orderBy('special_saving_transaction_id')
-        ->get();
+            $transactions = DB::table('sacco_special_saving_transactions')
+                ->where('special_saving_transaction_account_id', $account->special_saving_account_id)
+                ->where('special_saving_transaction_deleted', 'N')
+                ->where(function ($q) {
+                    $q->where('special_saving_transaction_reversed', 'N')
+                        ->orWhereNull('special_saving_transaction_reversed');
+                })
+                ->whereBetween('special_saving_transaction_period', [$period_from, $period_to])
+                ->orderBy('special_saving_transaction_period')
+                ->orderBy('special_saving_transaction_date')
+                ->orderBy('special_saving_transaction_id')
+                ->get();
 
-    $openingPrincipal = $openingTxn ? (float) $openingTxn->special_saving_transaction_principal_balance_after : 0;
-    $openingAccruedInterest = $openingTxn ? (float) $openingTxn->special_saving_transaction_accrued_interest_after : 0;
-    $openingAvailableInterest = $openingTxn ? (float) $openingTxn->special_saving_transaction_available_interest_after : 0;
-    $openingTotal = $openingTxn ? (float) $openingTxn->special_saving_transaction_total_balance_after : 0;
+            $openingPrincipal = $openingTxn ? (float) $openingTxn->special_saving_transaction_principal_balance_after : 0;
+            $openingAccruedInterest = $openingTxn ? (float) $openingTxn->special_saving_transaction_accrued_interest_after : 0;
+            $openingAvailableInterest = $openingTxn ? (float) $openingTxn->special_saving_transaction_available_interest_after : 0;
+            $openingTotal = $openingTxn ? (float) $openingTxn->special_saving_transaction_total_balance_after : 0;
 
-    return (object) [
-        'account' => $account,
-        'opening_principal' => $openingPrincipal,
-        'opening_accrued_interest' => $openingAccruedInterest,
-        'opening_available_interest' => $openingAvailableInterest,
-        'opening_total' => $openingTotal,
-        'transactions' => $transactions,
-    ];
-})->filter(function ($item) {
-    return $item->transactions->count() > 0
-        || abs((float) $item->opening_total) > 0
-        || abs((float) $item->account->special_saving_account_total_balance) > 0;
-})->values();
+            return (object) [
+                'account' => $account,
+                'opening_principal' => $openingPrincipal,
+                'opening_accrued_interest' => $openingAccruedInterest,
+                'opening_available_interest' => $openingAvailableInterest,
+                'opening_total' => $openingTotal,
+                'transactions' => $transactions,
+            ];
+        })->filter(function ($item) {
+            return $item->transactions->count() > 0
+                || abs((float) $item->opening_total) > 0
+                || abs((float) $item->account->special_saving_account_total_balance) > 0;
+        })->values();
 
         $data = [
             'member' => $member,
@@ -1814,10 +2464,10 @@ $specialSavings = $specialSavingAccounts->map(function ($account) use ($period_f
             'period_from' => $period_from,
             'period_to' => $period_to,
             'threshold_amount' => $threshold_amount,
-             'migrationMode' => $migrationMode,
-             'specialSavings' => $specialSavings,
-             'cleared_loans' => $cleared_loans,
-'statementLoanBalanceThreshold' => $statementLoanBalanceThreshold,
+            'migrationMode' => $migrationMode,
+            'specialSavings' => $specialSavings,
+            'cleared_loans' => $cleared_loans,
+            'statementLoanBalanceThreshold' => $statementLoanBalanceThreshold,
         ];
 
         return view('members.statement', compact('data'));
@@ -5628,673 +6278,673 @@ $specialSavings = $specialSavingAccounts->map(function ($account) use ($period_f
     }
 
 
-   public function adminDefaults()
-{
-    $currentPeriod = DB::table('sacco_period')
-        ->where('period_active', 'Y')
-        ->where('period_deleted', '<>', 'Y')
-        ->first();
+    public function adminDefaults()
+    {
+        $currentPeriod = DB::table('sacco_period')
+            ->where('period_active', 'Y')
+            ->where('period_deleted', '<>', 'Y')
+            ->first();
 
-    $defaults = DB::table('sacco_defaults')
-        ->orderBy('default_name')
-        ->get();
+        $defaults = DB::table('sacco_defaults')
+            ->orderBy('default_name')
+            ->get();
 
-    $subAccounts = DB::table('sacco_sub_account')
-        ->join('sacco_main_account', 'sacco_sub_account.sub_account_main_account', '=', 'sacco_main_account.main_account_id')
-        ->where('sacco_sub_account.sub_account_deleted', '<>', 'Y')
-        ->select(
-            'sacco_sub_account.sub_account_id',
-            'sacco_sub_account.sub_account_name',
-            'sacco_sub_account.sub_account_code',
-            'sacco_main_account.main_account_code',
-            'sacco_main_account.main_account_name'
-        )
-        ->orderBy('sacco_main_account.main_account_code')
-        ->orderBy('sacco_sub_account.sub_account_code')
-        ->orderBy('sacco_sub_account.sub_account_name')
-        ->get();
+        $subAccounts = DB::table('sacco_sub_account')
+            ->join('sacco_main_account', 'sacco_sub_account.sub_account_main_account', '=', 'sacco_main_account.main_account_id')
+            ->where('sacco_sub_account.sub_account_deleted', '<>', 'Y')
+            ->select(
+                'sacco_sub_account.sub_account_id',
+                'sacco_sub_account.sub_account_name',
+                'sacco_sub_account.sub_account_code',
+                'sacco_main_account.main_account_code',
+                'sacco_main_account.main_account_name'
+            )
+            ->orderBy('sacco_main_account.main_account_code')
+            ->orderBy('sacco_sub_account.sub_account_code')
+            ->orderBy('sacco_sub_account.sub_account_name')
+            ->get();
 
-    return view('admin.defaults', compact('defaults', 'subAccounts', 'currentPeriod'));
-}
+        return view('admin.defaults', compact('defaults', 'subAccounts', 'currentPeriod'));
+    }
 
 
     public function updateDefaults(Request $request)
-{
-    $defaultsInput = $request->input('defaults', []);
+    {
+        $defaultsInput = $request->input('defaults', []);
 
-    if (!is_array($defaultsInput) || empty($defaultsInput)) {
-        return redirect()->route('admin.defaults')->withErrors([
-            'error' => 'No default values were submitted.',
+        if (!is_array($defaultsInput) || empty($defaultsInput)) {
+            return redirect()->route('admin.defaults')->withErrors([
+                'error' => 'No default values were submitted.',
+            ]);
+        }
+
+        $defaultIds = array_keys($defaultsInput);
+
+        $existingDefaults = DB::table('sacco_defaults')
+            ->whereIn('default_id', $defaultIds)
+            ->get()
+            ->keyBy('default_id');
+
+        if ($existingDefaults->count() !== count($defaultIds)) {
+            return redirect()->route('admin.defaults')->withErrors([
+                'error' => 'Some defaults could not be found.',
+            ]);
+        }
+
+        $subAccountIds = DB::table('sacco_sub_account')
+            ->where('sub_account_deleted', '<>', 'Y')
+            ->pluck('sub_account_id')
+            ->map(fn($id) => (string) $id)
+            ->toArray();
+
+        foreach ($defaultsInput as $id => $value) {
+            $default = $existingDefaults->get($id);
+
+            if (!$default) {
+                return redirect()->route('admin.defaults')->withErrors([
+                    'error' => 'A submitted default could not be found.',
+                ]);
+            }
+
+            $value = is_string($value) ? trim($value) : $value;
+
+            if (
+                str_starts_with($default->default_name, 'default_') &&
+                str_ends_with($default->default_name, '_account')
+            ) {
+                if ($value === '' || !in_array((string) $value, $subAccountIds, true)) {
+                    return redirect()->route('admin.defaults')->withErrors([
+                        'error' => "The selected account for {$default->default_name} is invalid.",
+                    ])->withInput();
+                }
+            } else {
+                if ($value === null || $value === '') {
+                    return redirect()->route('admin.defaults')->withErrors([
+                        'error' => "The value for {$default->default_name} cannot be empty.",
+                    ])->withInput();
+                }
+            }
+        }
+
+        foreach ($defaultsInput as $id => $value) {
+            DB::table('sacco_defaults')
+                ->where('default_id', $id)
+                ->update([
+                    'default_value' => is_string($value) ? trim($value) : $value,
+                    'default_transdate' => now(),
+                    'default_userid' => auth()->id(),
+                    'default_ip' => $request->ip(),
+                ]);
+        }
+
+        return redirect()->route('admin.defaults')->with('success', 'Default values updated successfully.');
+    }
+    public function storeDefault(Request $request)
+    {
+        $request->validate([
+            'default_name' => 'required|string|max:250',
+            'default_value' => 'required|string|max:250',
         ]);
+
+        $defaultName = trim($request->input('default_name'));
+        $defaultValue = trim($request->input('default_value'));
+
+        $exists = DB::table('sacco_defaults')
+            ->whereRaw('LOWER(default_name) = ?', [strtolower($defaultName)])
+            ->exists();
+
+        if ($exists) {
+            return redirect()->route('admin.defaults')->withErrors([
+                'error' => "Default name {$defaultName} already exists.",
+            ])->withInput();
+        }
+
+        if (str_starts_with($defaultName, 'default_') && str_ends_with($defaultName, '_account')) {
+            $validSubAccount = DB::table('sacco_sub_account')
+                ->where('sub_account_id', $defaultValue)
+                ->where('sub_account_deleted', '<>', 'Y')
+                ->exists();
+
+            if (!$validSubAccount) {
+                return redirect()->route('admin.defaults')->withErrors([
+                    'error' => "The selected account for {$defaultName} is invalid.",
+                ])->withInput();
+            }
+        }
+
+        DB::table('sacco_defaults')->insert([
+            'default_name' => $defaultName,
+            'default_value' => $defaultValue,
+            'default_transdate' => now(),
+            'default_userid' => auth()->id(),
+            'default_ip' => $request->ip(),
+        ]);
+
+        return redirect()->route('admin.defaults')->with('success', 'New default added successfully.');
     }
 
-    $defaultIds = array_keys($defaultsInput);
-
-    $existingDefaults = DB::table('sacco_defaults')
-        ->whereIn('default_id', $defaultIds)
-        ->get()
-        ->keyBy('default_id');
-
-    if ($existingDefaults->count() !== count($defaultIds)) {
-        return redirect()->route('admin.defaults')->withErrors([
-            'error' => 'Some defaults could not be found.',
-        ]);
-    }
-
-    $subAccountIds = DB::table('sacco_sub_account')
-        ->where('sub_account_deleted', '<>', 'Y')
-        ->pluck('sub_account_id')
-        ->map(fn ($id) => (string) $id)
-        ->toArray();
-
-    foreach ($defaultsInput as $id => $value) {
-        $default = $existingDefaults->get($id);
+    public function destroyDefault($id)
+    {
+        $default = DB::table('sacco_defaults')
+            ->where('default_id', $id)
+            ->first();
 
         if (!$default) {
             return redirect()->route('admin.defaults')->withErrors([
-                'error' => 'A submitted default could not be found.',
+                'error' => 'Default not found.',
             ]);
         }
 
-        $value = is_string($value) ? trim($value) : $value;
-
-        if (
-            str_starts_with($default->default_name, 'default_') &&
-            str_ends_with($default->default_name, '_account')
-        ) {
-            if ($value === '' || !in_array((string) $value, $subAccountIds, true)) {
-                return redirect()->route('admin.defaults')->withErrors([
-                    'error' => "The selected account for {$default->default_name} is invalid.",
-                ])->withInput();
-            }
-        } else {
-            if ($value === null || $value === '') {
-                return redirect()->route('admin.defaults')->withErrors([
-                    'error' => "The value for {$default->default_name} cannot be empty.",
-                ])->withInput();
-            }
-        }
-    }
-
-    foreach ($defaultsInput as $id => $value) {
         DB::table('sacco_defaults')
             ->where('default_id', $id)
-            ->update([
-                'default_value' => is_string($value) ? trim($value) : $value,
-                'default_transdate' => now(),
-                'default_userid' => auth()->id(),
-                'default_ip' => $request->ip(),
-            ]);
+            ->delete();
+
+        return redirect()->route('admin.defaults')->with('success', 'Default deleted successfully.');
     }
-
-    return redirect()->route('admin.defaults')->with('success', 'Default values updated successfully.');
-}
-  public function storeDefault(Request $request)
-{
-    $request->validate([
-        'default_name' => 'required|string|max:250',
-        'default_value' => 'required|string|max:250',
-    ]);
-
-    $defaultName = trim($request->input('default_name'));
-    $defaultValue = trim($request->input('default_value'));
-
-    $exists = DB::table('sacco_defaults')
-        ->whereRaw('LOWER(default_name) = ?', [strtolower($defaultName)])
-        ->exists();
-
-    if ($exists) {
-        return redirect()->route('admin.defaults')->withErrors([
-            'error' => "Default name {$defaultName} already exists.",
-        ])->withInput();
-    }
-
-    if (str_starts_with($defaultName, 'default_') && str_ends_with($defaultName, '_account')) {
-        $validSubAccount = DB::table('sacco_sub_account')
-            ->where('sub_account_id', $defaultValue)
-            ->where('sub_account_deleted', '<>', 'Y')
-            ->exists();
-
-        if (!$validSubAccount) {
-            return redirect()->route('admin.defaults')->withErrors([
-                'error' => "The selected account for {$defaultName} is invalid.",
-            ])->withInput();
-        }
-    }
-
-    DB::table('sacco_defaults')->insert([
-        'default_name' => $defaultName,
-        'default_value' => $defaultValue,
-        'default_transdate' => now(),
-        'default_userid' => auth()->id(),
-        'default_ip' => $request->ip(),
-    ]);
-
-    return redirect()->route('admin.defaults')->with('success', 'New default added successfully.');
-}
-
-public function destroyDefault($id)
-{
-    $default = DB::table('sacco_defaults')
-        ->where('default_id', $id)
-        ->first();
-
-    if (!$default) {
-        return redirect()->route('admin.defaults')->withErrors([
-            'error' => 'Default not found.',
-        ]);
-    }
-
-    DB::table('sacco_defaults')
-        ->where('default_id', $id)
-        ->delete();
-
-    return redirect()->route('admin.defaults')->with('success', 'Default deleted successfully.');
-}
 
 
 
 
     public function loansTypes()
-{
-    $loanTypes = DB::table('sacco_loan_types')
-        ->where('loan_type_deleted', '<>', 'Y')
-        ->orderBy('loan_type_name')
-        ->get();
+    {
+        $loanTypes = DB::table('sacco_loan_types')
+            ->where('loan_type_deleted', '<>', 'Y')
+            ->orderBy('loan_type_name')
+            ->get();
 
-    $subAccountDetails = DB::table('sacco_sub_account')
-        ->join('sacco_main_account', 'sacco_sub_account.sub_account_main_account', '=', 'sacco_main_account.main_account_id')
-        ->where('sacco_sub_account.sub_account_deleted', '<>', 'Y')
-        ->select(
-            'sacco_sub_account.sub_account_id',
-            'sacco_sub_account.sub_account_name',
-            'sacco_sub_account.sub_account_code',
-            'sacco_main_account.main_account_code'
-        )
-        ->orderBy('sacco_sub_account.sub_account_name')
-        ->get()
-        ->keyBy('sub_account_id');
+        $subAccountDetails = DB::table('sacco_sub_account')
+            ->join('sacco_main_account', 'sacco_sub_account.sub_account_main_account', '=', 'sacco_main_account.main_account_id')
+            ->where('sacco_sub_account.sub_account_deleted', '<>', 'Y')
+            ->select(
+                'sacco_sub_account.sub_account_id',
+                'sacco_sub_account.sub_account_name',
+                'sacco_sub_account.sub_account_code',
+                'sacco_main_account.main_account_code'
+            )
+            ->orderBy('sacco_sub_account.sub_account_name')
+            ->get()
+            ->keyBy('sub_account_id');
 
-    $currentPeriod = DB::table('sacco_period')
-        ->where('period_active', 'Y')
-        ->where('period_deleted', '<>', 'Y')
-        ->first();
+        $currentPeriod = DB::table('sacco_period')
+            ->where('period_active', 'Y')
+            ->where('period_deleted', '<>', 'Y')
+            ->first();
 
-    return view('loans.types', compact('loanTypes', 'subAccountDetails', 'currentPeriod'));
-}
+        return view('loans.types', compact('loanTypes', 'subAccountDetails', 'currentPeriod'));
+    }
 
     public function editLoanType($id)
-{
-    $currentPeriod = DB::table('sacco_period')
-        ->where('period_active', 'Y')
-        ->where('period_deleted', '<>', 'Y')
-        ->first();
+    {
+        $currentPeriod = DB::table('sacco_period')
+            ->where('period_active', 'Y')
+            ->where('period_deleted', '<>', 'Y')
+            ->first();
 
-    $loanType = DB::table('sacco_loan_types')
-        ->where('loan_type_id', $id)
-        ->where('loan_type_deleted', '<>', 'Y')
-        ->first();
+        $loanType = DB::table('sacco_loan_types')
+            ->where('loan_type_id', $id)
+            ->where('loan_type_deleted', '<>', 'Y')
+            ->first();
 
-    if (!$loanType) {
-        return redirect()->route('loans.types')->with('error', 'Loan type not found.');
+        if (!$loanType) {
+            return redirect()->route('loans.types')->with('error', 'Loan type not found.');
+        }
+
+        $assetAccounts = DB::table('sacco_sub_account')
+            ->join('sacco_main_account', 'sacco_sub_account.sub_account_main_account', '=', 'sacco_main_account.main_account_id')
+            ->where('sacco_sub_account.sub_account_deleted', '<>', 'Y')
+            ->where('sacco_main_account.main_account_code', 'like', 'A%')
+            ->select(
+                'sacco_sub_account.sub_account_id',
+                'sacco_sub_account.sub_account_name',
+                'sacco_sub_account.sub_account_code',
+                'sacco_main_account.main_account_code'
+            )
+            ->orderBy('sacco_sub_account.sub_account_name')
+            ->orderBy('sacco_main_account.main_account_code')
+            ->orderBy('sacco_sub_account.sub_account_code')
+            ->get();
+
+        $incomeAccounts = DB::table('sacco_sub_account')
+            ->join('sacco_main_account', 'sacco_sub_account.sub_account_main_account', '=', 'sacco_main_account.main_account_id')
+            ->where('sacco_sub_account.sub_account_deleted', '<>', 'Y')
+            ->where('sacco_main_account.main_account_code', 'like', 'I%')
+            ->select(
+                'sacco_sub_account.sub_account_id',
+                'sacco_sub_account.sub_account_name',
+                'sacco_sub_account.sub_account_code',
+                'sacco_main_account.main_account_code'
+            )
+            ->orderBy('sacco_sub_account.sub_account_name')
+            ->orderBy('sacco_main_account.main_account_code')
+            ->orderBy('sacco_sub_account.sub_account_code')
+            ->get();
+
+        $incomeLiabilityAccounts = DB::table('sacco_sub_account')
+            ->join('sacco_main_account', 'sacco_sub_account.sub_account_main_account', '=', 'sacco_main_account.main_account_id')
+            ->where('sacco_sub_account.sub_account_deleted', '<>', 'Y')
+            ->where(function ($q) {
+                $q->where('sacco_main_account.main_account_code', 'like', 'I%')
+                    ->orWhere('sacco_main_account.main_account_code', 'like', 'L%');
+            })
+            ->select(
+                'sacco_sub_account.sub_account_id',
+                'sacco_sub_account.sub_account_name',
+                'sacco_sub_account.sub_account_code',
+                'sacco_main_account.main_account_code'
+            )
+            ->orderBy('sacco_sub_account.sub_account_name')
+            ->orderBy('sacco_main_account.main_account_code')
+            ->orderBy('sacco_sub_account.sub_account_code')
+            ->get();
+
+        return view('loans.edit', compact(
+            'currentPeriod',
+            'loanType',
+            'assetAccounts',
+            'incomeAccounts',
+            'incomeLiabilityAccounts'
+        ));
     }
+    public function updateLoanType(Request $request, $id)
+    {
+        $loanType = DB::table('sacco_loan_types')
+            ->where('loan_type_id', $id)
+            ->where('loan_type_deleted', '<>', 'Y')
+            ->first();
 
-    $assetAccounts = DB::table('sacco_sub_account')
-        ->join('sacco_main_account', 'sacco_sub_account.sub_account_main_account', '=', 'sacco_main_account.main_account_id')
-        ->where('sacco_sub_account.sub_account_deleted', '<>', 'Y')
-        ->where('sacco_main_account.main_account_code', 'like', 'A%')
-        ->select(
-            'sacco_sub_account.sub_account_id',
-            'sacco_sub_account.sub_account_name',
-            'sacco_sub_account.sub_account_code',
-            'sacco_main_account.main_account_code'
-        )
-        ->orderBy('sacco_sub_account.sub_account_name')
-        ->orderBy('sacco_main_account.main_account_code')
-        ->orderBy('sacco_sub_account.sub_account_code')
-        ->get();
+        if (!$loanType) {
+            return redirect()->route('loans.types')->with('error', 'Loan type not found.');
+        }
 
-    $incomeAccounts = DB::table('sacco_sub_account')
-        ->join('sacco_main_account', 'sacco_sub_account.sub_account_main_account', '=', 'sacco_main_account.main_account_id')
-        ->where('sacco_sub_account.sub_account_deleted', '<>', 'Y')
-        ->where('sacco_main_account.main_account_code', 'like', 'I%')
-        ->select(
-            'sacco_sub_account.sub_account_id',
-            'sacco_sub_account.sub_account_name',
-            'sacco_sub_account.sub_account_code',
-            'sacco_main_account.main_account_code'
-        )
-        ->orderBy('sacco_sub_account.sub_account_name')
-        ->orderBy('sacco_main_account.main_account_code')
-        ->orderBy('sacco_sub_account.sub_account_code')
-        ->get();
+        $validated = $request->validate([
+            'loan_type_name'                     => 'required|string|max:250|unique:sacco_loan_types,loan_type_name,' . $id . ',loan_type_id',
+            'loan_type_code'                     => 'required|string|max:100|unique:sacco_loan_types,loan_type_code,' . $id . ',loan_type_id',
 
-    $incomeLiabilityAccounts = DB::table('sacco_sub_account')
-        ->join('sacco_main_account', 'sacco_sub_account.sub_account_main_account', '=', 'sacco_main_account.main_account_id')
-        ->where('sacco_sub_account.sub_account_deleted', '<>', 'Y')
-        ->where(function ($q) {
-            $q->where('sacco_main_account.main_account_code', 'like', 'I%')
-              ->orWhere('sacco_main_account.main_account_code', 'like', 'L%');
-        })
-        ->select(
-            'sacco_sub_account.sub_account_id',
-            'sacco_sub_account.sub_account_name',
-            'sacco_sub_account.sub_account_code',
-            'sacco_main_account.main_account_code'
-        )
-        ->orderBy('sacco_sub_account.sub_account_name')
-        ->orderBy('sacco_main_account.main_account_code')
-        ->orderBy('sacco_sub_account.sub_account_code')
-        ->get();
+            'loan_type_active'                   => 'required|in:0,1',
 
-    return view('loans.edit', compact(
-        'currentPeriod',
-        'loanType',
-        'assetAccounts',
-        'incomeAccounts',
-        'incomeLiabilityAccounts'
-    ));
-}
-public function updateLoanType(Request $request, $id)
-{
-    $loanType = DB::table('sacco_loan_types')
-        ->where('loan_type_id', $id)
-        ->where('loan_type_deleted', '<>', 'Y')
-        ->first();
+            'loan_type_interest'                 => 'required|numeric|min:0',
+            'loan_type_interest_type'            => 'required|string|max:100',
+            'loan_type_duration'                 => 'required|integer|min:1',
+            'loan_type_max_amount'               => 'required|numeric|min:0',
 
-    if (!$loanType) {
-        return redirect()->route('loans.types')->with('error', 'Loan type not found.');
-    }
+            'loan_type_share_factor'             => 'required|numeric|min:0',
+            'loan_type_guaranteable_percent'     => 'required|integer|min:0|max:100',
+            'loan_type_insurable'                => 'required|in:Y,N',
+            'loan_type_insurance_effect'         => 'nullable|in:ADD_TO_LOAN,DEDUCT_FROM_DISBURSEMENT',
 
-    $validated = $request->validate([
-        'loan_type_name'                     => 'required|string|max:250|unique:sacco_loan_types,loan_type_name,' . $id . ',loan_type_id',
-        'loan_type_code'                     => 'required|string|max:100|unique:sacco_loan_types,loan_type_code,' . $id . ',loan_type_id',
+            'loan_type_qualification_period'     => 'required|integer|min:0',
+            'loan_type_max_qualification_period' => 'nullable|integer|min:0',
 
-        'loan_type_active'                   => 'required|in:0,1',
+            'loan_type_instant_qualification'    => 'nullable|in:1',
 
-        'loan_type_interest'                 => 'required|numeric|min:0',
-        'loan_type_interest_type'            => 'required|string|max:100',
-        'loan_type_duration'                 => 'required|integer|min:1',
-        'loan_type_max_amount'               => 'required|numeric|min:0',
+            'loan_type_crb_required'             => 'required|in:Y,N',
+            'loan_type_crb_charge'               => 'nullable|numeric|min:0',
+            'loan_type_crb_effect'               => 'nullable|in:ADD_TO_LOAN,DEDUCT_FROM_DISBURSEMENT',
 
-        'loan_type_share_factor'             => 'required|numeric|min:0',
-        'loan_type_guaranteable_percent'     => 'required|integer|min:0|max:100',
-        'loan_type_insurable'                => 'required|in:Y,N',
-        'loan_type_insurance_effect'         => 'nullable|in:ADD_TO_LOAN,DEDUCT_FROM_DISBURSEMENT',
+            'loan_type_commission_required'      => 'required|in:Y,N',
+            'loan_type_commission_type'          => 'nullable|in:FIXED,PERCENT',
+            'loan_type_commission_value'         => 'nullable|numeric|min:0',
+            'loan_type_commission_effect'        => 'nullable|in:ADD_TO_LOAN,DEDUCT_FROM_DISBURSEMENT',
 
-        'loan_type_qualification_period'     => 'required|integer|min:0',
-        'loan_type_max_qualification_period' => 'nullable|integer|min:0',
+            'loan_type_acount'                   => 'required|integer|exists:sacco_sub_account,sub_account_id',
+            'loan_type_int_account'              => 'required|integer|exists:sacco_sub_account,sub_account_id',
+            'loan_type_comm_account'             => 'required|integer|exists:sacco_sub_account,sub_account_id',
+        ]);
 
-        'loan_type_instant_qualification'    => 'nullable|in:1',
-
-        'loan_type_crb_required'             => 'required|in:Y,N',
-        'loan_type_crb_charge'               => 'nullable|numeric|min:0',
-        'loan_type_crb_effect'               => 'nullable|in:ADD_TO_LOAN,DEDUCT_FROM_DISBURSEMENT',
-
-        'loan_type_commission_required'      => 'required|in:Y,N',
-        'loan_type_commission_type'          => 'nullable|in:FIXED,PERCENT',
-        'loan_type_commission_value'         => 'nullable|numeric|min:0',
-        'loan_type_commission_effect'        => 'nullable|in:ADD_TO_LOAN,DEDUCT_FROM_DISBURSEMENT',
-
-        'loan_type_acount'                   => 'required|integer|exists:sacco_sub_account,sub_account_id',
-        'loan_type_int_account'              => 'required|integer|exists:sacco_sub_account,sub_account_id',
-        'loan_type_comm_account'             => 'required|integer|exists:sacco_sub_account,sub_account_id',
-    ]);
-
-    if (
-        !is_null($validated['loan_type_max_qualification_period']) &&
-        (int) $validated['loan_type_max_qualification_period'] < (int) $validated['loan_type_qualification_period']
-    ) {
-        return back()
-            ->withErrors([
-                'loan_type_max_qualification_period' => 'Maximum months in SACCO cannot be less than minimum months in SACCO.'
-            ])
-            ->withInput();
-    }
-
-    if (
-        $validated['loan_type_insurable'] === 'Y' &&
-        empty($validated['loan_type_insurance_effect'])
-    ) {
-        return back()
-            ->withErrors([
-                'loan_type_insurance_effect' => 'Please select insurance treatment when this loan type is insurable.'
-            ])
-            ->withInput();
-    }
-
-    if (
-        $validated['loan_type_crb_required'] === 'Y' &&
-        (float) ($validated['loan_type_crb_charge'] ?? 0) > 0 &&
-        empty($validated['loan_type_crb_effect'])
-    ) {
-        return back()
-            ->withErrors([
-                'loan_type_crb_effect' => 'Please select CRB charge treatment when CRB charge is greater than zero.'
-            ])
-            ->withInput();
-    }
-
-    if ($validated['loan_type_commission_required'] === 'Y') {
-        if (empty($validated['loan_type_commission_type'])) {
+        if (
+            !is_null($validated['loan_type_max_qualification_period']) &&
+            (int) $validated['loan_type_max_qualification_period'] < (int) $validated['loan_type_qualification_period']
+        ) {
             return back()
                 ->withErrors([
-                    'loan_type_commission_type' => 'Please select commission type when commission is required.'
+                    'loan_type_max_qualification_period' => 'Maximum months in SACCO cannot be less than minimum months in SACCO.'
                 ])
                 ->withInput();
         }
 
-        if (!isset($validated['loan_type_commission_value']) || (float) $validated['loan_type_commission_value'] < 0) {
+        if (
+            $validated['loan_type_insurable'] === 'Y' &&
+            empty($validated['loan_type_insurance_effect'])
+        ) {
             return back()
                 ->withErrors([
-                    'loan_type_commission_value' => 'Please provide a valid commission value when commission is required.'
+                    'loan_type_insurance_effect' => 'Please select insurance treatment when this loan type is insurable.'
                 ])
                 ->withInput();
         }
 
-        if (empty($validated['loan_type_commission_effect'])) {
+        if (
+            $validated['loan_type_crb_required'] === 'Y' &&
+            (float) ($validated['loan_type_crb_charge'] ?? 0) > 0 &&
+            empty($validated['loan_type_crb_effect'])
+        ) {
             return back()
                 ->withErrors([
-                    'loan_type_commission_effect' => 'Please select commission treatment when commission is required.'
+                    'loan_type_crb_effect' => 'Please select CRB charge treatment when CRB charge is greater than zero.'
                 ])
                 ->withInput();
         }
+
+        if ($validated['loan_type_commission_required'] === 'Y') {
+            if (empty($validated['loan_type_commission_type'])) {
+                return back()
+                    ->withErrors([
+                        'loan_type_commission_type' => 'Please select commission type when commission is required.'
+                    ])
+                    ->withInput();
+            }
+
+            if (!isset($validated['loan_type_commission_value']) || (float) $validated['loan_type_commission_value'] < 0) {
+                return back()
+                    ->withErrors([
+                        'loan_type_commission_value' => 'Please provide a valid commission value when commission is required.'
+                    ])
+                    ->withInput();
+            }
+
+            if (empty($validated['loan_type_commission_effect'])) {
+                return back()
+                    ->withErrors([
+                        'loan_type_commission_effect' => 'Please select commission treatment when commission is required.'
+                    ])
+                    ->withInput();
+            }
+        }
+
+        $crbRequired        = $validated['loan_type_crb_required'];
+        $commissionRequired = $validated['loan_type_commission_required'];
+        $insurable          = $validated['loan_type_insurable'];
+
+        $crbCharge = $crbRequired === 'Y'
+            ? (float) ($validated['loan_type_crb_charge'] ?? 0)
+            : 0;
+
+        $crbEffect = ($crbRequired === 'Y' && $crbCharge > 0)
+            ? $validated['loan_type_crb_effect']
+            : null;
+
+        $commissionValue = $commissionRequired === 'Y'
+            ? (float) ($validated['loan_type_commission_value'] ?? 0)
+            : 0;
+
+        $commissionType = $commissionRequired === 'Y'
+            ? ($validated['loan_type_commission_type'] ?? null)
+            : null;
+
+        $commissionEffect = $commissionRequired === 'Y'
+            ? ($validated['loan_type_commission_effect'] ?? null)
+            : 'ADD_TO_LOAN';
+
+        $insuranceEffect = $insurable === 'Y'
+            ? ($validated['loan_type_insurance_effect'] ?? 'ADD_TO_LOAN')
+            : 'ADD_TO_LOAN';
+
+        DB::table('sacco_loan_types')
+            ->where('loan_type_id', $id)
+            ->update([
+                'loan_type_name'                     => strtoupper(trim($validated['loan_type_name'])),
+                'loan_type_code'                     => strtoupper(trim($validated['loan_type_code'])),
+                'loan_type_active'                   => (int) $validated['loan_type_active'],
+
+                'loan_type_interest'                 => (float) $validated['loan_type_interest'],
+                'loan_type_interest_type'            => strtoupper(trim($validated['loan_type_interest_type'])),
+                'loan_type_duration'                 => (int) $validated['loan_type_duration'],
+                'loan_type_max_amount'               => (float) $validated['loan_type_max_amount'],
+
+                'loan_type_share_factor'             => (float) $validated['loan_type_share_factor'],
+                'loan_type_guaranteable_percent'     => (int) $validated['loan_type_guaranteable_percent'],
+                'loan_type_insurable'                => $insurable,
+                'loan_type_insurance_effect'         => $insuranceEffect,
+
+                'loan_type_qualification_period'     => (int) $validated['loan_type_qualification_period'],
+                'loan_type_max_qualification_period' => $validated['loan_type_max_qualification_period'] !== null
+                    ? (int) $validated['loan_type_max_qualification_period']
+                    : null,
+                'loan_type_instant_qualification'    => $request->has('loan_type_instant_qualification') ? 1 : 0,
+
+                'loan_type_crb_required'             => $crbRequired,
+                'loan_type_crb_charge'               => $crbCharge,
+                'loan_type_crb_effect'               => $crbEffect,
+
+                'loan_type_commission_required'      => $commissionRequired,
+                'loan_type_commission_type'          => $commissionType,
+                'loan_type_commission_value'         => $commissionValue,
+                'loan_type_commission_effect'        => $commissionEffect,
+
+                'loan_type_acount'                   => (int) $validated['loan_type_acount'],
+                'loan_type_int_account'              => (int) $validated['loan_type_int_account'],
+                'loan_type_comm_account'             => (int) $validated['loan_type_comm_account'],
+
+                'loan_type_by'                       => auth()->id(),
+                'loan_type_ip'                       => $request->ip(),
+                'loan_type_transdate'                => now(),
+            ]);
+
+        return redirect()->route('loans.types')->with('success', 'Loan type updated successfully.');
     }
+    public function createLoanType()
+    {
+        $currentPeriod = DB::table('sacco_period')
+            ->where('period_active', 'Y')
+            ->where('period_deleted', '<>', 'Y')
+            ->first();
 
-    $crbRequired        = $validated['loan_type_crb_required'];
-    $commissionRequired = $validated['loan_type_commission_required'];
-    $insurable          = $validated['loan_type_insurable'];
+        $assetAccounts = DB::table('sacco_sub_account')
+            ->join('sacco_main_account', 'sacco_sub_account.sub_account_main_account', '=', 'sacco_main_account.main_account_id')
+            ->where('sacco_sub_account.sub_account_deleted', '<>', 'Y')
+            ->where('sacco_main_account.main_account_code', 'like', 'A%')
+            ->select(
+                'sacco_sub_account.sub_account_id',
+                'sacco_sub_account.sub_account_name',
+                'sacco_sub_account.sub_account_code',
+                'sacco_main_account.main_account_code'
+            )
+            ->orderBy('sacco_sub_account.sub_account_name')
+            ->orderBy('sacco_main_account.main_account_code')
+            ->orderBy('sacco_sub_account.sub_account_code')
+            ->get();
 
-    $crbCharge = $crbRequired === 'Y'
-        ? (float) ($validated['loan_type_crb_charge'] ?? 0)
-        : 0;
+        $incomeAccounts = DB::table('sacco_sub_account')
+            ->join('sacco_main_account', 'sacco_sub_account.sub_account_main_account', '=', 'sacco_main_account.main_account_id')
+            ->where('sacco_sub_account.sub_account_deleted', '<>', 'Y')
+            ->where('sacco_main_account.main_account_code', 'like', 'I%')
+            ->select(
+                'sacco_sub_account.sub_account_id',
+                'sacco_sub_account.sub_account_name',
+                'sacco_sub_account.sub_account_code',
+                'sacco_main_account.main_account_code'
+            )
+            ->orderBy('sacco_sub_account.sub_account_name')
+            ->orderBy('sacco_main_account.main_account_code')
+            ->orderBy('sacco_sub_account.sub_account_code')
+            ->get();
 
-    $crbEffect = ($crbRequired === 'Y' && $crbCharge > 0)
-        ? $validated['loan_type_crb_effect']
-        : null;
+        $incomeLiabilityAccounts = DB::table('sacco_sub_account')
+            ->join('sacco_main_account', 'sacco_sub_account.sub_account_main_account', '=', 'sacco_main_account.main_account_id')
+            ->where('sacco_sub_account.sub_account_deleted', '<>', 'Y')
+            ->where(function ($q) {
+                $q->where('sacco_main_account.main_account_code', 'like', 'I%')
+                    ->orWhere('sacco_main_account.main_account_code', 'like', 'L%');
+            })
+            ->select(
+                'sacco_sub_account.sub_account_id',
+                'sacco_sub_account.sub_account_name',
+                'sacco_sub_account.sub_account_code',
+                'sacco_main_account.main_account_code'
+            )
+            ->orderBy('sacco_sub_account.sub_account_name')
+            ->orderBy('sacco_main_account.main_account_code')
+            ->orderBy('sacco_sub_account.sub_account_code')
+            ->get();
 
-    $commissionValue = $commissionRequired === 'Y'
-        ? (float) ($validated['loan_type_commission_value'] ?? 0)
-        : 0;
+        return view('loans.create', compact(
+            'currentPeriod',
+            'assetAccounts',
+            'incomeAccounts',
+            'incomeLiabilityAccounts'
+        ));
+    }
+    public function storeLoanType(Request $request)
+    {
+        $validated = $request->validate([
+            'loan_type_name'                     => 'required|string|max:250|unique:sacco_loan_types,loan_type_name',
+            'loan_type_code'                     => 'required|string|max:100|unique:sacco_loan_types,loan_type_code',
 
-    $commissionType = $commissionRequired === 'Y'
-        ? ($validated['loan_type_commission_type'] ?? null)
-        : null;
+            'loan_type_active'                   => 'required|in:0,1',
 
-    $commissionEffect = $commissionRequired === 'Y'
-        ? ($validated['loan_type_commission_effect'] ?? null)
-        : 'ADD_TO_LOAN';
+            'loan_type_interest'                 => 'required|numeric|min:0',
+            'loan_type_interest_type'            => 'required|string|max:100',
+            'loan_type_duration'                 => 'required|integer|min:1',
+            'loan_type_max_amount'               => 'required|numeric|min:0',
 
-    $insuranceEffect = $insurable === 'Y'
-    ? ($validated['loan_type_insurance_effect'] ?? 'ADD_TO_LOAN')
-    : 'ADD_TO_LOAN';
-    
-    DB::table('sacco_loan_types')
-        ->where('loan_type_id', $id)
-        ->update([
+            'loan_type_share_factor'             => 'required|numeric|min:0',
+            'loan_type_guaranteable_percent'     => 'required|integer|min:0|max:100',
+            'loan_type_insurable'                => 'required|in:Y,N',
+            'loan_type_insurance_effect'         => 'nullable|in:ADD_TO_LOAN,DEDUCT_FROM_DISBURSEMENT',
+
+            'loan_type_qualification_period'     => 'required|integer|min:0',
+            'loan_type_max_qualification_period' => 'nullable|integer|min:0',
+
+            'loan_type_instant_qualification'    => 'nullable|in:1',
+
+            'loan_type_crb_required'             => 'required|in:Y,N',
+            'loan_type_crb_charge'               => 'nullable|numeric|min:0',
+            'loan_type_crb_effect'               => 'nullable|in:ADD_TO_LOAN,DEDUCT_FROM_DISBURSEMENT',
+
+            'loan_type_commission_required'      => 'required|in:Y,N',
+            'loan_type_commission_type'          => 'nullable|in:FIXED,PERCENT',
+            'loan_type_commission_value'         => 'nullable|numeric|min:0',
+            'loan_type_commission_effect'        => 'nullable|in:ADD_TO_LOAN,DEDUCT_FROM_DISBURSEMENT',
+
+            'loan_type_acount'                   => 'required|integer|exists:sacco_sub_account,sub_account_id',
+            'loan_type_int_account'              => 'required|integer|exists:sacco_sub_account,sub_account_id',
+            'loan_type_comm_account'             => 'required|integer|exists:sacco_sub_account,sub_account_id',
+        ]);
+
+        if (
+            !is_null($validated['loan_type_max_qualification_period']) &&
+            $validated['loan_type_max_qualification_period'] < $validated['loan_type_qualification_period']
+        ) {
+            return back()
+                ->withErrors(['loan_type_max_qualification_period' => 'Maximum months in SACCO cannot be less than minimum months in SACCO.'])
+                ->withInput();
+        }
+
+        if (
+            $validated['loan_type_insurable'] === 'Y' &&
+            empty($validated['loan_type_insurance_effect'])
+        ) {
+            return back()
+                ->withErrors(['loan_type_insurance_effect' => 'Please select insurance treatment when this loan type is insurable.'])
+                ->withInput();
+        }
+
+        if (
+            $validated['loan_type_crb_required'] === 'Y' &&
+            (float) ($validated['loan_type_crb_charge'] ?? 0) > 0 &&
+            empty($validated['loan_type_crb_effect'])
+        ) {
+            return back()
+                ->withErrors(['loan_type_crb_effect' => 'Please select CRB charge treatment when CRB charge is greater than zero.'])
+                ->withInput();
+        }
+
+        if ($validated['loan_type_commission_required'] === 'Y') {
+            if (empty($validated['loan_type_commission_type'])) {
+                return back()
+                    ->withErrors(['loan_type_commission_type' => 'Please select commission type when commission is required.'])
+                    ->withInput();
+            }
+
+            if (!isset($validated['loan_type_commission_value']) || (float) $validated['loan_type_commission_value'] < 0) {
+                return back()
+                    ->withErrors(['loan_type_commission_value' => 'Please provide a valid commission value when commission is required.'])
+                    ->withInput();
+            }
+
+            if (empty($validated['loan_type_commission_effect'])) {
+                return back()
+                    ->withErrors(['loan_type_commission_effect' => 'Please select commission treatment when commission is required.'])
+                    ->withInput();
+            }
+        }
+
+        $crbCharge = (float) ($validated['loan_type_crb_charge'] ?? 0);
+        $commissionValue = (float) ($validated['loan_type_commission_value'] ?? 0);
+
+        DB::table('sacco_loan_types')->insert([
             'loan_type_name'                     => strtoupper(trim($validated['loan_type_name'])),
             'loan_type_code'                     => strtoupper(trim($validated['loan_type_code'])),
             'loan_type_active'                   => (int) $validated['loan_type_active'],
 
-            'loan_type_interest'                 => (float) $validated['loan_type_interest'],
+            'loan_type_interest'                 => $validated['loan_type_interest'],
             'loan_type_interest_type'            => strtoupper(trim($validated['loan_type_interest_type'])),
-            'loan_type_duration'                 => (int) $validated['loan_type_duration'],
-            'loan_type_max_amount'               => (float) $validated['loan_type_max_amount'],
+            'loan_type_duration'                 => $validated['loan_type_duration'],
+            'loan_type_max_amount'               => $validated['loan_type_max_amount'],
 
-            'loan_type_share_factor'             => (float) $validated['loan_type_share_factor'],
-            'loan_type_guaranteable_percent'     => (int) $validated['loan_type_guaranteable_percent'],
-            'loan_type_insurable'                => $insurable,
-            'loan_type_insurance_effect'         => $insuranceEffect,
+            'loan_type_share_factor'             => $validated['loan_type_share_factor'],
+            'loan_type_guaranteable_percent'     => $validated['loan_type_guaranteable_percent'],
+            'loan_type_insurable'                => $validated['loan_type_insurable'],
+            'loan_type_insurance_effect'         => $validated['loan_type_insurable'] === 'Y'
+                ? ($validated['loan_type_insurance_effect'] ?? null)
+                : null,
 
-            'loan_type_qualification_period'     => (int) $validated['loan_type_qualification_period'],
-            'loan_type_max_qualification_period' => $validated['loan_type_max_qualification_period'] !== null
-                                                    ? (int) $validated['loan_type_max_qualification_period']
-                                                    : null,
+            'loan_type_qualification_period'     => $validated['loan_type_qualification_period'],
+            'loan_type_max_qualification_period' => $validated['loan_type_max_qualification_period'] ?? null,
             'loan_type_instant_qualification'    => $request->has('loan_type_instant_qualification') ? 1 : 0,
 
-            'loan_type_crb_required'             => $crbRequired,
+            'loan_type_crb_required'             => $validated['loan_type_crb_required'],
             'loan_type_crb_charge'               => $crbCharge,
-            'loan_type_crb_effect'               => $crbEffect,
+            'loan_type_crb_effect'               => $validated['loan_type_crb_required'] === 'Y'
+                ? ($validated['loan_type_crb_effect'] ?? null)
+                : null,
 
-            'loan_type_commission_required'      => $commissionRequired,
-            'loan_type_commission_type'          => $commissionType,
-            'loan_type_commission_value'         => $commissionValue,
-            'loan_type_commission_effect'        => $commissionEffect,
+            'loan_type_commission_required'      => $validated['loan_type_commission_required'],
+            'loan_type_commission_type'          => $validated['loan_type_commission_required'] === 'Y'
+                ? ($validated['loan_type_commission_type'] ?? null)
+                : null,
+            'loan_type_commission_value'         => $validated['loan_type_commission_required'] === 'Y'
+                ? $commissionValue
+                : 0,
+            'loan_type_commission_effect'        => $validated['loan_type_commission_required'] === 'Y'
+                ? ($validated['loan_type_commission_effect'] ?? null)
+                : null,
 
-            'loan_type_acount'                   => (int) $validated['loan_type_acount'],
-            'loan_type_int_account'              => (int) $validated['loan_type_int_account'],
-            'loan_type_comm_account'             => (int) $validated['loan_type_comm_account'],
+            'loan_type_acount'                   => $validated['loan_type_acount'],
+            'loan_type_int_account'              => $validated['loan_type_int_account'],
+            'loan_type_comm_account'             => $validated['loan_type_comm_account'],
 
+            'loan_type_deleted'                  => 'N',
             'loan_type_by'                       => auth()->id(),
             'loan_type_ip'                       => $request->ip(),
             'loan_type_transdate'                => now(),
         ]);
 
-    return redirect()->route('loans.types')->with('success', 'Loan type updated successfully.');
-}
-public function createLoanType()
-{
-    $currentPeriod = DB::table('sacco_period')
-        ->where('period_active', 'Y')
-        ->where('period_deleted', '<>', 'Y')
-        ->first();
-
-    $assetAccounts = DB::table('sacco_sub_account')
-        ->join('sacco_main_account', 'sacco_sub_account.sub_account_main_account', '=', 'sacco_main_account.main_account_id')
-        ->where('sacco_sub_account.sub_account_deleted', '<>', 'Y')
-        ->where('sacco_main_account.main_account_code', 'like', 'A%')
-        ->select(
-            'sacco_sub_account.sub_account_id',
-            'sacco_sub_account.sub_account_name',
-            'sacco_sub_account.sub_account_code',
-            'sacco_main_account.main_account_code'
-        )
-        ->orderBy('sacco_sub_account.sub_account_name')
-        ->orderBy('sacco_main_account.main_account_code')
-        ->orderBy('sacco_sub_account.sub_account_code')
-        ->get();
-
-    $incomeAccounts = DB::table('sacco_sub_account')
-        ->join('sacco_main_account', 'sacco_sub_account.sub_account_main_account', '=', 'sacco_main_account.main_account_id')
-        ->where('sacco_sub_account.sub_account_deleted', '<>', 'Y')
-        ->where('sacco_main_account.main_account_code', 'like', 'I%')
-        ->select(
-            'sacco_sub_account.sub_account_id',
-            'sacco_sub_account.sub_account_name',
-            'sacco_sub_account.sub_account_code',
-            'sacco_main_account.main_account_code'
-        )
-        ->orderBy('sacco_sub_account.sub_account_name')
-        ->orderBy('sacco_main_account.main_account_code')
-        ->orderBy('sacco_sub_account.sub_account_code')
-        ->get();
-
-    $incomeLiabilityAccounts = DB::table('sacco_sub_account')
-        ->join('sacco_main_account', 'sacco_sub_account.sub_account_main_account', '=', 'sacco_main_account.main_account_id')
-        ->where('sacco_sub_account.sub_account_deleted', '<>', 'Y')
-        ->where(function ($q) {
-            $q->where('sacco_main_account.main_account_code', 'like', 'I%')
-              ->orWhere('sacco_main_account.main_account_code', 'like', 'L%');
-        })
-        ->select(
-            'sacco_sub_account.sub_account_id',
-            'sacco_sub_account.sub_account_name',
-            'sacco_sub_account.sub_account_code',
-            'sacco_main_account.main_account_code'
-        )
-        ->orderBy('sacco_sub_account.sub_account_name')
-        ->orderBy('sacco_main_account.main_account_code')
-        ->orderBy('sacco_sub_account.sub_account_code')
-        ->get();
-
-    return view('loans.create', compact(
-        'currentPeriod',
-        'assetAccounts',
-        'incomeAccounts',
-        'incomeLiabilityAccounts'
-    ));
-}
-public function storeLoanType(Request $request)
-{
-    $validated = $request->validate([
-        'loan_type_name'                     => 'required|string|max:250|unique:sacco_loan_types,loan_type_name',
-        'loan_type_code'                     => 'required|string|max:100|unique:sacco_loan_types,loan_type_code',
-
-        'loan_type_active'                   => 'required|in:0,1',
-
-        'loan_type_interest'                 => 'required|numeric|min:0',
-        'loan_type_interest_type'            => 'required|string|max:100',
-        'loan_type_duration'                 => 'required|integer|min:1',
-        'loan_type_max_amount'               => 'required|numeric|min:0',
-
-        'loan_type_share_factor'             => 'required|numeric|min:0',
-        'loan_type_guaranteable_percent'     => 'required|integer|min:0|max:100',
-        'loan_type_insurable'                => 'required|in:Y,N',
-        'loan_type_insurance_effect'         => 'nullable|in:ADD_TO_LOAN,DEDUCT_FROM_DISBURSEMENT',
-
-        'loan_type_qualification_period'     => 'required|integer|min:0',
-        'loan_type_max_qualification_period' => 'nullable|integer|min:0',
-
-        'loan_type_instant_qualification'    => 'nullable|in:1',
-
-        'loan_type_crb_required'             => 'required|in:Y,N',
-        'loan_type_crb_charge'               => 'nullable|numeric|min:0',
-        'loan_type_crb_effect'               => 'nullable|in:ADD_TO_LOAN,DEDUCT_FROM_DISBURSEMENT',
-
-        'loan_type_commission_required'      => 'required|in:Y,N',
-        'loan_type_commission_type'          => 'nullable|in:FIXED,PERCENT',
-        'loan_type_commission_value'         => 'nullable|numeric|min:0',
-        'loan_type_commission_effect'        => 'nullable|in:ADD_TO_LOAN,DEDUCT_FROM_DISBURSEMENT',
-
-        'loan_type_acount'                   => 'required|integer|exists:sacco_sub_account,sub_account_id',
-        'loan_type_int_account'              => 'required|integer|exists:sacco_sub_account,sub_account_id',
-        'loan_type_comm_account'             => 'required|integer|exists:sacco_sub_account,sub_account_id',
-    ]);
-
-    if (
-        !is_null($validated['loan_type_max_qualification_period']) &&
-        $validated['loan_type_max_qualification_period'] < $validated['loan_type_qualification_period']
-    ) {
-        return back()
-            ->withErrors(['loan_type_max_qualification_period' => 'Maximum months in SACCO cannot be less than minimum months in SACCO.'])
-            ->withInput();
+        return redirect()->route('loans.types')->with('success', 'Loan type added successfully.');
     }
-
-    if (
-        $validated['loan_type_insurable'] === 'Y' &&
-        empty($validated['loan_type_insurance_effect'])
-    ) {
-        return back()
-            ->withErrors(['loan_type_insurance_effect' => 'Please select insurance treatment when this loan type is insurable.'])
-            ->withInput();
-    }
-
-    if (
-        $validated['loan_type_crb_required'] === 'Y' &&
-        (float) ($validated['loan_type_crb_charge'] ?? 0) > 0 &&
-        empty($validated['loan_type_crb_effect'])
-    ) {
-        return back()
-            ->withErrors(['loan_type_crb_effect' => 'Please select CRB charge treatment when CRB charge is greater than zero.'])
-            ->withInput();
-    }
-
-    if ($validated['loan_type_commission_required'] === 'Y') {
-        if (empty($validated['loan_type_commission_type'])) {
-            return back()
-                ->withErrors(['loan_type_commission_type' => 'Please select commission type when commission is required.'])
-                ->withInput();
-        }
-
-        if (!isset($validated['loan_type_commission_value']) || (float) $validated['loan_type_commission_value'] < 0) {
-            return back()
-                ->withErrors(['loan_type_commission_value' => 'Please provide a valid commission value when commission is required.'])
-                ->withInput();
-        }
-
-        if (empty($validated['loan_type_commission_effect'])) {
-            return back()
-                ->withErrors(['loan_type_commission_effect' => 'Please select commission treatment when commission is required.'])
-                ->withInput();
-        }
-    }
-
-    $crbCharge = (float) ($validated['loan_type_crb_charge'] ?? 0);
-    $commissionValue = (float) ($validated['loan_type_commission_value'] ?? 0);
-
-    DB::table('sacco_loan_types')->insert([
-        'loan_type_name'                     => strtoupper(trim($validated['loan_type_name'])),
-        'loan_type_code'                     => strtoupper(trim($validated['loan_type_code'])),
-        'loan_type_active'                   => (int) $validated['loan_type_active'],
-
-        'loan_type_interest'                 => $validated['loan_type_interest'],
-        'loan_type_interest_type'            => strtoupper(trim($validated['loan_type_interest_type'])),
-        'loan_type_duration'                 => $validated['loan_type_duration'],
-        'loan_type_max_amount'               => $validated['loan_type_max_amount'],
-
-        'loan_type_share_factor'             => $validated['loan_type_share_factor'],
-        'loan_type_guaranteable_percent'     => $validated['loan_type_guaranteable_percent'],
-        'loan_type_insurable'                => $validated['loan_type_insurable'],
-        'loan_type_insurance_effect'         => $validated['loan_type_insurable'] === 'Y'
-                                                ? ($validated['loan_type_insurance_effect'] ?? null)
-                                                : null,
-
-        'loan_type_qualification_period'     => $validated['loan_type_qualification_period'],
-        'loan_type_max_qualification_period' => $validated['loan_type_max_qualification_period'] ?? null,
-        'loan_type_instant_qualification'    => $request->has('loan_type_instant_qualification') ? 1 : 0,
-
-        'loan_type_crb_required'             => $validated['loan_type_crb_required'],
-        'loan_type_crb_charge'               => $crbCharge,
-        'loan_type_crb_effect'               => $validated['loan_type_crb_required'] === 'Y'
-                                                ? ($validated['loan_type_crb_effect'] ?? null)
-                                                : null,
-
-        'loan_type_commission_required'      => $validated['loan_type_commission_required'],
-        'loan_type_commission_type'          => $validated['loan_type_commission_required'] === 'Y'
-                                                ? ($validated['loan_type_commission_type'] ?? null)
-                                                : null,
-        'loan_type_commission_value'         => $validated['loan_type_commission_required'] === 'Y'
-                                                ? $commissionValue
-                                                : 0,
-        'loan_type_commission_effect'        => $validated['loan_type_commission_required'] === 'Y'
-                                                ? ($validated['loan_type_commission_effect'] ?? null)
-                                                : null,
-
-        'loan_type_acount'                   => $validated['loan_type_acount'],
-        'loan_type_int_account'              => $validated['loan_type_int_account'],
-        'loan_type_comm_account'             => $validated['loan_type_comm_account'],
-
-        'loan_type_deleted'                  => 'N',
-        'loan_type_by'                       => auth()->id(),
-        'loan_type_ip'                       => $request->ip(),
-        'loan_type_transdate'                => now(),
-    ]);
-
-    return redirect()->route('loans.types')->with('success', 'Loan type added successfully.');
-}
 
     public function deleteLoanType($id)
-{
-    $loanType = DB::table('sacco_loan_types')
-        ->where('loan_type_id', $id)
-        ->first();
+    {
+        $loanType = DB::table('sacco_loan_types')
+            ->where('loan_type_id', $id)
+            ->first();
 
-    if (!$loanType) {
-        return redirect()->route('loans.types')->with('error', 'Loan type not found.');
+        if (!$loanType) {
+            return redirect()->route('loans.types')->with('error', 'Loan type not found.');
+        }
+
+        DB::table('sacco_loan_types')
+            ->where('loan_type_id', $id)
+            ->update([
+                'loan_type_active'     => 0,
+                'loan_type_deleted'    => 'Y',
+                'loan_type_deleted_by' => auth()->id(),
+                'loan_type_deleted_on' => now(),
+                'loan_type_deleted_ip' => request()->ip(),
+            ]);
+
+        return redirect()->route('loans.types')->with('success', 'Loan type deleted successfully.');
     }
-
-    DB::table('sacco_loan_types')
-        ->where('loan_type_id', $id)
-        ->update([
-            'loan_type_active'     => 0,
-            'loan_type_deleted'    => 'Y',
-            'loan_type_deleted_by' => auth()->id(),
-            'loan_type_deleted_on' => now(),
-            'loan_type_deleted_ip' => request()->ip(),
-        ]);
-
-    return redirect()->route('loans.types')->with('success', 'Loan type deleted successfully.');
-}
 
 
     public function loansTypesList()
@@ -6492,51 +7142,51 @@ public function storeLoanType(Request $request)
         return redirect()->route('accounts.main')->with('success', 'Main account updated successfully.');
     }
 
-   private function generateMainAccountCode($type)
-{
-    $type = strtoupper(trim($type));
+    private function generateMainAccountCode($type)
+    {
+        $type = strtoupper(trim($type));
 
-    $prefixMap = [
-        'ASSET - FIXED'      => ['prefix' => 'A', 'base' => 100],
-        'ASSETS - CURRENT'  => ['prefix' => 'A', 'base' => 100],
-        'LIABILITIES - SHORT' => ['prefix' => 'L', 'base' => 200],
-        'CAPITAL'           => ['prefix' => 'C', 'base' => 300],
-        'INCOME'            => ['prefix' => 'I', 'base' => 400],
-        'EXPENSE'           => ['prefix' => 'E', 'base' => 500],
-    ];
+        $prefixMap = [
+            'ASSET - FIXED'      => ['prefix' => 'A', 'base' => 100],
+            'ASSETS - CURRENT'  => ['prefix' => 'A', 'base' => 100],
+            'LIABILITIES - SHORT' => ['prefix' => 'L', 'base' => 200],
+            'CAPITAL'           => ['prefix' => 'C', 'base' => 300],
+            'INCOME'            => ['prefix' => 'I', 'base' => 400],
+            'EXPENSE'           => ['prefix' => 'E', 'base' => 500],
+        ];
 
-    if (!isset($prefixMap[$type])) {
-        throw new \InvalidArgumentException('Unsupported account type.');
-    }
-
-    $prefix = $prefixMap[$type]['prefix'];
-    $base   = $prefixMap[$type]['base'];
-
-    $existingCodes = DB::table('sacco_main_account')
-        ->where('main_account_deleted', '<>', 'Y')
-        ->where('main_account_code', 'LIKE', $prefix . '%')
-        ->pluck('main_account_code')
-        ->map(function ($code) use ($prefix) {
-            return (int) substr($code, strlen($prefix));
-        })
-        ->filter(function ($number) use ($base) {
-            return $number >= $base && $number <= 999;
-        })
-        ->unique()
-        ->sort()
-        ->values()
-        ->toArray();
-
-    $used = array_flip($existingCodes);
-
-    for ($i = $base; $i <= 999; $i++) {
-        if (!isset($used[$i])) {
-            return $prefix . str_pad($i, 3, '0', STR_PAD_LEFT);
+        if (!isset($prefixMap[$type])) {
+            throw new \InvalidArgumentException('Unsupported account type.');
         }
-    }
 
-    throw new \RuntimeException('No available main account codes remain for this account class.');
-}
+        $prefix = $prefixMap[$type]['prefix'];
+        $base   = $prefixMap[$type]['base'];
+
+        $existingCodes = DB::table('sacco_main_account')
+            ->where('main_account_deleted', '<>', 'Y')
+            ->where('main_account_code', 'LIKE', $prefix . '%')
+            ->pluck('main_account_code')
+            ->map(function ($code) use ($prefix) {
+                return (int) substr($code, strlen($prefix));
+            })
+            ->filter(function ($number) use ($base) {
+                return $number >= $base && $number <= 999;
+            })
+            ->unique()
+            ->sort()
+            ->values()
+            ->toArray();
+
+        $used = array_flip($existingCodes);
+
+        for ($i = $base; $i <= 999; $i++) {
+            if (!isset($used[$i])) {
+                return $prefix . str_pad($i, 3, '0', STR_PAD_LEFT);
+            }
+        }
+
+        throw new \RuntimeException('No available main account codes remain for this account class.');
+    }
 
 
 
@@ -6596,85 +7246,85 @@ public function storeLoanType(Request $request)
         return view('accounts.sub.edit', compact('subAccount', 'mainAccounts'));
     }
 
-   public function storeSubAccount(Request $request)
-{
-    $request->validate([
-        'sub_account_name' => 'required|string|max:100|unique:sacco_sub_account,sub_account_name',
-        'sub_account_main_account' => 'required|integer',
-    ]);
+    public function storeSubAccount(Request $request)
+    {
+        $request->validate([
+            'sub_account_name' => 'required|string|max:100|unique:sacco_sub_account,sub_account_name',
+            'sub_account_main_account' => 'required|integer',
+        ]);
 
-    $mainAccount = DB::table('sacco_main_account')
-        ->where('main_account_id', $request->sub_account_main_account)
-        ->where('main_account_deleted', '<>', 'Y')
-        ->first();
+        $mainAccount = DB::table('sacco_main_account')
+            ->where('main_account_id', $request->sub_account_main_account)
+            ->where('main_account_deleted', '<>', 'Y')
+            ->first();
 
-    if (!$mainAccount) {
-        return redirect()->back()
-            ->withErrors(['Selected main account was not found.'])
-            ->withInput();
-    }
-
-    $subAccountCode = $this->generateNextSubAccountCode($request->sub_account_main_account);
-
-    if (!$subAccountCode) {
-        return redirect()->back()
-            ->withErrors(['No available sub account codes remain for the selected main account. Maximum allowed is 999.'])
-            ->withInput();
-    }
-
-    $existingSubAccount = DB::table('sacco_sub_account')
-        ->where('sub_account_main_account', $request->sub_account_main_account)
-        ->where('sub_account_code', $subAccountCode)
-        ->where('sub_account_deleted', '<>', 'Y')
-        ->first();
-
-    if ($existingSubAccount) {
-        return redirect()->back()
-            ->withErrors(['Unable to generate a unique sub account code. Please try again.'])
-            ->withInput();
-    }
-
-    DB::table('sacco_sub_account')->insert([
-        'sub_account_name' => strtoupper($request->sub_account_name),
-        'sub_account_code' => $subAccountCode,
-        'sub_account_main_account' => $request->sub_account_main_account,
-        'sub_account_debit' => 0,
-        'sub_account_credit' => 0,
-        'sub_account_user_id' => auth()->id(),
-        'sub_account_ip' => $request->ip(),
-    ]);
-
-    return redirect()->route('accounts.sub')
-        ->with('success', 'Sub account added successfully.');
-}
-
-private function generateNextSubAccountCode($mainAccountId)
-{
-    $usedCodes = DB::table('sacco_sub_account')
-        ->where('sub_account_main_account', $mainAccountId)
-        ->where('sub_account_deleted', '<>', 'Y')
-        ->pluck('sub_account_code')
-        ->map(function ($code) {
-            return (int) $code;
-        })
-        ->filter(function ($code) {
-            return $code >= 1 && $code <= 999;
-        })
-        ->unique()
-        ->sort()
-        ->values()
-        ->toArray();
-
-    $usedLookup = array_flip($usedCodes);
-
-    for ($i = 1; $i <= 999; $i++) {
-        if (!isset($usedLookup[$i])) {
-            return str_pad($i, 3, '0', STR_PAD_LEFT);
+        if (!$mainAccount) {
+            return redirect()->back()
+                ->withErrors(['Selected main account was not found.'])
+                ->withInput();
         }
+
+        $subAccountCode = $this->generateNextSubAccountCode($request->sub_account_main_account);
+
+        if (!$subAccountCode) {
+            return redirect()->back()
+                ->withErrors(['No available sub account codes remain for the selected main account. Maximum allowed is 999.'])
+                ->withInput();
+        }
+
+        $existingSubAccount = DB::table('sacco_sub_account')
+            ->where('sub_account_main_account', $request->sub_account_main_account)
+            ->where('sub_account_code', $subAccountCode)
+            ->where('sub_account_deleted', '<>', 'Y')
+            ->first();
+
+        if ($existingSubAccount) {
+            return redirect()->back()
+                ->withErrors(['Unable to generate a unique sub account code. Please try again.'])
+                ->withInput();
+        }
+
+        DB::table('sacco_sub_account')->insert([
+            'sub_account_name' => strtoupper($request->sub_account_name),
+            'sub_account_code' => $subAccountCode,
+            'sub_account_main_account' => $request->sub_account_main_account,
+            'sub_account_debit' => 0,
+            'sub_account_credit' => 0,
+            'sub_account_user_id' => auth()->id(),
+            'sub_account_ip' => $request->ip(),
+        ]);
+
+        return redirect()->route('accounts.sub')
+            ->with('success', 'Sub account added successfully.');
     }
 
-    return null;
-}
+    private function generateNextSubAccountCode($mainAccountId)
+    {
+        $usedCodes = DB::table('sacco_sub_account')
+            ->where('sub_account_main_account', $mainAccountId)
+            ->where('sub_account_deleted', '<>', 'Y')
+            ->pluck('sub_account_code')
+            ->map(function ($code) {
+                return (int) $code;
+            })
+            ->filter(function ($code) {
+                return $code >= 1 && $code <= 999;
+            })
+            ->unique()
+            ->sort()
+            ->values()
+            ->toArray();
+
+        $usedLookup = array_flip($usedCodes);
+
+        for ($i = 1; $i <= 999; $i++) {
+            if (!isset($usedLookup[$i])) {
+                return str_pad($i, 3, '0', STR_PAD_LEFT);
+            }
+        }
+
+        return null;
+    }
 
     public function updateSubAccount(Request $request, $id)
     {
@@ -7753,73 +8403,73 @@ private function generateNextSubAccountCode($mainAccountId)
         return Excel::download(new LoansIssuedExport($query), 'loans_issued.xlsx');
     }
 
-public function reportsLoansRepayments(Request $request)
-{
-    $startPeriod    = trim($request->input('startPeriod', date('Ym', strtotime('-3 months'))));
-    $endPeriod      = trim($request->input('endPeriod', date('Ym')));
-    $searchName     = trim($request->input('searchName', ''));
-    $searchCompany  = trim($request->input('searchCompany', ''));
-    $searchLoanType = trim($request->input('searchLoanType', ''));
+    public function reportsLoansRepayments(Request $request)
+    {
+        $startPeriod    = trim($request->input('startPeriod', date('Ym', strtotime('-3 months'))));
+        $endPeriod      = trim($request->input('endPeriod', date('Ym')));
+        $searchName     = trim($request->input('searchName', ''));
+        $searchCompany  = trim($request->input('searchCompany', ''));
+        $searchLoanType = trim($request->input('searchLoanType', ''));
 
-    if ($startPeriod > $endPeriod) {
-        [$startPeriod, $endPeriod] = [$endPeriod, $startPeriod];
+        if ($startPeriod > $endPeriod) {
+            [$startPeriod, $endPeriod] = [$endPeriod, $startPeriod];
+        }
+
+        $query = DB::table('sacco_loan_payments as lp')
+            ->join('sacco_loans as l', 'lp.loan_payments_loan_id', '=', 'l.loan_id')
+            ->join('sacco_members as m', 'l.loan_member', '=', 'm.member_id')
+            ->leftJoin('sacco_department as d', 'm.member_dept', '=', 'd.department_id')
+            ->leftJoin('sacco_company as c', 'd.department_company_id', '=', 'c.company_id')
+            ->leftJoin('sacco_loan_types as lt', 'l.loan_loan_type', '=', 'lt.loan_type_id')
+            ->leftJoin('sacco_loan_category as lc', 'l.loan_loan_category', '=', 'lc.loan_category_id')
+            ->select(
+                'lp.loan_payments_id',
+                'lp.loan_payments_amount',
+                'lp.loan_payments_interest',
+                'lp.loan_payments_description',
+                'lp.loan_payments_docno',
+                'lp.loan_payments_paid_in_by',
+                'lp.loan_payments_period',
+                'lp.loan_payments_paid_on',
+                'lp.loan_payments_loan_id',
+
+                'm.member_name',
+                'm.member_phone_no',
+                'm.member_sacco_id',
+
+                'c.company_name',
+                'lt.loan_type_name',
+                'lc.loan_category_name'
+            )
+            ->whereBetween('lp.loan_payments_period', [$startPeriod, $endPeriod]);
+
+        if ($searchName !== '') {
+            $query->where('m.member_name', 'like', '%' . $searchName . '%');
+        }
+
+        if ($searchCompany !== '') {
+            $query->where('c.company_name', 'like', '%' . $searchCompany . '%');
+        }
+
+        if ($searchLoanType !== '') {
+            $query->where('lt.loan_type_name', 'like', '%' . $searchLoanType . '%');
+        }
+
+        $loanRepayments = $query
+            ->orderBy('lp.loan_payments_paid_on', 'desc')
+            ->orderBy('lp.loan_payments_period', 'desc')
+            ->orderBy('lp.loan_payments_id', 'desc')
+            ->get();
+
+        return view('reports.loans.repayments', compact(
+            'startPeriod',
+            'endPeriod',
+            'searchName',
+            'searchCompany',
+            'searchLoanType',
+            'loanRepayments'
+        ));
     }
-
-    $query = DB::table('sacco_loan_payments as lp')
-        ->join('sacco_loans as l', 'lp.loan_payments_loan_id', '=', 'l.loan_id')
-        ->join('sacco_members as m', 'l.loan_member', '=', 'm.member_id')
-        ->leftJoin('sacco_department as d', 'm.member_dept', '=', 'd.department_id')
-        ->leftJoin('sacco_company as c', 'd.department_company_id', '=', 'c.company_id')
-        ->leftJoin('sacco_loan_types as lt', 'l.loan_loan_type', '=', 'lt.loan_type_id')
-        ->leftJoin('sacco_loan_category as lc', 'l.loan_loan_category', '=', 'lc.loan_category_id')
-        ->select(
-            'lp.loan_payments_id',
-            'lp.loan_payments_amount',
-            'lp.loan_payments_interest',
-            'lp.loan_payments_description',
-            'lp.loan_payments_docno',
-            'lp.loan_payments_paid_in_by',
-            'lp.loan_payments_period',
-            'lp.loan_payments_paid_on',
-            'lp.loan_payments_loan_id',
-
-            'm.member_name',
-            'm.member_phone_no',
-            'm.member_sacco_id',
-
-            'c.company_name',
-            'lt.loan_type_name',
-            'lc.loan_category_name'
-        )
-        ->whereBetween('lp.loan_payments_period', [$startPeriod, $endPeriod]);
-
-    if ($searchName !== '') {
-        $query->where('m.member_name', 'like', '%' . $searchName . '%');
-    }
-
-    if ($searchCompany !== '') {
-        $query->where('c.company_name', 'like', '%' . $searchCompany . '%');
-    }
-
-    if ($searchLoanType !== '') {
-        $query->where('lt.loan_type_name', 'like', '%' . $searchLoanType . '%');
-    }
-
-    $loanRepayments = $query
-        ->orderBy('lp.loan_payments_paid_on', 'desc')
-        ->orderBy('lp.loan_payments_period', 'desc')
-        ->orderBy('lp.loan_payments_id', 'desc')
-        ->get();
-
-    return view('reports.loans.repayments', compact(
-        'startPeriod',
-        'endPeriod',
-        'searchName',
-        'searchCompany',
-        'searchLoanType',
-        'loanRepayments'
-    ));
-}
 
 
     // public function reportsLoansRepayments(Request $request)

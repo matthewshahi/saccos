@@ -33,7 +33,7 @@ class CheckUserRights
 
         return $next($request);
     }
-
+ 
 
     private function getGrantedRights($moduleName, $userId)
     {
