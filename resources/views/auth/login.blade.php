@@ -36,21 +36,11 @@
 
     $recaptchaSiteKey = trim((string) config('services.recaptcha.site_key', ''));
 
-    /*
-    |--------------------------------------------------------------------------
-    | Legal URLs
-    |--------------------------------------------------------------------------
-    | These may be overridden in config/app.php:
-    |
-    | 'legal' => [
-    |     'terms_url' => '/terms_privacy.html',
-    |     'privacy_url' => '/terms_privacy.html',
-    |     'data_protection_url' => '/terms_privacy.html',
-    | ],
-    */
-    $termsUrl = url((string) config('app.legal.terms_url', '/terms-and-conditions'));
-    $privacyUrl = url((string) config('app.legal.privacy_url', '/privacy-policy'));
-    $dataProtectionUrl = url((string) config('app.legal.data_protection_url', '/data-protection'));
+   $legalPageUrl = asset('terms_privacy.html');
+
+$termsUrl = $legalPageUrl . '#terms';
+$privacyUrl = $legalPageUrl . '#privacy';
+$dataProtectionUrl = $legalPageUrl . '#privacy';
 
     $forgotPasswordUrl = Route::has('member.password.request')
         ? route('member.password.request')
@@ -799,7 +789,7 @@
                     </div>
                 @endif
 
-                <form method="POST" action="{{ route('login') }}" id="memberLoginForm" novalidate>
+                <form method="POST" action="{{ route('login') }}" id="memberLoginForm">
                     @csrf
 
                     <div class="member-login-group">
@@ -889,11 +879,11 @@
 
                     <p class="member-login-legal">
                         By signing in, you agree to the
-                        <a href="{{ $termsUrl }}" target="_blank" rel="noopener">Terms of Use</a>
+                        <a href="../terms_privacy.html" target="_blank" rel="noopener">Terms of Use</a>
                         and acknowledge the
-                        <a href="{{ $privacyUrl }}" target="_blank" rel="noopener">Privacy Policy</a>
+                        <a href="../terms_privacy.html" target="_blank" rel="noopener">Privacy Policy</a>
                         and
-                        <a href="{{ $dataProtectionUrl }}" target="_blank" rel="noopener">Data Protection Notice</a>.
+                        <a href="../terms_privacy.html" target="_blank" rel="noopener">Data Protection Notice</a>.
                     </p>
 
                     <div
