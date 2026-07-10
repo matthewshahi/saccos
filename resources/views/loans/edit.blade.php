@@ -561,18 +561,7 @@
                         >
                             <option value="">
                                 Select interest method
-                            </option_interest',
-                                $loanType->loan_type_interest
-                            ) }}"
-                            placeholder="e.g. 12"
-                            required
-                        >
-
-                        @error('loan_type_interest')
-                            <div class="invalid-feedback">
-                                {{ $message }}
-                            </div>
-                        @>
+                            </option>
 
                             <option
                                 value="REDUCING BALANCE"
