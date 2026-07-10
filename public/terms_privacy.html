@@ -1,579 +1,1011 @@
+
 <!doctype html>
-<html lang="en">
+<html lang="en-KE">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>iSACCO Member App — About, Terms & Privacy</title>
-  <meta name="description" content="Official About, Terms of Service, Privacy Policy, Data Safety, and Support information for the iSACCO Member App." />
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#111827">
 
-  <!-- Bootstrap 5 (CDN) -->
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <title>iSACCO Member App | Legal, Privacy and Support</title>
+    <meta
+        name="description"
+        content="Terms of Use, Privacy Notice, data safety, account deletion and support information for the iSACCO Member App."
+    >
+    <meta name="robots" content="index, follow">
 
-  <style>
-    :root{
-      --brand:#0b5ed7;
-      --muted:#6c757d;
-      --soft:#f6f8fb;
-      --border:#e6eaf0;
-    }
-    body{ background: var(--soft); }
-    .hero{
-      background: linear-gradient(180deg, rgba(11,94,215,.10), rgba(255,255,255,0));
-      border-bottom: 1px solid var(--border);
-    }
-    .card{
-      border: 1px solid var(--border);
-      box-shadow: 0 6px 24px rgba(16,24,40,.06);
-      border-radius: 16px;
-    }
-    .nav-pills .nav-link{ border-radius: 999px; }
-    .badge-soft{
-      background: rgba(11,94,215,.10);
-      color: var(--brand);
-      border: 1px solid rgba(11,94,215,.20);
-      font-weight: 600;
-    }
-    .section-title{
-      font-weight: 800;
-      letter-spacing: -.02em;
-    }
-    .small-muted{ color: var(--muted); font-size:.95rem; }
-    a{ text-decoration: none; }
-    a:hover{ text-decoration: underline; }
-    code{ background: #fff; border:1px solid var(--border); padding: .1rem .35rem; border-radius: .4rem; }
-    .toc a{ display:block; padding:.4rem .25rem; }
-    .legal h3{ margin-top: 2rem; }
-    .legal h4{ margin-top: 1.2rem; }
-    .anchor{ scroll-margin-top: 90px; }
-  </style>
+    <link
+        href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+        rel="stylesheet"
+    >
+
+    <style>
+        :root {
+            --isacco-ink: #111827;
+            --isacco-muted: #667085;
+            --isacco-border: #e4e7ec;
+            --isacco-surface: #ffffff;
+            --isacco-background: #f7f6f2;
+            --isacco-gold: #9a7423;
+            --isacco-gold-dark: #725315;
+            --isacco-gold-soft: rgba(154, 116, 35, 0.10);
+            --isacco-green: #1f7a46;
+            --isacco-danger: #b42318;
+            --isacco-shadow: 0 20px 55px rgba(17, 24, 39, 0.09);
+        }
+
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            margin: 0;
+            min-width: 320px;
+            color: var(--isacco-ink);
+            background:
+                radial-gradient(circle at top left, rgba(154, 116, 35, 0.10), transparent 28rem),
+                var(--isacco-background);
+            font-family:
+                Inter,
+                system-ui,
+                -apple-system,
+                BlinkMacSystemFont,
+                "Segoe UI",
+                sans-serif;
+            line-height: 1.65;
+        }
+
+        a {
+            color: var(--isacco-gold-dark);
+            text-underline-offset: 3px;
+        }
+
+        a:hover {
+            color: var(--isacco-ink);
+        }
+
+        .site-header {
+            position: sticky;
+            top: 0;
+            z-index: 1030;
+            border-bottom: 1px solid rgba(228, 231, 236, 0.92);
+            background: rgba(255, 255, 255, 0.94);
+            backdrop-filter: blur(14px);
+        }
+
+        .brand-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--isacco-ink);
+            font-weight: 900;
+            letter-spacing: -0.03em;
+            text-decoration: none;
+        }
+
+        .brand-link:hover {
+            color: var(--isacco-ink);
+            text-decoration: none;
+        }
+
+        .brand-mark {
+            display: inline-grid;
+            width: 38px;
+            height: 38px;
+            place-items: center;
+            border-radius: 12px;
+            color: #ffffff;
+            background:
+                radial-gradient(circle at top right, rgba(184, 138, 43, 0.55), transparent 40%),
+                linear-gradient(135deg, #313a48, #111827);
+            box-shadow: 0 10px 25px rgba(17, 24, 39, 0.18);
+            font-size: 13px;
+            font-weight: 900;
+        }
+
+        .navbar-nav .nav-link {
+            color: #475467;
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .navbar-nav .nav-link:hover,
+        .navbar-nav .nav-link:focus {
+            color: var(--isacco-gold-dark);
+        }
+
+        .legal-hero {
+            padding: 52px 0 42px;
+            border-bottom: 1px solid var(--isacco-border);
+            background:
+                radial-gradient(circle at 88% 5%, rgba(154, 116, 35, 0.15), transparent 20rem),
+                linear-gradient(145deg, #ffffff 0%, #f3efe4 100%);
+        }
+
+        .legal-kicker {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 14px;
+            padding: 7px 11px;
+            border: 1px solid rgba(154, 116, 35, 0.20);
+            border-radius: 999px;
+            color: var(--isacco-gold-dark);
+            background: rgba(255, 255, 255, 0.72);
+            font-size: 10px;
+            font-weight: 900;
+            letter-spacing: 0.10em;
+            text-transform: uppercase;
+        }
+
+        .legal-kicker::before {
+            content: "";
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--isacco-green);
+            box-shadow: 0 0 0 4px rgba(31, 122, 70, 0.11);
+        }
+
+        .legal-title {
+            max-width: 800px;
+            margin: 0;
+            color: var(--isacco-ink);
+            font-size: clamp(2rem, 8vw, 3.5rem);
+            font-weight: 950;
+            line-height: 1.04;
+            letter-spacing: -0.055em;
+        }
+
+        .legal-intro {
+            max-width: 740px;
+            margin: 18px 0 0;
+            color: #475467;
+            font-size: 1rem;
+        }
+
+        .legal-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px 18px;
+            margin-top: 20px;
+            color: var(--isacco-muted);
+            font-size: 12px;
+        }
+
+        .legal-meta strong {
+            color: var(--isacco-ink);
+        }
+
+        .page-layout {
+            padding: 28px 0 52px;
+        }
+
+        .mobile-section-nav {
+            margin-bottom: 18px;
+            padding: 12px;
+            overflow-x: auto;
+            border: 1px solid var(--isacco-border);
+            border-radius: 16px;
+            background: #ffffff;
+            box-shadow: 0 8px 24px rgba(17, 24, 39, 0.05);
+            white-space: nowrap;
+        }
+
+        .mobile-section-nav a {
+            display: inline-block;
+            margin-right: 7px;
+            padding: 7px 10px;
+            border-radius: 999px;
+            color: #475467;
+            background: #f2f4f7;
+            font-size: 11px;
+            font-weight: 800;
+            text-decoration: none;
+        }
+
+        .mobile-section-nav a:hover {
+            color: var(--isacco-gold-dark);
+            background: var(--isacco-gold-soft);
+        }
+
+        .legal-card {
+            margin-bottom: 18px;
+            padding: 22px 18px;
+            border: 1px solid var(--isacco-border);
+            border-radius: 20px;
+            background: var(--isacco-surface);
+            box-shadow: 0 12px 34px rgba(17, 24, 39, 0.055);
+            scroll-margin-top: 86px;
+        }
+
+        .legal-card:last-child {
+            margin-bottom: 0;
+        }
+
+        .section-number {
+            display: block;
+            margin-bottom: 6px;
+            color: var(--isacco-gold-dark);
+            font-size: 10px;
+            font-weight: 900;
+            letter-spacing: 0.10em;
+            text-transform: uppercase;
+        }
+
+        .section-title {
+            margin: 0 0 13px;
+            color: var(--isacco-ink);
+            font-size: clamp(1.35rem, 5vw, 1.75rem);
+            font-weight: 900;
+            line-height: 1.2;
+            letter-spacing: -0.035em;
+        }
+
+        .legal-card h3 {
+            margin: 25px 0 8px;
+            color: var(--isacco-ink);
+            font-size: 1rem;
+            font-weight: 850;
+        }
+
+        .legal-card h3:first-of-type {
+            margin-top: 18px;
+        }
+
+        .legal-card p {
+            margin: 0 0 13px;
+            color: #475467;
+            font-size: 14px;
+        }
+
+        .legal-card ul,
+        .legal-card ol {
+            margin: 0 0 14px;
+            padding-left: 1.2rem;
+            color: #475467;
+            font-size: 14px;
+        }
+
+        .legal-card li {
+            margin-bottom: 7px;
+        }
+
+        .legal-card strong {
+            color: var(--isacco-ink);
+        }
+
+        .notice-box {
+            margin: 17px 0 0;
+            padding: 14px 15px;
+            border: 1px solid rgba(154, 116, 35, 0.20);
+            border-radius: 15px;
+            color: #475467;
+            background: var(--isacco-gold-soft);
+            font-size: 13px;
+        }
+
+        .notice-box strong {
+            display: block;
+            margin-bottom: 3px;
+        }
+
+        .notice-box.success {
+            border-color: rgba(31, 122, 70, 0.20);
+            background: rgba(31, 122, 70, 0.07);
+        }
+
+        .summary-grid {
+            display: grid;
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .summary-item {
+            padding: 14px;
+            border: 1px solid var(--isacco-border);
+            border-radius: 15px;
+            background: #fafafa;
+        }
+
+        .summary-item strong {
+            display: block;
+            margin-bottom: 4px;
+            font-size: 13px;
+        }
+
+        .summary-item span {
+            display: block;
+            color: var(--isacco-muted);
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        .contact-grid {
+            display: grid;
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .contact-card {
+            padding: 16px;
+            border: 1px solid var(--isacco-border);
+            border-radius: 16px;
+            background: #fafafa;
+        }
+
+        .contact-card h3 {
+            margin: 0 0 8px;
+            font-size: 14px;
+        }
+
+        .contact-card p {
+            margin: 0;
+            font-size: 13px;
+        }
+
+        .contact-card a {
+            font-weight: 750;
+            overflow-wrap: anywhere;
+        }
+
+        .deletion-steps {
+            counter-reset: deletion-step;
+            display: grid;
+            gap: 11px;
+            margin: 16px 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .deletion-steps li {
+            counter-increment: deletion-step;
+            position: relative;
+            min-height: 42px;
+            margin: 0;
+            padding: 4px 0 4px 50px;
+        }
+
+        .deletion-steps li::before {
+            content: counter(deletion-step);
+            position: absolute;
+            top: 0;
+            left: 0;
+            display: grid;
+            width: 36px;
+            height: 36px;
+            place-items: center;
+            border-radius: 50%;
+            color: var(--isacco-gold-dark);
+            background: var(--isacco-gold-soft);
+            font-size: 13px;
+            font-weight: 900;
+        }
+
+        .sidebar-card {
+            display: none;
+        }
+
+        .site-footer {
+            border-top: 1px solid var(--isacco-border);
+            background: #ffffff;
+        }
+
+        .footer-inner {
+            display: flex;
+            flex-direction: column;
+            gap: 13px;
+            padding: 24px 0;
+            color: var(--isacco-muted);
+            font-size: 11.5px;
+        }
+
+        .footer-links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px 16px;
+        }
+
+        .footer-links a {
+            font-weight: 750;
+            text-decoration: none;
+        }
+
+        @media (min-width: 576px) {
+            .legal-card {
+                padding: 28px;
+            }
+
+            .summary-grid,
+            .contact-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (min-width: 992px) {
+            .legal-hero {
+                padding: 76px 0 60px;
+            }
+
+            .page-layout {
+                padding: 42px 0 70px;
+            }
+
+            .page-grid {
+                display: grid;
+                grid-template-columns: minmax(0, 1fr) 310px;
+                gap: 26px;
+                align-items: start;
+            }
+
+            .mobile-section-nav {
+                display: none;
+            }
+
+            .legal-card {
+                padding: 38px 40px;
+                border-radius: 24px;
+            }
+
+            .sidebar-card {
+                position: sticky;
+                top: 88px;
+                display: block;
+                padding: 20px;
+                border: 1px solid var(--isacco-border);
+                border-radius: 20px;
+                background: #ffffff;
+                box-shadow: var(--isacco-shadow);
+            }
+
+            .sidebar-card h2 {
+                margin: 0 0 12px;
+                font-size: 14px;
+                font-weight: 900;
+            }
+
+            .sidebar-card nav {
+                display: grid;
+                gap: 4px;
+            }
+
+            .sidebar-card nav a {
+                padding: 9px 10px;
+                border-radius: 10px;
+                color: #475467;
+                font-size: 12px;
+                font-weight: 750;
+                text-decoration: none;
+            }
+
+            .sidebar-card nav a:hover {
+                color: var(--isacco-gold-dark);
+                background: var(--isacco-gold-soft);
+            }
+
+            .sidebar-help {
+                margin-top: 17px;
+                padding-top: 16px;
+                border-top: 1px solid var(--isacco-border);
+                color: var(--isacco-muted);
+                font-size: 11.5px;
+            }
+
+            .sidebar-help a {
+                display: inline-block;
+                margin-top: 7px;
+                font-weight: 800;
+            }
+
+            .footer-inner {
+                flex-direction: row;
+                align-items: center;
+                justify-content: space-between;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            html {
+                scroll-behavior: auto;
+            }
+        }
+    </style>
 </head>
 
 <body>
-  <!-- Top bar -->
-  <nav class="navbar navbar-expand-lg navbar-light bg-white sticky-top border-bottom">
-    <div class="container">
-      <a class="navbar-brand fw-bold" href="#">
-        iSACCO Member App
-        <span class="badge badge-soft ms-2">Official Legal & Support</span>
-      </a>
+    <header class="site-header">
+        <nav class="navbar navbar-expand-lg py-2" aria-label="Main navigation">
+            <div class="container">
+                <a class="brand-link" href="#top" aria-label="iSACCO legal and support home">
+                    <span class="brand-mark" aria-hidden="true">iS</span>
+                    <span>iSACCO Member App</span>
+                </a>
 
-      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbars"
-              aria-controls="navbars" aria-expanded="false" aria-label="Toggle navigation">
-        <span class="navbar-toggler-icon"></span>
-      </button>
+                <button
+                    class="navbar-toggler border-0 shadow-none"
+                    type="button"
+                    data-bs-toggle="collapse"
+                    data-bs-target="#legalNavigation"
+                    aria-controls="legalNavigation"
+                    aria-expanded="false"
+                    aria-label="Open navigation"
+                >
+                    <span class="navbar-toggler-icon"></span>
+                </button>
 
-      <div class="collapse navbar-collapse" id="navbars">
-        <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
-          <li class="nav-item"><a class="nav-link" href="#about">About</a></li>
-          <li class="nav-item"><a class="nav-link" href="#terms">Terms</a></li>
-          <li class="nav-item"><a class="nav-link" href="#privacy">Privacy</a></li>
-          <li class="nav-item"><a class="nav-link" href="#datasafety">Data Safety</a></li>
-          <li class="nav-item"><a class="nav-link" href="#support">Support</a></li>
-        </ul>
-      </div>
-    </div>
-  </nav>
-
-  <!-- Hero -->
-  <header class="hero py-5">
-    <div class="container">
-      <div class="row g-4 align-items-center">
-        <div class="col-lg-8">
-          <h1 class="display-6 fw-bold mb-2">About, Terms of Service, Privacy Policy & Support</h1>
-          <p class="lead mb-3">
-            This page provides official information for the <strong>iSACCO Member App</strong>, including Terms of Service,
-            Privacy Policy, Data Safety disclosures, and user support contacts.
-          </p>
-          <p class="small-muted mb-0">
-            Last updated: <strong>January 18, 2026</strong>
-          </p>
-        </div>
-        <div class="col-lg-4">
-          <div class="card p-4">
-            <div class="fw-bold mb-2">Quick links</div>
-            <div class="toc">
-              <a href="#about">1) About the App</a>
-              <a href="#terms">2) Terms of Service</a>
-              <a href="#privacy">3) Privacy Policy</a>
-              <a href="#datasafety">4) Data Safety Summary</a>
-              <a href="#accountdeletion">5) Account & Data Deletion</a>
-              <a href="#support">6) Support & Contact</a>
-              <a href="#saccocontacts">7) SACCO Contacts</a>
-            </div>
-            <hr>
-            <div class="small-muted">
-              Tip: In Google Play Console, set your “Privacy Policy” and “Support” URLs to this page (or anchors within it).
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </header>
-
-  <!-- Main content -->
-  <main class="container py-5">
-    <div class="row g-4">
-      <!-- Left: Content -->
-      <div class="col-lg-8">
-        <!-- ABOUT -->
-        <section id="about" class="card p-4 p-md-5 anchor">
-          <h2 class="section-title mb-3">1) About the iSACCO Member App</h2>
-          <p>
-            The <strong>iSACCO Member App</strong> is a mobile application that enables members of participating Savings and Credit
-            Cooperative Organizations (SACCOs) to access SACCO services digitally. Depending on your SACCO’s configuration, the app may
-            allow you to:
-          </p>
-
-          <ul>
-            <li>Sign in securely and view your member profile</li>
-            <li>View balances for savings/deposits, share capital, and other SACCO products</li>
-            <li>View loan information, apply for loans, and track loan status</li>
-            <li>Access statements and transaction history</li>
-            <li>Initiate payments or contributions where supported (for example, via mobile money integrations)</li>
-            <li>Receive service notifications (for example: loan updates, payment status, system messages)</li>
-          </ul>
-
-          <div class="alert alert-info mb-0">
-            <div class="fw-bold">Important</div>
-            <div>
-              The app is an access channel to your SACCO’s services. Your SACCO remains responsible for SACCO membership rules,
-              approvals, pricing (interest/fees), and account administration under its bylaws and policies.
-            </div>
-          </div>
-        </section>
-
-        <!-- TERMS -->
-        <section id="terms" class="card p-4 p-md-5 mt-4 anchor legal">
-          <h2 class="section-title mb-3">2) Terms of Service</h2>
-          <p class="small-muted">Effective date: January 18, 2026</p>
-
-          <h3>2.1 Acceptance of Terms</h3>
-          <p>
-            By downloading, accessing, or using the iSACCO Member App (“App”), you agree to be bound by these Terms of Service (“Terms”).
-            If you do not agree, do not use the App.
-          </p>
-
-          <h3>2.2 Who We Are</h3>
-          <p>
-            The App is provided by <strong>Shahi Service Limited</strong> (“Provider,” “we,” “us,” or “our”) as a technology platform.
-            SACCO financial services are provided by the relevant participating SACCO (“Your SACCO”).
-          </p>
-
-          <h3>2.3 Eligibility</h3>
-          <ul>
-            <li>You must be a member (or authorized user) of a participating SACCO to use the App.</li>
-            <li>You must be at least <strong>18 years old</strong> or have legal capacity to enter into agreements under applicable law, unless your SACCO explicitly supports junior/guardian member access under its policies.</li>
-            <li>You must provide accurate, current information and keep it updated.</li>
-          </ul>
-
-          <h3>2.4 Your Account & Security</h3>
-          <ul>
-            <li>You are responsible for maintaining the confidentiality of your login credentials and device security.</li>
-            <li>Notify your SACCO or our support immediately if you suspect unauthorized access.</li>
-            <li>We may implement additional security controls (e.g., device verification, OTPs, session expiry) to protect accounts.</li>
-          </ul>
-
-          <h3>2.5 SACCO Services, Approvals, and Decisions</h3>
-          <ul>
-            <li>Loan approvals, limits, interest rates, fees, and eligibility are determined by Your SACCO in line with its policies.</li>
-            <li>Information shown in the App is provided from the SACCO system and/or integrated services. If there is a discrepancy, the SACCO’s official records prevail.</li>
-            <li>Transactions may be subject to verification, reconciliation, and network/provider delays.</li>
-          </ul>
-
-          <h3>2.6 Payments and Mobile Money Integrations</h3>
-          <ul>
-            <li>If the App supports payments (e.g., mobile money), you authorize the App to initiate payment requests and to receive transaction status updates from third-party payment providers.</li>
-            <li>Payment processing and network availability are controlled by third-party providers. We do not guarantee uninterrupted payment service.</li>
-            <li>You are responsible for ensuring the payment details you enter are correct.</li>
-          </ul>
-
-          <h3>2.7 Acceptable Use</h3>
-          <p>You agree not to:</p>
-          <ul>
-            <li>Use the App for unlawful purposes, fraud, or to violate any SACCO policies or applicable laws.</li>
-            <li>Attempt to access accounts you are not authorized to access.</li>
-            <li>Reverse engineer, decompile, or interfere with the App’s security features.</li>
-            <li>Upload malicious code or disrupt the App’s performance.</li>
-          </ul>
-
-          <h3>2.8 Service Availability & Changes</h3>
-          <ul>
-            <li>We may update or modify the App, including features, security controls, and integrations.</li>
-            <li>We may suspend access for maintenance, security reasons, suspected misuse, or legal requirements.</li>
-          </ul>
-
-          <h3>2.9 Disclaimers</h3>
-          <ul>
-            <li>The App is provided on an “as is” basis. We do not guarantee that the App will be uninterrupted or error-free.</li>
-            <li>We do not provide financial advice. SACCO products are governed by SACCO policies and member agreements.</li>
-          </ul>
-
-          <h3>2.10 Limitation of Liability</h3>
-          <p>
-            To the extent permitted by law, we will not be liable for indirect, incidental, special, consequential, or punitive damages,
-            or any loss of profits, revenue, or data arising from your use of the App. Where liability cannot be excluded, it is limited
-            to the maximum extent permitted under applicable law.
-          </p>
-
-          <h3>2.11 Termination</h3>
-          <p>
-            We may suspend or terminate access to the App if we reasonably believe you have violated these Terms, SACCO policies, or the law,
-            or if required for security or compliance reasons. You may stop using the App at any time.
-          </p>
-
-          <h3>2.12 Governing Law</h3>
-          <p>
-            These Terms are governed by the laws of the <strong>Republic of Kenya</strong>, unless otherwise required by applicable law.
-          </p>
-
-          <h3>2.13 Contact</h3>
-          <p>
-            For questions about these Terms, contact us using the details in the <a href="#support">Support</a> section.
-          </p>
-        </section>
-
-        <!-- PRIVACY -->
-        <section id="privacy" class="card p-4 p-md-5 mt-4 anchor legal">
-          <h2 class="section-title mb-3">3) Privacy Policy</h2>
-          <p class="small-muted">Effective date: January 18, 2026</p>
-
-          <h3>3.1 Overview</h3>
-          <p>
-            This Privacy Policy explains how the iSACCO Member App collects, uses, shares, and protects your information.
-            The App is used to access SACCO services. Your SACCO may also have its own privacy and data handling policies.
-          </p>
-
-          <h3>3.2 Information We Collect</h3>
-          <h4>A) Information you provide</h4>
-          <ul>
-            <li>Identity and profile details: name, member number, phone number, email (where applicable)</li>
-            <li>Login credentials (stored securely and/or tokenized)</li>
-            <li>Requests and submissions: loan applications, support tickets, uploaded documents (if enabled)</li>
-          </ul>
-
-          <h4>B) Information generated through use</h4>
-          <ul>
-            <li>Account and SACCO data displayed in the app: savings/deposits, share capital, loans, statements, transactions</li>
-            <li>Device and app diagnostics: app version, device model, OS version, crash logs (where enabled)</li>
-            <li>Security and audit information: login timestamps, IP address (where available), device identifiers (for fraud prevention)</li>
-          </ul>
-
-          <h4>C) Payment information (if enabled)</h4>
-          <ul>
-            <li>Transaction references, amounts, timestamps, status updates returned by payment providers</li>
-            <li>We do not intentionally store full payment card data. Mobile money data is handled via the payment provider and status callbacks.</li>
-          </ul>
-
-          <h3>3.3 How We Use Information</h3>
-          <ul>
-            <li>To authenticate you and provide access to SACCO services</li>
-            <li>To display your SACCO account information and transaction history</li>
-            <li>To process requests (e.g., loan applications) and route them to Your SACCO</li>
-            <li>To prevent fraud, detect abuse, and protect accounts</li>
-            <li>To maintain and improve the App, fix bugs, and ensure reliability</li>
-            <li>To comply with legal obligations and respond to lawful requests</li>
-          </ul>
-
-          <h3>3.4 Legal Bases (where applicable)</h3>
-          <p>
-            We process data based on one or more of the following: providing the service you request, legitimate interests in security and fraud prevention,
-            compliance with legal obligations, and consent where required (for example, optional marketing or notifications).
-          </p>
-
-          <h3>3.5 Sharing of Information</h3>
-          <p>We may share information with:</p>
-          <ul>
-            <li><strong>Your SACCO</strong>: to provide SACCO services, handle approvals, manage accounts, and respond to inquiries.</li>
-            <li><strong>Service providers</strong>: hosting, analytics/crash reporting (if enabled), SMS/email delivery, and support tools, under contractual confidentiality and security obligations.</li>
-            <li><strong>Payment providers</strong> (if enabled): to initiate and confirm transactions. We receive transaction statuses from these providers.</li>
-            <li><strong>Legal and regulatory authorities</strong>: where required by law or valid legal process.</li>
-          </ul>
-
-          <div class="alert alert-warning">
-            <div class="fw-bold">No selling of personal data</div>
-            <div>We do not sell your personal data.</div>
-          </div>
-
-          <h3>3.6 Data Retention</h3>
-          <p>
-            We retain personal data only as long as necessary to provide the service, meet SACCO operational requirements, and comply with legal and regulatory obligations.
-            Retention periods may vary depending on data type (e.g., transaction and audit logs may be retained longer for compliance).
-          </p>
-
-          <h3>3.7 Security</h3>
-          <p>We apply reasonable administrative, technical, and physical safeguards, which may include:</p>
-          <ul>
-            <li>Encryption in transit (HTTPS/TLS) for data communications</li>
-            <li>Secure token-based authentication</li>
-            <li>Access controls, audit logs, and least-privilege principles</li>
-            <li>Monitoring and security updates</li>
-          </ul>
-          <p class="small-muted">
-            No system is 100% secure. You should also protect your device, keep your OS updated, and never share your credentials.
-          </p>
-
-          <h3>3.8 Your Rights & Choices</h3>
-          <p>Subject to applicable law and SACCO requirements, you may have rights to:</p>
-          <ul>
-            <li>Access and correct your personal data</li>
-            <li>Request deletion (where applicable and not legally restricted)</li>
-            <li>Object to certain processing or request restriction</li>
-            <li>Withdraw consent for optional features</li>
-          </ul>
-          <p>
-            To exercise these rights, use the <a href="#support">Support</a> contact or your SACCO office.
-          </p>
-
-          <h3>3.9 Children’s Privacy</h3>
-          <p>
-            The App is generally intended for adult SACCO members. Where a SACCO supports junior accounts or guardianship features,
-            access and processing may be subject to SACCO policy, guardian authorization, and applicable law.
-          </p>
-
-          <h3>3.10 International Transfers</h3>
-          <p>
-            If hosting or service providers are located outside your country, data may be transferred and processed in other jurisdictions.
-            We require reasonable safeguards and contractual protections where applicable.
-          </p>
-
-          <h3>3.11 Changes to this Policy</h3>
-          <p>
-            We may update this Privacy Policy from time to time. We will update the “Last updated” date at the top of this page.
-            Continued use of the App after updates means you accept the updated policy.
-          </p>
-        </section>
-
-        <!-- DATA SAFETY -->
-        <section id="datasafety" class="card p-4 p-md-5 mt-4 anchor">
-          <h2 class="section-title mb-3">4) Data Safety Summary (for App Store Listing)</h2>
-          <p>
-            This section summarizes typical data handling for the iSACCO Member App. Actual data collection may vary by SACCO configuration.
-          </p>
-
-          <div class="table-responsive">
-            <table class="table table-bordered bg-white align-middle">
-              <thead class="table-light">
-                <tr>
-                  <th style="width: 28%;">Category</th>
-                  <th>Examples</th>
-                  <th style="width: 22%;">Purpose</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td><strong>Personal Info</strong></td>
-                  <td>Name, member number, phone number, email (where applicable)</td>
-                  <td>Account access, SACCO services</td>
-                </tr>
-                <tr>
-                  <td><strong>Financial Info</strong></td>
-                  <td>Balances, loans, statements, transaction records (viewed/managed via SACCO)</td>
-                  <td>Provide SACCO services</td>
-                </tr>
-                <tr>
-                  <td><strong>Device / Diagnostics</strong></td>
-                  <td>App version, device model, crash logs (if enabled)</td>
-                  <td>Security, reliability, support</td>
-                </tr>
-                <tr>
-                  <td><strong>Payments</strong> (if enabled)</td>
-                  <td>Transaction reference, status, timestamps</td>
-                  <td>Payment confirmation and reconciliation</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <ul class="mb-0">
-            <li><strong>Encryption in transit:</strong> Yes (HTTPS/TLS).</li>
-            <li><strong>Data sharing:</strong> Only with Your SACCO and necessary service providers (e.g., hosting, payments) where applicable.</li>
-            <li><strong>Data selling:</strong> No.</li>
-            <li><strong>Account deletion:</strong> See <a href="#accountdeletion">Account & Data Deletion</a>.</li>
-          </ul>
-        </section>
-
-        <!-- ACCOUNT DELETION -->
-        <section id="accountdeletion" class="card p-4 p-md-5 mt-4 anchor legal">
-          <h2 class="section-title mb-3">5) Account & Data Deletion</h2>
-
-          <h3>5.1 How to Request Account Deletion</h3>
-          <p>
-            You may request account deletion by contacting support using the details below, or by visiting your SACCO office
-            (recommended for identity verification).
-          </p>
-
-          <div class="alert alert-secondary">
-            <div class="fw-bold">Deletion request email subject</div>
-            <div><code>Account Deletion Request — iSACCO Member App</code></div>
-            <div class="fw-bold mt-2">Include</div>
-            <ul class="mb-0">
-              <li>Full name</li>
-              <li>Member number (if available)</li>
-              <li>Registered phone number</li>
-              <li>Registered email (if applicable)</li>
-              <li>Name of your SACCO</li>
-            </ul>
-          </div>
-
-          <h3>5.2 What Happens When You Delete</h3>
-          <ul>
-            <li>We will verify your identity before processing the request.</li>
-            <li>Your app access may be disabled and your user account removed or deactivated.</li>
-            <li>Some records may be retained where required for legal, audit, or regulatory compliance (e.g., transaction records and audit logs).</li>
-          </ul>
-
-          <h3>5.3 Data Retention Exceptions</h3>
-          <p>
-            SACCOs and regulated financial recordkeeping may require retention of certain data for a defined period.
-            Where deletion is restricted, we will inform you and may instead apply access restriction or anonymization where appropriate.
-          </p>
-        </section>
-
-        <!-- SUPPORT -->
-        <section id="support" class="card p-4 p-md-5 mt-4 anchor">
-          <h2 class="section-title mb-3">6) Support & Contact</h2>
-          <p>
-            For app support, account access issues, or privacy/terms questions, contact the Provider using the details below.
-            For SACCO policy, loan approvals, member disputes, and account administration, contact your SACCO directly.
-          </p>
-
-          <div class="row g-3">
-            <div class="col-md-6">
-              <div class="p-3 bg-white border rounded-3 h-100">
-                <div class="fw-bold">Provider (App) Support</div>
-                <div class="small-muted mb-2">Shahi Service Limited</div>
-                <div>Email: <a href="mailto:matthewshahi@gmail.com">matthewshahi@gmail.com</a></div>
-                <div>Phone: <a href="tel:+254722400737">+254 722 400 737</a></div>
-                 
-              </div>
-            </div>
-            <div class="col-md-6">
-              <div class="p-3 bg-white border rounded-3 h-100">
-                <div class="fw-bold">Provider Address</div>
-                <div class="small-muted">Use your official business address for store verification.</div>
-                <div class="mt-2">
-                  West Park Heights, Kodi Road 2<br>
-                  Nairobi West, Apartment No. 1<br>
-                  Nairobi, Kenya
+                <div class="collapse navbar-collapse" id="legalNavigation">
+                    <ul class="navbar-nav ms-auto mt-2 mt-lg-0">
+                        <li class="nav-item"><a class="nav-link" href="#terms">Terms</a></li>
+                        <li class="nav-item"><a class="nav-link" href="#privacy">Privacy</a></li>
+                        <li class="nav-item"><a class="nav-link" href="#data-safety">Data safety</a></li>
+                        <li class="nav-item"><a class="nav-link" href="#account-deletion">Delete account</a></li>
+                        <li class="nav-item"><a class="nav-link" href="#support">Support</a></li>
+                    </ul>
                 </div>
-              </div>
             </div>
-          </div>
+        </nav>
+    </header>
 
-          <hr class="my-4">
+    <main id="top">
+        <section class="legal-hero">
+            <div class="container">
+                <div class="legal-kicker">Official information</div>
 
-          <div class="fw-bold mb-2">Security & Incident Reporting</div>
-          <ul class="mb-0">
-            <li>If you suspect unauthorized access, report immediately to your SACCO and Provider support.</li>
-            <li>Never share your password or OTPs with anyone.</li>
-            <li>Keep your device locked and updated.</li>
-          </ul>
+                <h1 class="legal-title">
+                    Legal, privacy and support information
+                </h1>
+
+                <p class="legal-intro">
+                    This page explains how the iSACCO Member App works, the rules that apply
+                    when you use it, how personal data is handled and how to obtain support
+                    or request account deletion.
+                </p>
+
+                <div class="legal-meta">
+                    <span>Provider: <strong>Shahi Service Limited</strong></span>
+                    <span>Last updated: <strong>10 July 2026</strong></span>
+                    <span>Jurisdiction: <strong>Kenya</strong></span>
+                </div>
+            </div>
         </section>
 
-        <!-- SACCO CONTACTS -->
-        <section id="saccocontacts" class="card p-4 p-md-5 mt-4 anchor">
-          <h2 class="section-title mb-3">7) SACCO Contacts</h2>
-          <p>
-            Each participating SACCO may provide its own contact details, office locations, and service hours.
-            If your SACCO has provided you with official support contacts, use those first for account and membership matters.
-          </p>
+        <div class="container page-layout">
+            <nav class="mobile-section-nav" aria-label="Page sections">
+                <a href="#about">About</a>
+                <a href="#terms">Terms</a>
+                <a href="#privacy">Privacy</a>
+                <a href="#data-safety">Data safety</a>
+                <a href="#account-deletion">Delete account</a>
+                <a href="#support">Support</a>
+            </nav>
 
-          <div class="alert alert-info mb-0">
-            <div class="fw-bold">For SACCO-specific matters, contact your SACCO</div>
+            <div class="page-grid">
+                <div>
+                    <section class="legal-card" id="about">
+                        <span class="section-number">Section 1</span>
+                        <h2 class="section-title">About iSACCO</h2>
+
+                        <p>
+                            iSACCO is a secure digital channel through which members of participating
+                            savings and credit co-operative societies can access services offered by
+                            their SACCO.
+                        </p>
+
+                        <p>Available services depend on the participating SACCO and may include:</p>
+
+                        <ul>
+                            <li>Viewing savings, deposits, share capital and other balances.</li>
+                            <li>Viewing loans, repayment information and transaction statements.</li>
+                            <li>Submitting membership, loan or service requests.</li>
+                            <li>Making or confirming payments through supported payment providers.</li>
+                            <li>Receiving account, transaction and service notifications.</li>
+                        </ul>
+
+                        <div class="notice-box">
+                            <strong>Your SACCO provides the financial services.</strong>
+                            Shahi Service Limited provides and supports the technology platform.
+                            Membership decisions, loan approvals, interest, fees and financial records
+                            remain subject to your SACCO's bylaws, policies and official records.
+                        </div>
+                    </section>
+
+                    <section class="legal-card" id="terms">
+                        <span class="section-number">Section 2</span>
+                        <h2 class="section-title">Terms of Use</h2>
+
+                        <h3>Acceptance</h3>
+                        <p>
+                            By accessing or using iSACCO, you agree to these Terms of Use. Do not use
+                            the app if you do not agree with them.
+                        </p>
+
+                        <h3>Eligibility</h3>
+                        <p>
+                            You may use iSACCO only where you are a registered member, applicant,
+                            authorised representative or other permitted user of a participating SACCO.
+                            You must provide accurate information and use only an account you are
+                            authorised to access.
+                        </p>
+
+                        <h3>Account security</h3>
+                        <ul>
+                            <li>Keep your password, PIN and one-time password confidential.</li>
+                            <li>Protect your device with a screen lock and current security updates.</li>
+                            <li>Report suspected unauthorised access immediately.</li>
+                            <li>Do not allow another person to use your account.</li>
+                        </ul>
+
+                        <h3>SACCO services and records</h3>
+                        <p>
+                            Your SACCO determines eligibility, limits, approvals, pricing and service
+                            rules. Information displayed in the app is obtained from SACCO and
+                            integrated service records. Where a genuine discrepancy occurs, it must
+                            be investigated against the SACCO's authorised records.
+                        </p>
+
+                        <h3>Payments</h3>
+                        <p>
+                            Where payment services are available, you authorise the transmission of
+                            the details needed to initiate, confirm and reconcile the transaction.
+                            Payment requests may be delayed or fail because of mobile networks,
+                            banks, payment providers, maintenance or incorrect details.
+                        </p>
+
+                        <h3>Acceptable use</h3>
+                        <p>You must not:</p>
+                        <ul>
+                            <li>Use iSACCO for fraud, impersonation or any unlawful activity.</li>
+                            <li>Attempt to access another member's account or restricted systems.</li>
+                            <li>Interfere with security controls, availability or app operation.</li>
+                            <li>Introduce malware, automate abusive requests or manipulate records.</li>
+                            <li>Copy, reverse engineer or misuse the platform except where permitted by law.</li>
+                        </ul>
+
+                        <h3>Availability and suspension</h3>
+                        <p>
+                            Access may be interrupted for maintenance, security, network failure,
+                            compliance requirements or circumstances outside reasonable control.
+                            Access may also be limited or suspended where misuse, fraud or a security
+                            risk is reasonably suspected.
+                        </p>
+
+                        <h3>Liability</h3>
+                        <p>
+                            Nothing in these Terms excludes liability that cannot lawfully be excluded.
+                            Subject to applicable law, Shahi Service Limited is not liable for indirect
+                            loss, third-party network failure, member error, or a SACCO decision made
+                            under the SACCO's own policies.
+                        </p>
+
+                        <h3>Governing law</h3>
+                        <p>
+                            These Terms are governed by the laws of the Republic of Kenya. SACCO
+                            products and services may also be governed by the SACCO's bylaws, member
+                            agreements and applicable regulatory requirements.
+                        </p>
+                    </section>
+
+                    <section class="legal-card" id="privacy">
+                        <span class="section-number">Section 3</span>
+                        <h2 class="section-title">Privacy and Data Protection Notice</h2>
+
+                        <h3>Who is responsible for your data?</h3>
+                        <p>
+                            For member accounts and SACCO financial services, the participating SACCO
+                            normally determines why and how personal data is used. Shahi Service Limited
+                            operates the iSACCO technology platform and processes data for the SACCO.
+                            Shahi Service Limited may separately determine limited processing needed
+                            for platform security, technical support and legal compliance.
+                        </p>
+
+                        <h3>Information processed</h3>
+                        <ul>
+                            <li>
+                                <strong>Identity and contact information:</strong>
+                                name, member number, National ID details, phone number, email address
+                                and other membership information provided by you or your SACCO.
+                            </li>
+                            <li>
+                                <strong>Financial and SACCO records:</strong>
+                                savings, deposits, shares, loans, repayments, statements, applications
+                                and transaction history.
+                            </li>
+                            <li>
+                                <strong>Security information:</strong>
+                                login activity, IP address, device and session identifiers, audit logs
+                                and records used to detect fraud or unauthorised access.
+                            </li>
+                            <li>
+                                <strong>Technical information:</strong>
+                                app version, operating system, device type, diagnostics and crash
+                                information where enabled.
+                            </li>
+                            <li>
+                                <strong>Support information:</strong>
+                                messages, documents and other details submitted when requesting help.
+                            </li>
+                        </ul>
+
+                        <h3>Why information is used</h3>
+                        <ul>
+                            <li>To identify and authenticate users.</li>
+                            <li>To provide SACCO account and transaction services.</li>
+                            <li>To process requests, payments, applications and notifications.</li>
+                            <li>To secure accounts, prevent fraud and maintain audit records.</li>
+                            <li>To provide support, investigate errors and improve reliability.</li>
+                            <li>To meet legal, regulatory and contractual obligations.</li>
+                        </ul>
+
+                        <h3>Lawful processing</h3>
+                        <p>
+                            Personal data is processed where necessary to provide requested services,
+                            perform contractual and membership obligations, comply with law, protect
+                            legitimate security interests, or on the basis of consent where consent is
+                            specifically required.
+                        </p>
+
+                        <h3>Sharing</h3>
+                        <p>Information may be shared only where necessary with:</p>
+                        <ul>
+                            <li>Your participating SACCO and its authorised personnel.</li>
+                            <li>Banks, mobile-money providers and payment processors used for a transaction.</li>
+                            <li>Hosting, messaging, security and support providers working under appropriate obligations.</li>
+                            <li>Regulators, law-enforcement agencies, courts or other authorities where legally required.</li>
+                        </ul>
+
+                        <div class="notice-box success">
+                            <strong>Personal data is not sold.</strong>
+                            iSACCO does not sell member personal data or use financial records for
+                            unrelated advertising.
+                        </div>
+
+                        <h3>Data retention</h3>
+                        <p>
+                            Data is retained only for as long as reasonably necessary for the service,
+                            SACCO operations, security, dispute resolution and legal or regulatory
+                            recordkeeping. Different records may have different retention periods.
+                            Data that is no longer required should be securely deleted, anonymised or
+                            otherwise handled in accordance with the applicable retention schedule.
+                        </p>
+
+                        <h3>Security</h3>
+                        <p>
+                            Reasonable technical and organisational safeguards are used, including
+                            encrypted transmission, access controls, authentication controls, audit
+                            logging, backups, monitoring and security updates. No digital system is
+                            completely risk-free, so members must also protect their devices and
+                            credentials.
+                        </p>
+
+                        <h3>Your rights</h3>
+                        <p>Subject to applicable law, you may request:</p>
+                        <ul>
+                            <li>Information about how your personal data is used.</li>
+                            <li>Access to personal data held about you.</li>
+                            <li>Correction of inaccurate or incomplete information.</li>
+                            <li>Restriction of or objection to qualifying processing.</li>
+                            <li>Deletion of information that is no longer lawfully required.</li>
+                            <li>Withdrawal of consent where processing relies on consent.</li>
+                        </ul>
+
+                        <p>
+                            Requests may require identity verification and may be referred to your
+                            SACCO where the SACCO controls the relevant member or financial records.
+                            Some records cannot be deleted immediately where retention is required by law,
+                            regulation, audit obligations or the establishment or defence of legal claims.
+                        </p>
+
+                        <h3>Children and junior accounts</h3>
+                        <p>
+                            iSACCO is primarily intended for adult members. Junior accounts may be
+                            accessed only under the participating SACCO's rules and with the required
+                            parent, guardian or authorised representative controls.
+                        </p>
+
+                        <h3>Cross-border processing</h3>
+                        <p>
+                            Where an approved service provider processes data outside Kenya, appropriate
+                            legal, contractual and security safeguards must be applied before the transfer.
+                        </p>
+
+                        <h3>Policy updates</h3>
+                        <p>
+                            This notice may be updated when services, legal requirements or processing
+                            arrangements change. Material changes will be communicated through the app,
+                            website or another appropriate channel.
+                        </p>
+                    </section>
+
+                    <section class="legal-card" id="data-safety">
+                        <span class="section-number">Section 4</span>
+                        <h2 class="section-title">Data Safety Summary</h2>
+
+                        <p>
+                            The following is a concise summary of the main data categories used by
+                            iSACCO. The exact features available depend on the participating SACCO.
+                        </p>
+
+                        <div class="summary-grid">
+                            <div class="summary-item">
+                                <strong>Personal information</strong>
+                                <span>Name, contact details, identity and membership information used to identify and serve the member.</span>
+                            </div>
+
+                            <div class="summary-item">
+                                <strong>Financial information</strong>
+                                <span>Savings, shares, loans, repayments, statements and transaction information used to provide SACCO services.</span>
+                            </div>
+
+                            <div class="summary-item">
+                                <strong>App and device activity</strong>
+                                <span>Login, session, device and diagnostic records used for security, support and service reliability.</span>
+                            </div>
+
+                            <div class="summary-item">
+                                <strong>Payment information</strong>
+                                <span>Amounts, references, phone numbers and transaction status used to initiate and reconcile supported payments.</span>
+                            </div>
+                        </div>
+
+                        <div class="notice-box">
+                            <strong>Key safeguards</strong>
+                            Data is encrypted in transit. Access is restricted to authorised users and
+                            service providers. Full card credentials are not intentionally stored by
+                            iSACCO.
+                        </div>
+                    </section>
+
+                    <section class="legal-card" id="account-deletion">
+                        <span class="section-number">Section 5</span>
+                        <h2 class="section-title">Account and Data Deletion</h2>
+
+                        <p>
+                            You may request deletion or deactivation of your iSACCO access account.
+                            Deleting app access does not automatically erase the underlying SACCO
+                            membership, financial or transaction records.
+                        </p>
+
+                        <ol class="deletion-steps">
+                            <li>
+                                Send an email to
+                                <a href="mailto:matthewshahi@gmail.com?subject=iSACCO%20Account%20Deletion%20Request">
+                                    matthewshahi@gmail.com
+                                </a>
+                                with the subject <strong>iSACCO Account Deletion Request</strong>,
+                                or submit the request through your SACCO.
+                            </li>
+                            <li>
+                                Include your full name, SACCO name, member number and registered phone
+                                number. Do not email your password, PIN or OTP.
+                            </li>
+                            <li>
+                                Complete identity verification when contacted. This protects your
+                                account from fraudulent deletion requests.
+                            </li>
+                            <li>
+                                After verification, app access will be deleted, disabled or anonymised
+                                as applicable, and you will be informed of records that must legally be retained.
+                            </li>
+                        </ol>
+
+                        <div class="notice-box">
+                            <strong>Financial records may need to be retained.</strong>
+                            Your SACCO may be required to keep membership, loan, payment, audit,
+                            statutory and dispute records even after app access is closed.
+                        </div>
+                    </section>
+
+                    <section class="legal-card" id="support">
+                        <span class="section-number">Section 6</span>
+                        <h2 class="section-title">Support and Contact</h2>
+
+                        <p>
+                            Contact Shahi Service Limited for technical problems, login errors,
+                            security incidents, privacy questions or account-deletion requests.
+                            Contact your SACCO for balances, statements, loan decisions, guarantors,
+                            membership status, fees or disputes about SACCO records.
+                        </p>
+
+                        <div class="contact-grid">
+                            <div class="contact-card">
+                                <h3>Technical and privacy support</h3>
+                                <p>
+                                    <a href="mailto:matthewshahi@gmail.com">matthewshahi@gmail.com</a><br>
+                                    <a href="tel:+254722400737">+254 722 400 737</a><br>
+                                    <a href="https://shahi.co.ke" target="_blank" rel="noopener noreferrer">shahi.co.ke</a>
+                                </p>
+                            </div>
+
+                            <div class="contact-card">
+                                <h3>Provider address</h3>
+                                <p>
+                                    Shahi Service Limited<br>
+                                    West Park Heights, Kodi Road 2<br>
+                                    Nairobi West, Apartment No. 1<br>
+                                    Nairobi, Kenya
+                                </p>
+                            </div>
+                        </div>
+
+                        <h3>Security incidents</h3>
+                        <p>
+                            Report a lost device, unexpected OTP, suspicious login or unauthorised
+                            transaction immediately to both your SACCO and technical support. Never
+                            disclose your password, PIN or OTP to a person claiming to provide support.
+                        </p>
+
+                        <h3>Complaints</h3>
+                        <p>
+                            Privacy concerns should first be raised with the participating SACCO or
+                            Shahi Service Limited. You may also lodge a complaint with Kenya's Office
+                            of the Data Protection Commissioner where applicable.
+                        </p>
+                    </section>
+                </div>
+
+                <aside class="sidebar-card" aria-label="On this page">
+                    <h2>On this page</h2>
+
+                    <nav>
+                        <a href="#about">About iSACCO</a>
+                        <a href="#terms">Terms of Use</a>
+                        <a href="#privacy">Privacy Notice</a>
+                        <a href="#data-safety">Data Safety</a>
+                        <a href="#account-deletion">Account Deletion</a>
+                        <a href="#support">Support</a>
+                    </nav>
+
+                    <div class="sidebar-help">
+                        Need technical help?
+                        <br>
+                        <a href="tel:+254722400737">Call +254 722 400 737</a>
+                    </div>
+                </aside>
+            </div>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container footer-inner">
             <div>
-              Examples: loan approval decisions, membership status, guarantor processes, fees/interest, statement disputes,
-              and policy clarifications.
+                © <span id="currentYear">2026</span> Shahi Service Limited.
+                iSACCO is a technology platform for participating SACCOs.
             </div>
-          </div>
-        </section>
 
-        <!-- OPTIONAL: COOKIES -->
-        <section id="cookies" class="card p-4 p-md-5 mt-4 anchor legal">
-          <h2 class="section-title mb-3">Optional: Cookies & Website Tracking (If Hosted on a Website)</h2>
-          <p>
-            This page may be hosted as a website. If you use analytics or cookies on the hosting website, disclose them here.
-            The mobile app itself typically does not use browser cookies; it may use secure tokens and local storage for authentication.
-          </p>
-          <ul class="mb-0">
-            <li><strong>Website analytics:</strong> If enabled, used to understand page traffic and improve documentation.</li>
-            <li><strong>Do Not Track:</strong> Respect is dependent on hosting setup and analytics provider capabilities.</li>
-          </ul>
-        </section>
-
-      </div>
-
-      <!-- Right: Sticky summary -->
-      <div class="col-lg-4">
-        <div class="card p-4 sticky-top" style="top: 90px;">
-          <h3 class="h5 fw-bold mb-2">Store Verification Checklist</h3>
-          <!-- <p class="small-muted mb-3">Use this checklist to reduce Play Store/App Store review issues.</p>
-          <ul class="list-group list-group-flush">
-            <li class="list-group-item d-flex justify-content-between align-items-center">
-              Privacy Policy URL available
-              <span class="badge bg-success">Required</span>
-            </li>
-            <li class="list-group-item d-flex justify-content-between align-items-center">
-              Support email & phone listed
-              <span class="badge bg-success">Required</span>
-            </li>
-            <li class="list-group-item d-flex justify-content-between align-items-center">
-              Account deletion steps included
-              <span class="badge bg-success">Required</span>
-            </li>
-            <li class="list-group-item d-flex justify-content-between align-items-center">
-              Data safety summary present
-              <span class="badge bg-success">Recommended</span>
-            </li>
-            <li class="list-group-item d-flex justify-content-between align-items-center">
-              SACCO responsibilities clarified
-              <span class="badge bg-success">Recommended</span>
-            </li>
-          </ul> -->
-
-          <!-- <hr>
-
-          <div class="small-muted">
-            <div class="fw-bold">Replace placeholders:</div>
-            <ul class="mb-0">
-              <li><code>support@YOURDOMAIN.co.ke</code></li>
-              <li><code>+254 700 000 000</code></li>
-              <li>App name and SACCO name (if specific)</li>
-              <li>Any unique features: e.g., M-Pesa flows, document uploads</li>
-            </ul>
-          </div> -->
-
-          <hr>
-          <div class="d-grid gap-2">
-            <a class="btn btn-primary" href="#privacy">Go to Privacy Policy</a>
-            <a class="btn btn-outline-primary" href="#accountdeletion">Account Deletion</a>
-            <a class="btn btn-outline-secondary" href="#support">Support</a>
-          </div>
+            <nav class="footer-links" aria-label="Footer navigation">
+                <a href="#terms">Terms</a>
+                <a href="#privacy">Privacy</a>
+                <a href="#account-deletion">Delete account</a>
+                <a href="#support">Support</a>
+            </nav>
         </div>
-      </div>
-    </div>
-  </main>
+    </footer>
 
-  <footer class="border-top bg-white">
-    <div class="container py-4">
-      <div class="row g-3 align-items-center">
-        <div class="col-md-8">
-          <div class="small-muted">
-            © <span id="y"></span> Shahi Service Limited. All rights reserved.
-            This page is provided for user reference and app store compliance. SACCO services are provided by participating SACCOs.
-          </div>
-        </div>
-        <div class="col-md-4 text-md-end">
-          <a href="#terms" class="me-3">Terms</a>
-          <a href="#privacy" class="me-3">Privacy</a>
-          <a href="#support">Support</a>
-        </div>
-      </div>
-    </div>
-  </footer>
+    <script
+        src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+    ></script>
 
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-  <script>
-    document.getElementById('y').textContent = new Date().getFullYear();
-  </script>
+    <script>
+        document.getElementById('currentYear').textContent = new Date().getFullYear();
+
+        document.querySelectorAll('#legalNavigation a').forEach(function (link) {
+            link.addEventListener('click', function () {
+                const navigation = document.getElementById('legalNavigation');
+
+                if (
+                    navigation &&
+                    navigation.classList.contains('show') &&
+                    typeof bootstrap !== 'undefined'
+                ) {
+                    bootstrap.Collapse.getOrCreateInstance(navigation).hide();
+                }
+            });
+        });
+    </script>
 </body>
 </html>
