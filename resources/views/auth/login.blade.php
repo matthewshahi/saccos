@@ -815,7 +815,7 @@ $dataProtectionUrl = $legalPageUrl . '#privacy';
                         </div>
 
                         <small class="member-login-help" id="loginHelp">
-                            Use your registered member details.
+                             Use your registered email, phone, ID or SACCO number. International phone numbers should include the country code.
                         </small>
 
                         @error('login')

@@ -263,45 +263,36 @@ class CustomAuthController extends Controller
     {
         $memberTable = (new Member())->getTable();
 
-        /*
-        |--------------------------------------------------------------------------
-        | Supported login columns
-        |--------------------------------------------------------------------------
-        |
-        | The first four are the important ones:
-        | - member_email
-        | - member_phone_no
-        | - member_national_id
-        | - member_sacco_id
-        |
-        | The extra national ID / phone variants are included to avoid breaking if
-        | your actual column name differs slightly.
-        |
-        */
-        $possibleLoginColumns = [
-            'member_email',
+        $possiblePhoneColumns = [
             'member_phone_no',
+            'member_phone',
+            'member_mobile',
+            'member_mobile_no',
+        ];
+
+        $possibleOtherLoginColumns = [
+            'member_email',
             'member_national_id',
             'member_sacco_id',
-
             'member_national_id_no',
             'member_national_no',
             'member_id_no',
             'member_id_number',
             'member_identity_no',
             'member_passport_no',
-
-            'member_phone',
-            'member_mobile',
-            'member_mobile_no',
         ];
 
-        $loginColumns = collect($possibleLoginColumns)
-            ->filter(fn ($column) => Schema::hasColumn($memberTable, $column))
+        $phoneColumns = collect($possiblePhoneColumns)
+            ->filter(fn($column) => Schema::hasColumn($memberTable, $column))
             ->values()
             ->all();
 
-        if (empty($loginColumns)) {
+        $otherLoginColumns = collect($possibleOtherLoginColumns)
+            ->filter(fn($column) => Schema::hasColumn($memberTable, $column))
+            ->values()
+            ->all();
+
+        if (empty($phoneColumns) && empty($otherLoginColumns)) {
             Log::error('No valid member login columns found on sacco_members table', [
                 'table' => $memberTable,
             ]);
@@ -309,14 +300,147 @@ class CustomAuthController extends Controller
             return null;
         }
 
-        return Member::where(function ($query) use ($loginColumns, $login) {
-                foreach ($loginColumns as $column) {
+        $phoneCandidates = $this->buildPhoneLoginCandidates($login);
+
+        return Member::query()
+            ->where(function ($query) use (
+                $login,
+                $phoneCandidates,
+                $phoneColumns,
+                $otherLoginColumns
+            ) {
+                /*
+             * Phone fields may match any equivalent phone format.
+             */
+                foreach ($phoneColumns as $column) {
+                    $query->orWhereIn($column, $phoneCandidates);
+                }
+
+                /*
+             * Email, ID, passport and SACCO number remain exact matches.
+             */
+                foreach ($otherLoginColumns as $column) {
                     $query->orWhere($column, $login);
                 }
             })
             ->where('member_password', $password)
             ->where('member_active', 'Y')
             ->first();
+    }
+
+    private function buildPhoneLoginCandidates(string $login): array
+    {
+        $login = trim($login);
+
+        /*
+     * Always try the exact value entered.
+     */
+        $candidates = [$login];
+
+        /*
+     * Do not treat emails, SACCO numbers or alphanumeric IDs as phones.
+     */
+        if (!preg_match('/^\+?[\d\s().-]+$/', $login)) {
+            return $candidates;
+        }
+
+        $digits = preg_replace('/\D+/', '', $login);
+
+        if (!is_string($digits) || strlen($digits) < 10) {
+            return $candidates;
+        }
+
+        /*
+     * Kenyan local mobile:
+     * 0712345678 or 0112345678
+     */
+        if (preg_match('/^0([17]\d{8})$/', $digits, $matches)) {
+            $subscriber = $matches[1];
+            $international = '254' . $subscriber;
+
+            return array_values(array_unique([
+                $login,
+                '0' . $subscriber,
+                $international,
+                '+' . $international,
+                '00' . $international,
+            ]));
+        }
+
+        /*
+     * Kenyan international mobile:
+     * 254712345678 or 254112345678
+     */
+        if (preg_match('/^254([17]\d{8})$/', $digits, $matches)) {
+            $subscriber = $matches[1];
+            $international = '254' . $subscriber;
+
+            return array_values(array_unique([
+                $login,
+                '0' . $subscriber,
+                $international,
+                '+' . $international,
+                '00' . $international,
+            ]));
+        }
+
+        /*
+     * International number entered using 00.
+     *
+     * Example:
+     * 00447911123456
+     */
+        if (str_starts_with($digits, '00') && strlen($digits) >= 12) {
+            $international = substr($digits, 2);
+
+            return array_values(array_unique([
+                $login,
+                $digits,
+                $international,
+                '+' . $international,
+            ]));
+        }
+
+        /*
+     * International number entered using +.
+     *
+     * Examples:
+     * +12025550123
+     * +447911123456
+     */
+        if (
+            str_starts_with($login, '+')
+            && strlen($digits) >= 10
+            && strlen($digits) <= 15
+        ) {
+            return array_values(array_unique([
+                $login,
+                $digits,
+                '+' . $digits,
+                '00' . $digits,
+            ]));
+        }
+
+        /*
+     * Digits-only international number.
+     *
+     * Only accept numbers longer than 10 digits. This reduces the risk of
+     * confusing a normal national ID with an international phone number.
+     */
+        if (strlen($digits) >= 11 && strlen($digits) <= 15) {
+            return array_values(array_unique([
+                $login,
+                $digits,
+                '+' . $digits,
+                '00' . $digits,
+            ]));
+        }
+
+        /*
+     * A plain 10-digit number that is not a Kenyan 07/01 number remains an
+     * exact match only because it may be a national ID or SACCO number.
+     */
+        return array_values(array_unique($candidates));
     }
 
     private function logLoginAuditFailure(
