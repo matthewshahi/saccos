@@ -22,7 +22,7 @@ class Kernel extends ConsoleKernel
             ->withoutOverlapping()
             ->onOneServer()
             ->timezone('Africa/Nairobi');
-            // ->runInBackground();
+        // ->runInBackground();
 
         // NCBA loan disbursements - DRY RUN by default.
         // This processes only rows marked READY_TO_SEND.
@@ -32,7 +32,7 @@ class Kernel extends ConsoleKernel
             ->withoutOverlapping()
             ->onOneServer()
             ->timezone('Africa/Nairobi');
-            // ->runInBackground();
+        // ->runInBackground();
 
         // Confirm NCBA disbursements already sent to bank.
         // This does not send money; it only checks transaction status.
@@ -48,7 +48,7 @@ class Kernel extends ConsoleKernel
             ->withoutOverlapping()
             ->onOneServer()
             ->timezone('Africa/Nairobi');
-            // ->runInBackground();
+        // ->runInBackground();
 
         // Guarantor emails
         $schedule->job(new \App\Jobs\SendGuarantorEmailJob())
@@ -56,7 +56,7 @@ class Kernel extends ConsoleKernel
             ->withoutOverlapping()
             ->onOneServer()
             ->timezone('Africa/Nairobi');
-            // ->runInBackground();
+        // ->runInBackground();
 
         // Pending notifications
         $schedule->job(new \App\Jobs\SendPendingNotificationsJob())
@@ -64,6 +64,26 @@ class Kernel extends ConsoleKernel
             ->withoutOverlapping()
             ->onOneServer()
             ->timezone('Africa/Nairobi');
+
+
+        /*
+|--------------------------------------------------------------------------
+| Bulk SMS Outbox
+|--------------------------------------------------------------------------
+| Sends a maximum of 60 queued messages per invocation.
+| Provider requests begin no faster than one message per second.
+|--------------------------------------------------------------------------
+*/
+
+        $schedule->command(
+            'bulk-sms:dispatch-outbox --limit=60'
+        )
+            ->everyMinute()
+            ->withoutOverlapping(10)
+            ->onOneServer()
+            ->timezone('Africa/Nairobi')
+            ->runInBackground();
+
 
         // Categorize unsorted FOSA transactions
         $schedule->job(new \App\Jobs\CategorizeUnsortedFosaJob())
@@ -78,7 +98,7 @@ class Kernel extends ConsoleKernel
             ->withoutOverlapping()
             ->onOneServer()
             ->timezone('Africa/Nairobi');
-            // ->runInBackground();
+        // ->runInBackground();
 
         // Nightly guarantor reset
         $schedule->job(new \App\Jobs\ResetGuarantorsJob())
@@ -86,7 +106,7 @@ class Kernel extends ConsoleKernel
             ->withoutOverlapping()
             ->onOneServer()
             ->timezone('Africa/Nairobi');
-            // ->runInBackground();
+        // ->runInBackground();
 
         // Nightly member totals update
         $schedule->job(new \App\Jobs\UpdateMemberTotalsJob())
@@ -94,7 +114,7 @@ class Kernel extends ConsoleKernel
             ->withoutOverlapping()
             ->onOneServer()
             ->timezone('Africa/Nairobi');
-            // ->runInBackground();
+        // ->runInBackground();
     }
 
     protected function commands(): void
