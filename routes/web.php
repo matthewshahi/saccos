@@ -813,6 +813,27 @@ Route::prefix('communications/bulk-sms')
             ->whereNumber('network')
             ->middleware('check_user_rights:bulk_sms_settings');
 
+            /*
+|--------------------------------------------------------------------------
+| Bulk SMS Composer
+|--------------------------------------------------------------------------
+| Allows an authorised user to select:
+| 1. All active members, including officials; or
+| 2. Active officials only.
+|
+| The POST route only creates personalised records in the SMS outbox.
+| It does not send SMS messages directly.
+|--------------------------------------------------------------------------
+*/
+
+Route::get('/compose', [BulkSmsController::class, 'compose'])
+    ->name('compose')
+    ->middleware('check_user_rights:bulk_sms_send');
+
+Route::post('/compose/queue', [BulkSmsController::class, 'queueBulkMessages'])
+    ->name('compose.queue')
+    ->middleware('check_user_rights:bulk_sms_send');
+    
 
         /*
         |--------------------------------------------------------------------------
