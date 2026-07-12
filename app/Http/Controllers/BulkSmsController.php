@@ -7,6 +7,7 @@ use App\Services\BulkSms\BulkSmsDispatchService;
 use App\Services\BulkSms\BulkSmsOutboxService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -17,6 +18,13 @@ class BulkSmsController extends Controller
         protected BulkSmsOutboxService $outbox,
         protected BulkSmsDispatchService $dispatcher
     ) {
+        /*
+         * Ensure all Bulk SMS defaults, providers, provider configurations
+         * and network records exist before any Bulk SMS controller action runs.
+         *
+         * Existing values are never overwritten.
+         */
+        $this->bootstrapBulkSmsModule();
     }
 
     public function index()
@@ -634,6 +642,369 @@ class BulkSmsController extends Controller
         'Cache-Control' => 'no-store, no-cache',
     ]);
 }
+
+    /**
+     * Create all missing Bulk SMS setup records.
+     *
+     * This runs before every Bulk SMS controller action. It is idempotent:
+     * existing defaults, providers, configuration values and networks are
+     * preserved exactly as they are.
+     */
+    protected function bootstrapBulkSmsModule(): void
+    {
+        if (Schema::hasTable('sacco_defaults')) {
+            $this->ensureBulkSmsDefaults();
+        }
+
+        if (Schema::hasTable('sacco_bulk_sms_providers')) {
+            $this->ensureBulkSmsProviders();
+        }
+
+        if (Schema::hasTable('sacco_bulk_sms_provider_configs')) {
+            $this->ensureBulkSmsProviderConfigs();
+        }
+
+        if (Schema::hasTable('sacco_bulk_sms_provider_networks')) {
+            $this->ensureBulkSmsProviderNetworks();
+        }
+    }
+
+    /**
+     * Ensure all global Bulk SMS defaults exist.
+     *
+     * New installations default safely to Advanta, disabled and in demo mode.
+     * Existing SACCO installations retain their current provider and settings.
+     */
+    protected function ensureBulkSmsDefaults(): void
+    {
+        $defaults = [
+            'BULK_SMS_ENABLED' => 'N',
+            'BULK_SMS_PROVIDER' => 'advanta',
+            'BULK_SMS_DEMO_MODE' => 'Y',
+            'BULK_SMS_DEFAULT_NETWORK' => 'safaricom',
+            'BULK_SMS_DEFAULT_SENDER_ID' => '',
+            'BULK_SMS_FAIL_CLOSED' => 'Y',
+            'BULK_SMS_LOG_TO_SYSTEM_NOTIFICATIONS' => 'N',
+            'BULK_SMS_MAX_RETRY_ATTEMPTS' => '3',
+            'BULK_SMS_RETRY_DELAY_SECONDS' => '60',
+            'BULK_SMS_PHONE_FORMAT' => '254',
+        ];
+
+        foreach ($defaults as $name => $value) {
+            $exists = DB::table('sacco_defaults')
+                ->where('default_name', $name)
+                ->exists();
+
+            if ($exists) {
+                continue;
+            }
+
+            DB::table('sacco_defaults')->insert([
+                'default_name' => $name,
+                'default_value' => $value,
+                'default_transdate' => now(),
+                'default_userid' => auth()->id(),
+                'default_ip' => request()?->ip(),
+            ]);
+        }
+    }
+
+    /**
+     * Ensure the supported provider records exist.
+     */
+    protected function ensureBulkSmsProviders(): void
+    {
+        $providers = [
+            [
+                'provider_code' => 'advanta',
+                'provider_name' => 'Advanta SMS',
+                'provider_type' => 'http_api',
+                'provider_driver' => 'advanta',
+                'provider_base_url' => 'https://quicksms.advantasms.com',
+                'provider_token_url' => null,
+                'provider_send_url' => 'https://quicksms.advantasms.com/api/services/sendsms',
+                'provider_balance_url' => 'https://quicksms.advantasms.com/api/services/getbalance',
+                'provider_delivery_status_url' => 'https://quicksms.advantasms.com/api/services/getdlr',
+                'provider_default_network' => 'safaricom',
+                'provider_requires_network' => 'N',
+                'provider_enabled' => 'Y',
+                'provider_notes' => 'Advanta SMS provider. Credentials are read from provider configs or environment variables.',
+            ],
+            [
+                'provider_code' => 'adtel',
+                'provider_name' => 'ADTEL Bulk SMS',
+                'provider_type' => 'oauth_api',
+                'provider_driver' => 'adtel',
+                'provider_base_url' => 'https://api.adtel.co.ke',
+                'provider_token_url' => 'https://api.adtel.co.ke/oauth/token',
+                'provider_send_url' => 'https://api.adtel.co.ke/api/v2/sendsms',
+                'provider_balance_url' => null,
+                'provider_delivery_status_url' => null,
+                'provider_default_network' => 'safaricom',
+                'provider_requires_network' => 'Y',
+                'provider_enabled' => 'Y',
+                'provider_notes' => 'ADTEL Bulk SMS provider. Credentials are read from provider configs or environment variables.',
+            ],
+        ];
+
+        foreach ($providers as $provider) {
+            $exists = DB::table('sacco_bulk_sms_providers')
+                ->where('provider_code', $provider['provider_code'])
+                ->exists();
+
+            if ($exists) {
+                continue;
+            }
+
+            $provider['provider_created_at'] = now();
+            $provider['provider_updated_at'] = now();
+
+            DB::table('sacco_bulk_sms_providers')->insert($provider);
+        }
+    }
+
+    /**
+     * Ensure configuration rows exist for every supported provider.
+     *
+     * Credential values are intentionally blank. The environment key is
+     * registered so each SACCO can keep its own secrets in its own .env file.
+     */
+    protected function ensureBulkSmsProviderConfigs(): void
+    {
+        $configs = [
+            /*
+             |--------------------------------------------------------------------------
+             | Advanta
+             |--------------------------------------------------------------------------
+             */
+            [
+                'provider_code' => 'advanta',
+                'config_key' => 'SEND_URL',
+                'config_value' => 'https://quicksms.advantasms.com/api/services/sendsms',
+                'config_env_key' => 'ADVANTA_SEND_URL',
+                'config_is_secret' => 'N',
+                'config_is_required' => 'Y',
+                'config_description' => 'Advanta Send SMS endpoint.',
+            ],
+            [
+                'provider_code' => 'advanta',
+                'config_key' => 'API_KEY',
+                'config_value' => null,
+                'config_env_key' => 'ADVANTA_API_KEY',
+                'config_is_secret' => 'Y',
+                'config_is_required' => 'Y',
+                'config_description' => 'Advanta API key.',
+            ],
+            [
+                'provider_code' => 'advanta',
+                'config_key' => 'PARTNER_ID',
+                'config_value' => null,
+                'config_env_key' => 'ADVANTA_PARTNER_ID',
+                'config_is_secret' => 'Y',
+                'config_is_required' => 'Y',
+                'config_description' => 'Advanta Partner ID.',
+            ],
+            [
+                'provider_code' => 'advanta',
+                'config_key' => 'SHORTCODE',
+                'config_value' => null,
+                'config_env_key' => 'ADVANTA_SHORTCODE',
+                'config_is_secret' => 'N',
+                'config_is_required' => 'Y',
+                'config_description' => 'Advanta approved shortcode or sender ID.',
+            ],
+            [
+                'provider_code' => 'advanta',
+                'config_key' => 'BALANCE_URL',
+                'config_value' => 'https://quicksms.advantasms.com/api/services/getbalance',
+                'config_env_key' => 'ADVANTA_BALANCE_URL',
+                'config_is_secret' => 'N',
+                'config_is_required' => 'N',
+                'config_description' => 'Advanta account balance endpoint.',
+            ],
+            [
+                'provider_code' => 'advanta',
+                'config_key' => 'DLR_URL',
+                'config_value' => 'https://quicksms.advantasms.com/api/services/getdlr',
+                'config_env_key' => 'ADVANTA_DLR_URL',
+                'config_is_secret' => 'N',
+                'config_is_required' => 'N',
+                'config_description' => 'Advanta delivery report endpoint.',
+            ],
+            [
+                'provider_code' => 'advanta',
+                'config_key' => 'CALLBACK_URL',
+                'config_value' => null,
+                'config_env_key' => 'ADVANTA_CALLBACK_URL',
+                'config_is_secret' => 'N',
+                'config_is_required' => 'N',
+                'config_description' => 'Public callback URL for Advanta delivery reports.',
+            ],
+
+            /*
+             |--------------------------------------------------------------------------
+             | ADTEL
+             |--------------------------------------------------------------------------
+             */
+            [
+                'provider_code' => 'adtel',
+                'config_key' => 'AUTH_URL',
+                'config_value' => 'https://api.adtel.co.ke/oauth/token',
+                'config_env_key' => 'ADTEL_AUTH_URL',
+                'config_is_secret' => 'N',
+                'config_is_required' => 'Y',
+                'config_description' => 'ADTEL OAuth token endpoint.',
+            ],
+            [
+                'provider_code' => 'adtel',
+                'config_key' => 'SEND_URL',
+                'config_value' => 'https://api.adtel.co.ke/api/v2/sendsms',
+                'config_env_key' => 'ADTEL_SEND_URL',
+                'config_is_secret' => 'N',
+                'config_is_required' => 'Y',
+                'config_description' => 'ADTEL Send SMS endpoint.',
+            ],
+            [
+                'provider_code' => 'adtel',
+                'config_key' => 'USERNAME',
+                'config_value' => null,
+                'config_env_key' => 'ADTEL_USERNAME',
+                'config_is_secret' => 'Y',
+                'config_is_required' => 'Y',
+                'config_description' => 'ADTEL account username.',
+            ],
+            [
+                'provider_code' => 'adtel',
+                'config_key' => 'PASSWORD',
+                'config_value' => null,
+                'config_env_key' => 'ADTEL_PASSWORD',
+                'config_is_secret' => 'Y',
+                'config_is_required' => 'Y',
+                'config_description' => 'ADTEL account password.',
+            ],
+            [
+                'provider_code' => 'adtel',
+                'config_key' => 'SENDER_ID',
+                'config_value' => null,
+                'config_env_key' => 'ADTEL_SENDER_ID',
+                'config_is_secret' => 'N',
+                'config_is_required' => 'Y',
+                'config_description' => 'ADTEL approved sender ID.',
+            ],
+            [
+                'provider_code' => 'adtel',
+                'config_key' => 'ACTION_RESPONSE_URL',
+                'config_value' => null,
+                'config_env_key' => 'ADTEL_ACTION_RESPONSE_URL',
+                'config_is_secret' => 'N',
+                'config_is_required' => 'Y',
+                'config_description' => 'Public ADTEL action response callback URL.',
+            ],
+            [
+                'provider_code' => 'adtel',
+                'config_key' => 'CLIENT_ID',
+                'config_value' => null,
+                'config_env_key' => 'ADTEL_CLIENT_ID',
+                'config_is_secret' => 'Y',
+                'config_is_required' => 'N',
+                'config_description' => 'ADTEL OAuth client ID.',
+            ],
+            [
+                'provider_code' => 'adtel',
+                'config_key' => 'CLIENT_SECRET',
+                'config_value' => null,
+                'config_env_key' => 'ADTEL_CLIENT_SECRET',
+                'config_is_secret' => 'Y',
+                'config_is_required' => 'N',
+                'config_description' => 'ADTEL OAuth client secret.',
+            ],
+            [
+                'provider_code' => 'adtel',
+                'config_key' => 'BASIC_AUTH_TOKEN',
+                'config_value' => null,
+                'config_env_key' => 'ADTEL_BASIC_AUTH_TOKEN',
+                'config_is_secret' => 'Y',
+                'config_is_required' => 'N',
+                'config_description' => 'Optional pre-encoded ADTEL Basic Authorization token.',
+            ],
+        ];
+
+        foreach ($configs as $config) {
+            $exists = DB::table('sacco_bulk_sms_provider_configs')
+                ->where('provider_code', $config['provider_code'])
+                ->where('config_key', $config['config_key'])
+                ->exists();
+
+            if ($exists) {
+                continue;
+            }
+
+            $config['config_created_at'] = now();
+            $config['config_updated_at'] = now();
+
+            DB::table('sacco_bulk_sms_provider_configs')->insert($config);
+        }
+    }
+
+    /**
+     * Ensure common Kenyan network rows exist for each provider.
+     */
+    protected function ensureBulkSmsProviderNetworks(): void
+    {
+        $providers = ['advanta', 'adtel'];
+
+        $networks = [
+            [
+                'network_code' => 'safaricom',
+                'network_name' => 'Safaricom',
+                'provider_network_value' => null,
+                'network_is_default' => 'Y',
+                'network_enabled' => 'Y',
+                'network_sort_order' => 1,
+            ],
+            [
+                'network_code' => 'airtel',
+                'network_name' => 'Airtel Kenya',
+                'provider_network_value' => null,
+                'network_is_default' => 'N',
+                'network_enabled' => 'Y',
+                'network_sort_order' => 2,
+            ],
+            [
+                'network_code' => 'telkom',
+                'network_name' => 'Telkom Kenya',
+                'provider_network_value' => null,
+                'network_is_default' => 'N',
+                'network_enabled' => 'Y',
+                'network_sort_order' => 3,
+            ],
+        ];
+
+        foreach ($providers as $providerCode) {
+            foreach ($networks as $network) {
+                $exists = DB::table('sacco_bulk_sms_provider_networks')
+                    ->where('provider_code', $providerCode)
+                    ->where('network_code', $network['network_code'])
+                    ->exists();
+
+                if ($exists) {
+                    continue;
+                }
+
+                DB::table('sacco_bulk_sms_provider_networks')->insert([
+                    'provider_code' => $providerCode,
+                    'network_code' => $network['network_code'],
+                    'network_name' => $network['network_name'],
+                    'provider_network_value' => $network['provider_network_value'],
+                    'network_is_default' => $network['network_is_default'],
+                    'network_enabled' => $network['network_enabled'],
+                    'network_sort_order' => $network['network_sort_order'],
+                    'network_created_at' => now(),
+                    'network_updated_at' => now(),
+                ]);
+            }
+        }
+    }
 
     protected function upsertDefault(string $name, mixed $value): void
     {

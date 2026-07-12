@@ -633,176 +633,287 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
         ->name('emails.bulk.send')
         ->middleware('check_user_rights:bulk_emails_send');
 
-    /*
+   /*
+|--------------------------------------------------------------------------
+| Bulk SMS Route Parameters
+|--------------------------------------------------------------------------
+| Provider codes may contain letters, numbers, underscores and hyphens.
+| Examples: adtel, advanta, africas_talking, provider-xyz
+|--------------------------------------------------------------------------
+*/
+
+$bulkSmsProviderPattern = '[A-Za-z0-9_-]+';
+
+
+/*
+|--------------------------------------------------------------------------
+| Public Bulk SMS Provider Callback
+|--------------------------------------------------------------------------
+| This route must remain outside authentication and user-rights middleware
+| because SMS providers call it directly from their servers.
+|
+| Examples:
+| /bulk-sms/callback/advanta
+| /bulk-sms/callback/adtel
+| /bulk-sms/callback/africas_talking
+|--------------------------------------------------------------------------
+*/
+
+Route::post(
+    '/bulk-sms/callback/{provider}',
+    [BulkSmsController::class, 'providerCallback']
+)
+    ->name('bulk_sms.callback')
+    ->where('provider', $bulkSmsProviderPattern)
+    ->middleware('throttle:300,1')
+    ->withoutMiddleware([
+        VerifyCsrfToken::class,
+    ]);
+
+
+/*
 |--------------------------------------------------------------------------
 | Bulk SMS Module
 |--------------------------------------------------------------------------
 | Module: Communications > Bulk SMS
 |--------------------------------------------------------------------------
 */
-    Route::prefix('communications/bulk-sms')
-        ->name('bulk_sms.')
-        ->middleware('check_user_rights:bulk_sms')
-        ->group(function () {
 
-            /*
+Route::prefix('communications/bulk-sms')
+    ->name('bulk_sms.')
+    ->middleware('check_user_rights:bulk_sms')
+    ->group(function () use ($bulkSmsProviderPattern) {
+
+        /*
         |--------------------------------------------------------------------------
         | Dashboard / Overview
         |--------------------------------------------------------------------------
         */
-            Route::get('/', [BulkSmsController::class, 'index'])
-                ->name('index');
 
-            /*
+        Route::get('/', [BulkSmsController::class, 'index'])
+            ->name('index');
+
+
+        /*
         |--------------------------------------------------------------------------
         | Global Settings
         |--------------------------------------------------------------------------
         */
-            Route::get('/settings', [BulkSmsController::class, 'settings'])
-                ->name('settings')
-                ->middleware('check_user_rights:bulk_sms_settings');
 
-            Route::post('/settings/update', [BulkSmsController::class, 'updateSettings'])
-                ->name('settings.update')
-                ->middleware('check_user_rights:bulk_sms_settings');
+        Route::get('/settings', [BulkSmsController::class, 'settings'])
+            ->name('settings')
+            ->middleware('check_user_rights:bulk_sms_settings');
 
-            /*
+        Route::post('/settings/update', [BulkSmsController::class, 'updateSettings'])
+            ->name('settings.update')
+            ->middleware('check_user_rights:bulk_sms_settings');
+
+
+        /*
         |--------------------------------------------------------------------------
         | Providers
         |--------------------------------------------------------------------------
         */
-            Route::get('/providers', [BulkSmsController::class, 'providers'])
-                ->name('providers')
-                ->middleware('check_user_rights:bulk_sms_settings');
 
-            Route::get('/providers/create', [BulkSmsController::class, 'createProvider'])
-                ->name('providers.create')
-                ->middleware('check_user_rights:bulk_sms_settings');
+        Route::get('/providers', [BulkSmsController::class, 'providers'])
+            ->name('providers')
+            ->middleware('check_user_rights:bulk_sms_settings');
 
-            Route::post('/providers/store', [BulkSmsController::class, 'storeProvider'])
-                ->name('providers.store')
-                ->middleware('check_user_rights:bulk_sms_settings');
+        Route::get('/providers/create', [BulkSmsController::class, 'createProvider'])
+            ->name('providers.create')
+            ->middleware('check_user_rights:bulk_sms_settings');
 
-            Route::get('/providers/{provider}/edit', [BulkSmsController::class, 'editProvider'])
-                ->name('providers.edit')
-                ->middleware('check_user_rights:bulk_sms_settings')
-                ->where('provider', '[A-Za-z0-9_\-]+');
+        Route::post('/providers/store', [BulkSmsController::class, 'storeProvider'])
+            ->name('providers.store')
+            ->middleware('check_user_rights:bulk_sms_settings');
 
-            Route::post('/providers/{provider}/update', [BulkSmsController::class, 'updateProvider'])
-                ->name('providers.update')
-                ->middleware('check_user_rights:bulk_sms_settings')
-                ->where('provider', '[A-Za-z0-9_\-]+');
+        Route::get(
+            '/providers/{provider}/edit',
+            [BulkSmsController::class, 'editProvider']
+        )
+            ->name('providers.edit')
+            ->where('provider', $bulkSmsProviderPattern)
+            ->middleware('check_user_rights:bulk_sms_settings');
 
-            Route::post('/providers/{provider}/toggle', [BulkSmsController::class, 'toggleProvider'])
-                ->name('providers.toggle')
-                ->middleware('check_user_rights:bulk_sms_settings')
-                ->where('provider', '[A-Za-z0-9_\-]+');
+        Route::post(
+            '/providers/{provider}/update',
+            [BulkSmsController::class, 'updateProvider']
+        )
+            ->name('providers.update')
+            ->where('provider', $bulkSmsProviderPattern)
+            ->middleware('check_user_rights:bulk_sms_settings');
 
-            /*
+        Route::post(
+            '/providers/{provider}/toggle',
+            [BulkSmsController::class, 'toggleProvider']
+        )
+            ->name('providers.toggle')
+            ->where('provider', $bulkSmsProviderPattern)
+            ->middleware('check_user_rights:bulk_sms_settings');
+
+
+        /*
         |--------------------------------------------------------------------------
-        | Provider Configs
+        | Provider Configurations
         |--------------------------------------------------------------------------
         */
-            Route::get('/providers/{provider}/configs', [BulkSmsController::class, 'providerConfigs'])
-                ->name('provider_configs')
-                ->middleware('check_user_rights:bulk_sms_settings')
-                ->where('provider', '[A-Za-z0-9_\-]+');
 
-            Route::post('/provider-configs/{config}/update', [BulkSmsController::class, 'updateProviderConfig'])
-                ->name('provider_configs.update')
-                ->middleware('check_user_rights:bulk_sms_settings')
-                ->whereNumber('config');
+        Route::get(
+            '/providers/{provider}/configs',
+            [BulkSmsController::class, 'providerConfigs']
+        )
+            ->name('provider_configs')
+            ->where('provider', $bulkSmsProviderPattern)
+            ->middleware('check_user_rights:bulk_sms_settings');
 
-            /*
+        Route::post(
+            '/provider-configs/{config}/update',
+            [BulkSmsController::class, 'updateProviderConfig']
+        )
+            ->name('provider_configs.update')
+            ->whereNumber('config')
+            ->middleware('check_user_rights:bulk_sms_settings');
+
+
+        /*
         |--------------------------------------------------------------------------
         | Provider Networks
         |--------------------------------------------------------------------------
         */
-            Route::get('/providers/{provider}/networks', [BulkSmsController::class, 'providerNetworks'])
-                ->name('provider_networks')
-                ->middleware('check_user_rights:bulk_sms_settings')
-                ->where('provider', '[A-Za-z0-9_\-]+');
 
-            Route::post('/providers/{provider}/networks/store', [BulkSmsController::class, 'storeProviderNetwork'])
-                ->name('provider_networks.store')
-                ->middleware('check_user_rights:bulk_sms_settings')
-                ->where('provider', '[A-Za-z0-9_\-]+');
+        Route::get(
+            '/providers/{provider}/networks',
+            [BulkSmsController::class, 'providerNetworks']
+        )
+            ->name('provider_networks')
+            ->where('provider', $bulkSmsProviderPattern)
+            ->middleware('check_user_rights:bulk_sms_settings');
 
-            Route::post('/provider-networks/{network}/update', [BulkSmsController::class, 'updateProviderNetwork'])
-                ->name('provider_networks.update')
-                ->middleware('check_user_rights:bulk_sms_settings')
-                ->whereNumber('network');
+        Route::post(
+            '/providers/{provider}/networks/store',
+            [BulkSmsController::class, 'storeProviderNetwork']
+        )
+            ->name('provider_networks.store')
+            ->where('provider', $bulkSmsProviderPattern)
+            ->middleware('check_user_rights:bulk_sms_settings');
 
-            Route::post('/provider-networks/{network}/toggle', [BulkSmsController::class, 'toggleProviderNetwork'])
-                ->name('provider_networks.toggle')
-                ->middleware('check_user_rights:bulk_sms_settings')
-                ->whereNumber('network');
+        Route::post(
+            '/provider-networks/{network}/update',
+            [BulkSmsController::class, 'updateProviderNetwork']
+        )
+            ->name('provider_networks.update')
+            ->whereNumber('network')
+            ->middleware('check_user_rights:bulk_sms_settings');
 
-            /*
+        Route::post(
+            '/provider-networks/{network}/toggle',
+            [BulkSmsController::class, 'toggleProviderNetwork']
+        )
+            ->name('provider_networks.toggle')
+            ->whereNumber('network')
+            ->middleware('check_user_rights:bulk_sms_settings');
+
+
+        /*
         |--------------------------------------------------------------------------
         | Messages / Outbox
         |--------------------------------------------------------------------------
         */
-            Route::get('/messages', [BulkSmsController::class, 'messages'])
-                ->name('messages');
 
-            Route::post('/messages/dispatch-queued', [BulkSmsController::class, 'dispatchQueued'])
-                ->name('messages.dispatch_queued')
-                ->middleware('check_user_rights:bulk_sms_send');
+        Route::get('/messages', [BulkSmsController::class, 'messages'])
+            ->name('messages');
 
-            Route::get('/messages/{sms}', [BulkSmsController::class, 'showMessage'])
-                ->name('messages.show')
-                ->whereNumber('sms');
+        Route::post(
+            '/messages/dispatch-queued',
+            [BulkSmsController::class, 'dispatchQueued']
+        )
+            ->name('messages.dispatch_queued')
+            ->middleware('check_user_rights:bulk_sms_send');
 
-            Route::post('/messages/{sms}/dispatch', [BulkSmsController::class, 'dispatchMessage'])
-                ->name('messages.dispatch')
-                ->middleware('check_user_rights:bulk_sms_send')
-                ->whereNumber('sms');
+        Route::get(
+            '/messages/{sms}',
+            [BulkSmsController::class, 'showMessage']
+        )
+            ->name('messages.show')
+            ->whereNumber('sms');
 
-            /*
+        Route::post(
+            '/messages/{sms}/dispatch',
+            [BulkSmsController::class, 'dispatchMessage']
+        )
+            ->name('messages.dispatch')
+            ->whereNumber('sms')
+            ->middleware('check_user_rights:bulk_sms_send');
+
+
+        /*
         |--------------------------------------------------------------------------
         | Manual Test
         |--------------------------------------------------------------------------
         */
-            Route::get('/test', [BulkSmsController::class, 'testForm'])
-                ->name('test')
-                ->middleware('check_user_rights:bulk_sms_send');
 
-            Route::post('/test', [BulkSmsController::class, 'sendTest'])
-                ->name('test.send')
-                ->middleware('check_user_rights:bulk_sms_send');
+        Route::get('/test', [BulkSmsController::class, 'testForm'])
+            ->name('test')
+            ->middleware('check_user_rights:bulk_sms_send');
 
-            /*
+        Route::post('/test', [BulkSmsController::class, 'sendTest'])
+            ->name('test.send')
+            ->middleware('check_user_rights:bulk_sms_send');
+
+
+        /*
         |--------------------------------------------------------------------------
         | Diagnostics
         |--------------------------------------------------------------------------
         */
-            Route::get('/diagnostics', [BulkSmsController::class, 'diagnostics'])
-                ->name('diagnostics')
-                ->middleware('check_user_rights:bulk_sms_settings');
 
-            Route::post('/diagnostics/adtel-token-test', [BulkSmsController::class, 'adtelTokenTest'])
-                ->name('diagnostics.adtel_token_test')
-                ->middleware('check_user_rights:bulk_sms_settings');
+        Route::get('/diagnostics', [BulkSmsController::class, 'diagnostics'])
+            ->name('diagnostics')
+            ->middleware('check_user_rights:bulk_sms_settings');
+
+        /*
+         * Generic provider connection test.
+         *
+         * Examples:
+         * /diagnostics/advanta/connection-test
+         * /diagnostics/adtel/connection-test
+         */
+        Route::post(
+            '/diagnostics/{provider}/connection-test',
+            [BulkSmsController::class, 'providerConnectionTest']
+        )
+            ->name('diagnostics.provider_connection_test')
+            ->where('provider', $bulkSmsProviderPattern)
+            ->middleware('check_user_rights:bulk_sms_settings');
+
+        Route::get(
+            '/diagnostics/json',
+            [BulkSmsController::class, 'diagnosticsJson']
+        )
+            ->name('diagnostics.json')
+            ->middleware('check_user_rights:bulk_sms_settings');
 
 
-            Route::get('/diagnostics/json', [BulkSmsController::class, 'diagnosticsJson'])
-                ->name('diagnostics.json')
-                ->middleware('check_user_rights:bulk_sms_settings');
-
-            /*
+        /*
         |--------------------------------------------------------------------------
         | Reports
         |--------------------------------------------------------------------------
         */
-            Route::get('/reports/summary', [BulkSmsController::class, 'reportSummary'])
-                ->name('reports.summary')
-                ->middleware('check_user_rights:bulk_sms_reports');
 
-            Route::get('/reports/export', [BulkSmsController::class, 'exportMessages'])
-                ->name('reports.export')
-                ->middleware('check_user_rights:bulk_sms_reports');
-        });
+        Route::get(
+            '/reports/summary',
+            [BulkSmsController::class, 'reportSummary']
+        )
+            ->name('reports.summary')
+            ->middleware('check_user_rights:bulk_sms_reports');
+
+        Route::get(
+            '/reports/export',
+            [BulkSmsController::class, 'exportMessages']
+        )
+            ->name('reports.export')
+            ->middleware('check_user_rights:bulk_sms_reports');
+    });
 
     Route::get('/proc/recalc/loans', [TempLoanCalController::class, 'recalcAllLoansAndMembers'])
         ->name('proc.recalc.loans.process')
