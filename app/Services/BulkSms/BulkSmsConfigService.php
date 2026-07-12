@@ -9,58 +9,122 @@ class BulkSmsConfigService
     /**
      * Read a value from sacco_defaults.
      */
-    public function defaultValue(string $name, mixed $fallback = null): mixed
-    {
+    public function defaultValue(
+        string $name,
+        mixed $fallback = null
+    ): mixed {
         $value = DB::table('sacco_defaults')
             ->where('default_name', $name)
             ->value('default_value');
 
-        return $value !== null ? $value : $fallback;
+        return $value !== null
+            ? $value
+            : $fallback;
+    }
+
+    /**
+     * Determine whether a configuration value is present.
+     */
+    protected function hasValue(mixed $value): bool
+    {
+        if ($value === null) {
+            return false;
+        }
+
+        if (is_string($value)) {
+            return trim($value) !== '';
+        }
+
+        return true;
+    }
+
+    /**
+     * Normalize a provider code.
+     */
+    protected function normalizeProviderCode(
+        mixed $provider
+    ): string {
+        return strtolower(trim((string) $provider));
     }
 
     /**
      * Check whether the Bulk SMS module is enabled.
+     *
+     * This remains database-controlled so administrators can safely
+     * enable or disable sending through the Bulk SMS settings page.
      */
     public function isEnabled(): bool
     {
         return strtoupper(
-            (string) $this->defaultValue('BULK_SMS_ENABLED', 'N')
+            trim(
+                (string) $this->defaultValue(
+                    'BULK_SMS_ENABLED',
+                    'N'
+                )
+            )
         ) === 'Y';
     }
 
     /**
-     * Check whether messages should only be logged without being sent.
+     * Check whether demo mode is enabled.
+     *
+     * Demo mode remains database-controlled.
      */
     public function isDemoMode(): bool
     {
         return strtoupper(
-            (string) $this->defaultValue('BULK_SMS_DEMO_MODE', 'Y')
+            trim(
+                (string) $this->defaultValue(
+                    'BULK_SMS_DEMO_MODE',
+                    'Y'
+                )
+            )
         ) === 'Y';
     }
 
     /**
-     * Determine whether SMS processing should stop when configuration
-     * or provider readiness checks fail.
+     * Determine whether processing should stop when readiness fails.
      */
     public function failClosed(): bool
     {
         return strtoupper(
-            (string) $this->defaultValue('BULK_SMS_FAIL_CLOSED', 'Y')
+            trim(
+                (string) $this->defaultValue(
+                    'BULK_SMS_FAIL_CLOSED',
+                    'Y'
+                )
+            )
         ) === 'Y';
     }
 
     /**
-     * Get the active SMS provider code.
+     * Get the active SMS provider.
      *
-     * Examples:
-     * - adtel
-     * - advanta
+     * Provider priority:
+     *
+     * 1. BULK_SMS_PROVIDER from config/bulk_sms.php and .env
+     * 2. BULK_SMS_PROVIDER from sacco_defaults
+     * 3. advanta fallback
+     *
+     * Since each SACCO installation has its own database and environment,
+     * an explicitly configured installation provider should take priority.
      */
     public function providerCode(): string
     {
-        return strtolower(trim(
-            (string) $this->defaultValue('BULK_SMS_PROVIDER', 'adtel')
-        ));
+        $installationProvider = config('bulk_sms.provider');
+
+        if ($this->hasValue($installationProvider)) {
+            return $this->normalizeProviderCode(
+                $installationProvider
+            );
+        }
+
+        return $this->normalizeProviderCode(
+            $this->defaultValue(
+                'BULK_SMS_PROVIDER',
+                'advanta'
+            )
+        );
     }
 
     /**
@@ -68,26 +132,59 @@ class BulkSmsConfigService
      */
     public function defaultNetwork(): string
     {
-        return strtolower(trim(
-            (string) $this->defaultValue(
-                'BULK_SMS_DEFAULT_NETWORK',
-                'safaricom'
-            )
-        ));
+        $network = $this->defaultValue(
+            'BULK_SMS_DEFAULT_NETWORK',
+            'safaricom'
+        );
+
+        return strtolower(trim((string) $network));
     }
 
     /**
-     * Get the default sender ID configured for the SACCO.
+     * Get the default sender ID.
+     *
+     * Sender ID priority:
+     *
+     * 1. BULK_SMS_DEFAULT_SENDER_ID from .env
+     * 2. Provider-specific SHORTCODE
+     * 3. Provider-specific SENDER_ID
+     * 4. BULK_SMS_DEFAULT_SENDER_ID from sacco_defaults
      */
     public function defaultSenderId(): ?string
     {
-        $value = $this->defaultValue('BULK_SMS_DEFAULT_SENDER_ID');
+        $installationSenderId = config(
+            'bulk_sms.default_sender_id'
+        );
 
-        if ($value === null || trim((string) $value) === '') {
+        if ($this->hasValue($installationSenderId)) {
+            return trim((string) $installationSenderId);
+        }
+
+        $providerShortcode = $this->providerConfig(
+            'SHORTCODE'
+        );
+
+        if ($this->hasValue($providerShortcode)) {
+            return trim((string) $providerShortcode);
+        }
+
+        $providerSenderId = $this->providerConfig(
+            'SENDER_ID'
+        );
+
+        if ($this->hasValue($providerSenderId)) {
+            return trim((string) $providerSenderId);
+        }
+
+        $databaseSenderId = $this->defaultValue(
+            'BULK_SMS_DEFAULT_SENDER_ID'
+        );
+
+        if (!$this->hasValue($databaseSenderId)) {
             return null;
         }
 
-        return trim((string) $value);
+        return trim((string) $databaseSenderId);
     }
 
     /**
@@ -96,12 +193,15 @@ class BulkSmsConfigService
     public function provider(): ?object
     {
         return DB::table('sacco_bulk_sms_providers')
-            ->where('provider_code', $this->providerCode())
+            ->where(
+                'provider_code',
+                $this->providerCode()
+            )
             ->first();
     }
 
     /**
-     * Check whether the active provider is enabled.
+     * Check whether the active provider exists and is enabled.
      */
     public function providerIsEnabled(): bool
     {
@@ -112,14 +212,19 @@ class BulkSmsConfigService
         }
 
         return strtoupper(
-            (string) $provider->provider_enabled
+            trim((string) $provider->provider_enabled)
         ) === 'Y';
     }
 
     /**
-     * Get one configuration value for the active provider.
+     * Resolve one configuration value for the active provider.
      *
-     * Environment variables take priority over database values.
+     * Resolution priority:
+     *
+     * 1. config/bulk_sms.php direct provider value
+     * 2. Environment key registered by the database configuration row
+     * 3. Database config_value
+     * 4. Supplied fallback
      */
     public function providerConfig(
         string $key,
@@ -128,81 +233,118 @@ class BulkSmsConfigService
         $providerCode = $this->providerCode();
         $configKey = strtoupper(trim($key));
 
-        $config = DB::table('sacco_bulk_sms_provider_configs')
+        /*
+         * First use the installation configuration.
+         *
+         * Example:
+         * config('bulk_sms.providers.advanta.API_KEY')
+         */
+        $directConfiguration = config(
+            'bulk_sms.providers.'
+            . $providerCode
+            . '.'
+            . $configKey
+        );
+
+        if ($this->hasValue($directConfiguration)) {
+            return $directConfiguration;
+        }
+
+        /*
+         * Then check the provider configuration row.
+         */
+        $configurationRow = DB::table(
+            'sacco_bulk_sms_provider_configs'
+        )
             ->where('provider_code', $providerCode)
             ->where('config_key', $configKey)
             ->first();
 
-        if (!$config) {
+        if (!$configurationRow) {
             return $fallback;
         }
 
         /*
-         * When an environment key is defined and contains a value,
-         * use it instead of the database value.
+         * Resolve the environment key through config/bulk_sms.php.
+         *
+         * Do not call env() directly here because direct runtime env()
+         * calls are unreliable after Laravel configuration is cached.
          */
-        if (!empty($config->config_env_key)) {
-            $environmentValue = env(
-                trim((string) $config->config_env_key)
+        if (!empty($configurationRow->config_env_key)) {
+            $environmentKey = trim(
+                (string) $configurationRow->config_env_key
             );
 
-            if (
-                $environmentValue !== null
-                && $environmentValue !== ''
-            ) {
+            $environmentValue = config(
+                'bulk_sms.environment.'
+                . $environmentKey
+            );
+
+            if ($this->hasValue($environmentValue)) {
                 return $environmentValue;
             }
         }
 
-        return $config->config_value !== null
-            ? $config->config_value
-            : $fallback;
+        /*
+         * Finally use the database value.
+         */
+        if ($this->hasValue(
+            $configurationRow->config_value
+        )) {
+            return $configurationRow->config_value;
+        }
+
+        return $fallback;
     }
 
     /**
      * Return all configurations for the active provider.
      *
-     * Secret values are masked before being returned to the interface.
+     * Secret values are masked before being returned.
      */
     public function providerConfigs(): array
     {
         $providerCode = $this->providerCode();
 
-        $configs = DB::table('sacco_bulk_sms_provider_configs')
+        $configurations = DB::table(
+            'sacco_bulk_sms_provider_configs'
+        )
             ->where('provider_code', $providerCode)
             ->orderBy('config_key')
             ->get();
 
         $output = [];
 
-        foreach ($configs as $config) {
-            $value = $config->config_value;
-
-            if (!empty($config->config_env_key)) {
-                $environmentValue = env(
-                    trim((string) $config->config_env_key)
-                );
-
-                if (
-                    $environmentValue !== null
-                    && $environmentValue !== ''
-                ) {
-                    $value = $environmentValue;
-                }
-            }
+        foreach ($configurations as $configuration) {
+            $value = $this->providerConfig(
+                (string) $configuration->config_key
+            );
 
             $isSecret = strtoupper(
-                (string) $config->config_is_secret
+                trim(
+                    (string) $configuration->config_is_secret
+                )
             ) === 'Y';
 
-            $output[$config->config_key] = [
-                'value' => $isSecret && $value
-                    ? '********'
-                    : $value,
+            $output[$configuration->config_key] = [
+                'value' => $isSecret
+                    && $this->hasValue($value)
+                        ? '********'
+                        : $value,
 
-                'env_key' => $config->config_env_key,
-                'is_secret' => $config->config_is_secret,
-                'is_required' => $config->config_is_required,
+                'env_key' => $configuration->config_env_key,
+
+                'is_secret' => $configuration
+                    ->config_is_secret,
+
+                'is_required' => $configuration
+                    ->config_is_required,
+
+                'source' => $this->configurationSource(
+                    $providerCode,
+                    (string) $configuration->config_key,
+                    $configuration
+                ),
             ];
         }
 
@@ -210,8 +352,50 @@ class BulkSmsConfigService
     }
 
     /**
-     * Check whether the active provider is fully configured and ready
-     * to send SMS messages.
+     * Describe where a provider configuration value came from.
+     *
+     * This is safe for diagnostics because it does not expose the value.
+     */
+    protected function configurationSource(
+        string $providerCode,
+        string $configKey,
+        object $configuration
+    ): string {
+        $directValue = config(
+            'bulk_sms.providers.'
+            . $providerCode
+            . '.'
+            . strtoupper(trim($configKey))
+        );
+
+        if ($this->hasValue($directValue)) {
+            return 'environment';
+        }
+
+        if (!empty($configuration->config_env_key)) {
+            $environmentValue = config(
+                'bulk_sms.environment.'
+                . trim(
+                    (string) $configuration->config_env_key
+                )
+            );
+
+            if ($this->hasValue($environmentValue)) {
+                return 'environment';
+            }
+        }
+
+        if ($this->hasValue(
+            $configuration->config_value
+        )) {
+            return 'database';
+        }
+
+        return 'missing';
+    }
+
+    /**
+     * Check whether the selected provider is ready to send.
      */
     public function readiness(): array
     {
@@ -221,143 +405,190 @@ class BulkSmsConfigService
         $issues = [];
 
         /*
-         * Global Bulk SMS status.
-         */
+        |--------------------------------------------------------------------------
+        | Global module status
+        |--------------------------------------------------------------------------
+        */
+
         if (!$this->isEnabled()) {
             $issues[] = 'Bulk SMS is disabled in sacco_defaults.';
         }
 
         /*
-         * Provider existence and status.
-         */
+        |--------------------------------------------------------------------------
+        | Provider status
+        |--------------------------------------------------------------------------
+        */
+
         if (!$provider) {
-            $issues[] = 'Selected Bulk SMS provider does not exist.';
+            $issues[] = sprintf(
+                'Selected Bulk SMS provider "%s" does not exist.',
+                $providerCode
+            );
         }
 
         if (
             $provider
-            && strtoupper((string) $provider->provider_enabled) !== 'Y'
+            && strtoupper(
+                trim((string) $provider->provider_enabled)
+            ) !== 'Y'
         ) {
-            $issues[] = 'Selected Bulk SMS provider is disabled.';
+            $issues[] = sprintf(
+                'Selected Bulk SMS provider "%s" is disabled.',
+                $providerCode
+            );
         }
 
         /*
-         * The send URL may be supplied through:
-         *
-         * 1. SEND_URL in sacco_bulk_sms_provider_configs; or
-         * 2. provider_send_url in sacco_bulk_sms_providers.
+         * The send URL can be stored in either provider configs,
+         * the environment, or the provider database record.
          */
-        $configuredSendUrl = $this->providerConfig('SEND_URL')
-            ?: ($provider->provider_send_url ?? null);
+        $configuredSendUrl = $this->providerConfig(
+            'SEND_URL'
+        ) ?: ($provider->provider_send_url ?? null);
 
-        if ($provider && !$configuredSendUrl) {
+        if ($provider && !$this->hasValue(
+            $configuredSendUrl
+        )) {
             $issues[] = 'Provider SMS send URL is not configured.';
         }
 
         /*
-         |--------------------------------------------------------------------------
-         | ADTEL readiness
-         |--------------------------------------------------------------------------
-         */
+        |--------------------------------------------------------------------------
+        | ADTEL readiness
+        |--------------------------------------------------------------------------
+        */
+
         if ($providerCode === 'adtel') {
-            $authUrl = $this->providerConfig('AUTH_URL')
-                ?: ($provider->provider_token_url ?? null);
+            $authUrl = $this->providerConfig(
+                'AUTH_URL'
+            ) ?: ($provider->provider_token_url ?? null);
 
-            $username = $this->providerConfig('USERNAME');
-            $password = $this->providerConfig('PASSWORD');
+            $username = $this->providerConfig(
+                'USERNAME'
+            );
 
-            $clientId = $this->providerConfig('CLIENT_ID');
-            $clientSecret = $this->providerConfig('CLIENT_SECRET');
+            $password = $this->providerConfig(
+                'PASSWORD'
+            );
+
+            $clientId = $this->providerConfig(
+                'CLIENT_ID'
+            );
+
+            $clientSecret = $this->providerConfig(
+                'CLIENT_SECRET'
+            );
+
             $basicAuthToken = $this->providerConfig(
                 'BASIC_AUTH_TOKEN'
             );
 
-            $senderId = $this->providerConfig('SENDER_ID')
-                ?: $this->defaultSenderId();
+            $senderId = $this->providerConfig(
+                'SENDER_ID'
+            ) ?: $this->defaultSenderId();
 
             $actionResponseUrl = $this->providerConfig(
                 'ACTION_RESPONSE_URL'
             );
 
-            if (!$authUrl) {
+            if (!$this->hasValue($authUrl)) {
                 $issues[] = 'Missing required ADTEL config: AUTH_URL.';
             }
 
-            if (!$username) {
+            if (!$this->hasValue($username)) {
                 $issues[] = 'Missing required ADTEL config: USERNAME.';
             }
 
-            if (!$password) {
+            if (!$this->hasValue($password)) {
                 $issues[] = 'Missing required ADTEL config: PASSWORD.';
             }
 
             if (
-                !$basicAuthToken
-                && (!$clientId || !$clientSecret)
+                !$this->hasValue($basicAuthToken)
+                && (
+                    !$this->hasValue($clientId)
+                    || !$this->hasValue($clientSecret)
+                )
             ) {
                 $issues[] = 'Missing ADTEL Basic Auth credentials: provide either BASIC_AUTH_TOKEN or CLIENT_ID and CLIENT_SECRET.';
             }
 
-            if (!$senderId) {
+            if (!$this->hasValue($senderId)) {
                 $issues[] = 'Missing ADTEL sender ID. Set SENDER_ID or BULK_SMS_DEFAULT_SENDER_ID.';
             }
 
-            if (!$actionResponseUrl) {
+            if (!$this->hasValue(
+                $actionResponseUrl
+            )) {
                 $issues[] = 'Missing required ADTEL config: ACTION_RESPONSE_URL.';
             }
         }
 
         /*
-         |--------------------------------------------------------------------------
-         | Advanta readiness
-         |--------------------------------------------------------------------------
-         */
+        |--------------------------------------------------------------------------
+        | Advanta readiness
+        |--------------------------------------------------------------------------
+        */
+
         elseif ($providerCode === 'advanta') {
-            $apiKey = $this->providerConfig('API_KEY');
-            $partnerId = $this->providerConfig('PARTNER_ID');
+            $apiKey = $this->providerConfig(
+                'API_KEY'
+            );
 
-            $shortcode = $this->providerConfig('SHORTCODE')
-                ?: $this->providerConfig('SENDER_ID')
-                ?: $this->defaultSenderId();
+            $partnerId = $this->providerConfig(
+                'PARTNER_ID'
+            );
 
-            if (!$apiKey) {
+            $shortcode = $this->providerConfig(
+                'SHORTCODE'
+            ) ?: $this->defaultSenderId();
+
+            if (!$this->hasValue($apiKey)) {
                 $issues[] = 'Missing required Advanta config: API_KEY.';
             }
 
-            if (!$partnerId) {
+            if (!$this->hasValue($partnerId)) {
                 $issues[] = 'Missing required Advanta config: PARTNER_ID.';
             }
 
-            if (!$shortcode) {
-                $issues[] = 'Missing Advanta shortcode. Set SHORTCODE, SENDER_ID or BULK_SMS_DEFAULT_SENDER_ID.';
+            if (!$this->hasValue($shortcode)) {
+                $issues[] = 'Missing Advanta shortcode. Set ADVANTA_SHORTCODE or BULK_SMS_DEFAULT_SENDER_ID.';
             }
         }
 
         /*
-         |--------------------------------------------------------------------------
-         | Other providers
-         |--------------------------------------------------------------------------
-         |
-         | For providers without custom validation rules, validate all
-         | database configuration records marked as required.
-         */
+        |--------------------------------------------------------------------------
+        | Other providers
+        |--------------------------------------------------------------------------
+        */
+
         else {
-            $requiredConfigs = DB::table(
+            $requiredConfigurations = DB::table(
                 'sacco_bulk_sms_provider_configs'
             )
-                ->where('provider_code', $providerCode)
-                ->where('config_is_required', 'Y')
+                ->where(
+                    'provider_code',
+                    $providerCode
+                )
+                ->where(
+                    'config_is_required',
+                    'Y'
+                )
                 ->get();
 
-            foreach ($requiredConfigs as $config) {
+            foreach (
+                $requiredConfigurations
+                as $configuration
+            ) {
                 $value = $this->providerConfig(
-                    $config->config_key
+                    (string) $configuration->config_key
                 );
 
-                if ($value === null || trim((string) $value) === '') {
+                if (!$this->hasValue($value)) {
                     $issues[] = sprintf(
                         'Missing required provider config: %s.',
-                        $config->config_key
+                        $configuration->config_key
                     );
                 }
             }
@@ -365,17 +596,29 @@ class BulkSmsConfigService
 
         return [
             'enabled' => $this->isEnabled(),
+
             'demo_mode' => $this->isDemoMode(),
 
             'provider_code' => $providerCode,
-            'provider_exists' => $provider !== null,
-            'provider_enabled' => $this->providerIsEnabled(),
 
-            'default_network' => $this->defaultNetwork(),
-            'default_sender_id' => $this->defaultSenderId(),
+            'provider_exists' => $provider !== null,
+
+            'provider_enabled' => $this
+                ->providerIsEnabled(),
+
+            'default_network' => $this
+                ->defaultNetwork(),
+
+            'default_sender_id' => $this
+                ->defaultSenderId(),
+
+            'send_url' => $configuredSendUrl,
 
             'ready_to_send' => empty($issues),
-            'issues' => array_values(array_unique($issues)),
+
+            'issues' => array_values(
+                array_unique($issues)
+            ),
         ];
     }
 }
