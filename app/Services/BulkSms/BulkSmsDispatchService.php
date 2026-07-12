@@ -3,16 +3,21 @@
 namespace App\Services\BulkSms;
 
 use App\Services\BulkSms\Providers\AdtelBulkSmsProvider;
+use App\Services\BulkSms\Providers\AdvantaBulkSmsProvider;
 use Illuminate\Support\Facades\DB;
 
 class BulkSmsDispatchService
 {
     public function __construct(
         protected BulkSmsConfigService $config,
-        protected AdtelBulkSmsProvider $adtel
+        protected AdtelBulkSmsProvider $adtel,
+        protected AdvantaBulkSmsProvider $advanta
     ) {
     }
 
+    /**
+     * Dispatch one queued SMS message.
+     */
     public function dispatchOne(int $smsId): array
     {
         $sms = DB::table('sacco_bulk_sms_messages')
@@ -28,7 +33,10 @@ class BulkSmsDispatchService
             ];
         }
 
-        if ($sms->sms_status !== 'queued') {
+        /*
+         * Only queued messages can be dispatched.
+         */
+        if (strtolower((string) $sms->sms_status) !== 'queued') {
             return [
                 'success' => true,
                 'sent' => false,
@@ -40,6 +48,9 @@ class BulkSmsDispatchService
 
         $readiness = $this->config->readiness();
 
+        /*
+         * Stop when the entire Bulk SMS module is disabled.
+         */
         if (!$this->config->isEnabled()) {
             return $this->markStopped(
                 $smsId,
@@ -50,6 +61,9 @@ class BulkSmsDispatchService
             );
         }
 
+        /*
+         * Demo mode logs messages but does not send them.
+         */
         if ($this->config->isDemoMode()) {
             return $this->markStopped(
                 $smsId,
@@ -60,33 +74,57 @@ class BulkSmsDispatchService
             );
         }
 
-        if (!$readiness['ready_to_send']) {
+        /*
+         * Provider configuration and required credentials must be valid.
+         */
+        if (!($readiness['ready_to_send'] ?? false)) {
+            $issues = $readiness['issues'] ?? [
+                'Bulk SMS provider configuration is incomplete.',
+            ];
+
             return $this->markStopped(
                 $smsId,
                 'failed',
                 'BULK_SMS_NOT_READY',
-                implode(' ', $readiness['issues']),
+                implode(' ', $issues),
                 $readiness
             );
         }
 
-        $providerCode = strtolower((string) $sms->provider_code);
+        $providerCode = strtolower(trim((string) $sms->provider_code));
 
-        if ($providerCode === 'adtel') {
-            $result = $this->adtel->send($sms);
+        /*
+         * Route the message to the selected provider.
+         *
+         * Each SACCO installation selects its provider using:
+         * BULK_SMS_PROVIDER=adtel
+         * or
+         * BULK_SMS_PROVIDER=advanta
+         */
+        $result = match ($providerCode) {
+            'adtel' => $this->adtel->send($sms),
 
-            return $this->applyProviderResult($smsId, $result);
-        }
+            'advanta' => $this->advanta->send($sms),
 
-        return $this->markStopped(
-            $smsId,
-            'failed',
-            'UNSUPPORTED_SMS_PROVIDER',
-            'Unsupported SMS provider: ' . $providerCode,
-            $readiness
-        );
+            default => [
+                'success' => false,
+                'sent' => false,
+                'provider_message_id' => null,
+                'http_status' => null,
+                'request_payload' => null,
+                'response_payload' => null,
+                'error_code' => 'UNSUPPORTED_SMS_PROVIDER',
+                'error_message' => 'Unsupported SMS provider: '
+                    . ($providerCode !== '' ? $providerCode : '[empty]'),
+            ],
+        };
+
+        return $this->applyProviderResult($smsId, $result);
     }
 
+    /**
+     * Dispatch multiple queued SMS messages.
+     */
     public function dispatchQueued(int $limit = 20): array
     {
         $limit = max(1, min($limit, 100));
@@ -103,24 +141,45 @@ class BulkSmsDispatchService
             $results[] = $this->dispatchOne((int) $message->sms_id);
         }
 
+        $sentCount = collect($results)
+            ->filter(fn (array $result) => ($result['sent'] ?? false) === true)
+            ->count();
+
+        $failedCount = collect($results)
+            ->filter(fn (array $result) => ($result['success'] ?? false) === false)
+            ->count();
+
         return [
             'count' => count($results),
+            'sent_count' => $sentCount,
+            'failed_count' => $failedCount,
             'results' => $results,
         ];
     }
 
+    /**
+     * Apply the SMS provider response to the outbox record.
+     */
     protected function applyProviderResult(int $smsId, array $result): array
     {
         $sent = (bool) ($result['sent'] ?? false);
         $status = $sent ? 'sent' : 'failed';
+
+        $errorCode = $sent
+            ? null
+            : ($result['error_code'] ?? 'SMS_SEND_FAILED');
+
+        $errorMessage = $sent
+            ? null
+            : ($result['error_message'] ?? 'SMS send failed.');
 
         $update = [
             'sms_status' => $status,
             'provider_message_id' => $result['provider_message_id'] ?? null,
             'request_payload' => $result['request_payload'] ?? null,
             'response_payload' => $result['response_payload'] ?? null,
-            'error_code' => $sent ? null : ($result['error_code'] ?? 'SMS_SEND_FAILED'),
-            'error_message' => $sent ? null : ($result['error_message'] ?? 'SMS send failed.'),
+            'error_code' => $errorCode,
+            'error_message' => $errorMessage,
             'attempt_count' => DB::raw('COALESCE(attempt_count, 0) + 1'),
             'updated_at' => now(),
         ];
@@ -143,11 +202,14 @@ class BulkSmsDispatchService
             'status' => $status,
             'provider_message_id' => $result['provider_message_id'] ?? null,
             'http_status' => $result['http_status'] ?? null,
-            'error_code' => $sent ? null : ($result['error_code'] ?? 'SMS_SEND_FAILED'),
-            'error_message' => $sent ? null : ($result['error_message'] ?? 'SMS send failed.'),
+            'error_code' => $errorCode,
+            'error_message' => $errorMessage,
         ];
     }
 
+    /**
+     * Stop an SMS before it reaches the provider.
+     */
     protected function markStopped(
         int $smsId,
         string $status,
@@ -159,9 +221,12 @@ class BulkSmsDispatchService
             'sms_status' => $status,
             'error_code' => $errorCode,
             'error_message' => $errorMessage,
-            'response_payload' => json_encode([
-                'readiness' => $readiness,
-            ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+            'response_payload' => json_encode(
+                [
+                    'readiness' => $readiness,
+                ],
+                JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
+            ),
             'attempt_count' => DB::raw('COALESCE(attempt_count, 0) + 1'),
             'updated_at' => now(),
         ];
