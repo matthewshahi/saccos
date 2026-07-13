@@ -2,156 +2,674 @@
 
 namespace App\Services;
 
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
 class NcbaOpenBankingService
 {
-    public function buildMpesaPayload(object $disbursement): array
-    {
-        $amount = number_format((float) $disbursement->amount, 2, '.', '');
+    private const CONFIG_PREFIX =
+        'disbursements.providers.ncba';
+
+    private const TOKEN_ENDPOINT =
+        '/api/v1/Auth/generate-token';
+
+    private const MPESA_DISBURSEMENT_ENDPOINT =
+        '/api/v1/MobileMoneyTransfer/mobilemoneytransfer';
+
+    private const TRANSACTION_STATUS_ENDPOINT =
+        '/api/v1/TransactionStatusQuery/transactionstatusquery';
+
+    private const MINIMUM_MPESA_AMOUNT = 50.00;
+
+    private const MAXIMUM_MPESA_AMOUNT = 250000.00;
+
+    private const TOKEN_CACHE_MINUTES = 50;
+
+    /**
+     * Build the NCBA M-Pesa disbursement payload.
+     */
+    public function buildMpesaPayload(
+        object $disbursement
+    ): array {
+        $this->validateConfiguration();
+
+        $this->validateDisbursement(
+            $disbursement
+        );
+
+        $amount = number_format(
+            (float) $disbursement->amount,
+            2,
+            '.',
+            ''
+        );
 
         return [
-            'beneficiaryName' => $disbursement->member_name,
-            'date' => now()->toDateString(),
-            'debitAccount' => config('services.ncba.debit_account'),
+            'beneficiaryName' => trim(
+                (string) $disbursement->member_name
+            ),
+
+            'date' => now(
+                'Africa/Nairobi'
+            )->toDateString(),
+
+            'debitAccount' => trim(
+                (string) $this->config(
+                    'debit_account'
+                )
+            ),
+
             'debitAmount' => $amount,
-            'mobileNumber' => $disbursement->member_phone,
-            'transactionNarration' => $this->cleanNarration($disbursement->narration ?: 'LOAN DISBURSEMENT'),
-            'uniqueReferenceNumber' => $disbursement->transaction_ref,
+
+            'mobileNumber' => trim(
+                (string) $disbursement->member_phone
+            ),
+
+            'transactionNarration' =>
+                $this->cleanNarration(
+                    $disbursement->narration
+                    ?: 'LOAN DISBURSEMENT'
+                ),
+
+            'uniqueReferenceNumber' => trim(
+                (string) $disbursement->transaction_ref
+            ),
         ];
     }
 
-    public function sendMpesaDisbursement(object $disbursement): array
-    {
-        $this->validateDisbursement($disbursement);
+    /**
+     * Submit an M-Pesa disbursement through NCBA.
+     */
+    public function sendMpesaDisbursement(
+        object $disbursement
+    ): array {
+        $this->validateConfiguration();
 
-        $payload = $this->buildMpesaPayload($disbursement);
+        $payload = $this->buildMpesaPayload(
+            $disbursement
+        );
 
-        if (! config('services.ncba.enabled') || config('services.ncba.dry_run')) {
+        /*
+         * Fail-safe protection.
+         *
+         * The Artisan command already controls live mode, but the service
+         * itself must also refuse transmission when NCBA is disabled or
+         * configured for dry-run operation.
+         */
+        if (
+            !(bool) $this->config(
+                'enabled',
+                false
+            )
+            || (bool) $this->config(
+                'dry_run',
+                true
+            )
+        ) {
             return [
                 'dry_run' => true,
-                'endpoint' => '/api/v1/MobileMoneyTransfer/mobilemoneytransfer',
+
+                'endpoint' =>
+                    self::MPESA_DISBURSEMENT_ENDPOINT,
+
                 'payload' => $payload,
+
                 'response' => [
-                    'message' => 'Dry run only. No request was sent to NCBA.',
+                    'message' =>
+                        'Dry run only. No request was sent to NCBA.',
                 ],
             ];
         }
 
-        $response = $this->post('/api/v1/MobileMoneyTransfer/mobilemoneytransfer', $payload);
+        $response = $this->post(
+            self::MPESA_DISBURSEMENT_ENDPOINT,
+            $payload
+        );
 
         return [
             'dry_run' => false,
-            'endpoint' => '/api/v1/MobileMoneyTransfer/mobilemoneytransfer',
+
+            'endpoint' =>
+                self::MPESA_DISBURSEMENT_ENDPOINT,
+
             'payload' => $payload,
-            'http_status' => $response['http_status'],
-            'response' => $response['json'],
+
+            'http_status' =>
+                $response['http_status'],
+
+            'response' =>
+                $response['json'],
         ];
     }
 
-    public function queryTransactionStatus(string $transactionRef): array
-    {
+    /**
+     * Query NCBA for a transaction's current status.
+     */
+    public function queryTransactionStatus(
+        string $transactionRef
+    ): array {
+        $this->validateConfiguration();
+
+        $transactionRef = trim(
+            $transactionRef
+        );
+
+        if ($transactionRef === '') {
+            throw new RuntimeException(
+                'Transaction reference is required for the NCBA status query.'
+            );
+        }
+
         $payload = [
-            'country' => config('services.ncba.country_code', 'KE'),
-            'transactionId' => $transactionRef,
+            'country' => strtoupper(
+                trim(
+                    (string) $this->config(
+                        'country_code',
+                        'KE'
+                    )
+                )
+            ),
+
+            'transactionId' =>
+                $transactionRef,
         ];
 
-        $response = $this->post('/api/v1/TransactionStatusQuery/transactionstatusquery', $payload);
+        $response = $this->post(
+            self::TRANSACTION_STATUS_ENDPOINT,
+            $payload
+        );
 
         return [
-            'endpoint' => '/api/v1/TransactionStatusQuery/transactionstatusquery',
+            'endpoint' =>
+                self::TRANSACTION_STATUS_ENDPOINT,
+
             'payload' => $payload,
-            'http_status' => $response['http_status'],
-            'response' => $response['json'],
+
+            'http_status' =>
+                $response['http_status'],
+
+            'response' =>
+                $response['json'],
         ];
     }
 
-    private function post(string $endpoint, array $payload): array
-    {
+    /**
+     * Send an authenticated request to NCBA.
+     */
+    private function post(
+        string $endpoint,
+        array $payload
+    ): array {
         $token = $this->getToken();
 
-        $response = Http::timeout(60)
+        $response = Http::connectTimeout(15)
+            ->timeout(60)
+            ->acceptJson()
+            ->asJson()
             ->withHeaders([
-                'Content-Type' => 'application/json',
-                'Ocp-Apim-Subscription-Key' => config('services.ncba.subscription_key'),
-                'Authorization' => 'Bearer ' . $token,
+                'Ocp-Apim-Subscription-Key' =>
+                    trim(
+                        (string) $this->config(
+                            'subscription_key'
+                        )
+                    ),
+
+                'Authorization' =>
+                    'Bearer ' . $token,
             ])
-            ->post(config('services.ncba.base_url') . $endpoint, $payload);
+            ->post(
+                $this->buildUrl($endpoint),
+                $payload
+            );
+
+        return $this->formatResponse(
+            $response
+        );
+    }
+
+    /**
+     * Request and cache an NCBA authentication token.
+     */
+    private function getToken(): string
+    {
+        $cacheKey = $this->tokenCacheKey();
+
+        return Cache::remember(
+            $cacheKey,
+            now()->addMinutes(
+                self::TOKEN_CACHE_MINUTES
+            ),
+            function (): string {
+                $response = Http::connectTimeout(15)
+                    ->timeout(30)
+                    ->acceptJson()
+                    ->asJson()
+                    ->withHeaders([
+                        'Ocp-Apim-Subscription-Key' =>
+                            trim(
+                                (string) $this->config(
+                                    'subscription_key'
+                                )
+                            ),
+                    ])
+                    ->post(
+                        $this->buildUrl(
+                            self::TOKEN_ENDPOINT
+                        ),
+                        [
+                            'userID' => trim(
+                                (string) $this->config(
+                                    'user_id'
+                                )
+                            ),
+
+                            'password' => (string) $this->config(
+                                'password'
+                            ),
+                        ]
+                    );
+
+                if (!$response->successful()) {
+                    throw new RuntimeException(
+                        sprintf(
+                            'NCBA token request failed: HTTP %d - %s',
+                            $response->status(),
+                            $response->body()
+                        )
+                    );
+                }
+
+                $json = $response->json();
+
+                if (!is_array($json)) {
+                    throw new RuntimeException(
+                        'NCBA token response was not valid JSON.'
+                    );
+                }
+
+                $token =
+                    $json['token']
+                    ?? $json['access_token']
+                    ?? $json['accessToken']
+                    ?? $json['data']['token']
+                    ?? $json['data']['access_token']
+                    ?? $json['data']['accessToken']
+                    ?? null;
+
+                if (
+                    $token === null
+                    || trim((string) $token) === ''
+                ) {
+                    throw new RuntimeException(
+                        'NCBA token response did not contain a '
+                        . 'recognizable token field: '
+                        . json_encode(
+                            $json,
+                            JSON_UNESCAPED_SLASHES
+                            | JSON_UNESCAPED_UNICODE
+                        )
+                    );
+                }
+
+                return trim(
+                    (string) $token
+                );
+            }
+        );
+    }
+
+    /**
+     * Validate the outgoing disbursement.
+     */
+    private function validateDisbursement(
+        object $disbursement
+    ): void {
+        $amount = round(
+            (float) (
+                $disbursement->amount
+                ?? 0
+            ),
+            2
+        );
+
+        if (
+            $amount
+            < self::MINIMUM_MPESA_AMOUNT
+        ) {
+            throw new RuntimeException(
+                sprintf(
+                    'Amount is below the NCBA M-Pesa minimum of KES %s.',
+                    number_format(
+                        self::MINIMUM_MPESA_AMOUNT,
+                        2
+                    )
+                )
+            );
+        }
+
+        if (
+            $amount
+            > self::MAXIMUM_MPESA_AMOUNT
+        ) {
+            throw new RuntimeException(
+                sprintf(
+                    'Amount is above the NCBA M-Pesa maximum of KES %s.',
+                    number_format(
+                        self::MAXIMUM_MPESA_AMOUNT,
+                        2
+                    )
+                )
+            );
+        }
+
+        $memberName = trim(
+            (string) (
+                $disbursement->member_name
+                ?? ''
+            )
+        );
+
+        if ($memberName === '') {
+            throw new RuntimeException(
+                'Member name is required.'
+            );
+        }
+
+        $memberPhone = trim(
+            (string) (
+                $disbursement->member_phone
+                ?? ''
+            )
+        );
+
+        if (
+            !preg_match(
+                '/^254[17][0-9]{8}$/',
+                $memberPhone
+            )
+        ) {
+            throw new RuntimeException(
+                'Invalid member phone. Expected format is '
+                . '2547XXXXXXXX or 2541XXXXXXXX.'
+            );
+        }
+
+        $transactionReference = trim(
+            (string) (
+                $disbursement->transaction_ref
+                ?? ''
+            )
+        );
+
+        if ($transactionReference === '') {
+            throw new RuntimeException(
+                'Missing transaction reference.'
+            );
+        }
+
+        $provider = strtoupper(
+            trim(
+                (string) (
+                    $disbursement->disbursement_provider
+                    ?? ''
+                )
+            )
+        );
+
+        if (
+            $provider !== ''
+            && $provider !== 'NCBA'
+        ) {
+            throw new RuntimeException(
+                sprintf(
+                    'Disbursement provider [%s] is not NCBA.',
+                    $provider
+                )
+            );
+        }
+
+        $channel = strtoupper(
+            trim(
+                (string) (
+                    $disbursement->disbursement_channel
+                    ?? ''
+                )
+            )
+        );
+
+        if ($channel !== 'MPESA') {
+            throw new RuntimeException(
+                sprintf(
+                    'Unsupported NCBA disbursement channel [%s].',
+                    $channel !== ''
+                        ? $channel
+                        : 'NONE'
+                )
+            );
+        }
+
+        $currency = strtoupper(
+            trim(
+                (string) (
+                    $disbursement->currency
+                    ?? ''
+                )
+            )
+        );
+
+        $configuredCurrency = strtoupper(
+            trim(
+                (string) $this->config(
+                    'currency',
+                    'KES'
+                )
+            )
+        );
+
+        if (
+            $currency !== ''
+            && $currency !== $configuredCurrency
+        ) {
+            throw new RuntimeException(
+                sprintf(
+                    'Disbursement currency [%s] does not match '
+                    . 'the NCBA configured currency [%s].',
+                    $currency,
+                    $configuredCurrency
+                )
+            );
+        }
+    }
+
+    /**
+     * Validate all required NCBA configuration values.
+     */
+    private function validateConfiguration(): void
+    {
+        $requiredSettings = [
+            'base_url',
+            'user_id',
+            'password',
+            'subscription_key',
+            'debit_account',
+            'country_code',
+            'sender_country',
+            'currency',
+        ];
+
+        foreach ($requiredSettings as $setting) {
+            $value = $this->config(
+                $setting
+            );
+
+            if (
+                $value === null
+                || trim((string) $value) === ''
+            ) {
+                throw new RuntimeException(
+                    sprintf(
+                        'Missing required NCBA configuration: %s.',
+                        strtoupper($setting)
+                    )
+                );
+            }
+        }
+
+        $baseUrl = trim(
+            (string) $this->config(
+                'base_url'
+            )
+        );
+
+        if (
+            filter_var(
+                $baseUrl,
+                FILTER_VALIDATE_URL
+            ) === false
+        ) {
+            throw new RuntimeException(
+                'NCBA base URL is invalid.'
+            );
+        }
+
+        $currency = strtoupper(
+            trim(
+                (string) $this->config(
+                    'currency'
+                )
+            )
+        );
+
+        if (
+            !preg_match(
+                '/^[A-Z]{3}$/',
+                $currency
+            )
+        ) {
+            throw new RuntimeException(
+                'NCBA currency must be a valid three-letter currency code.'
+            );
+        }
+    }
+
+    /**
+     * Build a normalized NCBA request URL.
+     */
+    private function buildUrl(
+        string $endpoint
+    ): string {
+        $baseUrl = rtrim(
+            trim(
+                (string) $this->config(
+                    'base_url'
+                )
+            ),
+            '/'
+        );
+
+        return $baseUrl
+            . '/'
+            . ltrim(
+                $endpoint,
+                '/'
+            );
+    }
+
+    /**
+     * Convert an HTTP response into a predictable structure.
+     */
+    private function formatResponse(
+        Response $response
+    ): array {
+        $json = $response->json();
+
+        if (!is_array($json)) {
+            $json = [
+                'raw' => $response->body(),
+            ];
+        }
 
         return [
-            'http_status' => $response->status(),
-            'json' => $response->json() ?? [
-                'raw' => $response->body(),
-            ],
+            'http_status' =>
+                $response->status(),
+
+            'json' =>
+                $json,
         ];
     }
 
-    private function getToken(): string
+    /**
+     * Generate an environment-specific token cache key.
+     */
+    private function tokenCacheKey(): string
     {
-        return Cache::remember('ncba_open_banking_token', now()->addMinutes(50), function () {
-            $response = Http::timeout(30)
-                ->withHeaders([
-                    'Content-Type' => 'application/json',
-                    'Ocp-Apim-Subscription-Key' => config('services.ncba.subscription_key'),
-                ])
-                ->post(config('services.ncba.base_url') . '/api/v1/Auth/generate-token', [
-                    'userID' => config('services.ncba.user_id'),
-                    'password' => config('services.ncba.password'),
-                ]);
+        $identity = implode('|', [
+            trim(
+                (string) $this->config(
+                    'base_url'
+                )
+            ),
 
-            if (! $response->successful()) {
-                throw new RuntimeException('NCBA token request failed: HTTP ' . $response->status() . ' - ' . $response->body());
-            }
+            trim(
+                (string) $this->config(
+                    'user_id'
+                )
+            ),
 
-            $json = $response->json();
+            trim(
+                (string) $this->config(
+                    'debit_account'
+                )
+            ),
+        ]);
 
-            $token = $json['token']
-                ?? $json['access_token']
-                ?? $json['accessToken']
-                ?? $json['data']['token']
-                ?? $json['data']['access_token']
-                ?? $json['data']['accessToken']
-                ?? null;
-
-            if (! $token) {
-                throw new RuntimeException('NCBA token response did not contain a recognizable token field: ' . json_encode($json));
-            }
-
-            return $token;
-        });
+        return 'ncba_open_banking_token:'
+            . sha1($identity);
     }
 
-    private function validateDisbursement(object $disbursement): void
-    {
-        if ((float) $disbursement->amount < 50) {
-            throw new RuntimeException('Amount is below NCBA M-Pesa minimum of KES 50.');
-        }
-
-        if ((float) $disbursement->amount > 250000) {
-            throw new RuntimeException('Amount is above NCBA M-Pesa maximum of KES 250,000.');
-        }
-
-        if (! preg_match('/^254(7|1)[0-9]{8}$/', $disbursement->member_phone)) {
-            throw new RuntimeException('Invalid member phone. Expected format is 2547XXXXXXXX or 2541XXXXXXXX.');
-        }
-
-        if (empty($disbursement->transaction_ref)) {
-            throw new RuntimeException('Missing transaction reference.');
-        }
-
-        if (empty(config('services.ncba.debit_account'))) {
-            throw new RuntimeException('NCBA debit account is not configured.');
-        }
+    /**
+     * Read an NCBA value from config/disbursements.php.
+     */
+    private function config(
+        string $key,
+        mixed $default = null
+    ): mixed {
+        return config(
+            self::CONFIG_PREFIX
+            . '.'
+            . $key,
+            $default
+        );
     }
 
-    private function cleanNarration(string $narration): string
-    {
-        $narration = strtoupper($narration);
-        $narration = preg_replace('/[^A-Z0-9 ]/', '', $narration);
-        $narration = trim(preg_replace('/\s+/', ' ', $narration));
+    /**
+     * Prepare a bank-safe narration.
+     */
+    private function cleanNarration(
+        string $narration
+    ): string {
+        $narration = strtoupper(
+            trim($narration)
+        );
 
-        return substr($narration, 0, 50);
+        $narration = preg_replace(
+            '/[^A-Z0-9 ]/',
+            '',
+            $narration
+        );
+
+        $narration = preg_replace(
+            '/\s+/',
+            ' ',
+            (string) $narration
+        );
+
+        return substr(
+            trim((string) $narration),
+            0,
+            50
+        );
     }
 }
