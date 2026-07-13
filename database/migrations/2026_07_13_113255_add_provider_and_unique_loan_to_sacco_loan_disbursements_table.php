@@ -4,7 +4,6 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use RuntimeException;
 
 return new class extends Migration
 {
@@ -30,7 +29,7 @@ return new class extends Migration
             ->first();
 
         if ($duplicateLoan !== null) {
-            throw new RuntimeException(
+            throw new \RuntimeException(
                 sprintf(
                     'Cannot add the unique loan disbursement constraint. '
                     . 'Loan ID %s already has %s disbursement records. '
@@ -55,9 +54,9 @@ return new class extends Migration
          */
         if (
             $provider === ''
-            || !preg_match('/^[A-Z0-9_-]{2,30}$/', $provider)
+            || ! preg_match('/^[A-Z0-9_-]{2,30}$/', $provider)
         ) {
-            throw new RuntimeException(
+            throw new \RuntimeException(
                 'LOAN_DISBURSEMENT_PROVIDER must contain between 2 and '
                 . '30 uppercase letters, numbers, underscores or hyphens.'
             );
