@@ -9,71 +9,129 @@ class Kernel extends ConsoleKernel
 {
     protected function schedule(Schedule $schedule): void
     {
-        // Reconcile STK push payments - currently disabled
+        /*
+        |--------------------------------------------------------------------------
+        | STK Push Reconciliation
+        |--------------------------------------------------------------------------
+        | Currently disabled.
+        |--------------------------------------------------------------------------
+        */
+
         // $schedule->job(new \App\Jobs\ReconcileStkPushPaymentsJob())
         //     ->everyMinute()
-        //     ->withoutOverlapping()
+        //     ->withoutOverlapping(5)
         //     ->onOneServer()
         //     ->timezone('Africa/Nairobi');
 
-        // Process incoming transactions every minute
+        /*
+        |--------------------------------------------------------------------------
+        | Incoming Transactions
+        |--------------------------------------------------------------------------
+        */
+
         $schedule->job(new \App\Jobs\ProcessTransactionsJob())
             ->everyMinute()
-            ->withoutOverlapping()
+            ->withoutOverlapping(5)
             ->onOneServer()
             ->timezone('Africa/Nairobi');
-        // ->runInBackground();
-
-        // NCBA loan disbursements - DRY RUN by default.
-        // This processes only rows marked READY_TO_SEND.
-        // It will NOT send money unless --live is added and .env allows live mode.
-        $schedule->command('ncba:process-loan-disbursements --limit=1')
-            ->everyMinute()
-            ->withoutOverlapping()
-            ->onOneServer()
-            ->timezone('Africa/Nairobi');
-        // ->runInBackground();
-
-        // Confirm NCBA disbursements already sent to bank.
-        // This does not send money; it only checks transaction status.
-        $schedule->command('ncba:confirm-loan-disbursements --limit=10')
-            ->everyFiveMinutes()
-            ->withoutOverlapping()
-            ->onOneServer()
-            ->timezone('Africa/Nairobi');
-
-        // Welcome emails
-        $schedule->job(new \App\Jobs\SendWelcomeEmailJob())
-            ->everyMinute()
-            ->withoutOverlapping()
-            ->onOneServer()
-            ->timezone('Africa/Nairobi');
-        // ->runInBackground();
-
-        // Guarantor emails
-        $schedule->job(new \App\Jobs\SendGuarantorEmailJob())
-            ->everyMinute()
-            ->withoutOverlapping()
-            ->onOneServer()
-            ->timezone('Africa/Nairobi');
-        // ->runInBackground();
-
-        // Pending notifications
-        $schedule->job(new \App\Jobs\SendPendingNotificationsJob())
-            ->everyMinute()
-            ->withoutOverlapping()
-            ->onOneServer()
-            ->timezone('Africa/Nairobi');
-
 
         /*
 |--------------------------------------------------------------------------
-| Bulk SMS Outbox
+| Loan Disbursement Queue
 |--------------------------------------------------------------------------
-| Sends a maximum of 60 queued messages per invocation.
-| Provider requests begin no faster than one message per second.
+| Picks a maximum of 10 eligible loans created within the last 24 hours
+| and creates disbursement records for provider processing.
 |--------------------------------------------------------------------------
 */
+
+        $schedule->command(
+            'loans:queue-disbursements --limit=10'
+        )
+            ->everyMinute()
+            ->withoutOverlapping(5)
+            ->onOneServer()
+            ->timezone('Africa/Nairobi');
+        /*
+        |--------------------------------------------------------------------------
+        | NCBA Loan Disbursements
+        |--------------------------------------------------------------------------
+        | Processes one READY_TO_SEND NCBA disbursement every minute.
+        |
+        | The --live option permits submission to the configured NCBA endpoint.
+        | In the current environment, this should point to the NCBA UAT endpoint.
+        |--------------------------------------------------------------------------
+        */
+
+        $schedule->command(
+            'ncba:process-loan-disbursements --live --limit=1'
+        )
+            ->everyMinute()
+            ->withoutOverlapping(5)
+            ->onOneServer()
+            ->timezone('Africa/Nairobi')
+            ->runInBackground();
+
+        /*
+        |--------------------------------------------------------------------------
+        | NCBA Disbursement Confirmation
+        |--------------------------------------------------------------------------
+        | Checks the bank status of disbursements already submitted to NCBA.
+        |--------------------------------------------------------------------------
+        */
+
+        $schedule->command(
+            'ncba:confirm-loan-disbursements --limit=10'
+        )
+            ->everyMinute()
+            ->withoutOverlapping(5)
+            ->onOneServer()
+            ->timezone('Africa/Nairobi')
+            ->runInBackground();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Welcome Emails
+        |--------------------------------------------------------------------------
+        */
+
+        $schedule->job(new \App\Jobs\SendWelcomeEmailJob())
+            ->everyMinute()
+            ->withoutOverlapping(5)
+            ->onOneServer()
+            ->timezone('Africa/Nairobi');
+
+        /*
+        |--------------------------------------------------------------------------
+        | Guarantor Emails
+        |--------------------------------------------------------------------------
+        */
+
+        $schedule->job(new \App\Jobs\SendGuarantorEmailJob())
+            ->everyMinute()
+            ->withoutOverlapping(5)
+            ->onOneServer()
+            ->timezone('Africa/Nairobi');
+
+        /*
+        |--------------------------------------------------------------------------
+        | Pending Notifications
+        |--------------------------------------------------------------------------
+        */
+
+        $schedule->job(new \App\Jobs\SendPendingNotificationsJob())
+            ->everyMinute()
+            ->withoutOverlapping(5)
+            ->onOneServer()
+            ->timezone('Africa/Nairobi');
+
+        /*
+        |--------------------------------------------------------------------------
+        | Bulk SMS Outbox
+        |--------------------------------------------------------------------------
+        | Sends a maximum of 60 queued messages per invocation.
+        | Provider requests begin no faster than one message per second.
+        |--------------------------------------------------------------------------
+        */
 
         $schedule->command(
             'bulk-sms:dispatch-outbox --limit=60'
@@ -84,37 +142,53 @@ class Kernel extends ConsoleKernel
             ->timezone('Africa/Nairobi')
             ->runInBackground();
 
+        /*
+        |--------------------------------------------------------------------------
+        | FOSA Transaction Categorisation
+        |--------------------------------------------------------------------------
+        */
 
-        // Categorize unsorted FOSA transactions
         $schedule->job(new \App\Jobs\CategorizeUnsortedFosaJob())
             ->everyFiveMinutes()
-            ->withoutOverlapping()
+            ->withoutOverlapping(10)
             ->onOneServer()
             ->timezone('Africa/Nairobi');
 
-        // Nightly loan recompute
+        /*
+        |--------------------------------------------------------------------------
+        | Nightly Loan Recompute
+        |--------------------------------------------------------------------------
+        */
+
         $schedule->job(new \App\Jobs\UpdateMembersLoanBalancesJob())
             ->dailyAt('00:00')
-            ->withoutOverlapping()
+            ->withoutOverlapping(60)
             ->onOneServer()
             ->timezone('Africa/Nairobi');
-        // ->runInBackground();
 
-        // Nightly guarantor reset
+        /*
+        |--------------------------------------------------------------------------
+        | Nightly Guarantor Reset
+        |--------------------------------------------------------------------------
+        */
+
         $schedule->job(new \App\Jobs\ResetGuarantorsJob())
             ->dailyAt('00:30')
-            ->withoutOverlapping()
+            ->withoutOverlapping(60)
             ->onOneServer()
             ->timezone('Africa/Nairobi');
-        // ->runInBackground();
 
-        // Nightly member totals update
+        /*
+        |--------------------------------------------------------------------------
+        | Nightly Member Totals Update
+        |--------------------------------------------------------------------------
+        */
+
         $schedule->job(new \App\Jobs\UpdateMemberTotalsJob())
             ->dailyAt('01:00')
-            ->withoutOverlapping()
+            ->withoutOverlapping(60)
             ->onOneServer()
             ->timezone('Africa/Nairobi');
-        // ->runInBackground();
     }
 
     protected function commands(): void
