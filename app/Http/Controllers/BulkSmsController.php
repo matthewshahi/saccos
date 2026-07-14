@@ -52,331 +52,285 @@ class BulkSmsController extends Controller
 
 
     /**
- * Show the Bulk SMS composer.
- *
- * Counts include only active members with valid Kenyan mobile numbers.
- *
- * Members:
- * All active members, including officials.
- *
- * Officials:
- * Active members whose member_position is 2.
- */
-public function compose()
-{
-    $membersResult = $this->resolveBulkSmsRecipients('members');
-    $officialsResult = $this->resolveBulkSmsRecipients('officials');
-
-    $activeMembersCount = $membersResult['recipients']->count();
-    $activeOfficialsCount = $officialsResult['recipients']->count();
-
-    /*
-     * These can be displayed on the Blade later if required.
-     */
-    $invalidMembersPhoneCount = $membersResult['invalid_phone_count'];
-    $invalidOfficialsPhoneCount = $officialsResult['invalid_phone_count'];
-
-    $duplicateMembersPhoneCount = $membersResult['duplicate_phone_count'];
-    $duplicateOfficialsPhoneCount = $officialsResult['duplicate_phone_count'];
-
-    return view('bulk_sms.compose', compact(
-        'activeMembersCount',
-        'activeOfficialsCount',
-        'invalidMembersPhoneCount',
-        'invalidOfficialsPhoneCount',
-        'duplicateMembersPhoneCount',
-        'duplicateOfficialsPhoneCount'
-    ));
-}
-
-/**
- * Load personalised messages into the Bulk SMS outbox.
- *
- * Only members with valid Kenyan mobile numbers are added.
- * Invalid, blank, textual and duplicate phone numbers are skipped.
- *
- * This method does not send SMS messages.
- */
-public function queueBulkMessages(Request $request)
-{
-    $validated = $request->validate([
-        'audience' => [
-            'required',
-            'in:members,officials',
-        ],
-
-        'message' => [
-            'required',
-            'string',
-            'max:1000',
-        ],
-    ], [
-        'audience.required' => 'Please select the recipients.',
-        'audience.in' => 'The selected recipient group is invalid.',
-        'message.required' => 'Please enter the SMS message.',
-        'message.max' => 'The SMS message may not exceed 1,000 characters.',
-    ]);
-
-    $audience = $validated['audience'];
-    $genericMessage = trim($validated['message']);
-
-    /*
-     * Retrieve active recipients and remove:
+     * Show the Bulk SMS composer.
      *
-     * - Missing numbers
-     * - Blank numbers
-     * - Text such as N/A, NONE or UNKNOWN
-     * - Invalid Kenyan mobile numbers
-     * - Duplicate mobile numbers
+     * Counts include only non-deleted members with valid Kenyan mobile numbers.
+     *
+     * Members:
+     * All active members, including officials.
+     *
+     * Officials:
+     * Active members whose member_position is 2.
+     *
+     * Inactive members:
+     * All inactive, non-deleted members.
      */
-    $recipientResult = $this->resolveBulkSmsRecipients(
-        $audience
-    );
+    public function compose()
+    {
+        $membersResult = $this->resolveBulkSmsRecipients('members');
+        $officialsResult = $this->resolveBulkSmsRecipients('officials');
+        $inactiveMembersResult = $this->resolveBulkSmsRecipients('inactive_members');
 
-    $recipients = $recipientResult['recipients'];
+        $activeMembersCount = $membersResult['recipients']->count();
+        $activeOfficialsCount = $officialsResult['recipients']->count();
+        $inactiveMembersCount = $inactiveMembersResult['recipients']->count();
 
-    if ($recipients->isEmpty()) {
-        return back()
-            ->withInput()
-            ->with(
-                'error',
-                'No active recipients with valid mobile numbers were found for the selected group.'
-            );
+        $invalidMembersPhoneCount = $membersResult['invalid_phone_count'];
+        $invalidOfficialsPhoneCount = $officialsResult['invalid_phone_count'];
+        $invalidInactiveMembersPhoneCount = $inactiveMembersResult['invalid_phone_count'];
+
+        $duplicateMembersPhoneCount = $membersResult['duplicate_phone_count'];
+        $duplicateOfficialsPhoneCount = $officialsResult['duplicate_phone_count'];
+        $duplicateInactiveMembersPhoneCount = $inactiveMembersResult['duplicate_phone_count'];
+
+        return view('bulk_sms.compose', compact(
+            'activeMembersCount',
+            'activeOfficialsCount',
+            'inactiveMembersCount',
+            'invalidMembersPhoneCount',
+            'invalidOfficialsPhoneCount',
+            'invalidInactiveMembersPhoneCount',
+            'duplicateMembersPhoneCount',
+            'duplicateOfficialsPhoneCount',
+            'duplicateInactiveMembersPhoneCount'
+        ));
     }
 
-    /*
-     * One reference identifies the entire batch.
-     */
-    $batchReference = 'BULK-'
-        . now()->format('YmdHis')
-        . '-'
-        . strtoupper(Str::random(8));
-
-    $subject = $audience === 'officials'
-        ? 'Bulk SMS to Officials'
-        : 'Bulk SMS to Members';
-
-    $summary = [
-        'selected' => $recipients->count(),
-        'queued' => 0,
-        'failed' => 0,
-        'demo' => 0,
-        'skipped' => 0,
-        'other' => 0,
-
-        'invalid_phone' => $recipientResult[
-            'invalid_phone_count'
-        ],
-
-        'duplicate_phone' => $recipientResult[
-            'duplicate_phone_count'
-        ],
-    ];
-
-    /*
-     * All valid messages are inserted as one atomic batch.
+    /**
+     * Load personalised messages into the Bulk SMS outbox.
      *
-     * No SMS provider request is made here.
+     * Only recipients with valid Kenyan mobile numbers are added.
+     * Invalid, blank, textual and duplicate phone numbers are skipped.
+     *
+     * This method does not send SMS messages.
      */
-    DB::transaction(function () use (
-        $recipients,
-        $genericMessage,
-        $audience,
-        $subject,
-        $batchReference,
-        &$summary
-    ) {
-        foreach ($recipients as $member) {
-            $personalisedMessage = $this->buildBulkSmsMessage(
-                $member->member_name,
-                $genericMessage
-            );
+    public function queueBulkMessages(Request $request)
+    {
+        $validated = $request->validate([
+            'audience' => [
+                'required',
+                'in:members,officials,inactive_members',
+            ],
 
-            /*
-             * Pass the original phone to the outbox.
-             *
-             * The outbox stores:
-             * - recipient_phone_raw
-             * - recipient_phone_normalized
-             *
-             * The number has already been validated here, but the
-             * outbox normalises it again as a final safety check.
-             */
-            $result = $this->outbox->queue([
-                'member_id' => $member->member_id,
+            'message' => [
+                'required',
+                'string',
+                'max:1000',
+            ],
+        ], [
+            'audience.required' => 'Please select the recipients.',
+            'audience.in' => 'The selected recipient group is invalid.',
+            'message.required' => 'Please enter the SMS message.',
+            'message.max' => 'The SMS message may not exceed 1,000 characters.',
+        ]);
 
-                'recipient_name' => $member->member_name,
+        $audience = $validated['audience'];
+        $genericMessage = trim($validated['message']);
 
-                'phone' => $member->member_phone_no,
+        /*
+         * Retrieve the selected recipients and remove:
+         *
+         * - Missing numbers
+         * - Blank numbers
+         * - Text such as N/A, NONE or UNKNOWN
+         * - Invalid Kenyan mobile numbers
+         * - Duplicate mobile numbers
+         */
+        $recipientResult = $this->resolveBulkSmsRecipients($audience);
+        $recipients = $recipientResult['recipients'];
 
-                'subject' => $subject,
-
-                'message' => $personalisedMessage,
-
-                'request_reference' => $batchReference
-                    . '-'
-                    . $member->member_id,
-
-                'meta' => [
-                    'source' => 'bulk_sms_composer',
-                    'batch_reference' => $batchReference,
-                    'audience' => $audience,
-                    'member_id' => $member->member_id,
-                    'member_position' => $member->member_position,
-
-                    /*
-                     * The validated number is retained for audit.
-                     */
-                    'validated_phone' => $member
-                        ->normalized_phone,
-                ],
-            ]);
-
-            $status = strtolower(
-                trim(
-                    (string) (
-                        $result['status'] ?? 'other'
-                    )
-                )
-            );
-
-            if (array_key_exists($status, $summary)) {
-                $summary[$status]++;
-            } else {
-                $summary['other']++;
-            }
+        if ($recipients->isEmpty()) {
+            return back()
+                ->withInput()
+                ->with(
+                    'error',
+                    'No recipients with valid mobile numbers were found for the selected group.'
+                );
         }
-    });
 
-    $message = sprintf(
-        'Bulk SMS batch %s loaded to the outbox. Valid recipients: %d, queued: %d, invalid phone numbers skipped: %d, duplicate phone numbers skipped: %d.',
-        $batchReference,
-        $summary['selected'],
-        $summary['queued'],
-        $summary['invalid_phone'],
-        $summary['duplicate_phone']
-    );
+        /*
+         * One reference identifies the entire batch.
+         */
+        $batchReference = 'BULK-'
+            . now()->format('YmdHis')
+            . '-'
+            . strtoupper(Str::random(8));
 
-    return redirect()
-        ->route('bulk_sms.messages', [
-            'search' => $batchReference,
-        ])
-        ->with('success', $message);
-}
+        $subject = match ($audience) {
+            'officials' => 'Bulk SMS to Officials',
+            'inactive_members' => 'Bulk SMS to Inactive Members',
+            default => 'Bulk SMS to Active Members',
+        };
 
-/**
- * Retrieve the selected active members and retain only recipients
- * with valid and unique Kenyan mobile numbers.
- *
- * A valid mobile number is normalised to one of these formats:
- *
- * 2547XXXXXXXX
- * 2541XXXXXXXX
- */
-protected function resolveBulkSmsRecipients(
-    string $audience
-): array {
-    $query = $this->activeBulkSmsMembersQuery();
+        $summary = [
+            'selected' => $recipients->count(),
+            'queued' => 0,
+            'failed' => 0,
+            'demo' => 0,
+            'skipped' => 0,
+            'other' => 0,
+            'invalid_phone' => $recipientResult['invalid_phone_count'],
+            'duplicate_phone' => $recipientResult['duplicate_phone_count'],
+        ];
 
-    /*
-     * Officials only.
-     */
-    if ($audience === 'officials') {
-        $query->where('member_position', 2);
-    }
+        /*
+         * All valid messages are inserted as one atomic batch.
+         *
+         * No SMS provider request is made here.
+         */
+        DB::transaction(function () use (
+            $recipients,
+            $genericMessage,
+            $audience,
+            $subject,
+            $batchReference,
+            &$summary
+        ) {
+            foreach ($recipients as $member) {
+                $personalisedMessage = $this->buildBulkSmsMessage(
+                    $member->member_name,
+                    $genericMessage
+                );
 
-    $members = $query
-        ->orderBy('member_id')
-        ->get();
+                $result = $this->outbox->queue([
+                    'member_id' => $member->member_id,
+                    'recipient_name' => $member->member_name,
+                    'phone' => $member->member_phone_no,
+                    'subject' => $subject,
+                    'message' => $personalisedMessage,
+                    'request_reference' => $batchReference . '-' . $member->member_id,
+                    'meta' => [
+                        'source' => 'bulk_sms_composer',
+                        'batch_reference' => $batchReference,
+                        'audience' => $audience,
+                        'member_id' => $member->member_id,
+                        'member_position' => $member->member_position,
+                        'member_active' => $member->member_active,
+                        'validated_phone' => $member->normalized_phone,
+                    ],
+                ]);
 
-    $validRecipients = collect();
+                $status = strtolower(
+                    trim((string) ($result['status'] ?? 'other'))
+                );
 
-    $invalidPhoneCount = 0;
-    $duplicatePhoneCount = 0;
+                if (array_key_exists($status, $summary)) {
+                    $summary[$status]++;
+                } else {
+                    $summary['other']++;
+                }
+            }
+        });
 
-    /*
-     * Tracks numbers already selected for this batch.
-     *
-     * This prevents two members sharing one phone number from receiving
-     * the same bulk message twice.
-     */
-    $seenPhoneNumbers = [];
-
-    foreach ($members as $member) {
-        $rawPhone = trim(
-            (string) $member->member_phone_no
+        $message = sprintf(
+            'Bulk SMS batch %s loaded to the outbox. Valid recipients: %d, queued: %d, invalid phone numbers skipped: %d, duplicate phone numbers skipped: %d.',
+            $batchReference,
+            $summary['selected'],
+            $summary['queued'],
+            $summary['invalid_phone'],
+            $summary['duplicate_phone']
         );
 
-        /*
-         * Blank phone number.
-         */
-        if ($rawPhone === '') {
-            $invalidPhoneCount++;
-            continue;
-        }
-
-        /*
-         * Use the existing central phone normaliser.
-         *
-         * Text, malformed numbers, landlines and unsupported values
-         * return null and are excluded.
-         */
-        $normalizedPhone = $this->outbox
-            ->normalizeKenyanPhone($rawPhone);
-
-        if ($normalizedPhone === null) {
-            $invalidPhoneCount++;
-            continue;
-        }
-
-        /*
-         * Do not queue the same mobile number twice in one campaign.
-         */
-        if (isset($seenPhoneNumbers[$normalizedPhone])) {
-            $duplicatePhoneCount++;
-            continue;
-        }
-
-        $seenPhoneNumbers[$normalizedPhone] = true;
-
-        /*
-         * Attach the clean number to the retrieved row.
-         */
-        $member->normalized_phone = $normalizedPhone;
-
-        $validRecipients->push($member);
+        return redirect()
+            ->route('bulk_sms.messages', [
+                'search' => $batchReference,
+            ])
+            ->with('success', $message);
     }
 
-    return [
-        'recipients' => $validRecipients,
-        'invalid_phone_count' => $invalidPhoneCount,
-        'duplicate_phone_count' => $duplicatePhoneCount,
-    ];
-}
+    /**
+     * Retrieve the selected audience and retain only recipients with valid
+     * and unique Kenyan mobile numbers.
+     *
+     * A valid mobile number is normalised to one of these formats:
+     *
+     * 2547XXXXXXXX
+     * 2541XXXXXXXX
+     */
+    protected function resolveBulkSmsRecipients(string $audience): array
+    {
+        $query = $this->bulkSmsMembersQuery();
 
-/**
- * Return all active and non-deleted members.
- *
- * No member_position condition is applied here because selecting
- * "members" includes both ordinary members and officials.
- */
-protected function activeBulkSmsMembersQuery(): \Illuminate\Database\Query\Builder
-{
-    return DB::table('sacco_members')
-        ->select([
-            'member_id',
-            'member_name',
-            'member_phone_no',
-            'member_position',
-        ])
-        ->where('member_active', 'Y')
-        ->where(function ($query) {
-            $query->whereNull('member_deleted')
-                ->orWhere('member_deleted', 'N')
-                ->orWhere('member_deleted', 0)
-                ->orWhere('member_deleted', '0');
-        });
-}
+        switch ($audience) {
+            case 'officials':
+                $query
+                    ->where('member_active', 'Y')
+                    ->where('member_position', 2);
+                break;
+
+            case 'inactive_members':
+                $query->whereIn('member_active', ['N', 'n', '0']);
+                break;
+
+            case 'members':
+            default:
+                $query->where('member_active', 'Y');
+                break;
+        }
+
+        $members = $query
+            ->orderBy('member_id')
+            ->get();
+
+        $validRecipients = collect();
+        $invalidPhoneCount = 0;
+        $duplicatePhoneCount = 0;
+        $seenPhoneNumbers = [];
+
+        foreach ($members as $member) {
+            $rawPhone = trim((string) $member->member_phone_no);
+
+            if ($rawPhone === '') {
+                $invalidPhoneCount++;
+                continue;
+            }
+
+            $normalizedPhone = $this->outbox
+                ->normalizeKenyanPhone($rawPhone);
+
+            if ($normalizedPhone === null) {
+                $invalidPhoneCount++;
+                continue;
+            }
+
+            if (isset($seenPhoneNumbers[$normalizedPhone])) {
+                $duplicatePhoneCount++;
+                continue;
+            }
+
+            $seenPhoneNumbers[$normalizedPhone] = true;
+            $member->normalized_phone = $normalizedPhone;
+            $validRecipients->push($member);
+        }
+
+        return [
+            'recipients' => $validRecipients,
+            'invalid_phone_count' => $invalidPhoneCount,
+            'duplicate_phone_count' => $duplicatePhoneCount,
+        ];
+    }
+
+    /**
+     * Return all non-deleted members. Audience-specific activity and position
+     * filters are applied in resolveBulkSmsRecipients().
+     */
+    protected function bulkSmsMembersQuery(): \Illuminate\Database\Query\Builder
+    {
+        return DB::table('sacco_members')
+            ->select([
+                'member_id',
+                'member_name',
+                'member_phone_no',
+                'member_position',
+                'member_active',
+            ])
+            ->where(function ($query) {
+                $query->whereNull('member_deleted')
+                    ->orWhere('member_deleted', 'N')
+                    ->orWhere('member_deleted', 0)
+                    ->orWhere('member_deleted', '0');
+            });
+    }
 
 /**
  * Create the personalised SMS message.

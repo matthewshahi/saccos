@@ -133,6 +133,38 @@
                                     </div>
                                 </div>
                             </div>
+
+                            <div class="card mt-3">
+                                <div class="card-body py-3">
+                                    <div class="form-check">
+                                        <input
+                                            type="radio"
+                                            name="audience"
+                                            id="audience_inactive_members"
+                                            value="inactive_members"
+                                            class="form-check-input"
+                                            {{ old('audience') === 'inactive_members' ? 'checked' : '' }}
+                                            required
+                                        >
+
+                                        <label
+                                            class="form-check-label"
+                                            for="audience_inactive_members"
+                                        >
+                                            <strong>All Inactive Members</strong>
+
+                                            <span class="badge bg-secondary ms-2">
+                                                {{ number_format($inactiveMembersCount) }}
+                                            </span>
+
+                                            <div class="text-muted small mt-1">
+                                                Sends to inactive, non-deleted
+                                                members with valid mobile numbers.
+                                            </div>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="col-md-12 form-group mb-3">
@@ -216,6 +248,27 @@
                             <th>Valid Officials</th>
                             <td>
                                 {{ number_format($activeOfficialsCount) }}
+                            </td>
+                        </tr>
+
+                        <tr>
+                            <th>Valid Inactive Members</th>
+                            <td>
+                                {{ number_format($inactiveMembersCount) }}
+                            </td>
+                        </tr>
+
+                        <tr>
+                            <th>Invalid Inactive Member Numbers</th>
+                            <td>
+                                {{ number_format($invalidInactiveMembersPhoneCount) }}
+                            </td>
+                        </tr>
+
+                        <tr>
+                            <th>Duplicate Inactive Member Numbers</th>
+                            <td>
+                                {{ number_format($duplicateInactiveMembersPhoneCount) }}
                             </td>
                         </tr>
 
