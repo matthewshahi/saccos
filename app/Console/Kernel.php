@@ -36,13 +36,13 @@ class Kernel extends ConsoleKernel
             ->timezone('Africa/Nairobi');
 
         /*
-|--------------------------------------------------------------------------
-| Loan Disbursement Queue
-|--------------------------------------------------------------------------
-| Picks a maximum of 10 eligible loans created within the last 24 hours
-| and creates disbursement records for provider processing.
-|--------------------------------------------------------------------------
-*/
+        |--------------------------------------------------------------------------
+        | Loan Disbursement Queue
+        |--------------------------------------------------------------------------
+        | Picks a maximum of 10 eligible loans created within the last 24 hours
+        | and creates disbursement records for provider processing.
+        |--------------------------------------------------------------------------
+        */
 
         $schedule->command(
             'loans:queue-disbursements --limit=10'
@@ -51,6 +51,7 @@ class Kernel extends ConsoleKernel
             ->withoutOverlapping(5)
             ->onOneServer()
             ->timezone('Africa/Nairobi');
+
         /*
         |--------------------------------------------------------------------------
         | NCBA Loan Disbursements
@@ -189,6 +190,50 @@ class Kernel extends ConsoleKernel
             ->withoutOverlapping(60)
             ->onOneServer()
             ->timezone('Africa/Nairobi');
+
+        /*
+        |--------------------------------------------------------------------------
+        | Special Savings Interest Accrual
+        |--------------------------------------------------------------------------
+        | Checks for special-savings accounts whose monthly interest date is due.
+        |
+        | The command runs every minute from 02:00 through 03:59.
+        | Each invocation processes a controlled batch of eligible accounts so
+        | that large SACCOs do not overload the application or database server.
+        |--------------------------------------------------------------------------
+        */
+
+        $schedule->command(
+            'special-savings:process-due-interest'
+        )
+            ->everyMinute()
+            ->between('02:00', '03:59')
+            ->withoutOverlapping(10)
+            ->onOneServer()
+            ->timezone('Africa/Nairobi')
+            ->runInBackground();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Special Savings Interest Vesting
+        |--------------------------------------------------------------------------
+        | Checks for accrued special-savings interest whose configured withdrawal
+        | cycle has matured and moves it into available interest.
+        |
+        | The command runs every minute from 04:00 through 07:59, after monthly
+        | interest processing and before normal official working hours.
+        |--------------------------------------------------------------------------
+        */
+
+        $schedule->command(
+            'special-savings:process-due-vesting'
+        )
+            ->everyMinute()
+            ->between('04:00', '07:59')
+            ->withoutOverlapping(10)
+            ->onOneServer()
+            ->timezone('Africa/Nairobi')
+            ->runInBackground();
     }
 
     protected function commands(): void
