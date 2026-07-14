@@ -777,41 +777,109 @@ class ProcessDueSpecialSavingsInterest extends Command
     }
 
     /**
-     * Determine the next cycle while preserving the account opening-day anchor.
-     * A 31st anchor becomes month-end in shorter months and returns to the 31st
-     * whenever the target month contains that day.
-     */
-    private function determineNextCycle($account, $product): array
-    {
-        $openingDate = Carbon::parse(
-            $account->special_saving_account_opening_date,
+ * Determine the next interest cycle while preserving the correct account
+ * schedule anchor.
+ *
+ * Rules:
+ * - Where the last-interest date follows the opening-date anniversary,
+ *   retain the original opening-day anchor.
+ * - Where imported or manually maintained last-interest dates use a
+ *   different schedule, treat that last-interest date as the established
+ *   schedule.
+ * - A genuine 31st/month-end schedule remains month-end in shorter months.
+ * - A 30th schedule remains anchored to the 30th and does not drift to the
+ *   31st after February.
+ */
+private function determineNextCycle($account, $product): array
+{
+    $openingDate = Carbon::parse(
+        $account->special_saving_account_opening_date,
+        self::TIMEZONE
+    )->startOfDay();
+
+    $lastInterestDate = !empty($account->special_saving_account_last_interest_date)
+        ? Carbon::parse(
+            $account->special_saving_account_last_interest_date,
             self::TIMEZONE
-        )->startOfDay();
+        )->startOfDay()
+        : null;
 
-        $cycleStart = $account->special_saving_account_last_interest_date
-            ? Carbon::parse(
-                $account->special_saving_account_last_interest_date,
-                self::TIMEZONE
-            )->startOfDay()
-            : $openingDate->copy();
+    $cycleStart = $lastInterestDate
+        ? $lastInterestDate->copy()
+        : $openingDate->copy();
 
-        $months = $this->frequencyMonths(
-            (string) $product->special_saving_product_interest_posting_frequency
+    $months = $this->frequencyMonths(
+        (string) $product->special_saving_product_interest_posting_frequency
+    );
+
+    /*
+     * Start with the account-opening anniversary as the normal anchor.
+     */
+    $anchorDay = $openingDate->day;
+    $monthEndAnchor = $anchorDay === 31;
+
+    /*
+     * Where a previous interest date exists, determine whether it still
+     * follows the opening-date anniversary.
+     *
+     * Example:
+     * Opening 30 January -> last interest 29 February is still correctly
+     * following a 30th-day anchor because February has no 30th.
+     *
+     * But:
+     * Opening on the 1st -> last interest 31 May is an explicit month-end
+     * schedule and must continue to 30 June, not 1 June.
+     */
+    if ($lastInterestDate !== null) {
+        $expectedDayFromOpeningAnchor = min(
+            $openingDate->day,
+            $lastInterestDate->daysInMonth
         );
 
-        $targetMonth = $cycleStart->copy()
-            ->startOfMonth()
-            ->addMonthsNoOverflow($months);
+        $lastDateFollowsOpeningAnchor =
+            $lastInterestDate->day === $expectedDayFromOpeningAnchor;
 
-        $anchorDay = $openingDate->day;
-        $targetDay = min($anchorDay, $targetMonth->daysInMonth);
-        $cycleEnd = $targetMonth->copy()->day($targetDay)->startOfDay();
+        if (!$lastDateFollowsOpeningAnchor) {
+            $anchorDay = $lastInterestDate->day;
 
-        return [
-            'start' => $cycleStart,
-            'end' => $cycleEnd,
-        ];
+            $monthEndAnchor =
+                $lastInterestDate->day === $lastInterestDate->daysInMonth;
+        }
     }
+
+    $targetMonth = $cycleStart
+        ->copy()
+        ->startOfMonth()
+        ->addMonthsNoOverflow($months);
+
+    if ($monthEndAnchor) {
+        $cycleEnd = $targetMonth->copy()->endOfMonth()->startOfDay();
+    } else {
+        $targetDay = min($anchorDay, $targetMonth->daysInMonth);
+
+        $cycleEnd = $targetMonth
+            ->copy()
+            ->day($targetDay)
+            ->startOfDay();
+    }
+
+    /*
+     * Defensive protection against malformed legacy dates.
+     */
+    if ($cycleEnd->lte($cycleStart)) {
+        throw new RuntimeException(sprintf(
+            'Invalid special-savings interest cycle generated for account %s: %s to %s.',
+            $account->special_saving_account_id,
+            $cycleStart->toDateString(),
+            $cycleEnd->toDateString()
+        ));
+    }
+
+    return [
+        'start' => $cycleStart,
+        'end' => $cycleEnd,
+    ];
+}
 
     /**
      * Convert supported frequency settings into calendar months.
