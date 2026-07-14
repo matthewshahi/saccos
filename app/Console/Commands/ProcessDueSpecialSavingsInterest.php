@@ -20,6 +20,7 @@ class ProcessDueSpecialSavingsInterest extends Command
      */
     protected $signature = 'special-savings:process-due-interest
         {--date= : Processing date in YYYY-MM-DD format. Defaults to today in Africa/Nairobi}
+        {--cutoff-date= : Earliest interest cycle-end date allowed. Defaults to config special_savings.interest_cutoff_date}
         {--limit= : Override the dynamically calculated batch size}
         {--min-batch=10 : Minimum automatic batch size}
         {--max-batch=100 : Maximum automatic batch size}
@@ -38,6 +39,7 @@ class ProcessDueSpecialSavingsInterest extends Command
     {
         try {
             $asOfDate = $this->resolveProcessingDate();
+            $cutoffDate = $this->resolveCutoffDate();
             $minBatch = max(1, (int) $this->option('min-batch'));
             $maxBatch = max($minBatch, (int) $this->option('max-batch'));
             $accountId = $this->option('account') !== null
@@ -45,11 +47,15 @@ class ProcessDueSpecialSavingsInterest extends Command
                 : null;
             $dryRun = (bool) $this->option('dry-run');
 
-            $dueAccounts = $this->loadDueAccounts($asOfDate, $accountId);
+            $dueAccounts = $this->loadDueAccounts($asOfDate, $cutoffDate, $accountId);
             $eligibleCount = $dueAccounts->count();
 
             if ($eligibleCount === 0) {
-                $this->info('No special-savings accounts are due for interest as at ' . $asOfDate->toDateString() . '.');
+                $this->info(sprintf(
+                    'No special-savings accounts are due for interest as at %s using cutoff %s.',
+                    $asOfDate->toDateString(),
+                    $cutoffDate->toDateString()
+                ));
 
                 return self::SUCCESS;
             }
@@ -64,10 +70,11 @@ class ProcessDueSpecialSavingsInterest extends Command
             $selected = $dueAccounts->take($batchSize);
 
             $this->line(sprintf(
-                'Due accounts: %d | Batch: %d | Date: %s | Mode: %s',
+                'Due accounts: %d | Batch: %d | Date: %s | Cutoff: %s | Mode: %s',
                 $eligibleCount,
                 $selected->count(),
                 $asOfDate->toDateString(),
+                $cutoffDate->toDateString(),
                 $dryRun ? 'DRY RUN' : 'LIVE'
             ));
 
@@ -95,7 +102,8 @@ class ProcessDueSpecialSavingsInterest extends Command
                     } else {
                         $result = $this->processAccount(
                             accountId: (int) $candidate->account->special_saving_account_id,
-                            asOfDate: $asOfDate
+                            asOfDate: $asOfDate,
+                            cutoffDate: $cutoffDate
                         );
                     }
 
@@ -130,6 +138,7 @@ class ProcessDueSpecialSavingsInterest extends Command
                         'account_id' => $candidate->account->special_saving_account_id ?? null,
                         'product_id' => $candidate->product->special_saving_product_id ?? null,
                         'as_of_date' => $asOfDate->toDateString(),
+                        'cutoff_date' => $cutoffDate->toDateString(),
                         'exception' => $e,
                     ]);
 
@@ -173,6 +182,7 @@ class ProcessDueSpecialSavingsInterest extends Command
 
             Log::info('Automatic special-savings interest batch completed.', [
                 'as_of_date' => $asOfDate->toDateString(),
+                'cutoff_date' => $cutoffDate->toDateString(),
                 'eligible_count' => $eligibleCount,
                 'batch_size' => $selected->count(),
                 'dry_run' => $dryRun,
@@ -197,7 +207,11 @@ class ProcessDueSpecialSavingsInterest extends Command
      * Only one overdue cycle per account is returned per command invocation.
      * This deliberately spreads catch-up processing across the available runs.
      */
-    private function loadDueAccounts(Carbon $asOfDate, ?int $accountId = null)
+    private function loadDueAccounts(
+        Carbon $asOfDate,
+        Carbon $cutoffDate,
+        ?int $accountId = null
+    )
     {
         $rows = DB::table('sacco_special_saving_accounts as a')
             ->join(
@@ -237,11 +251,15 @@ class ProcessDueSpecialSavingsInterest extends Command
             ->get();
 
         return $rows
-            ->map(function ($row) {
+            ->map(function ($row) use ($cutoffDate) {
                 try {
                     $account = clone $row;
                     $product = clone $row;
-                    $cycle = $this->determineNextCycle($account, $product);
+                    $cycle = $this->determineFirstCycleOnOrAfterCutoff(
+                        account: $account,
+                        product: $product,
+                        cutoffDate: $cutoffDate
+                    );
 
                     return (object) [
                         'account' => $account,
@@ -279,9 +297,12 @@ class ProcessDueSpecialSavingsInterest extends Command
     /**
      * Process one account inside a database transaction and account-row lock.
      */
-    private function processAccount(int $accountId, Carbon $asOfDate): array
-    {
-        return DB::transaction(function () use ($accountId, $asOfDate) {
+    private function processAccount(
+        int $accountId,
+        Carbon $asOfDate,
+        Carbon $cutoffDate
+    ): array {
+        return DB::transaction(function () use ($accountId, $asOfDate, $cutoffDate) {
             $account = DB::table('sacco_special_saving_accounts')
                 ->where('special_saving_account_id', $accountId)
                 ->lockForUpdate()
@@ -313,7 +334,11 @@ class ProcessDueSpecialSavingsInterest extends Command
                 return $this->basicResult($account, $product, 'not_due', 'Product is not active.');
             }
 
-            $cycle = $this->determineNextCycle($account, $product);
+            $cycle = $this->determineFirstCycleOnOrAfterCutoff(
+                account: $account,
+                product: $product,
+                cutoffDate: $cutoffDate
+            );
             $cycleStart = $cycle['start'];
             $cycleEnd = $cycle['end'];
 
@@ -777,9 +802,16 @@ class ProcessDueSpecialSavingsInterest extends Command
     }
 
     /**
-     * Determine the next cycle while preserving the account opening-day anchor.
-     * A 31st anchor becomes month-end in shorter months and returns to the 31st
-     * whenever the target month contains that day.
+     * Determine the next interest cycle using a stable account schedule anchor.
+     *
+     * The opening date provides the normal anniversary day. Where an imported
+     * or manually maintained last-interest date clearly follows a different
+     * schedule, that established schedule is retained.
+     *
+     * Examples:
+     * - Opening on 25th: always 25th.
+     * - Opening on 30th: February uses 28/29, then returns to 30th.
+     * - Opening on 31st or an established month-end schedule: always month-end.
      */
     private function determineNextCycle($account, $product): array
     {
@@ -788,27 +820,164 @@ class ProcessDueSpecialSavingsInterest extends Command
             self::TIMEZONE
         )->startOfDay();
 
-        $cycleStart = $account->special_saving_account_last_interest_date
+        $lastInterestDate = !empty($account->special_saving_account_last_interest_date)
             ? Carbon::parse(
                 $account->special_saving_account_last_interest_date,
                 self::TIMEZONE
             )->startOfDay()
+            : null;
+
+        $cycleStart = $lastInterestDate
+            ? $lastInterestDate->copy()
             : $openingDate->copy();
 
         $months = $this->frequencyMonths(
             (string) $product->special_saving_product_interest_posting_frequency
         );
 
-        $targetMonth = $cycleStart->copy()
+        $anchor = $this->resolveCycleAnchor(
+            openingDate: $openingDate,
+            lastInterestDate: $lastInterestDate
+        );
+
+        return $this->buildNextCycle(
+            cycleStart: $cycleStart,
+            months: $months,
+            anchorDay: $anchor['day'],
+            monthEndAnchor: $anchor['month_end']
+        );
+    }
+
+    /**
+     * Move forward virtually until the first cycle whose end date is on or
+     * after the configured cutoff date.
+     *
+     * Excluded historical cycles are not posted and do not require database
+     * updates. The first allowed cycle is then processed normally.
+     */
+    private function determineFirstCycleOnOrAfterCutoff(
+        $account,
+        $product,
+        Carbon $cutoffDate
+    ): array {
+        $openingDate = Carbon::parse(
+            $account->special_saving_account_opening_date,
+            self::TIMEZONE
+        )->startOfDay();
+
+        $lastInterestDate = !empty($account->special_saving_account_last_interest_date)
+            ? Carbon::parse(
+                $account->special_saving_account_last_interest_date,
+                self::TIMEZONE
+            )->startOfDay()
+            : null;
+
+        $cycleStart = $lastInterestDate
+            ? $lastInterestDate->copy()
+            : $openingDate->copy();
+
+        $months = $this->frequencyMonths(
+            (string) $product->special_saving_product_interest_posting_frequency
+        );
+
+        $anchor = $this->resolveCycleAnchor(
+            openingDate: $openingDate,
+            lastInterestDate: $lastInterestDate
+        );
+
+        /*
+         * The guard prevents malformed legacy data or unsupported date logic
+         * from causing an infinite loop.
+         */
+        for ($i = 0; $i < 600; $i++) {
+            $cycle = $this->buildNextCycle(
+                cycleStart: $cycleStart,
+                months: $months,
+                anchorDay: $anchor['day'],
+                monthEndAnchor: $anchor['month_end']
+            );
+
+            if ($cycle['end']->gte($cutoffDate)) {
+                return $cycle;
+            }
+
+            $cycleStart = $cycle['end']->copy();
+        }
+
+        throw new RuntimeException(sprintf(
+            'Unable to determine a processable interest cycle for account %s after cutoff %s.',
+            $account->special_saving_account_id,
+            $cutoffDate->toDateString()
+        ));
+    }
+
+    /**
+     * Resolve the fixed anniversary anchor for this account.
+     */
+    private function resolveCycleAnchor(
+        Carbon $openingDate,
+        ?Carbon $lastInterestDate
+    ): array {
+        $anchorDay = $openingDate->day;
+        $monthEndAnchor = $anchorDay === 31;
+
+        if ($lastInterestDate !== null) {
+            $expectedDayFromOpeningAnchor = min(
+                $openingDate->day,
+                $lastInterestDate->daysInMonth
+            );
+
+            $lastDateFollowsOpeningAnchor =
+                $lastInterestDate->day === $expectedDayFromOpeningAnchor;
+
+            /*
+             * A different imported/manual schedule becomes the established
+             * schedule. If that date is month-end, retain month-end permanently.
+             */
+            if (!$lastDateFollowsOpeningAnchor) {
+                $anchorDay = $lastInterestDate->day;
+                $monthEndAnchor =
+                    $lastInterestDate->day === $lastInterestDate->daysInMonth;
+            }
+        }
+
+        return [
+            'day' => $anchorDay,
+            'month_end' => $monthEndAnchor,
+        ];
+    }
+
+    /**
+     * Build one cycle from a given start date and fixed schedule anchor.
+     */
+    private function buildNextCycle(
+        Carbon $cycleStart,
+        int $months,
+        int $anchorDay,
+        bool $monthEndAnchor
+    ): array {
+        $targetMonth = $cycleStart
+            ->copy()
             ->startOfMonth()
             ->addMonthsNoOverflow($months);
 
-        $anchorDay = $openingDate->day;
-        $targetDay = min($anchorDay, $targetMonth->daysInMonth);
-        $cycleEnd = $targetMonth->copy()->day($targetDay)->startOfDay();
+        if ($monthEndAnchor) {
+            $cycleEnd = $targetMonth->copy()->endOfMonth()->startOfDay();
+        } else {
+            $targetDay = min($anchorDay, $targetMonth->daysInMonth);
+            $cycleEnd = $targetMonth->copy()->day($targetDay)->startOfDay();
+        }
+
+        if ($cycleEnd->lte($cycleStart)) {
+            throw new RuntimeException(sprintf(
+                'Invalid special-savings interest cycle generated: %s to %s.',
+                $cycleStart->toDateString(),
+                $cycleEnd->toDateString()
+            ));
+        }
 
         return [
-            'start' => $cycleStart,
+            'start' => $cycleStart->copy(),
             'end' => $cycleEnd,
         ];
     }
@@ -894,6 +1063,41 @@ class ProcessDueSpecialSavingsInterest extends Command
 
         if (!$parsed || $parsed->format('Y-m-d') !== (string) $date) {
             throw new RuntimeException('The --date option must use YYYY-MM-DD format.');
+        }
+
+        return $parsed->startOfDay();
+    }
+
+
+    /**
+     * Resolve the earliest cycle-end date that may be calculated.
+     *
+     * Precedence:
+     * 1. Explicit --cutoff-date option
+     * 2. config('special_savings.interest_cutoff_date')
+     */
+    private function resolveCutoffDate(): Carbon
+    {
+        $value = $this->option('cutoff-date');
+
+        if ($value === null || trim((string) $value) === '') {
+            $value = config('special_savings.interest_cutoff_date');
+        }
+
+        if ($value === null || trim((string) $value) === '') {
+            throw new RuntimeException(
+                'Special-savings interest cutoff date is not configured. '
+                . 'Set SPECIAL_SAVINGS_INTEREST_CUTOFF_DATE or use --cutoff-date.'
+            );
+        }
+
+        $value = trim((string) $value);
+        $parsed = Carbon::createFromFormat('Y-m-d', $value, self::TIMEZONE);
+
+        if (!$parsed || $parsed->format('Y-m-d') !== $value) {
+            throw new RuntimeException(
+                'The special-savings interest cutoff date must use YYYY-MM-DD format.'
+            );
         }
 
         return $parsed->startOfDay();
