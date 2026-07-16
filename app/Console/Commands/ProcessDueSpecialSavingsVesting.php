@@ -20,6 +20,7 @@ class ProcessDueSpecialSavingsVesting extends Command
      */
     protected $signature = 'special-savings:process-due-vesting
         {--date= : Processing date in YYYY-MM-DD format. Defaults to today in Africa/Nairobi}
+        {--start-date= : Earliest vesting review date. Defaults to config special_savings.vesting_start_date}
         {--limit= : Override the dynamically calculated batch size}
         {--min-batch=10 : Minimum automatic batch size}
         {--max-batch=100 : Maximum automatic batch size}
@@ -39,6 +40,14 @@ class ProcessDueSpecialSavingsVesting extends Command
     {
         try {
             $asOfDate = $this->resolveProcessingDate();
+            $startDate = $this->resolveVestingStartDate();
+
+            if ($startDate->gt($asOfDate)) {
+                throw new RuntimeException(
+                    'The vesting start date cannot be later than the processing date.'
+                );
+            }
+
             $minBatch = max(1, (int) $this->option('min-batch'));
             $maxBatch = max($minBatch, (int) $this->option('max-batch'));
             $accountId = $this->positiveIntegerOption('account');
@@ -47,6 +56,7 @@ class ProcessDueSpecialSavingsVesting extends Command
 
             $dueAccounts = $this->loadDueAccounts(
                 asOfDate: $asOfDate,
+                startDate: $startDate,
                 accountId: $accountId,
                 productId: $productId
             );
@@ -57,6 +67,8 @@ class ProcessDueSpecialSavingsVesting extends Command
                 $this->info(
                     'No special-savings accounts are due for interest vesting as at '
                     . $asOfDate->toDateString()
+                    . ' using vesting start '
+                    . $startDate->toDateString()
                     . '.'
                 );
 
@@ -73,10 +85,11 @@ class ProcessDueSpecialSavingsVesting extends Command
             $selected = $dueAccounts->take($batchSize);
 
             $this->line(sprintf(
-                'Due accounts: %d | Batch: %d | Date: %s | Mode: %s',
+                'Due accounts: %d | Batch: %d | Date: %s | Start: %s | Mode: %s',
                 $eligibleCount,
                 $selected->count(),
                 $asOfDate->toDateString(),
+                $startDate->toDateString(),
                 $dryRun ? 'DRY RUN' : 'LIVE'
             ));
 
@@ -99,11 +112,13 @@ class ProcessDueSpecialSavingsVesting extends Command
                         ? $this->previewAccount(
                             account: $candidate->account,
                             product: $candidate->product,
-                            asOfDate: $asOfDate
+                            asOfDate: $asOfDate,
+                            startDate: $startDate
                         )
                         : $this->processAccount(
                             accountId: (int) $candidate->account->special_saving_account_id,
-                            asOfDate: $asOfDate
+                            asOfDate: $asOfDate,
+                            startDate: $startDate
                         );
 
                     $status = $result['status'];
@@ -136,6 +151,7 @@ class ProcessDueSpecialSavingsVesting extends Command
                         'account_id' => $candidate->account->special_saving_account_id ?? null,
                         'product_id' => $candidate->product->special_saving_product_id ?? null,
                         'as_of_date' => $asOfDate->toDateString(),
+                        'vesting_start_date' => $startDate->toDateString(),
                         'exception' => $e,
                     ]);
 
@@ -179,6 +195,7 @@ class ProcessDueSpecialSavingsVesting extends Command
 
             Log::info('Automatic special-savings vesting batch completed.', [
                 'as_of_date' => $asOfDate->toDateString(),
+                'vesting_start_date' => $startDate->toDateString(),
                 'eligible_count' => $eligibleCount,
                 'batch_size' => $selected->count(),
                 'dry_run' => $dryRun,
@@ -205,6 +222,7 @@ class ProcessDueSpecialSavingsVesting extends Command
      */
     private function loadDueAccounts(
         Carbon $asOfDate,
+        Carbon $startDate,
         ?int $accountId = null,
         ?int $productId = null
     ) {
@@ -243,14 +261,15 @@ class ProcessDueSpecialSavingsVesting extends Command
             ->get();
 
         return $rows
-            ->map(function ($row) use ($asOfDate) {
+            ->map(function ($row) use ($asOfDate, $startDate) {
                 try {
                     $account = clone $row;
                     $product = clone $row;
                     $schedule = $this->determineVestingSchedule(
                         account: $account,
                         product: $product,
-                        asOfDate: $asOfDate
+                        asOfDate: $asOfDate,
+                        startDate: $startDate
                     );
 
                     return (object) [
@@ -295,9 +314,12 @@ class ProcessDueSpecialSavingsVesting extends Command
     /**
      * Process one account inside a database transaction and row lock.
      */
-    private function processAccount(int $accountId, Carbon $asOfDate): array
-    {
-        return DB::transaction(function () use ($accountId, $asOfDate) {
+    private function processAccount(
+        int $accountId,
+        Carbon $asOfDate,
+        Carbon $startDate
+    ): array {
+        return DB::transaction(function () use ($accountId, $asOfDate, $startDate) {
             $account = DB::table('sacco_special_saving_accounts')
                 ->where('special_saving_account_id', $accountId)
                 ->lockForUpdate()
@@ -342,7 +364,8 @@ class ProcessDueSpecialSavingsVesting extends Command
             $schedule = $this->determineVestingSchedule(
                 account: $account,
                 product: $product,
-                asOfDate: $asOfDate
+                asOfDate: $asOfDate,
+                startDate: $startDate
             );
 
             if ($schedule['automatic'] !== true) {
@@ -381,13 +404,15 @@ class ProcessDueSpecialSavingsVesting extends Command
                 account: $account,
                 product: $product,
                 policy: $schedule['policy'],
-                dueDate: $dueDate
+                dueDate: $dueDate,
+                startDate: $startDate
             );
             $nextVestingDate = $this->determineNextVestingDate(
                 account: $account,
                 product: $product,
                 policy: $schedule['policy'],
-                dueDate: $dueDate
+                dueDate: $dueDate,
+                startDate: $startDate
             );
 
             $existingTransaction = DB::table('sacco_special_saving_transactions')
@@ -417,11 +442,20 @@ class ProcessDueSpecialSavingsVesting extends Command
                 );
             }
 
+            $includeCycleStart = $cycleStart !== null
+                && $cycleStart->equalTo(
+                    $this->effectiveVestingAnchorDate(
+                        account: $account,
+                        startDate: $startDate
+                    )
+                );
+
             $vestingAmount = $this->calculateVestableInterest(
                 account: $account,
                 policy: $schedule['policy'],
                 cycleStart: $cycleStart,
-                cycleEnd: $dueDate
+                cycleEnd: $dueDate,
+                includeCycleStart: $includeCycleStart
             );
 
             if ($vestingAmount <= 0) {
@@ -540,6 +574,7 @@ class ProcessDueSpecialSavingsVesting extends Command
                 'cycle_start' => $cycleStart?->toDateString(),
                 'due_date' => $dueDate->toDateString(),
                 'processing_date' => $asOfDate->toDateString(),
+                'vesting_start_date' => $startDate->toDateString(),
                 'vesting_amount' => $vestingAmount,
                 'next_vesting_date' => $nextVestingDate?->toDateString(),
             ]);
@@ -564,12 +599,18 @@ class ProcessDueSpecialSavingsVesting extends Command
     /**
      * Preview one account without changing any records.
      */
-    private function previewAccount($account, $product, Carbon $asOfDate): array
+    private function previewAccount(
+        $account,
+        $product,
+        Carbon $asOfDate,
+        Carbon $startDate
+    ): array
     {
         $schedule = $this->determineVestingSchedule(
             account: $account,
             product: $product,
-            asOfDate: $asOfDate
+            asOfDate: $asOfDate,
+            startDate: $startDate
         );
 
         if ($schedule['automatic'] !== true) {
@@ -607,19 +648,31 @@ class ProcessDueSpecialSavingsVesting extends Command
             account: $account,
             product: $product,
             policy: $schedule['policy'],
-            dueDate: $dueDate
+            dueDate: $dueDate,
+            startDate: $startDate
         );
+
+        $includeCycleStart = $cycleStart !== null
+            && $cycleStart->equalTo(
+                $this->effectiveVestingAnchorDate(
+                    account: $account,
+                    startDate: $startDate
+                )
+            );
+
         $vestingAmount = $this->calculateVestableInterest(
             account: $account,
             policy: $schedule['policy'],
             cycleStart: $cycleStart,
-            cycleEnd: $dueDate
+            cycleEnd: $dueDate,
+            includeCycleStart: $includeCycleStart
         );
         $nextVestingDate = $this->determineNextVestingDate(
             account: $account,
             product: $product,
             policy: $schedule['policy'],
-            dueDate: $dueDate
+            dueDate: $dueDate,
+            startDate: $startDate
         );
 
         return $this->result(
@@ -641,8 +694,12 @@ class ProcessDueSpecialSavingsVesting extends Command
     /**
      * Resolve whether and when the product allows automatic vesting.
      */
-    private function determineVestingSchedule($account, $product, Carbon $asOfDate): array
-    {
+    private function determineVestingSchedule(
+        $account,
+        $product,
+        Carbon $asOfDate,
+        Carbon $startDate
+    ): array {
         $policy = $this->normalizePolicy(
             (string) $product->special_saving_product_interest_vesting_policy
         );
@@ -670,10 +727,22 @@ class ProcessDueSpecialSavingsVesting extends Command
             ];
         }
 
+        $effectiveAnchor = $this->effectiveVestingAnchorDate(
+            account: $account,
+            startDate: $startDate
+        );
+
         if (in_array($policy, ['IMMEDIATE', 'IMMEDIATE_ON_ACCRUAL', 'AVAILABLE_IMMEDIATELY'], true)) {
-            $dueDate = $account->special_saving_account_last_interest_date
-                ? Carbon::parse($account->special_saving_account_last_interest_date, self::TIMEZONE)->startOfDay()
+            $lastInterestDate = $account->special_saving_account_last_interest_date
+                ? Carbon::parse(
+                    $account->special_saving_account_last_interest_date,
+                    self::TIMEZONE
+                )->startOfDay()
                 : $asOfDate->copy();
+
+            $dueDate = $lastInterestDate->lt($effectiveAnchor)
+                ? $effectiveAnchor->copy()
+                : $lastInterestDate;
 
             return [
                 'policy' => $policy,
@@ -712,6 +781,10 @@ class ProcessDueSpecialSavingsVesting extends Command
                 )->startOfDay()
                 : $asOfDate->copy();
 
+            if ($dueDate->lt($effectiveAnchor)) {
+                $dueDate = $effectiveAnchor->copy();
+            }
+
             return [
                 'policy' => $policy,
                 'automatic' => true,
@@ -722,16 +795,27 @@ class ProcessDueSpecialSavingsVesting extends Command
             ];
         }
 
-        $dueDate = $account->special_saving_account_next_free_withdrawal_date
+        $firstDueDate = $this->addMonthsPreservingAnchor(
+            fromDate: $effectiveAnchor,
+            months: $cycleMonths,
+            anchorDay: $effectiveAnchor->day
+        );
+
+        $storedDueDate = $account->special_saving_account_next_free_withdrawal_date
             ? Carbon::parse(
                 $account->special_saving_account_next_free_withdrawal_date,
                 self::TIMEZONE
             )->startOfDay()
-            : $this->initialCycleDueDate(
-                account: $account,
-                cycleMonths: $cycleMonths,
-                asOfDate: $asOfDate
-            );
+            : null;
+
+        /*
+         * Historical stored dates before the configured review baseline are
+         * ignored. Once processing begins, a later stored date remains
+         * authoritative so a completed cycle is never reopened.
+         */
+        $dueDate = $storedDueDate !== null && $storedDueDate->gte($firstDueDate)
+            ? $storedDueDate
+            : $firstDueDate;
 
         return [
             'policy' => $policy,
@@ -743,14 +827,20 @@ class ProcessDueSpecialSavingsVesting extends Command
     }
 
     /**
-     * Derive the first vesting date when an account does not already have one.
+     * Derive the first vesting date from the effective review anchor.
      */
-    private function initialCycleDueDate($account, int $cycleMonths, Carbon $asOfDate): Carbon
-    {
-        $anchor = $this->vestingAnchorDate($account);
+    private function initialCycleDueDate(
+        $account,
+        int $cycleMonths,
+        Carbon $startDate
+    ): Carbon {
+        $anchor = $this->effectiveVestingAnchorDate(
+            account: $account,
+            startDate: $startDate
+        );
 
         if ($cycleMonths <= 0) {
-            return $asOfDate->copy();
+            return $anchor;
         }
 
         return $this->addMonthsPreservingAnchor(
@@ -767,10 +857,16 @@ class ProcessDueSpecialSavingsVesting extends Command
         $account,
         $product,
         string $policy,
-        Carbon $dueDate
+        Carbon $dueDate,
+        Carbon $startDate
     ): ?Carbon {
+        $effectiveAnchor = $this->effectiveVestingAnchorDate(
+            account: $account,
+            startDate: $startDate
+        );
+
         if (in_array($policy, ['IMMEDIATE', 'IMMEDIATE_ON_ACCRUAL', 'AVAILABLE_IMMEDIATELY'], true)) {
-            return null;
+            return $effectiveAnchor;
         }
 
         $cycleMonths = max(
@@ -779,28 +875,31 @@ class ProcessDueSpecialSavingsVesting extends Command
         );
 
         if ($cycleMonths <= 0) {
-            return null;
+            return $effectiveAnchor;
         }
 
-        $anchor = $this->vestingAnchorDate($account);
         $initialDueDate = $this->addMonthsPreservingAnchor(
-            fromDate: $anchor,
+            fromDate: $effectiveAnchor,
             months: $cycleMonths,
-            anchorDay: $anchor->day
+            anchorDay: $effectiveAnchor->day
         );
 
         if ($dueDate->equalTo($initialDueDate)) {
-            return $anchor;
+            return $effectiveAnchor;
         }
 
         $previousMonth = $dueDate->copy()
             ->startOfMonth()
             ->subMonthsNoOverflow($cycleMonths);
 
-        return $previousMonth
+        $cycleStart = $previousMonth
             ->copy()
-            ->day(min($anchor->day, $previousMonth->daysInMonth))
+            ->day(min($effectiveAnchor->day, $previousMonth->daysInMonth))
             ->startOfDay();
+
+        return $cycleStart->lt($effectiveAnchor)
+            ? $effectiveAnchor
+            : $cycleStart;
     }
 
     /**
@@ -813,7 +912,8 @@ class ProcessDueSpecialSavingsVesting extends Command
         $account,
         string $policy,
         ?Carbon $cycleStart,
-        Carbon $cycleEnd
+        Carbon $cycleEnd,
+        bool $includeCycleStart
     ): float {
         $currentAccrued = round(
             max(0, (float) $account->special_saving_account_accrued_interest_balance),
@@ -824,22 +924,16 @@ class ProcessDueSpecialSavingsVesting extends Command
             return 0.00;
         }
 
-        if (in_array($policy, ['IMMEDIATE', 'IMMEDIATE_ON_ACCRUAL', 'AVAILABLE_IMMEDIATELY'], true)) {
-            return $currentAccrued;
-        }
-
         if ($cycleStart === null) {
-            return $currentAccrued;
+            return 0.00;
         }
-
-        $isInitialCycle = $cycleStart->equalTo($this->vestingAnchorDate($account));
 
         $transactions = DB::table('sacco_special_saving_transactions')
             ->where('special_saving_transaction_account_id', $account->special_saving_account_id)
             ->where('special_saving_transaction_deleted', 'N')
             ->where('special_saving_transaction_reversed', 'N')
             ->when(
-                $isInitialCycle,
+                $includeCycleStart,
                 fn($query) => $query->whereDate(
                     'special_saving_transaction_date',
                     '>=',
@@ -898,7 +992,8 @@ class ProcessDueSpecialSavingsVesting extends Command
         $account,
         $product,
         string $policy,
-        Carbon $dueDate
+        Carbon $dueDate,
+        Carbon $startDate
     ): ?Carbon {
         if (in_array($policy, ['IMMEDIATE', 'IMMEDIATE_ON_ACCRUAL', 'AVAILABLE_IMMEDIATELY'], true)) {
             return $account->special_saving_account_next_free_withdrawal_date
@@ -918,26 +1013,51 @@ class ProcessDueSpecialSavingsVesting extends Command
             return null;
         }
 
+        $effectiveAnchor = $this->effectiveVestingAnchorDate(
+            account: $account,
+            startDate: $startDate
+        );
+
         return $this->addMonthsPreservingAnchor(
             fromDate: $dueDate,
             months: $cycleMonths,
-            anchorDay: $this->vestingAnchorDate($account)->day
+            anchorDay: $effectiveAnchor->day
         );
     }
 
     /**
-     * A paid principal withdrawal resets the cycle; otherwise opening date anchors it.
+     * Resolve the first date from which automatic vesting may review interest.
+     *
+     * For legacy accounts, the configured start date becomes the baseline.
+     * A later account opening or principal withdrawal date moves the baseline
+     * forward because a withdrawal resets the vesting cycle.
      */
-    private function vestingAnchorDate($account): Carbon
-    {
-        $anchorDate = $account->special_saving_account_last_withdrawal_date
-            ?: $account->special_saving_account_opening_date;
+    private function effectiveVestingAnchorDate(
+        $account,
+        Carbon $startDate
+    ): Carbon {
+        $candidates = [$startDate->copy()->startOfDay()];
 
-        if (!$anchorDate) {
-            throw new RuntimeException('The account has no opening or withdrawal date for vesting.');
+        if (!empty($account->special_saving_account_opening_date)) {
+            $candidates[] = Carbon::parse(
+                $account->special_saving_account_opening_date,
+                self::TIMEZONE
+            )->startOfDay();
         }
 
-        return Carbon::parse($anchorDate, self::TIMEZONE)->startOfDay();
+        if (!empty($account->special_saving_account_last_withdrawal_date)) {
+            $candidates[] = Carbon::parse(
+                $account->special_saving_account_last_withdrawal_date,
+                self::TIMEZONE
+            )->startOfDay();
+        }
+
+        usort(
+            $candidates,
+            fn(Carbon $left, Carbon $right) => $left->timestamp <=> $right->timestamp
+        );
+
+        return end($candidates)->copy();
     }
 
     /**
@@ -1023,6 +1143,41 @@ class ProcessDueSpecialSavingsVesting extends Command
 
         if (!$parsed || $parsed->format('Y-m-d') !== (string) $date) {
             throw new RuntimeException('The --date option must use YYYY-MM-DD format.');
+        }
+
+        return $parsed->startOfDay();
+    }
+
+    /**
+     * Resolve the earliest date whose interest records may be reviewed for
+     * automatic vesting.
+     *
+     * Precedence:
+     * 1. Explicit --start-date option
+     * 2. config('special_savings.vesting_start_date')
+     */
+    private function resolveVestingStartDate(): Carbon
+    {
+        $value = $this->option('start-date');
+
+        if ($value === null || trim((string) $value) === '') {
+            $value = config('special_savings.vesting_start_date');
+        }
+
+        if ($value === null || trim((string) $value) === '') {
+            throw new RuntimeException(
+                'Special-savings vesting start date is not configured. '
+                . 'Set SPECIAL_SAVINGS_VESTING_START_DATE or use --start-date.'
+            );
+        }
+
+        $value = trim((string) $value);
+        $parsed = Carbon::createFromFormat('Y-m-d', $value, self::TIMEZONE);
+
+        if (!$parsed || $parsed->format('Y-m-d') !== $value) {
+            throw new RuntimeException(
+                'The special-savings vesting start date must use YYYY-MM-DD format.'
+            );
         }
 
         return $parsed->startOfDay();
