@@ -3,7 +3,6 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use RuntimeException;
 
 return new class extends Migration
 {
@@ -11,12 +10,12 @@ return new class extends Migration
     private const SYSTEM_USER_ID = 999999;
 
     /**
-     * Run the migration.
+     * Run the migrations.
      */
     public function up(): void
     {
         if (!Schema::hasTable('sacco_defaults')) {
-            throw new RuntimeException(
+            throw new \RuntimeException(
                 'The sacco_defaults table does not exist.'
             );
         }
@@ -27,7 +26,7 @@ return new class extends Migration
 
         /*
         |--------------------------------------------------------------------------
-        | Create the system-user default
+        | Create the default when it does not exist
         |--------------------------------------------------------------------------
         */
         if ($default === null) {
@@ -44,7 +43,7 @@ return new class extends Migration
 
         /*
         |--------------------------------------------------------------------------
-        | Repair an empty or invalid existing value
+        | Repair an existing empty or invalid value
         |--------------------------------------------------------------------------
         | A valid configured value is preserved.
         |--------------------------------------------------------------------------
@@ -55,33 +54,28 @@ return new class extends Migration
 
         if (
             $currentValue === ''
-            || !is_numeric($currentValue)
+            || !ctype_digit($currentValue)
             || (int) $currentValue <= 0
         ) {
             DB::table('sacco_defaults')
                 ->where('default_name', self::DEFAULT_NAME)
                 ->update([
-                    'default_value' =>
-                        (string) self::SYSTEM_USER_ID,
-
+                    'default_value' => (string) self::SYSTEM_USER_ID,
                     'default_transdate' => now(),
-
-                    'default_userid' =>
-                        self::SYSTEM_USER_ID,
-
+                    'default_userid' => self::SYSTEM_USER_ID,
                     'default_ip' => '127.0.0.1',
                 ]);
         }
     }
 
     /**
-     * Reverse the migration.
-     *
-     * The row is intentionally retained because another process may already
-     * be using it for financial audit records.
+     * Reverse the migrations.
      */
     public function down(): void
     {
-        // Intentionally left blank.
+        /*
+         * Intentionally retained because financial records may reference
+         * the system audit identifier.
+         */
     }
 };
