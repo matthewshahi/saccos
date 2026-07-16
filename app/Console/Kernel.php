@@ -37,10 +37,35 @@ class Kernel extends ConsoleKernel
 
         /*
         |--------------------------------------------------------------------------
+        | Automatic Loan Approval
+        |--------------------------------------------------------------------------
+        | Processes a maximum of 10 pending self-service loan applications whose
+        | loan products have automatic approval enabled.
+        |
+        | Only applications submitted within the last 30 days are eligible for
+        | automatic approval. Older applications remain pending and require
+        | manual approval.
+        |
+        | The command must revalidate all applicable product, member, amount,
+        | duration, qualification, guarantor, charge and accounting conditions
+        | before approving an application.
+        |--------------------------------------------------------------------------
+        */
+
+        $schedule->command(
+            'loans:process-auto-approvals --limit=10 --max-age-days=30'
+        )
+            ->everyMinute()
+            ->withoutOverlapping(5)
+            ->onOneServer()
+            ->timezone('Africa/Nairobi');
+
+        /*
+        |--------------------------------------------------------------------------
         | Loan Disbursement Queue
         |--------------------------------------------------------------------------
-        | Picks a maximum of 10 eligible loans created within the last 24 hours
-        | and creates disbursement records for provider processing.
+        | Picks a maximum of 10 eligible approved loans created within the last
+        | 24 hours and creates disbursement records for provider processing.
         |--------------------------------------------------------------------------
         */
 
