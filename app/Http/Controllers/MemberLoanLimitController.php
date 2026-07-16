@@ -272,24 +272,16 @@ class MemberLoanLimitController extends Controller
             ],
         ]);
 
-        $memberId = (int) $validated[
-            'member_loan_limit_member_id'
-        ];
+        $memberId = (int) $validated['member_loan_limit_member_id'];
 
-        $loanTypeId = (int) $validated[
-            'member_loan_limit_loan_type_id'
-        ];
+        $loanTypeId = (int) $validated['member_loan_limit_loan_type_id'];
 
         $limitAmount = round(
-            (float) $validated[
-                'member_loan_limit_amount'
-            ],
+            (float) $validated['member_loan_limit_amount'],
             2
         );
 
-        $active = (int) $validated[
-            'member_loan_limit_active'
-        ];
+        $active = (int) $validated['member_loan_limit_active'];
 
         $loanType = $this->getLoanType(
             $loanTypeId
@@ -346,7 +338,7 @@ class MemberLoanLimitController extends Controller
                     ) {
                         throw ValidationException::withMessages([
                             'member_loan_limit_member_id' =>
-                                'This member already has an individual limit for the selected loan type.',
+                            'This member already has an individual limit for the selected loan type.',
                         ]);
                     }
 
@@ -359,22 +351,22 @@ class MemberLoanLimitController extends Controller
                         )
                         ->update([
                             'member_loan_limit_amount' =>
-                                $limitAmount,
+                            $limitAmount,
 
                             'member_loan_limit_active' =>
-                                $active,
+                            $active,
 
                             'member_loan_limit_deleted' =>
-                                'N',
+                            'N',
 
                             'member_loan_limit_by' =>
-                                Auth::id(),
+                            Auth::id(),
 
                             'member_loan_limit_transdate' =>
-                                now(),
+                            now(),
 
                             'member_loan_limit_ip' =>
-                                $request->ip(),
+                            $request->ip(),
                         ]);
 
                     return 'restored';
@@ -389,28 +381,28 @@ class MemberLoanLimitController extends Controller
                     'sacco_member_loan_limits'
                 )->insert([
                     'member_loan_limit_member_id' =>
-                        $memberId,
+                    $memberId,
 
                     'member_loan_limit_loan_type_id' =>
-                        $loanTypeId,
+                    $loanTypeId,
 
                     'member_loan_limit_amount' =>
-                        $limitAmount,
+                    $limitAmount,
 
                     'member_loan_limit_active' =>
-                        $active,
+                    $active,
 
                     'member_loan_limit_deleted' =>
-                        'N',
+                    'N',
 
                     'member_loan_limit_by' =>
-                        Auth::id(),
+                    Auth::id(),
 
                     'member_loan_limit_transdate' =>
-                        now(),
+                    now(),
 
                     'member_loan_limit_ip' =>
-                        $request->ip(),
+                    $request->ip(),
                 ]);
 
                 return 'created';
@@ -428,7 +420,7 @@ class MemberLoanLimitController extends Controller
                 return back()
                     ->withErrors([
                         'member_loan_limit_member_id' =>
-                            'This member already has an individual limit for the selected loan type.',
+                        'This member already has an individual limit for the selected loan type.',
                     ])
                     ->withInput();
             }
@@ -619,24 +611,16 @@ class MemberLoanLimitController extends Controller
             ],
         ]);
 
-        $memberId = (int) $validated[
-            'member_loan_limit_member_id'
-        ];
+        $memberId = (int) $validated['member_loan_limit_member_id'];
 
-        $loanTypeId = (int) $validated[
-            'member_loan_limit_loan_type_id'
-        ];
+        $loanTypeId = (int) $validated['member_loan_limit_loan_type_id'];
 
         $limitAmount = round(
-            (float) $validated[
-                'member_loan_limit_amount'
-            ],
+            (float) $validated['member_loan_limit_amount'],
             2
         );
 
-        $active = (int) $validated[
-            'member_loan_limit_active'
-        ];
+        $active = (int) $validated['member_loan_limit_active'];
 
         $loanType = $this->getLoanType(
             $loanTypeId
@@ -659,29 +643,18 @@ class MemberLoanLimitController extends Controller
         | Prevent duplicate member-and-loan-type combinations
         |--------------------------------------------------------------------------
         */
-        $duplicate = DB::table(
-            'sacco_member_loan_limits'
-        )
-            ->where(
-                'member_loan_limit_member_id',
-                $memberId
-            )
-            ->where(
-                'member_loan_limit_loan_type_id',
-                $loanTypeId
-            )
-            ->where(
-                'member_loan_limit_id',
-                '<>',
-                $id
-            )
+        $duplicate = DB::table('sacco_member_loan_limits')
+            ->where('member_loan_limit_member_id', $memberId)
+            ->where('member_loan_limit_loan_type_id', $loanTypeId)
+            ->where('member_loan_limit_id', '<>', $id)
+            ->where('member_loan_limit_deleted', '<>', 'Y')
             ->exists();
 
         if ($duplicate) {
             return back()
                 ->withErrors([
                     'member_loan_limit_member_id' =>
-                        'Another record already exists for this member and loan type.',
+                    'Another record already exists for this member and loan type.',
                 ])
                 ->withInput();
         }
@@ -713,7 +686,7 @@ class MemberLoanLimitController extends Controller
                 if (!$record) {
                     throw ValidationException::withMessages([
                         'member_loan_limit_member_id' =>
-                            'The individual loan limit no longer exists.',
+                        'The individual loan limit no longer exists.',
                     ]);
                 }
 
@@ -726,25 +699,25 @@ class MemberLoanLimitController extends Controller
                     )
                     ->update([
                         'member_loan_limit_member_id' =>
-                            $memberId,
+                        $memberId,
 
                         'member_loan_limit_loan_type_id' =>
-                            $loanTypeId,
+                        $loanTypeId,
 
                         'member_loan_limit_amount' =>
-                            $limitAmount,
+                        $limitAmount,
 
                         'member_loan_limit_active' =>
-                            $active,
+                        $active,
 
                         'member_loan_limit_by' =>
-                            Auth::id(),
+                        Auth::id(),
 
                         'member_loan_limit_transdate' =>
-                            now(),
+                        now(),
 
                         'member_loan_limit_ip' =>
-                            $request->ip(),
+                        $request->ip(),
                     ]);
             });
         } catch (QueryException $exception) {
@@ -755,7 +728,7 @@ class MemberLoanLimitController extends Controller
                 return back()
                     ->withErrors([
                         'member_loan_limit_member_id' =>
-                            'Another record already exists for this member and loan type.',
+                        'Another record already exists for this member and loan type.',
                     ])
                     ->withInput();
             }
@@ -812,9 +785,7 @@ class MemberLoanLimitController extends Controller
                 );
         }
 
-        $active = (int) $validated[
-            'member_loan_limit_active'
-        ];
+        $active = (int) $validated['member_loan_limit_active'];
 
         /*
         |--------------------------------------------------------------------------
@@ -849,16 +820,16 @@ class MemberLoanLimitController extends Controller
             )
             ->update([
                 'member_loan_limit_active' =>
-                    $active,
+                $active,
 
                 'member_loan_limit_by' =>
-                    Auth::id(),
+                Auth::id(),
 
                 'member_loan_limit_transdate' =>
-                    now(),
+                now(),
 
                 'member_loan_limit_ip' =>
-                    $request->ip(),
+                $request->ip(),
             ]);
 
         return back()->with(
@@ -910,19 +881,19 @@ class MemberLoanLimitController extends Controller
             )
             ->update([
                 'member_loan_limit_active' =>
-                    0,
+                0,
 
                 'member_loan_limit_deleted' =>
-                    'Y',
+                'Y',
 
                 'member_loan_limit_by' =>
-                    Auth::id(),
+                Auth::id(),
 
                 'member_loan_limit_transdate' =>
-                    now(),
+                now(),
 
                 'member_loan_limit_ip' =>
-                    $request->ip(),
+                $request->ip(),
             ]);
 
         return redirect()
@@ -1104,39 +1075,39 @@ class MemberLoanLimitController extends Controller
                         ->member_name,
 
                     'sacco_id' =>
-                        $member->member_sacco_id
-                            ? (string) $member
-                                ->member_sacco_id
-                            : null,
+                    $member->member_sacco_id
+                        ? (string) $member
+                            ->member_sacco_id
+                        : null,
 
                     'national_id' =>
-                        $member->member_national_id
-                            ? (string) $member
-                                ->member_national_id
-                            : null,
+                    $member->member_national_id
+                        ? (string) $member
+                            ->member_national_id
+                        : null,
 
                     'phone' =>
-                        $member->member_phone_no
-                            ? (string) $member
-                                ->member_phone_no
-                            : null,
+                    $member->member_phone_no
+                        ? (string) $member
+                            ->member_phone_no
+                        : null,
 
                     'email' =>
-                        $member->member_email
-                            ? (string) $member
-                                ->member_email
-                            : null,
+                    $member->member_email
+                        ? (string) $member
+                            ->member_email
+                        : null,
 
                     'label' => trim(
                         (string) $member
                             ->member_name
-                        . (
-                            $member->member_sacco_id
+                            . (
+                                $member->member_sacco_id
                                 ? ' — '
-                                    . $member
-                                        ->member_sacco_id
+                                . $member
+                                ->member_sacco_id
                                 : ''
-                        )
+                            )
                     ),
                 ];
             }
@@ -1195,7 +1166,7 @@ class MemberLoanLimitController extends Controller
         if (!$loanType) {
             throw ValidationException::withMessages([
                 'member_loan_limit_loan_type_id' =>
-                    'The selected loan type does not exist or has been deleted.',
+                'The selected loan type does not exist or has been deleted.',
             ]);
         }
 
@@ -1261,7 +1232,7 @@ class MemberLoanLimitController extends Controller
         if (!$memberIsActive) {
             throw ValidationException::withMessages([
                 'member_loan_limit_member_id' =>
-                    'The individual limit cannot be active because the selected member is inactive or unavailable.',
+                'The individual limit cannot be active because the selected member is inactive or unavailable.',
             ]);
         }
 
@@ -1271,7 +1242,7 @@ class MemberLoanLimitController extends Controller
         ) {
             throw ValidationException::withMessages([
                 'member_loan_limit_loan_type_id' =>
-                    'The individual limit cannot be active because the selected loan type is inactive.',
+                'The individual limit cannot be active because the selected loan type is inactive.',
             ]);
         }
     }
@@ -1297,7 +1268,7 @@ class MemberLoanLimitController extends Controller
         if ($loanTypeMaximum <= 0) {
             throw ValidationException::withMessages([
                 'member_loan_limit_loan_type_id' =>
-                    'The selected loan type does not have a valid maximum loan amount.',
+                'The selected loan type does not have a valid maximum loan amount.',
             ]);
         }
 
@@ -1312,7 +1283,7 @@ class MemberLoanLimitController extends Controller
         ) {
             throw ValidationException::withMessages([
                 'member_loan_limit_amount' =>
-                    'The individual limit must be lower than the selected loan type maximum of KES '
+                'The individual limit must be lower than the selected loan type maximum of KES '
                     . number_format(
                         $loanTypeMaximum,
                         2

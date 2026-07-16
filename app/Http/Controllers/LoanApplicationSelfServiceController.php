@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use App\Services\MemberLoanLimitService;
 
 class LoanApplicationSelfServiceController extends Controller
 {
@@ -180,8 +181,10 @@ class LoanApplicationSelfServiceController extends Controller
                 ->where('batch_trans_deleted', '<>', 'Y')
                 ->select(
                     'sacco_loan_batch_trans_members.*',
-                    'sacco_loan_types.loan_type_name',
-                    'sacco_loan_types.loan_type_acount',
+'sacco_loan_types.loan_type_id as loan_type_id',
+'sacco_loan_types.loan_type_name',
+'sacco_loan_types.loan_type_max_amount as loan_type_max_amount',
+'sacco_loan_types.loan_type_acount',
                     'sacco_loan_types.loan_type_guaranteable_percent',
                     'sacco_loan_types.loan_type_commission_effect',
                     'sacco_loan_types.loan_type_insurance_effect',
@@ -193,6 +196,27 @@ class LoanApplicationSelfServiceController extends Controller
             if (!$loan) {
                 throw new \Exception('Loan not found or already processed.');
             }
+
+            /*
+|--------------------------------------------------------------------------
+| Final product and individual member-limit recheck
+|--------------------------------------------------------------------------
+| The applicable limit may have changed after the member submitted or
+| edited the application.
+|--------------------------------------------------------------------------
+*/
+$memberLimitValidation = app(MemberLoanLimitService::class)
+    ->validateRequestedAmount(
+        (int) $loan->batch_trans_member_id,
+        $loan,
+        (float) $loan->batch_trans_loan_amount
+    );
+
+if (!$memberLimitValidation['is_valid']) {
+    throw new \Exception(
+        $memberLimitValidation['message']
+    );
+}
 
             $default_bank_account = $this->getDefaultAccount('default_bank_account');
             $default_insurance_account = $this->getDefaultAccount('default_insurance_account');
@@ -324,10 +348,10 @@ class LoanApplicationSelfServiceController extends Controller
             $loan_id = DB::table('sacco_loans')->insertGetId($loanInsert);
 
             $guarantors = DB::table('sacco_loan_batch_guarantors_members')
-    ->where('guarantors_loan_batch_trans_id', $loan->batch_trans_id)
-    ->whereRaw("COALESCE(guarantors_deleted, 'N') <> 'Y'")
-    ->where('guarantors_approved', 'Y')
-    ->get();
+                ->where('guarantors_loan_batch_trans_id', $loan->batch_trans_id)
+                ->whereRaw("COALESCE(guarantors_deleted, 'N') <> 'Y'")
+                ->where('guarantors_approved', 'Y')
+                ->get();
 
             foreach ($guarantors as $guarantor) {
                 DB::table('sacco_loan_guarantors')->insert([
@@ -549,25 +573,25 @@ class LoanApplicationSelfServiceController extends Controller
 
         $selfGuaranteeAvailable = 0;
 
-        
 
-if ($member) {
-    $pendingSelfGuaranteeAmount = DB::table('sacco_loan_batch_guarantors_members as g')
-        ->join('sacco_loan_batch_trans_members as t', 'g.guarantors_loan_batch_trans_id', '=', 't.batch_trans_id')
-        ->where('g.guarantors_guarantor_id', $trustedMemberId)
-        ->where('t.batch_trans_member_id', $trustedMemberId)
-        ->whereRaw("COALESCE(g.guarantors_deleted, 'N') <> 'Y'")
-        ->whereRaw("COALESCE(t.batch_trans_deleted, 'N') <> 'Y'")
-        ->whereRaw("COALESCE(t.batch_trans_updated, 'N') = 'N'")
-        ->sum('g.guarantors_amount_guaranteed');
 
-    $selfGuaranteeAvailable = max(
-        0,
-        ((float) $member->member_total_share * $maxGuarantorFactorSelf)
-            - (float) $member->member_tied_shares_self
-            - (float) $pendingSelfGuaranteeAmount
-    );
-}
+        if ($member) {
+            $pendingSelfGuaranteeAmount = DB::table('sacco_loan_batch_guarantors_members as g')
+                ->join('sacco_loan_batch_trans_members as t', 'g.guarantors_loan_batch_trans_id', '=', 't.batch_trans_id')
+                ->where('g.guarantors_guarantor_id', $trustedMemberId)
+                ->where('t.batch_trans_member_id', $trustedMemberId)
+                ->whereRaw("COALESCE(g.guarantors_deleted, 'N') <> 'Y'")
+                ->whereRaw("COALESCE(t.batch_trans_deleted, 'N') <> 'Y'")
+                ->whereRaw("COALESCE(t.batch_trans_updated, 'N') = 'N'")
+                ->sum('g.guarantors_amount_guaranteed');
+
+            $selfGuaranteeAvailable = max(
+                0,
+                ((float) $member->member_total_share * $maxGuarantorFactorSelf)
+                    - (float) $member->member_tied_shares_self
+                    - (float) $pendingSelfGuaranteeAmount
+            );
+        }
 
         return view('loans.apply', compact(
             'loanTypes',
@@ -720,9 +744,42 @@ if ($member) {
                 }
             }
 
+            /*
+|--------------------------------------------------------------------------
+| Product maximum and individual member limit
+|--------------------------------------------------------------------------
+*/
+            $memberLimitValidation = app(MemberLoanLimitService::class)
+                ->validateRequestedAmount(
+                    (int) $trustedMemberId,
+                    $loanType,
+                    (float) $loanAmount
+                );
+
+            if (!$memberLimitValidation['is_valid']) {
+                DB::rollBack();
+
+                return $respondError(
+                    $memberLimitValidation['message'],
+                    422,
+                    [
+                        'batch_trans_loan_amount' => [
+                            $memberLimitValidation['message'],
+                        ],
+                    ]
+                );
+            }
+
             $nmsg = '';
-            $nmsg .= $this->validateLoanParameters($loanAmount, $loanType, $loanDuration, $topUpLoan);
+            $nmsg .= $this->validateLoanParameters(
+                $loanAmount,
+                $loanType,
+                $loanDuration,
+                $topUpLoan
+            );
             $nmsg .= $this->validateMemberEligibility($member, $loanType);
+          
+
 
             if (!empty($nmsg)) {
                 DB::rollBack();
@@ -1159,6 +1216,32 @@ if ($member) {
         |--------------------------------------------------------------------------
         */
             $nmsg = '';
+            /*
+|--------------------------------------------------------------------------
+| Product maximum and individual member limit
+|--------------------------------------------------------------------------
+*/
+            $memberLimitValidation = app(MemberLoanLimitService::class)
+                ->validateRequestedAmount(
+                    (int) $trustedMemberId,
+                    $loanType,
+                    (float) $loanAmount
+                );
+
+            if (!$memberLimitValidation['is_valid']) {
+                DB::rollBack();
+
+                return $respondError(
+                    $memberLimitValidation['message'],
+                    422,
+                    [
+                        'batch_trans_loan_amount' => [
+                            $memberLimitValidation['message'],
+                        ],
+                    ]
+                );
+            }
+
             $nmsg .= $this->validateLoanParameters($loanAmount, $loanType, $loanDuration, $topUpLoan);
             $nmsg .= $this->validateMemberEligibility($member, $loanType);
 
@@ -1422,8 +1505,8 @@ if ($member) {
         }
     }
 
- 
-    
+
+
     public function deleteGuarantor(Request $request, $id)
     {
         $isApiRequest = $request->expectsJson()
@@ -1781,9 +1864,42 @@ if ($member) {
         | 9. Business validations
         |--------------------------------------------------------------------------
         */
+            /*
+|--------------------------------------------------------------------------
+| Product maximum and individual member limit
+|--------------------------------------------------------------------------
+*/
+            $memberLimitValidation = app(MemberLoanLimitService::class)
+                ->validateRequestedAmount(
+                    (int) $trustedMemberId,
+                    $loanType,
+                    (float) $loanAmount
+                );
+
+            if (!$memberLimitValidation['is_valid']) {
+                DB::rollBack();
+
+                return $respondError(
+                    $memberLimitValidation['message'],
+                    422,
+                    [
+                        'batch_trans_loan_amount' => [
+                            $memberLimitValidation['message'],
+                        ],
+                    ]
+                );
+            }
+
             $nmsg = '';
-            $nmsg .= $this->validateLoanParameters($loanAmount, $loanType, $loanDuration, $topUpLoan);
+            $nmsg .= $this->validateLoanParameters(
+                $loanAmount,
+                $loanType,
+                $loanDuration,
+                $topUpLoan
+            );
             $nmsg .= $this->validateMemberEligibility($member, $loanType);
+
+
 
             if (!empty($topUpLoan)) {
                 $topUpOutstanding = (float) (($topUpLoan->loan_amount ?? 0) - ($topUpLoan->loan_loan_paid ?? 0));
@@ -2071,7 +2187,7 @@ if ($member) {
                 continue;
             }
 
-           
+
             /*
 |--------------------------------------------------------------------------
 | Capacity-based guarantee control
@@ -2084,65 +2200,65 @@ if ($member) {
 |--------------------------------------------------------------------------
 */
 
-if ($borrowerMemberId !== $guarantorId) {
-    /*
+            if ($borrowerMemberId !== $guarantorId) {
+                /*
     |--------------------------------------------------------------------------
     | Pending guarantees for OTHER members only
     |--------------------------------------------------------------------------
     */
-    $pendingOtherGuaranteeAmount = DB::table('sacco_loan_batch_guarantors_members as g')
-        ->join('sacco_loan_batch_trans_members as t', 'g.guarantors_loan_batch_trans_id', '=', 't.batch_trans_id')
-        ->where('g.guarantors_guarantor_id', $guarantorId)
-        ->where('t.batch_trans_member_id', '<>', $guarantorId)
-        ->whereRaw("COALESCE(g.guarantors_deleted, 'N') <> 'Y'")
-        ->whereRaw("COALESCE(t.batch_trans_deleted, 'N') <> 'Y'")
-        ->whereRaw("COALESCE(t.batch_trans_updated, 'N') = 'N'")
-        ->where('t.batch_trans_id', '<>', $batchTransId)
-        ->sum('g.guarantors_amount_guaranteed');
+                $pendingOtherGuaranteeAmount = DB::table('sacco_loan_batch_guarantors_members as g')
+                    ->join('sacco_loan_batch_trans_members as t', 'g.guarantors_loan_batch_trans_id', '=', 't.batch_trans_id')
+                    ->where('g.guarantors_guarantor_id', $guarantorId)
+                    ->where('t.batch_trans_member_id', '<>', $guarantorId)
+                    ->whereRaw("COALESCE(g.guarantors_deleted, 'N') <> 'Y'")
+                    ->whereRaw("COALESCE(t.batch_trans_deleted, 'N') <> 'Y'")
+                    ->whereRaw("COALESCE(t.batch_trans_updated, 'N') = 'N'")
+                    ->where('t.batch_trans_id', '<>', $batchTransId)
+                    ->sum('g.guarantors_amount_guaranteed');
 
-    $availableToGuaranteeOthers = (
-        ((float) $guarantor->member_total_share * $maxGuarantorFactor)
-        - (float) $guarantor->member_tied_shares
-        - (float) $pendingOtherGuaranteeAmount
-    );
+                $availableToGuaranteeOthers = (
+                    ((float) $guarantor->member_total_share * $maxGuarantorFactor)
+                    - (float) $guarantor->member_tied_shares
+                    - (float) $pendingOtherGuaranteeAmount
+                );
 
-    if ($availableToGuaranteeOthers < $guarantorAmount) {
-        $nmsg .= "Error: Guarantor {$guarantorName} does not have enough free shares to guarantee others. "
-            . "Available guarantee capacity is " . number_format(max(0, $availableToGuaranteeOthers), 2)
-            . ", pending guarantees for others are " . number_format((float) $pendingOtherGuaranteeAmount, 2)
-            . ", requested guarantee is " . number_format($guarantorAmount, 2) . ". ";
-        continue;
-    }
-} else {
-    /*
+                if ($availableToGuaranteeOthers < $guarantorAmount) {
+                    $nmsg .= "Error: Guarantor {$guarantorName} does not have enough free shares to guarantee others. "
+                        . "Available guarantee capacity is " . number_format(max(0, $availableToGuaranteeOthers), 2)
+                        . ", pending guarantees for others are " . number_format((float) $pendingOtherGuaranteeAmount, 2)
+                        . ", requested guarantee is " . number_format($guarantorAmount, 2) . ". ";
+                    continue;
+                }
+            } else {
+                /*
     |--------------------------------------------------------------------------
     | Pending SELF guarantees only
     |--------------------------------------------------------------------------
     */
-    $pendingSelfGuaranteeAmount = DB::table('sacco_loan_batch_guarantors_members as g')
-        ->join('sacco_loan_batch_trans_members as t', 'g.guarantors_loan_batch_trans_id', '=', 't.batch_trans_id')
-        ->where('g.guarantors_guarantor_id', $guarantorId)
-        ->where('t.batch_trans_member_id', $guarantorId)
-        ->whereRaw("COALESCE(g.guarantors_deleted, 'N') <> 'Y'")
-        ->whereRaw("COALESCE(t.batch_trans_deleted, 'N') <> 'Y'")
-        ->whereRaw("COALESCE(t.batch_trans_updated, 'N') = 'N'")
-        ->where('t.batch_trans_id', '<>', $batchTransId)
-        ->sum('g.guarantors_amount_guaranteed');
+                $pendingSelfGuaranteeAmount = DB::table('sacco_loan_batch_guarantors_members as g')
+                    ->join('sacco_loan_batch_trans_members as t', 'g.guarantors_loan_batch_trans_id', '=', 't.batch_trans_id')
+                    ->where('g.guarantors_guarantor_id', $guarantorId)
+                    ->where('t.batch_trans_member_id', $guarantorId)
+                    ->whereRaw("COALESCE(g.guarantors_deleted, 'N') <> 'Y'")
+                    ->whereRaw("COALESCE(t.batch_trans_deleted, 'N') <> 'Y'")
+                    ->whereRaw("COALESCE(t.batch_trans_updated, 'N') = 'N'")
+                    ->where('t.batch_trans_id', '<>', $batchTransId)
+                    ->sum('g.guarantors_amount_guaranteed');
 
-    $availableSelfGuarantee = (
-        ((float) $guarantor->member_total_share * $maxGuarantorFactorSelf)
-        - (float) $guarantor->member_tied_shares_self
-        - (float) $pendingSelfGuaranteeAmount
-    );
+                $availableSelfGuarantee = (
+                    ((float) $guarantor->member_total_share * $maxGuarantorFactorSelf)
+                    - (float) $guarantor->member_tied_shares_self
+                    - (float) $pendingSelfGuaranteeAmount
+                );
 
-    if ($availableSelfGuarantee < $guarantorAmount) {
-        $nmsg .= "Error: Guarantor {$guarantorName} does not have enough free shares to self-guarantee. "
-            . "Available self-guarantee capacity is " . number_format(max(0, $availableSelfGuarantee), 2)
-            . ", pending self-guarantees are " . number_format((float) $pendingSelfGuaranteeAmount, 2)
-            . ", requested guarantee is " . number_format($guarantorAmount, 2) . ". ";
-        continue;
-    }
-}
+                if ($availableSelfGuarantee < $guarantorAmount) {
+                    $nmsg .= "Error: Guarantor {$guarantorName} does not have enough free shares to self-guarantee. "
+                        . "Available self-guarantee capacity is " . number_format(max(0, $availableSelfGuarantee), 2)
+                        . ", pending self-guarantees are " . number_format((float) $pendingSelfGuaranteeAmount, 2)
+                        . ", requested guarantee is " . number_format($guarantorAmount, 2) . ". ";
+                    continue;
+                }
+            }
 
             $seenGuarantorIds[] = $guarantorId;
 
@@ -2156,16 +2272,16 @@ if ($borrowerMemberId !== $guarantorId) {
             $totalGuaranteed += $guarantorAmount;
         }
 
-if (count($desiredGuarantors) > $maximumNoOfGuarantors) {
-    $nmsg .= "Error: Total guarantors on this loan cannot exceed {$maximumNoOfGuarantors}. ";
-}
+        if (count($desiredGuarantors) > $maximumNoOfGuarantors) {
+            $nmsg .= "Error: Total guarantors on this loan cannot exceed {$maximumNoOfGuarantors}. ";
+        }
 
-$requiredGuarantee = round(
-    $loanAmount * ((float) ($loanType->loan_type_guaranteable_percent ?? 0)) / 100,
-    2
-);
+        $requiredGuarantee = round(
+            $loanAmount * ((float) ($loanType->loan_type_guaranteable_percent ?? 0)) / 100,
+            2
+        );
 
-/*
+        /*
 |--------------------------------------------------------------------------
 | Stop here if there are row-level guarantor errors
 |--------------------------------------------------------------------------
@@ -2176,41 +2292,41 @@ $requiredGuarantee = round(
 | "Guarantor is already attached..." + "This loan requires guarantors."
 |--------------------------------------------------------------------------
 */
-if (!empty($nmsg)) {
-    return [
-        'success' => false,
-        'message' => trim($nmsg),
-        'guarantors' => [],
-        'total_guaranteed' => 0,
-        'required_guarantee' => $requiredGuarantee,
-    ];
-}
-
-if ((float) ($loanType->loan_type_guaranteable_percent ?? 0) > 0) {
-    if (empty($desiredGuarantors)) {
-        $nmsg .= 'Error: This loan requires guarantors. ';
-    } elseif ($requiredGuarantee > $totalGuaranteed) {
-        $nmsg .= 'Error: This loan application is under-guaranteed. '
-            . 'Required guarantee is ' . number_format($requiredGuarantee, 2)
-            . ', but total submitted guarantee is ' . number_format($totalGuaranteed, 2) . '. ';
-    } elseif ($totalGuaranteed > $requiredGuarantee) {
-        $prorationFactor = $requiredGuarantee / $totalGuaranteed;
-
-        foreach ($desiredGuarantors as $idx => $guarantor) {
-            $desiredGuarantors[$idx]['amount'] = round($guarantor['amount'] * $prorationFactor, 2);
+        if (!empty($nmsg)) {
+            return [
+                'success' => false,
+                'message' => trim($nmsg),
+                'guarantors' => [],
+                'total_guaranteed' => 0,
+                'required_guarantee' => $requiredGuarantee,
+            ];
         }
 
-        $proratedTotal = round(array_sum(array_column($desiredGuarantors, 'amount')), 2);
+        if ((float) ($loanType->loan_type_guaranteable_percent ?? 0) > 0) {
+            if (empty($desiredGuarantors)) {
+                $nmsg .= 'Error: This loan requires guarantors. ';
+            } elseif ($requiredGuarantee > $totalGuaranteed) {
+                $nmsg .= 'Error: This loan application is under-guaranteed. '
+                    . 'Required guarantee is ' . number_format($requiredGuarantee, 2)
+                    . ', but total submitted guarantee is ' . number_format($totalGuaranteed, 2) . '. ';
+            } elseif ($totalGuaranteed > $requiredGuarantee) {
+                $prorationFactor = $requiredGuarantee / $totalGuaranteed;
 
-        if (!empty($desiredGuarantors) && $proratedTotal != $requiredGuarantee) {
-            $difference = round($requiredGuarantee - $proratedTotal, 2);
-            $lastIndex = count($desiredGuarantors) - 1;
-            $desiredGuarantors[$lastIndex]['amount'] = round($desiredGuarantors[$lastIndex]['amount'] + $difference, 2);
+                foreach ($desiredGuarantors as $idx => $guarantor) {
+                    $desiredGuarantors[$idx]['amount'] = round($guarantor['amount'] * $prorationFactor, 2);
+                }
+
+                $proratedTotal = round(array_sum(array_column($desiredGuarantors, 'amount')), 2);
+
+                if (!empty($desiredGuarantors) && $proratedTotal != $requiredGuarantee) {
+                    $difference = round($requiredGuarantee - $proratedTotal, 2);
+                    $lastIndex = count($desiredGuarantors) - 1;
+                    $desiredGuarantors[$lastIndex]['amount'] = round($desiredGuarantors[$lastIndex]['amount'] + $difference, 2);
+                }
+
+                $totalGuaranteed = round(array_sum(array_column($desiredGuarantors, 'amount')), 2);
+            }
         }
-
-        $totalGuaranteed = round(array_sum(array_column($desiredGuarantors, 'amount')), 2);
-    }
-}
 
 
         // if (count($desiredGuarantors) > $maximumNoOfGuarantors) {
