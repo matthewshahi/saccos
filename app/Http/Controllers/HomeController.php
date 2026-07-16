@@ -6590,6 +6590,11 @@ class HomeController extends Controller
                 )->ignore($id, 'loan_type_id'),
             ],
 
+            // 'loan_type_auto_approval' => [
+            //     'required',
+            //     'boolean',
+            // ],
+
             'loan_type_active' => [
                 'required',
                 'boolean',
@@ -6671,23 +6676,6 @@ class HomeController extends Controller
 
             /*
         |--------------------------------------------------------------------------
-        | Instant processing settings
-        |--------------------------------------------------------------------------
-        | These settings are independent.
-        |--------------------------------------------------------------------------
-        */
-            'loan_type_instant_qualification' => [
-                'required',
-                'boolean',
-            ],
-
-            'loan_type_instant_disbursement' => [
-                'required',
-                'boolean',
-            ],
-
-            /*
-        |--------------------------------------------------------------------------
         | CRB configuration
         |--------------------------------------------------------------------------
         */
@@ -6705,6 +6693,28 @@ class HomeController extends Controller
             'loan_type_crb_effect' => [
                 'nullable',
                 'in:ADD_TO_LOAN,DEDUCT_FROM_DISBURSEMENT',
+            ],
+
+            /*
+|--------------------------------------------------------------------------
+| Automated loan processing settings
+|--------------------------------------------------------------------------
+| These settings operate independently.
+|--------------------------------------------------------------------------
+*/
+            'loan_type_instant_qualification' => [
+                'required',
+                'boolean',
+            ],
+
+            'loan_type_auto_approval' => [
+                'required',
+                'boolean',
+            ],
+
+            'loan_type_instant_disbursement' => [
+                'required',
+                'boolean',
             ],
 
             /*
@@ -6763,6 +6773,8 @@ class HomeController extends Controller
     |--------------------------------------------------------------------------
     */
         $instantQualification = (int) $validated['loan_type_instant_qualification'];
+
+        $autoApproval = (int) $validated['loan_type_auto_approval'];
 
         $instantDisbursement = (int) $validated['loan_type_instant_disbursement'];
 
@@ -6972,13 +6984,17 @@ class HomeController extends Controller
                     ? (int) $maximumQualificationPeriod
                     : null,
 
+
                 /*
-            |--------------------------------------------------------------------------
-            | Instant processing
-            |--------------------------------------------------------------------------
-            */
+|--------------------------------------------------------------------------
+| Automated loan processing
+|--------------------------------------------------------------------------
+*/
                 'loan_type_instant_qualification' =>
                 $instantQualification,
+
+                'loan_type_auto_approval' =>
+                $autoApproval,
 
                 'loan_type_instant_disbursement' =>
                 $instantDisbursement,
