@@ -1,3 +1,4 @@
+```php
 <?php
 
 use Illuminate\Http\Request;
@@ -10,135 +11,301 @@ use App\Http\Controllers\Api\LoanApplicationController;
 use App\Http\Controllers\Api\MpesaApiTheController;
 use App\Http\Controllers\Api\PublicRegistrationApiController;
 use App\Http\Controllers\Api\GuaranteeRequestController;
+use App\Http\Controllers\Api\MpesaB2cCallbackController;
+
 
 // Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 //     return $request->user();
 // });
 
-// M-Pesa-related routes
+/*
+|--------------------------------------------------------------------------
+| M-Pesa-related Routes
+|--------------------------------------------------------------------------
+*/
+
 Route::prefix('mobile')->group(function () {
-    Route::match(['get', 'post'], '/stkpush/callback/{unique_number?}', [MpesaTheController::class, 'handleSTKPushCallback'])
+
+    Route::match(
+        ['get', 'post'],
+        '/stkpush/callback/{unique_number?}',
+        [MpesaTheController::class, 'handleSTKPushCallback']
+    )
         ->name('stkpush.callback')
-        ->middleware('safaricom.ip'); // Apply IP filtering middleware
+        ->middleware('safaricom.ip');
 
-    Route::post('/pay/validation', [MpesaTheController::class, 'validationRequest'])
+    Route::post(
+        '/pay/validation',
+        [MpesaTheController::class, 'validationRequest']
+    )
         ->name('mpesa.pay.validation')
-        ->middleware('safaricom.ip'); // Apply IP filtering middleware
+        ->middleware('safaricom.ip');
 
-    Route::post('/pay/stk_confirmation', [MpesaTheController::class, 'handleC2BPayment'])
+    Route::post(
+        '/pay/stk_confirmation',
+        [MpesaTheController::class, 'handleC2BPayment']
+    )
         ->name('mpesa.pay.confirmation')
-        ->middleware('safaricom.ip'); // Apply IP filtering middleware
+        ->middleware('safaricom.ip');
 
-    // ✅ Fix: Point to PaymentInquiryController
-    Route::post('/status/result', [PaymentInquiryController::class, 'handleTransactionStatusResult'])
+    /*
+    |--------------------------------------------------------------------------
+    | Transaction Status Query Callbacks
+    |--------------------------------------------------------------------------
+    */
+
+    Route::post(
+        '/status/result',
+        [
+            PaymentInquiryController::class,
+            'handleTransactionStatusResult',
+        ]
+    )
         ->name('mpesa.status.result')
         ->middleware('safaricom.ip');
 
-    Route::post('/status/timeout', [PaymentInquiryController::class, 'handleTransactionStatusTimeout'])
+    Route::post(
+        '/status/timeout',
+        [
+            PaymentInquiryController::class,
+            'handleTransactionStatusTimeout',
+        ]
+    )
         ->name('mpesa.status.timeout')
         ->middleware('safaricom.ip');
+
+    /*
+    |--------------------------------------------------------------------------
+    | M-Pesa B2C Loan Disbursement Callbacks
+    |--------------------------------------------------------------------------
+    |
+    | These routes receive asynchronous B2C responses from Safaricom.
+    |
+    | Result:
+    | Safaricom sends the final success or failure response.
+    |
+    | Timeout:
+    | Safaricom sends this when the transaction result cannot be delivered
+    | or the request processing outcome is uncertain.
+    |
+    */
+
+    Route::post(
+        '/b2c/result',
+        [MpesaB2cCallbackController::class, 'result']
+    )
+        ->name('mpesa.b2c.result')
+        ->middleware([
+            'throttle:120,1',
+            'safaricom.ip',
+        ]);
+
+    Route::post(
+        '/b2c/timeout',
+        [MpesaB2cCallbackController::class, 'timeout']
+    )
+        ->name('mpesa.b2c.timeout')
+        ->middleware([
+            'throttle:120,1',
+            'safaricom.ip',
+        ]);
 });
 
 
-Route::post('/auth/login', [AuthController::class, 'login'])
+/*
+|--------------------------------------------------------------------------
+| Authentication
+|--------------------------------------------------------------------------
+*/
+
+Route::post(
+    '/auth/login',
+    [AuthController::class, 'login']
+)
     ->middleware('throttle:5,1');
-Route::post('/auth/refresh', [AuthController::class, 'refresh'])
+
+Route::post(
+    '/auth/refresh',
+    [AuthController::class, 'refresh']
+)
     ->middleware('throttle:10,1');
 
+
+/*
+|--------------------------------------------------------------------------
+| Authenticated Member Dashboard Routes
+|--------------------------------------------------------------------------
+*/
+
 Route::middleware(['auth.api'])->group(function () {
-    Route::get('/auth/dashboard', [MemberDashboardController::class, 'index']);
 
-    // ✅ Share Savings
-    Route::get('/auth/savings', [MemberDashboardController::class, 'savings']);
+    Route::get(
+        '/auth/dashboard',
+        [MemberDashboardController::class, 'index']
+    );
 
-    // ✅ FOSA Savings
-    Route::get('/auth/fosa', [MemberDashboardController::class, 'fosaSavings']);
+    // Share Savings
+    Route::get(
+        '/auth/savings',
+        [MemberDashboardController::class, 'savings']
+    );
 
-    // ✅ Loans (NEW)
-    Route::get('/auth/loans', [MemberDashboardController::class, 'loans']);
-    Route::get('/auth/profile', [MemberDashboardController::class, 'profile']);
+    // FOSA Savings
+    Route::get(
+        '/auth/fosa',
+        [MemberDashboardController::class, 'fosaSavings']
+    );
+
+    // Loans
+    Route::get(
+        '/auth/loans',
+        [MemberDashboardController::class, 'loans']
+    );
+
+    Route::get(
+        '/auth/profile',
+        [MemberDashboardController::class, 'profile']
+    );
 });
 
-Route::middleware(['auth.api', 'throttle:30,1'])
+
+/*
+|--------------------------------------------------------------------------
+| Guarantee Requests
+|--------------------------------------------------------------------------
+*/
+
+Route::middleware([
+    'auth.api',
+    'throttle:30,1',
+])
     ->prefix('auth/guarantee-requests')
     ->group(function () {
 
         // Pending requests for the logged-in guarantor
-        Route::get('/', [GuaranteeRequestController::class, 'index']);
+        Route::get(
+            '/',
+            [GuaranteeRequestController::class, 'index']
+        );
 
         // Small summary for dashboard alert/badge
-        Route::get('/summary', [GuaranteeRequestController::class, 'summary']);
+        Route::get(
+            '/summary',
+            [GuaranteeRequestController::class, 'summary']
+        );
 
         // Optional single request details
-        Route::get('/{id}', [GuaranteeRequestController::class, 'show'])
+        Route::get(
+            '/{id}',
+            [GuaranteeRequestController::class, 'show']
+        )
             ->whereNumber('id');
 
         // Approve request
-        Route::post('/{id}/approve', [GuaranteeRequestController::class, 'approve'])
+        Route::post(
+            '/{id}/approve',
+            [GuaranteeRequestController::class, 'approve']
+        )
             ->whereNumber('id');
 
         // Decline request
-        Route::post('/{id}/decline', [GuaranteeRequestController::class, 'decline'])
+        Route::post(
+            '/{id}/decline',
+            [GuaranteeRequestController::class, 'decline']
+        )
             ->whereNumber('id');
     });
-    
+
+
+/*
+|--------------------------------------------------------------------------
+| Loan Applications
+|--------------------------------------------------------------------------
+*/
+
 Route::middleware(['auth.api'])
     ->prefix('auth/loan-applications')
     ->group(function () {
 
         /*
         |--------------------------------------------------------------------------
-        | Loan Products (Catalog)
+        | Loan Products
         |--------------------------------------------------------------------------
-        | What loan types exist and their rules.
-        | Stateless. Cacheable. No member state.
+        |
+        | Returns the available loan products and their rules.
+        |
         */
-        Route::get('/products', [
-            LoanApplicationController::class,
-            'products'
-        ]);
+
+        Route::get(
+            '/products',
+            [LoanApplicationController::class, 'products']
+        );
 
         /*
         |--------------------------------------------------------------------------
-        | Loan Application Context (Member Info)
+        | Loan Application Context
         |--------------------------------------------------------------------------
-        | Returns authenticated member details needed for application UI
-        | (name, phone, sacco id, join date, etc.)
+        |
+        | Returns authenticated member details needed for the application UI,
+        | including name, phone, SACCO ID and joining date.
+        |
         */
-        Route::get('/context', [
-            LoanApplicationController::class,
-            'context'
-        ]);
+
+        Route::get(
+            '/context',
+            [LoanApplicationController::class, 'context']
+        );
 
         /*
         |--------------------------------------------------------------------------
         | Top-Up Eligible Loans
         |--------------------------------------------------------------------------
-        | Returns member's outstanding loans eligible for top-up
-        | (loan id, type, balance).
+        |
+        | Returns the member's outstanding loans that qualify for top-up.
+        |
         */
-        Route::get('/topup-loans', [
-            LoanApplicationController::class,
-            'topupLoans'
-        ]);
+
+        Route::get(
+            '/topup-loans',
+            [LoanApplicationController::class, 'topupLoans']
+        );
 
         /*
         |--------------------------------------------------------------------------
-        | (Future) Submit Loan Application
+        | Future: Submit Loan Application
         |--------------------------------------------------------------------------
-        | Route::post('/apply', [LoanApplicationController::class, 'apply']);
+        |
+        | Route::post(
+        |     '/apply',
+        |     [LoanApplicationController::class, 'apply']
+        | );
+        |
         */
 
         /*
         |--------------------------------------------------------------------------
-        | (Future) View Member Loan Applications
+        | Future: View Member Loan Applications
         |--------------------------------------------------------------------------
-        | Route::get('/', [LoanApplicationController::class, 'index']);
+        |
+        | Route::get(
+        |     '/',
+        |     [LoanApplicationController::class, 'index']
+        | );
+        |
         */
 
-        Route::post('/apply', [LoanApplicationController::class, 'apply']);
+        Route::post(
+            '/apply',
+            [LoanApplicationController::class, 'apply']
+        );
     });
 
+
+/*
+|--------------------------------------------------------------------------
+| Authenticated STK Push from Mobile Application
+|--------------------------------------------------------------------------
+*/
 
 Route::middleware(['auth.api'])->group(function () {
 
@@ -149,11 +316,23 @@ Route::middleware(['auth.api'])->group(function () {
 });
 
 
-// ✅ PUBLIC: Registration (no login)
+/*
+|--------------------------------------------------------------------------
+| Public Registration
+|--------------------------------------------------------------------------
+*/
+
 Route::prefix('public/registration')->group(function () {
-    Route::get('/meta', [PublicRegistrationApiController::class, 'meta'])
+
+    Route::get(
+        '/meta',
+        [PublicRegistrationApiController::class, 'meta']
+    )
         ->middleware('throttle:60,1');
 
-    Route::post('/submit', [PublicRegistrationApiController::class, 'submit'])
-        ->middleware('throttle:3,1'); // recommended tighter limit
+    Route::post(
+        '/submit',
+        [PublicRegistrationApiController::class, 'submit']
+    )
+        ->middleware('throttle:3,1');
 });

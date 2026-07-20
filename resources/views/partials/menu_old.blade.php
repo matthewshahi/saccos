@@ -1,0 +1,1077 @@
+<div class="sidebar-panel bg-white">
+    <div class="gull-brand pe-3 text-center mt-4 mb-2 d-flex justify-content-center align-items-center">
+        <a href="{{ url('/') }}" style="text-decoration: none;">
+            @php
+                // Extract the domain name
+                $currentDomain = parse_url(url('/'), PHP_URL_HOST);
+
+                // Check if it's localhost or 127.0.0.1
+if ($currentDomain === '127.0.0.1' || $currentDomain === 'localhost') {
+    $currentDomain = 'default'; // Use 'default' as a placeholder
+}
+
+// Construct logo paths
+$domainLogoPath = '/image/' . $currentDomain . '.jpg'; // Domain-specific logo
+$defaultLogoPath = '/image/logo.jpg'; // Default logo
+            @endphp
+
+            @if (file_exists(public_path($domainLogoPath)))
+                <!-- Check if the domain-specific logo exists -->
+                <img src="{{ asset($domainLogoPath) }}" alt="Logo" style="height: 50px;">
+            @else
+                <span
+                    style="margin-left: 10px; font-size: 19px; color: rebeccapurple; font-weight: 900; font-family: 'Montserrat', sans-serif; background: linear-gradient(to right, rebeccapurple, indigo); -webkit-background-clip: text; color: transparent; text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);">
+                    @php
+                        $nameParts = explode(' ', $defaultCompanyName);
+                        $first = $nameParts[0] ?? '';
+                        $second = $nameParts[1] ?? '';
+                    @endphp
+
+                    <div class="logo-container">
+                        <span class="adom">{{ $first }}</span>
+                        <span class="sacco">{{ $second }}</span>
+                    </div>
+                </span>
+            @endif
+        </a>
+        <div class="sidebar-compact-switch ms-auto"><span></span></div>
+    </div>
+    <div class="scroll-nav ps ps--active-y" data-perfect-scrollbar="data-perfect-scrollbar"
+        data-suppress-scroll-x="true" style="height: 75%;">
+        <div class="side-nav">
+            <div class="main-menu">
+                <ul class="metismenu" id="menu">
+                    <li class="Ul_li--hover">
+                        <a class="{{ request()->is('dashboard') ? 'active' : '' }}" href="{{ url('/dashboard') }}">
+                            <i class="i-Library text-20 me-2" style="color: #663399;"></i>
+                            <span class="item-name text-15 text-muted">Dashboard</span>
+                        </a>
+                    </li>
+                    <li class="Ul_li--hover">
+                        <a class="has-arrow" href="#">
+                            <i class="i-Library text-20 me-2" style="color: #663399;"></i>
+                            <span class="item-name text-15 text-muted">Members</span>
+                        </a>
+                        <ul class="mm-collapse">
+
+                            {{-- 🧍 Member Management --}}
+                            <li class="item-name">
+                                <a href="{{ url('/members/list') }}">
+                                    <span class="text-muted">All Members</span>
+                                </a>
+                            </li>
+                            <li class="item-name">
+                                <a href="{{ url('/members/active/y') }}">
+                                    <span class="text-muted">Active Members</span>
+                                </a>
+                            </li>
+                            <li class="item-name">
+                                <a href="{{ url('/members/active/n') }}">
+                                    <span class="text-muted">Inactive Members</span>
+                                </a>
+                            </li>
+                            <li class="item-name">
+                                <a href="{{ url('/members/add') }}">
+                                    <span class="text-muted">Register New Member</span>
+                                </a>
+                            </li>
+
+                            {{-- 🏛️ Institution Management --}}
+                            <li class="item-name">
+                                <a href="{{ url('/institutions/list') }}">
+                                    <span class="text-muted">All Institutions</span>
+                                </a>
+                            </li>
+                            <li class="item-name">
+                                <a href="{{ url('/institutions/add') }}">
+                                    <span class="text-muted">Add Institution</span>
+                                </a>
+                            </li>
+
+                            {{-- 💰 Financial Actions --}}
+                            <li class="item-name">
+                                <a href="{{ url('/registration-fees/create') }}">
+                                    <span class="text-muted">Record Registration Fee</span>
+                                </a>
+                            </li>
+
+                            {{-- 📨 Membership Requests --}}
+                            <li class="item-name">
+                                <a href="{{ url('new_members/list') }}">
+                                    <span class="text-muted">Pending Membership Requests</span>
+                                </a>
+                            </li>
+
+                        </ul>
+                    </li>
+                    <li class="Ul_li--hover">
+                        <a class="has-arrow" href="#">
+                            <i class="i-Money-Bag text-20 me-2" style="color: #663399;"></i>
+                            <span class="item-name text-15 text-muted">Savings/deposits</span>
+                        </a>
+                        <ul class="mm-collapse">
+                            <li class="item-name">
+                                <a href="{{ route('shares.transactions.index') }}">
+                                    <span class="text-muted">Savings</span>
+                                </a>
+                            </li>
+                            <li class="item-name">
+                                <a href="{{ route('modify.member.shares') }}">
+                                    <span class="text-muted">Add/reduce</span>
+                                </a>
+                            </li>
+                            <li class="item-name">
+                                <a href="{{ route('shares.clearance.index') }}">
+                                    <span class="text-muted">Clear Loans Using Savings</span>
+                                </a>
+                            </li>
+                            <li class="item-name">
+                                <a href="{{ route('transfer.member.shares') }}">
+                                    <span class="text-muted">Transfer between members</span>
+                                </a>
+                            </li>
+
+                            <li class="item-name">
+                                <a href="{{ route('shares_reductions.index') }}">
+                                    <span class="text-muted">Mass Savings Reductions</span>
+                                </a>
+                            </li>
+
+                            <li class="item-name">
+                                <a href="{{ route('proc.end.month.shares') }}">
+                                    <span class="text-muted">End month proc.</span>
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+                    <li class="Ul_li--hover">
+                        <a class="has-arrow" href="#">
+                            <i class="i-Business-Mens text-20 me-2" style="color: #663399;"></i>
+                            <span class="item-name text-15 text-muted">Capital</span>
+                        </a>
+
+                        <ul class="mm-collapse">
+                            <li class="item-name">
+                                <a href="{{ route('capitalshares.transactions.index') }}">
+                                    <span class="text-muted">Capital Shares</span>
+                                </a>
+                            </li>
+
+                            <li class="item-name">
+                                <a href="{{ route('modify.member.share.capital') }}">
+                                    <span class="text-muted">Add/reduce </span>
+                                </a>
+                            </li>
+                            <li class="item-name">
+                                <a href="{{ route('transfer.member.capital.shares') }}">
+                                    <span class="text-muted">Transfer between members</span>
+                                </a>
+                            </li>
+                            <li class="item-name">
+                                <a href="{{ route('transfer.share.to.capital.shares') }}">
+                                    <span class="text-muted">Transfer from deposits capital</span>
+                                </a>
+                            </li>
+
+                            <li class="item-name">
+                                <a href="{{ route('minimum_capital.index') }}">
+                                    <span class="text-muted">Bulk Transfer Deposits to Capital</span>
+                                </a>
+                            </li>
+
+                        </ul>
+                    </li>
+                    <li class="Ul_li--hover">
+                        <a class="has-arrow" href="#">
+                            <i class="i-Bank text-20 me-2" style="color: #663399;"></i>
+                            <span class="item-name text-15 text-muted">FOSA</span>
+                        </a>
+                        <ul class="mm-collapse">
+                            <li class="item-name">
+                                <a href="{{ route('fosa.transactions.index') }}">
+                                    <span class="text-muted">Add/reduce</span>
+                                </a>
+                            </li>
+
+                            <li class="item-name">
+                                <a href="{{ route('fosa.transfers.index') }}">
+                                    <span class="text-muted">FOSA Out Transfers</span>
+                                </a>
+                            </li>
+
+
+                            <li class="item-name">
+                                <a href="{{ route('fosa.transactions.import') }}">
+                                    <span class="text-muted">Import</span>
+                                </a>
+                            </li>
+                            <li class="item-name">
+                                <a href="{{ route('fosa.endmonth.index') }}">
+                                    <span class="text-muted">End Month Proc</span>
+                                </a>
+                            </li>
+
+                            <li class="item-name">
+                                <a href="{{ route('fosa.index') }}">
+                                    <span class="text-muted">Types</span>
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+
+                    <li class="Ul_li--hover">
+                        <a class="has-arrow" href="#">
+                            <i class="i-Coins text-20 me-2" style="color: #663399;"></i>
+                            <span class="item-name text-15 text-muted">Special Savings</span>
+                        </a>
+
+                        <ul class="mm-collapse">
+                            <li class="item-name">
+                                <a href="{{ route('special_savings.dashboard') }}">
+                                    <span class="text-muted">Dashboard</span>
+                                </a>
+                            </li>
+
+                            <li class="item-name">
+                                <a href="{{ route('special_savings.accounts.index') }}">
+                                    <span class="text-muted">Member Accounts</span>
+                                </a>
+                            </li>
+
+                            <li class="item-name">
+                                <a href="{{ route('special_savings.deposits.create') }}">
+                                    <span class="text-muted">Post Deposit</span>
+                                </a>
+                            </li>
+
+                            <li class="item-name">
+                                <a href="{{ route('special_savings.transfers.create') }}">
+                                    <span class="text-muted">Transfer to Special Savings</span>
+                                </a>
+                            </li>
+
+                            <li class="item-name">
+                                <a href="{{ route('special_savings.withdrawals.index') }}">
+                                    <span class="text-muted">Withdrawals</span>
+                                </a>
+                            </li>
+
+                            <li class="item-name">
+                                <a href="{{ route('special_savings.transactions.index') }}">
+                                    <span class="text-muted">Transactions</span>
+                                </a>
+                            </li>
+
+                            <li class="item-name">
+                                <a href="{{ route('special_savings.interest.index') }}">
+                                    <span class="text-muted">Interest Processing</span>
+                                </a>
+                            </li>
+
+                            <li class="item-name">
+                                <a href="{{ route('special_savings.vesting.index') }}">
+                                    <span class="text-muted">Interest Vesting</span>
+                                </a>
+                            </li>
+
+                            <li class="item-name">
+                                <a href="{{ route('special_savings.end_month.index') }}">
+                                    <span class="text-muted">End Month Proc.</span>
+                                </a>
+                            </li>
+
+                            <li class="item-name">
+                                <a href="{{ route('special_savings.import.form') }}">
+                                    <span class="text-muted">Import Contributions</span>
+                                </a>
+                            </li>
+
+                            <li class="item-name">
+                                <a href="{{ route('special_savings.products.index') }}">
+                                    <span class="text-muted">Products</span>
+                                </a>
+                            </li>
+
+                            <li class="item-name">
+                                <a href="{{ route('special_savings.categories.index') }}">
+                                    <span class="text-muted">Categories</span>
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+
+                    <li class="Ul_li--hover">
+                        <a class="has-arrow" href="#">
+                            <i class="i-Calendar-4 text-20 me-2" style="color: #663399;"></i>
+                            <span class="item-name text-15 text-muted">End month proc.</span>
+                        </a>
+                        <ul class="mm-collapse">
+                            <li class="item-name">
+                                <a href="{{ route('list.contribution') }}">
+                                    <span class="text-muted">Monthly contributions</span>
+                                </a>
+                            </li>
+                            <li class="item-name">
+                                <a href="{{ url('/reports/loans/active') }}">
+                                    <span class="text-muted">Loan Contributions - With Interest </span>
+                                </a>
+                            </li>
+                            <li class="item-name">
+                                <a href="{{ route('proc.end.month.shares') }}">
+                                    <span class="text-muted">Shares</span>
+                                </a>
+                            </li>
+                            <li class="item-name">
+                                <a href="{{ route('proc.end.month.loans') }}">
+                                    <span class="text-muted">Loans</span>
+                                </a>
+                            </li>
+                            <li class="item-name">
+                                <a href="{{ route('payroll.deductions.import.index') }}">
+                                    <span class="text-muted">Bulk Deductions Import</span>
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+                    <li class="Ul_li--hover">
+                        <a class="has-arrow" href="#">
+                            <i class="i-File-Clipboard-File--Text text-20 me-2" style="color: #663399;"></i>
+                            <span class="item-name text-15 text-muted">Loans</span>
+                        </a>
+                        <ul class="mm-collapse">
+                            <li class="item-name">
+                                <a href="{{ url('/loans/batch') }}">
+                                    <span class="text-muted">Batches</span>
+                                </a>
+                            </li>
+                            <!-- <li class="item-name">
+                                <a href="{{ url('/loans/issued') }}">
+                                    <span class="text-muted">Loans issued</span>
+                                </a>
+                            </li> -->
+                            <li class="item-name">
+                                <a href="{{ url('/modify/member/loans') }}">
+                                    <span class="text-muted">Increase/Reduce Loans</span>
+                                </a>
+                            </li>
+
+                            <li class="item-name">
+                                <a href="{{ route('payroll.deductions.import.index') }}">
+                                    <span class="text-muted">Bulk Deductions Import</span>
+                                </a>
+                            </li>
+
+                            <li class="item-name">
+                                <a href="{{ url('/reports/loans/active') }}">
+                                    <span class="text-muted">Monthly Contributions</span>
+                                </a>
+                            </li>
+
+
+
+                            <li class="item-name">
+                                <a href="{{ url('/admin/loans/pending/approval') }}">
+                                    <span class="text-muted">Approve Self Serve Loans</span>
+                                </a>
+                            </li>
+
+                            <li class="item-name">
+                                <a href="{{ url('/loans/apply') }}">
+                                    <span class="text-muted">Self-Service Loan Application</span>
+                                </a>
+                            </li>
+                            <li class="item-name">
+                                <a href="{{ url('/loans/types') }}">
+                                    <span class="text-muted">Loan types</span>
+                                </a>
+                            </li>
+                            <li class="item-name">
+    <a href="{{ route('loans.member_limits.index') }}">
+        <span class="text-muted">
+            Individual Loan Limits
+        </span>
+    </a>
+</li>
+                            <li class="item-name">
+                                <a href="{{ route('loans.deduction-types') }}">
+                                    <span class="text-muted">Loan Deduction Types</span>
+                                </a>
+                            </li>
+                            <li class="item-name">
+                                <a href="{{ url('/loans/types/list') }}">
+                                    <span class="text-muted">Loans & Loan Calculator</span>
+                                </a>
+                            </li>
+                            <li class="item-name">
+                                <a href="{{ url('/loans/categories') }}">
+                                    <span class="text-muted">Loan categories</span>
+                                </a>
+                            </li>
+
+                            <a href="{{ route('loans.reprocess.index') }}">
+                                <span class="text-muted">Reprocess</span>
+                            </a>
+
+                        </ul>
+                    </li>
+                    @include('partials.menu_matatu')
+                    <li class="Ul_li--hover">
+                        <a class="has-arrow" href="#">
+                            <i class="i-Financial text-20 me-2" style="color: #663399;"></i>
+                            <span class="item-name text-15 text-muted">Journals</span>
+                        </a>
+                        <ul class="mm-collapse">
+                            <li class="item-name">
+                                <a href="{{ url('/accounts/main') }}">
+                                    <span class="text-muted">Main Accounts</span>
+                                </a>
+                            </li>
+
+                            <li class="item-name">
+                                <a href="{{ url('/accounts/sub') }}">
+                                    <span class="text-muted">Sub Accounts</span>
+                                </a>
+                            </li>
+                            <li class="item-name">
+                                <a href="{{ url('/admin/budget') }}">
+                                    <span class="text-muted">Set Budget</span>
+                                </a>
+                            </li>
+
+                            <li class="item-name">
+                                <a href="{{ url('/accounts/transfer') }}">
+                                    <span class="text-muted">Transfer Ledgers</span>
+                                </a>
+                            </li>
+
+                            <li class="item-name">
+                                <a href="{{ url('/admin/end-of-year-processing') }}">
+                                    <span class="text-muted">Close the year</span>
+                                </a>
+                            </li>
+
+
+                        </ul>
+                    </li>
+                    <li class="Ul_li--hover">
+                        <a class="has-arrow" href="#">
+                            <i class="i-Administrator text-20 me-2" style="color: #663399;"></i>
+                            <span class="item-name text-15 text-muted">Reports</span>
+                        </a>
+                        <ul class="mm-collapse">
+                            <li class="Ul_li--hover">
+                                <a class="has-arrow" href="#">
+                                    <i class="i-Bar-Chart text-20 me-2" style="color: #663399;"></i>
+                                    <span class="item-name text-15 text-muted">General</span>
+                                </a>
+                                <ul class="mm-collapse">
+                                    <li class="item-name">
+                                        <a href="{{ url('/reports/mpesa') }}">
+                                            <span class="text-muted">mPesa</span>
+                                        </a>
+                                    </li>
+                                    <li class="item-name">
+                                        <a href="{{ url('/reports/members/status') }}">
+                                            <span class="text-muted">Consolidated (All in One)</span>
+                                        </a>
+                                    </li>
+
+                                    <li class="item-name">
+                                        <a href="{{ url('/reports/members/financial-position') }}">
+                                            <span class="text-muted">All COntrinutions + Loans "As At"</span>
+                                        </a>
+                                    </li>
+
+
+
+                                    <li class="item-name">
+                                        <a href="{{ url('/registration-fees') }}">
+                                            <span class="text-muted">Registration Fees</span>
+                                        </a>
+                                    </li>
+                                    <li class="item-name">
+                                        <a href="{{ url('/reports/loans/insurance') }}">
+                                            <span class="text-muted">Report - To Insurance</span>
+                                        </a>
+                                    </li>
+
+
+                                </ul>
+                            </li>
+
+                            <li class="Ul_li--hover">
+                                <a class="has-arrow" href="#">
+                                    <i class="i-Bar-Chart text-20 me-2" style="color: #663399;"></i>
+                                    <span class="item-name text-15 text-muted">Other Savings</span>
+                                </a>
+                                <ul class="mm-collapse">
+                                    <li class="item-name">
+                                        <a href="{{ url('reports/fosa-members') }}">
+                                            <span class="text-muted">Other Savings </span>
+                                        </a>
+                                    </li>
+
+
+
+
+                                </ul>
+                            </li>
+
+
+
+                            <li class="Ul_li--hover">
+                                <a class="has-arrow" href="#">
+                                    <i class="i-Bar-Chart text-20 me-2" style="color: #663399;"></i>
+                                    <span class="item-name text-15 text-muted">Savings</span>
+                                </a>
+
+                                <ul class="mm-collapse">
+                                    <li class="item-name">
+                                        <a href="{{ url('reports/sasra/member_contributions/data') }}">
+                                            <span class="text-muted">Monthly Savings</span>
+                                        </a>
+                                    </li>
+                                    <li class="item-name">
+                                        <a href="{{ url('/reports/sasra/share_compliance') }}">
+                                            <span class="text-muted">Monthly Savings Compliance</span>
+                                        </a>
+                                    </li>
+                                    <li class="item-name">
+                                        <a href="{{ url('/reports/shares/top-members') }}">
+                                            <span class="text-muted">Top Savers</span>
+                                        </a>
+                                    </li>
+
+                                    <li class="item-name">
+                                        <a href="{{ url('/reports/shares/aging') }}">
+                                            <span class="text-muted">Savings/Deposist - Aging</span>
+                                        </a>
+                                    </li>
+
+
+
+                                </ul>
+                            </li>
+
+                            <li class="Ul_li--hover">
+                                <a class="has-arrow" href="#">
+                                    <i class="i-Bar-Chart text-20 me-2" style="color: #663399;"></i>
+                                    <span class="item-name text-15 text-muted">Loans</span>
+                                </a>
+                                <ul class="mm-collapse">
+                                    <li class="item-name">
+                                        <a href="{{ url('/reports/loans/issued') }}">Loans Given</a>
+                                    </li>
+                                    <li class="item-name">
+                                        <a href="{{ url('/reports/loans/repayments') }}">Loan Repayments</a>
+                                    </li>
+                                    <li class="item-name">
+                                        <a href="{{ url('/members/report') }}">Member Contributions and Loan Balances
+                                            Report</a>
+                                    </li>
+                                    <!-- <li class="item-name">
+                                        <a href="{{ url('/reports/loans/repayments/data') }}">Loans Given</a>
+                                    </li>
+                                    <li class="item-name">
+                                        <a href="{{ url('/reports/loans/repayments/download') }}">Loans Given</a>
+                                    </li> -->
+
+                                </ul>
+
+                            </li>
+
+                            <li class="item-name has-arrow">
+                                <a href="#">
+                                    <i class="i-Pie-Chart text-20 me-2" style="color: #663399;"></i>
+                                    <span class="item-name text-15 text-muted">Final accounts</span>
+                                </a>
+                                <ul class="mm-collapse">
+
+                                    <li class="item-name">
+                                        <a href="{{ url('/reports/final-accounts/trial-balance') }}">
+                                            <span class="text-muted">Trial balance</span>
+                                        </a>
+                                    </li>
+                                    <li class="item-name">
+                                        <a href="{{ url('/reports/final-accounts/profit-loss') }}">
+                                            <span class="text-muted">Profit and Loss </span>
+                                        </a>
+                                    </li>
+                                    <li class="item-name">
+                                        <a href="{{ url('/reports/final-accounts/balance-sheet') }}">
+                                            <span class="text-muted">Balance sheet</span>
+                                        </a>
+                                    </li>
+
+
+
+
+
+
+                                </ul>
+                            </li>
+
+
+                            <li class="item-name has-arrow">
+                                <a href="#">
+                                    <i class="i-Pie-Chart text-20 me-2" style="color: #663399;"></i>
+                                    <span class="item-name text-15 text-muted">Final accounts(1)</span>
+                                </a>
+                                <ul class="mm-collapse">
+                                    <li class="item-name">
+                                        <a href="{{ url('/reports/accounts/ledger') }}">
+                                            <span class="text-muted">Ledgers</span>
+                                        </a>
+                                    </li>
+                                    <li class="item-name">
+                                        <a href="{{ url('/reports/accounts/trial-balance') }}">
+                                            <span class="text-muted">Trial balance</span>
+                                        </a>
+                                    </li>
+                                    <li class="item-name">
+                                        <a href="{{ url('/reports/accounts/profit-loss') }}">
+                                            <span class="text-muted">Profit and Loss </span>
+                                        </a>
+                                    </li>
+                                    <li class="item-name">
+                                        <a href="{{ url('/reports/accounts/balance-sheet') }}">
+                                            <span class="text-muted">Balance sheet</span>
+                                        </a>
+                                    </li>
+
+
+
+
+
+
+                                </ul>
+                            </li>
+
+
+                            <li class="Ul_li--hover">
+                                <a class="has-arrow" href="#">
+                                    <i class="i-Bar-Chart text-20 me-2" style="color: #663399;"></i>
+                                    <span class="item-name text-15 text-muted">Transport</span>
+                                </a>
+
+                                <ul class="mm-collapse">
+
+                                    <!-- MPESA Collections -->
+                                    <li class="item-name">
+                                        <a href="{{ url('/reports/transport/mpesa') }}">
+                                            <span class="text-muted">mPesa Collections</span>
+                                        </a>
+                                    </li>
+
+
+
+                                </ul>
+                            </li>
+
+
+                            <li class="Ul_li--hover">
+                                <a class="has-arrow" href="#">
+                                    <i class="i-Bar-Chart text-20 me-2" style="color: #663399;"></i>
+                                    <span class="item-name text-15 text-muted">SASRA</span>
+                                </a>
+
+                                <ul class="mm-collapse">
+
+                                    {{-- SASRA Regulatory Returns --}}
+                                    <li class="Ul_li--hover">
+                                        <a class="has-arrow" href="#">
+                                            <i class="i-File-Clipboard-File--Text text-15 me-2"
+                                                style="color: #663399;"></i>
+                                            <span class="text-muted">Regulatory Returns</span>
+                                        </a>
+
+                                        <ul class="mm-collapse">
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/sasra/capital-adequacy') }}">
+                                                    <span class="text-muted">Capital Adequacy</span>
+                                                </a>
+                                            </li>
+
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/sasra/liquidity-statement') }}">
+                                                    <span class="text-muted">Liquidity Statement</span>
+                                                </a>
+                                            </li>
+
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/sasra/deposit-return') }}">
+                                                    <span class="text-muted">Deposit Return</span>
+                                                </a>
+                                            </li>
+
+                                            <li class="item-name">
+                                                <a
+                                                    href="{{ url('/reports/sasra/risk-classification-provisioning') }}">
+                                                    <span class="text-muted">Risk Classification &amp;
+                                                        Provisioning</span>
+                                                </a>
+                                            </li>
+
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/sasra/investment-return') }}">
+                                                    <span class="text-muted">Investment Return</span>
+                                                </a>
+                                            </li>
+
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/final-accounts/balance-sheet') }}">
+                                                    <span class="text-muted">Statement of Financial Position</span>
+                                                </a>
+                                            </li>
+
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/final-accounts/profit-loss') }}">
+                                                    <span class="text-muted">Statement of Comprehensive Income</span>
+                                                </a>
+                                            </li>
+
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/final-accounts/trial-balance') }}">
+                                                    <span class="text-muted">Trial Balance</span>
+                                                </a>
+                                            </li>
+                                        </ul>
+                                    </li>
+
+                                    {{-- SASRA Loans and Credit Risk --}}
+                                    <li class="Ul_li--hover">
+                                        <a class="has-arrow" href="#">
+                                            <i class="i-File-Clipboard-File--Text text-15 me-2"
+                                                style="color: #663399;"></i>
+                                            <span class="text-muted">Loans &amp; Credit Risk</span>
+                                        </a>
+
+                                        <ul class="mm-collapse">
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/sasra/loan-portfolio-summary') }}">
+                                                    <span class="text-muted">Loan Portfolio Summary</span>
+                                                </a>
+                                            </li>
+
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/sasra/outstandingloans/y/active') }}">
+                                                    <span class="text-muted">Outstanding Loans - Active Members</span>
+                                                </a>
+                                            </li>
+
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/sasra/outstandingloans/n/active') }}">
+                                                    <span class="text-muted">Outstanding Loans - Inactive
+                                                        Members</span>
+                                                </a>
+                                            </li>
+
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/sasra/outstandingloans/n') }}">
+                                                    <span class="text-muted">Fully Paid Loans</span>
+                                                </a>
+                                            </li>
+
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/sasra/loan-arrears-aging') }}">
+                                                    <span class="text-muted">Loan Arrears Aging</span>
+                                                </a>
+                                            </li>
+
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/sasra/non-performing-loans') }}">
+                                                    <span class="text-muted">Non-Performing Loans</span>
+                                                </a>
+                                            </li>
+
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/sasra/loan-provisioning') }}">
+                                                    <span class="text-muted">Loan Provisioning</span>
+                                                </a>
+                                            </li>
+
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/sasra/loan_performance') }}">
+                                                    <span class="text-muted">Loan Risk Classification</span>
+                                                </a>
+                                            </li>
+
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/sasra/loan_performance/1') }}">
+                                                    <span class="text-muted">Insider / Official Loans</span>
+                                                </a>
+                                            </li>
+
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/sasra/loan-repayment-performance') }}">
+                                                    <span class="text-muted">Loan Repayment Performance</span>
+                                                </a>
+                                            </li>
+                                        </ul>
+                                    </li>
+
+                                    {{-- SASRA Savings and Deposits --}}
+                                    <li class="Ul_li--hover">
+                                        <a class="has-arrow" href="#">
+                                            <i class="i-Money-Bag text-15 me-2" style="color: #663399;"></i>
+                                            <span class="text-muted">Savings &amp; Deposits</span>
+                                        </a>
+
+                                        <ul class="mm-collapse">
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/sasra/share') }}">
+                                                    <span class="text-muted">Shares / Deposits Balances</span>
+                                                </a>
+                                            </li>
+
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/sasra/member_contributions/data') }}">
+                                                    <span class="text-muted">Monthly Savings</span>
+                                                </a>
+                                            </li>
+
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/sasra/share_compliance') }}">
+                                                    <span class="text-muted">Savings Compliance</span>
+                                                </a>
+                                            </li>
+
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/sasra/deposit-movement') }}">
+                                                    <span class="text-muted">Deposit Movement</span>
+                                                </a>
+                                            </li>
+
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/sasra/member-deposits-summary') }}">
+                                                    <span class="text-muted">Member Deposits Summary</span>
+                                                </a>
+                                            </li>
+
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/sasra/withdrawable-deposits') }}">
+                                                    <span class="text-muted">Withdrawable Deposits</span>
+                                                </a>
+                                            </li>
+
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/sasra/non-withdrawable-deposits') }}">
+                                                    <span class="text-muted">Non-withdrawable Deposits</span>
+                                                </a>
+                                            </li>
+
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/sasra/dormant-deposits') }}">
+                                                    <span class="text-muted">Dormant / Inactive Deposits</span>
+                                                </a>
+                                            </li>
+                                        </ul>
+                                    </li>
+
+                                    {{-- SASRA Investments and Financial Performance --}}
+                                    <li class="Ul_li--hover">
+                                        <a class="has-arrow" href="#">
+                                            <i class="i-Financial text-15 me-2" style="color: #663399;"></i>
+                                            <span class="text-muted">Investments &amp; Performance</span>
+                                        </a>
+
+                                        <ul class="mm-collapse">
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/sasra/investment-register') }}">
+                                                    <span class="text-muted">Investment Register</span>
+                                                </a>
+                                            </li>
+
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/sasra/investment-income') }}">
+                                                    <span class="text-muted">Investment Income</span>
+                                                </a>
+                                            </li>
+
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/sasra/investment-return') }}">
+                                                    <span class="text-muted">Investment Return</span>
+                                                </a>
+                                            </li>
+
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/profit_and_loss') }}">
+                                                    <span class="text-muted">Financial Performance / ROI</span>
+                                                </a>
+                                            </li>
+                                        </ul>
+                                    </li>
+
+                                    {{-- SASRA Governance and Complaints --}}
+                                    <li class="Ul_li--hover">
+                                        <a class="has-arrow" href="#">
+                                            <i class="i-Administrator text-15 me-2" style="color: #663399;"></i>
+                                            <span class="text-muted">Governance &amp; Complaints</span>
+                                        </a>
+
+                                        <ul class="mm-collapse">
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/sasra/complaints-register') }}">
+                                                    <span class="text-muted">Complaints Register</span>
+                                                </a>
+                                            </li>
+
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/sasra/complaints-summary') }}">
+                                                    <span class="text-muted">Complaints Summary</span>
+                                                </a>
+                                            </li>
+
+                                            <li class="item-name">
+                                                <a href="{{ url('/reports/sasra/complaints-source-report') }}">
+                                                    <span class="text-muted">Complaints Source Report</span>
+                                                </a>
+                                            </li>
+
+                                            <li class="item-name">
+                                                <a
+                                                    href="{{ url('/reports/sasra/complaints-monitoring-evaluation') }}">
+                                                    <span class="text-muted">Complaints Monitoring &amp;
+                                                        Evaluation</span>
+                                                </a>
+                                            </li>
+                                        </ul>
+                                    </li>
+
+                                </ul>
+                            </li>
+                        </ul>
+                    </li>
+
+                    <li class="Ul_li--hover">
+                        <a class="has-arrow" href="{{ url('/file-upload') }}">
+                            <i class="i-Download text-20 me-2" style="color: #663399;"></i>
+                            <span class="item-name text-15 text-muted">Downloads</span>
+                        </a>
+                    </li>
+
+
+                    <li class="Ul_li--hover">
+                        <a class="has-arrow" href="#">
+                            <i class="i-Mail text-20 me-2" style="color: #663399;"></i>
+                            <span class="item-name text-15 text-muted">Communications</span>
+                        </a>
+                        <ul class="mm-collapse">
+                            <li class="item-name">
+                                <a href="{{ route('emails.bulk') }}">
+                                    <i class="i-Mail text-15 me-2" style="color: #663399;"></i>
+                                    <span class="text-muted">Bulk Email</span>
+                                </a>
+
+                            </li>
+                            <li class="item-name">
+                                <a href="{{ route('bulk_sms.index') }}">
+                                    <i class="i-Speach-Bubble-3 text-15 me-2" style="color: #663399;"></i>
+                                    <span class="text-muted">Bulk SMS</span>
+                                </a>
+                            </li>
+
+                        </ul>
+                    </li>
+
+
+                    <li class="Ul_li--hover">
+                        <a class="has-arrow" href="#">
+                            <i class="i-Administrator text-20 me-2" style="color: #663399;"></i>
+                            <span class="item-name text-15 text-muted">Sacco Admin</span>
+                        </a>
+                        <ul class="mm-collapse">
+                            <li class="item-name has-arrow">
+                                <a href="#">
+                                    <span class="text-muted">Rights</span>
+                                </a>
+                                <ul class="mm-collapse">
+                                    <li class="item-name">
+                                        <a href="{{ url('/admin/access-rights') }}">
+                                            <span class="text-muted">Modify access rights</span>
+                                        </a>
+                                    </li>
+                                    <li class="item-name">
+                                        <a href="{{ url('/members/mass-password-reset') }}">
+                                            <span class="text-muted">Mass Reset Passwords</span>
+                                        </a>
+                                    </li>
+                                </ul>
+                            </li>
+                            <li class="item-name has-arrow">
+                                <a href="{{ url('/admin/route-audit-logs') }}">
+                                    <span class="text-muted">Audit Logs (1)</span>
+                                </a>
+                            </li>
+                            <li class="item-name has-arrow">
+                                <a href="{{ url('/admin/defaults') }}">
+                                    <span class="text-muted">Sacco defaults</span>
+                                </a>
+                            </li>
+                            <li class="item-name">
+                                <a href="{{ url('/admin/periods') }}">
+                                    <span class="text-muted">Accounting periods</span>
+                                </a>
+                            </li>
+
+                            <li class="item-name">
+                                <a href="{{ url('/kintypelist') }}">
+                                    <span class="text-muted">Kin Type List</span>
+                                </a>
+                            </li>
+                            <li class="item-name">
+                                <a href="{{ url('/mobile/config') }}">
+                                    <span class="text-muted">MPESA configs</span>
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+                    <li class="Ul_li--hover">
+                        <a class="has-arrow" href="#">
+                            <i class="i-Administrator text-20 me-2" style="color: #663399;"></i>
+                            <span class="item-name text-15 text-muted">User Profile</span>
+                        </a>
+                        <ul class="mm-collapse">
+                            <li class="item-name">
+                                <a href="{{ url('/profile/password') }}">
+                                    <span class="text-muted">Change Password</span>
+                                </a>
+                            </li>
+
+
+                            <li class="item-name">
+                                <a href="{{ url('/dashboard/member_dashboard') }}?view_as_member=y">
+                                    <span class="text-muted">View as a Member</span>
+                                </a>
+
+                            </li>
+
+
+                            <li class="item-name">
+                                <a href="{{ url('/logout') }}"
+                                    onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
+                                    <span class="text-muted">Logout</span>
+                                </a>
+                                <form id="logout-form" action="{{ url('/logout') }}" method="POST"
+                                    style="display: none;">
+                                    @csrf
+                                </form>
+                            </li>
+                        </ul> 
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    <div class="support-contact p-2 d-flex justify-content-between align-items-center"
+        style="position: absolute; bottom: 0; left: 0; width: 100%; background: linear-gradient(to right, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.9)); 
+            font-size: 14px; border-top: 1px solid rgba(102, 51, 153, 0.2);">
+        <div style="font-size: 13px; color: rgba(102, 51, 153, 1); font-weight: 600;">
+            <strong>ERP provided by:</strong> <br> Shahi Services,
+            <a href="tel:+254722400737"
+                style="text-decoration: none; color: rgba(102, 51, 153, 1); font-weight: bold;">
+                +254722400737
+            </a>
+        </div>
+    </div>
+</div>
