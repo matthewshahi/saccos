@@ -506,10 +506,12 @@
             $liClass = implode(' ', $liClasses);
             $name = e((string) ($menu->menu_name ?? ''));
             $icon = trim((string) ($menu->menu_icon ?? ''));
-            $iconSize = $depth === 0 ? 'text-20' : 'text-15';
+            $iconSize = $depth === 0
+                ? 'sacco-menu-icon-main'
+                : 'sacco-menu-icon-child';
             $iconHtml = $icon !== ''
                 ? '<i class="' . e($icon) . ' ' . $iconSize
-                    . ' me-2" style="color:#663399;"></i>'
+                    . ' me-2 text-muted"></i>'
                 : '';
 
             if ($type === 'GROUP' || $hasChildren) {
@@ -526,7 +528,7 @@
                 }
 
                 $labelHtml = $depth === 0
-                    ? '<span class="item-name text-15 text-muted">' . $name . '</span>'
+                    ? '<span class="item-name sacco-menu-label-main text-muted">' . $name . '</span>'
                     : '<span class="text-muted">' . $name . '</span>';
 
                 $html .= '<li class="' . e($liClass) . '">';
@@ -550,7 +552,7 @@
             ) === 'Y';
 
             $labelHtml = $depth === 0
-                ? '<span class="item-name text-15 text-muted">' . $name . '</span>'
+                ? '<span class="item-name sacco-menu-label-main text-muted">' . $name . '</span>'
                 : '<span class="text-muted">' . $name . '</span>';
 
             $linkClasses = $isActive ? 'active' : '';
@@ -602,7 +604,7 @@
     );
 @endphp
 
-<div class="sidebar-panel bg-white">
+<div id="sacco-staff-menu" class="sidebar-panel bg-white">
     <div class="gull-brand pe-3 text-center mt-4 mb-2 d-flex justify-content-center align-items-center">
         <a href="{{ url('/') }}" style="text-decoration:none;">
             @php
@@ -751,27 +753,45 @@
 </div>
 
 <style>
-    .sacco-menu-search-input {
+    /*
+     * Every custom rule is scoped to this sidebar only. Nothing here can
+     * change typography, links, buttons or search fields elsewhere.
+     */
+    #sacco-staff-menu .sacco-menu-icon-main {
+        font-size: 20px !important;
+    }
+
+    #sacco-staff-menu .sacco-menu-icon-child {
+        font-size: 15px !important;
+    }
+
+    #sacco-staff-menu .sacco-menu-label-main {
+        font-size: 15px !important;
+    }
+
+    #sacco-staff-menu .sacco-menu-search-input {
         padding-left: 2rem;
+        font-size: 13px;
         border-color: rgba(102, 51, 153, .25);
     }
 
-    .sacco-menu-search-input:focus {
+    #sacco-staff-menu .sacco-menu-search-input:focus {
         border-color: rgba(102, 51, 153, .65);
         box-shadow: 0 0 0 .15rem rgba(102, 51, 153, .12);
     }
 
-    .sacco-menu-search-icon {
+    #sacco-staff-menu .sacco-menu-search-icon {
         position: absolute;
         left: .65rem;
         top: 50%;
         z-index: 2;
         color: #663399;
+        font-size: 15px;
         transform: translateY(-50%);
         pointer-events: none;
     }
 
-    .sacco-menu-search-results {
+    #sacco-staff-menu .sacco-menu-search-results {
         position: absolute;
         top: calc(100% + .25rem);
         left: .75rem;
@@ -784,67 +804,72 @@
         border-radius: .35rem;
     }
 
-    .sacco-menu-search-result {
+    #sacco-staff-menu .sacco-menu-search-result {
         display: block;
         padding: .65rem .75rem;
         color: #333;
+        font-size: 13px;
         text-decoration: none;
         border-bottom: 1px solid #f0edf4;
     }
 
-    .sacco-menu-search-result:last-child {
+    #sacco-staff-menu .sacco-menu-search-result:last-child {
         border-bottom: 0;
     }
 
-    .sacco-menu-search-result:hover,
-    .sacco-menu-search-result:focus,
-    .sacco-menu-search-result.is-selected {
+    #sacco-staff-menu .sacco-menu-search-result:hover,
+    #sacco-staff-menu .sacco-menu-search-result:focus,
+    #sacco-staff-menu .sacco-menu-search-result.is-selected {
         color: #663399;
         background: rgba(102, 51, 153, .07);
         outline: none;
     }
 
-    .sacco-menu-search-result-name {
+    #sacco-staff-menu .sacco-menu-search-result-name {
         display: block;
+        font-size: 13px;
         font-weight: 700;
         line-height: 1.2;
     }
 
-    .sacco-menu-search-result-path {
+    #sacco-staff-menu .sacco-menu-search-result-path {
         display: block;
         margin-top: .2rem;
         color: #777;
-        font-size: .72rem;
+        font-size: 11px;
         line-height: 1.25;
     }
 
-    .sacco-menu-search-empty {
+    #sacco-staff-menu .sacco-menu-search-empty {
         padding: .75rem;
         color: #777;
-        font-size: .82rem;
+        font-size: 13px;
         text-align: center;
     }
 
-    .sacco-menu-action-form {
+    #sacco-staff-menu .sacco-menu-action-form {
         width: 100%;
+        margin: 0;
     }
 
-    .sacco-menu-action-link {
+    #sacco-staff-menu .sacco-menu-action-link {
         display: flex;
         align-items: center;
         width: 100%;
-        padding: inherit;
+        padding: 0;
         color: inherit;
         font: inherit;
+        font-size: inherit;
+        line-height: inherit;
         text-align: left;
         background: transparent;
         border: 0;
         cursor: pointer;
     }
 
-    .sacco-menu-action-link:hover,
-    .sacco-menu-action-link:focus,
-    .sacco-menu-action-link.active {
+    #sacco-staff-menu .sacco-menu-action-link:hover,
+    #sacco-staff-menu .sacco-menu-action-link:focus,
+    #sacco-staff-menu .sacco-menu-action-link.active {
         color: #663399;
         outline: none;
     }
