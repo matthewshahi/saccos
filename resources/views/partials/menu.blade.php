@@ -873,6 +873,47 @@
         color: #663399;
         outline: none;
     }
+
+    /*
+     * Compact staff-menu typography.
+     * These rules apply only inside #sacco-staff-menu.
+     */
+    #sacco-staff-menu #menu > li > a,
+    #sacco-staff-menu #menu > li > form .sacco-menu-action-link {
+        font-size: 13px !important;
+        line-height: 1.25;
+        padding-top: 8px !important;
+        padding-bottom: 8px !important;
+    }
+
+    #sacco-staff-menu #menu > li > a .sacco-menu-label-main,
+    #sacco-staff-menu #menu > li > form .sacco-menu-label-main {
+        font-size: 13px !important;
+        line-height: 1.25;
+    }
+
+    #sacco-staff-menu #menu ul li > a,
+    #sacco-staff-menu #menu ul li > form .sacco-menu-action-link,
+    #sacco-staff-menu #menu ul li > a span,
+    #sacco-staff-menu #menu ul li > form span {
+        font-size: 12px !important;
+        line-height: 1.25;
+    }
+
+    #sacco-staff-menu #menu ul li > a,
+    #sacco-staff-menu #menu ul li > form .sacco-menu-action-link {
+        padding-top: 6px !important;
+        padding-bottom: 6px !important;
+    }
+
+    #sacco-staff-menu #menu .sacco-menu-icon-main {
+        font-size: 17px !important;
+    }
+
+    #sacco-staff-menu #menu .sacco-menu-icon-child {
+        font-size: 13px !important;
+    }
+
 </style>
 
 <script id="sacco-menu-search-data" type="application/json">
