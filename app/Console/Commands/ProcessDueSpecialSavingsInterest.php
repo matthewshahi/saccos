@@ -482,6 +482,10 @@ class ProcessDueSpecialSavingsInterest extends Command
                 'special_saving_transaction_deleted' => 'N',
             ]);
 
+            $this->postSpecialSavingsInterestToLedger(
+    (int) $transactionId
+);
+
             Log::info('Special-savings interest posted automatically.', [
                 'transaction_id' => $transactionId,
                 'account_id' => $accountId,
@@ -491,6 +495,8 @@ class ProcessDueSpecialSavingsInterest extends Command
                 'cycle_end' => $cycleEnd->toDateString(),
                 'calculation' => $calculation,
             ]);
+
+            
 
             $result = $this->resultFromCalculation(
                 account: $account,
@@ -1167,4 +1173,586 @@ class ProcessDueSpecialSavingsInterest extends Command
             'reason' => $reason,
         ];
     }
+
+/**
+ * Post one completed special-savings interest accrual to the General Ledger.
+ *
+ * Accounting entry:
+ *   Dr Special Savings Interest Expense
+ *   Cr Special Savings Accrued Interest Payable
+ *
+ * Call this immediately after inserting the INTEREST_ACCRUAL transaction.
+ *
+ * @throws RuntimeException
+ */
+private function postSpecialSavingsInterestToLedger(
+    int $specialSavingTransactionId
+): string {
+    return DB::transaction(function () use ($specialSavingTransactionId): string {
+        /*
+        |--------------------------------------------------------------------------
+        | 1. Lock and validate the subsidiary transaction
+        |--------------------------------------------------------------------------
+        */
+        $transaction = DB::table('sacco_special_saving_transactions')
+            ->where(
+                'special_saving_transaction_id',
+                $specialSavingTransactionId
+            )
+            ->lockForUpdate()
+            ->first();
+
+        if (!$transaction) {
+            throw new RuntimeException(
+                "Special-savings transaction {$specialSavingTransactionId} "
+                . 'was not found.'
+            );
+        }
+
+        if (
+            strtoupper(trim((string) $transaction->special_saving_transaction_type))
+            !== 'INTEREST_ACCRUAL'
+        ) {
+            throw new RuntimeException(
+                "Special-savings transaction {$specialSavingTransactionId} "
+                . 'is not an interest accrual transaction.'
+            );
+        }
+
+        if (
+            strtoupper(trim((string) $transaction->special_saving_transaction_deleted))
+            === 'Y'
+            || strtoupper(trim((string) $transaction->special_saving_transaction_reversed))
+            === 'Y'
+        ) {
+            throw new RuntimeException(
+                "Special-savings transaction {$specialSavingTransactionId} "
+                . 'is deleted or reversed and cannot be posted.'
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Already posted: return safely without duplicating the ledger
+        |--------------------------------------------------------------------------
+        */
+        if (
+            strtoupper(trim(
+                (string) $transaction->special_saving_transaction_ledger_posted
+            )) === 'Y'
+        ) {
+            return (string) (
+                $transaction->special_saving_transaction_ledger_ref
+                ?? $transaction->special_saving_transaction_doc_no
+            );
+        }
+
+        $interestAmount = round(
+            (float) $transaction->special_saving_transaction_interest_amount,
+            2
+        );
+
+        if ($interestAmount <= 0) {
+            throw new RuntimeException(
+                "Special-savings transaction {$specialSavingTransactionId} "
+                . 'has an invalid interest amount.'
+            );
+        }
+
+        $documentNumber = trim(
+            (string) $transaction->special_saving_transaction_doc_no
+        );
+
+        if ($documentNumber === '') {
+            throw new RuntimeException(
+                "Special-savings transaction {$specialSavingTransactionId} "
+                . 'does not have a document number.'
+            );
+        }
+
+        $period = trim(
+            (string) $transaction->special_saving_transaction_period
+        );
+
+        if (!preg_match('/^\d{6}$/', $period)) {
+            throw new RuntimeException(
+                "Special-savings transaction {$specialSavingTransactionId} "
+                . "has an invalid accounting period [{$period}]."
+            );
+        }
+
+        $postingDate = $transaction->special_saving_transaction_date;
+
+        if (empty($postingDate)) {
+            throw new RuntimeException(
+                "Special-savings transaction {$specialSavingTransactionId} "
+                . 'does not have a posting date.'
+            );
+        }
+
+        $description = trim(
+            (string) $transaction->special_saving_transaction_description
+        );
+
+        if ($description === '') {
+            $description = 'Automatic special-savings interest accrual.';
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | 2. Resolve required ledger defaults
+        |--------------------------------------------------------------------------
+        */
+        $requiredDefaults = [
+            'expense' =>
+                'special_savings_ledger_interest_expense_account',
+
+            'accrued_payable' =>
+                'special_savings_ledger_accrued_interest_payable_account',
+        ];
+
+        $resolvedAccounts = [];
+
+        foreach ($requiredDefaults as $key => $defaultName) {
+            $defaultRows = DB::table('sacco_defaults')
+                ->where('default_name', $defaultName)
+                ->lockForUpdate()
+                ->get();
+
+            if ($defaultRows->count() !== 1) {
+                Log::error(
+                    'Required special-savings ledger default is missing or duplicated.',
+                    [
+                        'default_name' => $defaultName,
+                        'rows_found' => $defaultRows->count(),
+                        'transaction_id' => $specialSavingTransactionId,
+                    ]
+                );
+
+                throw new RuntimeException(
+                    "Required ledger default [{$defaultName}] is missing "
+                    . 'or duplicated. No ledger entry was posted.'
+                );
+            }
+
+            $configuredValue = trim(
+                (string) $defaultRows->first()->default_value
+            );
+
+            if (
+                $configuredValue === ''
+                || !ctype_digit($configuredValue)
+                || (int) $configuredValue <= 0
+            ) {
+                Log::error(
+                    'Required special-savings ledger default is invalid.',
+                    [
+                        'default_name' => $defaultName,
+                        'default_value' => $configuredValue,
+                        'transaction_id' => $specialSavingTransactionId,
+                    ]
+                );
+
+                throw new RuntimeException(
+                    "Ledger default [{$defaultName}] does not contain "
+                    . 'a valid sub-account ID.'
+                );
+            }
+
+            $resolvedAccounts[$key] = (int) $configuredValue;
+        }
+
+        if (
+            $resolvedAccounts['expense']
+            === $resolvedAccounts['accrued_payable']
+        ) {
+            throw new RuntimeException(
+                'The interest expense account and accrued-interest payable '
+                . 'account cannot be the same sub-account.'
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | 3. Validate the sub-accounts and their classifications
+        |--------------------------------------------------------------------------
+        */
+        $accounts = DB::table('sacco_sub_account as sub')
+            ->join(
+                'sacco_main_account as main',
+                'main.main_account_id',
+                '=',
+                'sub.sub_account_main_account'
+            )
+            ->whereIn('sub.sub_account_id', [
+                $resolvedAccounts['expense'],
+                $resolvedAccounts['accrued_payable'],
+            ])
+            ->whereRaw(
+                "UPPER(COALESCE(sub.sub_account_deleted, 'N')) <> 'Y'"
+            )
+            ->whereRaw(
+                "UPPER(COALESCE(main.main_account_deleted, 'N')) <> 'Y'"
+            )
+            ->lockForUpdate()
+            ->select([
+                'sub.sub_account_id',
+                'sub.sub_account_name',
+                'sub.sub_account_code',
+                'sub.sub_account_main_account',
+                'main.main_account_id',
+                'main.main_account_code',
+                'main.main_account_name',
+            ])
+            ->get()
+            ->keyBy('sub_account_id');
+
+        $expenseAccount = $accounts->get(
+            $resolvedAccounts['expense']
+        );
+
+        $payableAccount = $accounts->get(
+            $resolvedAccounts['accrued_payable']
+        );
+
+        if (!$expenseAccount) {
+            throw new RuntimeException(
+                'The configured special-savings interest expense '
+                . 'sub-account does not exist or is deleted.'
+            );
+        }
+
+        if (!$payableAccount) {
+            throw new RuntimeException(
+                'The configured special-savings accrued-interest payable '
+                . 'sub-account does not exist or is deleted.'
+            );
+        }
+
+        if (
+            !preg_match(
+                '/^E\d{3}$/',
+                strtoupper(trim((string) $expenseAccount->main_account_code))
+            )
+        ) {
+            throw new RuntimeException(
+                'The configured interest expense account is not under '
+                . 'a correctly classified E### expense main account.'
+            );
+        }
+
+        if (
+            !preg_match(
+                '/^L\d{3}$/',
+                strtoupper(trim((string) $payableAccount->main_account_code))
+            )
+        ) {
+            throw new RuntimeException(
+                'The configured accrued-interest payable account is not under '
+                . 'a correctly classified L### liability main account.'
+            );
+        }
+
+        if (
+            !preg_match(
+                '/^\d{3}$/',
+                trim((string) $expenseAccount->sub_account_code)
+            )
+        ) {
+            throw new RuntimeException(
+                'The interest expense sub-account code must contain '
+                . 'exactly three numeric digits.'
+            );
+        }
+
+        if (
+            !preg_match(
+                '/^\d{3}$/',
+                trim((string) $payableAccount->sub_account_code)
+            )
+        ) {
+            throw new RuntimeException(
+                'The accrued-interest payable sub-account code must contain '
+                . 'exactly three numeric digits.'
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | 4. Prevent duplicate General Ledger posting
+        |--------------------------------------------------------------------------
+        */
+        $existingLedgerRows = DB::table('sacco_accounts_trans')
+            ->where('accounts_trans_doc_no', $documentNumber)
+            ->where('accounts_trans_source', self::SYSTEM_SOURCE)
+            ->lockForUpdate()
+            ->get();
+
+        $ledgerReference = 'SSI-GL-' . $specialSavingTransactionId;
+
+        if ($existingLedgerRows->isNotEmpty()) {
+            $expenseDebit = round(
+                (float) $existingLedgerRows
+                    ->where(
+                        'accounts_trans_sub_account',
+                        $resolvedAccounts['expense']
+                    )
+                    ->sum('accounts_trans_debit'),
+                2
+            );
+
+            $payableCredit = round(
+                (float) $existingLedgerRows
+                    ->where(
+                        'accounts_trans_sub_account',
+                        $resolvedAccounts['accrued_payable']
+                    )
+                    ->sum('accounts_trans_credit'),
+                2
+            );
+
+            $totalDebit = round(
+                (float) $existingLedgerRows->sum('accounts_trans_debit'),
+                2
+            );
+
+            $totalCredit = round(
+                (float) $existingLedgerRows->sum('accounts_trans_credit'),
+                2
+            );
+
+            $isCorrectExistingLedger =
+                $existingLedgerRows->count() === 2
+                && abs($expenseDebit - $interestAmount) < 0.005
+                && abs($payableCredit - $interestAmount) < 0.005
+                && abs($totalDebit - $totalCredit) < 0.005;
+
+            if (!$isCorrectExistingLedger) {
+                throw new RuntimeException(
+                    "A conflicting or incomplete General Ledger entry already "
+                    . "exists for document [{$documentNumber}]."
+                );
+            }
+
+            DB::table('sacco_special_saving_transactions')
+                ->where(
+                    'special_saving_transaction_id',
+                    $specialSavingTransactionId
+                )
+                ->update([
+                    'special_saving_transaction_sub_account_id' =>
+                        $resolvedAccounts['accrued_payable'],
+
+                    'special_saving_transaction_ledger_posted' => 'Y',
+
+                    'special_saving_transaction_ledger_ref' =>
+                        $ledgerReference,
+                ]);
+
+            return $ledgerReference;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | 5. Build the balanced journal
+        |--------------------------------------------------------------------------
+        */
+        $ledgerRows = [
+            [
+                'accounts_trans_sub_account' =>
+                    $resolvedAccounts['expense'],
+
+                'accounts_trans_period' => $period,
+
+                'accounts_trans_debit' => $interestAmount,
+                'accounts_trans_credit' => 0,
+
+                'accounts_trans_doc_no' => $documentNumber,
+
+                'accounts_trans_decription' =>
+                    $description
+                    . ' | Debit: '
+                    . $expenseAccount->sub_account_name,
+
+                'accounts_trans_dat_date' => $postingDate,
+
+                'accounts_trans_user_id' => null,
+                'accounts_trans_ip' => self::SYSTEM_IP,
+
+                'accounts_trans_source' => self::SYSTEM_SOURCE,
+                'accounts_trans_app_name' => 'iSacco',
+            ],
+
+            [
+                'accounts_trans_sub_account' =>
+                    $resolvedAccounts['accrued_payable'],
+
+                'accounts_trans_period' => $period,
+
+                'accounts_trans_debit' => 0,
+                'accounts_trans_credit' => $interestAmount,
+
+                'accounts_trans_doc_no' => $documentNumber,
+
+                'accounts_trans_decription' =>
+                    $description
+                    . ' | Credit: '
+                    . $payableAccount->sub_account_name,
+
+                'accounts_trans_dat_date' => $postingDate,
+
+                'accounts_trans_user_id' => null,
+                'accounts_trans_ip' => self::SYSTEM_IP,
+
+                'accounts_trans_source' => self::SYSTEM_SOURCE,
+                'accounts_trans_app_name' => 'iSacco',
+            ],
+        ];
+
+        $totalDebit = round(
+            array_sum(array_column($ledgerRows, 'accounts_trans_debit')),
+            2
+        );
+
+        $totalCredit = round(
+            array_sum(array_column($ledgerRows, 'accounts_trans_credit')),
+            2
+        );
+
+        if (abs($totalDebit - $totalCredit) >= 0.005) {
+            throw new RuntimeException(
+                'Special-savings interest ledger is not balanced. '
+                . 'Debit: ' . number_format($totalDebit, 2)
+                . ', Credit: ' . number_format($totalCredit, 2) . '.'
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | 6. Insert detailed General Ledger entries
+        |--------------------------------------------------------------------------
+        */
+        DB::table('sacco_accounts_trans')->insert($ledgerRows);
+
+        /*
+        |--------------------------------------------------------------------------
+        | 7. Update sub-account cached totals
+        |--------------------------------------------------------------------------
+        */
+        $expenseUpdated = DB::table('sacco_sub_account')
+            ->where(
+                'sub_account_id',
+                $resolvedAccounts['expense']
+            )
+            ->increment(
+                'sub_account_debit',
+                $interestAmount
+            );
+
+        $payableUpdated = DB::table('sacco_sub_account')
+            ->where(
+                'sub_account_id',
+                $resolvedAccounts['accrued_payable']
+            )
+            ->increment(
+                'sub_account_credit',
+                $interestAmount
+            );
+
+        if ($expenseUpdated !== 1 || $payableUpdated !== 1) {
+            throw new RuntimeException(
+                'Failed to update the special-savings sub-account totals.'
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | 8. Update main-account cached totals
+        |--------------------------------------------------------------------------
+        */
+        $expenseMainUpdated = DB::table('sacco_main_account')
+            ->where(
+                'main_account_id',
+                $expenseAccount->main_account_id
+            )
+            ->increment(
+                'main_account_debit',
+                $interestAmount
+            );
+
+        $payableMainUpdated = DB::table('sacco_main_account')
+            ->where(
+                'main_account_id',
+                $payableAccount->main_account_id
+            )
+            ->increment(
+                'main_account_credit',
+                $interestAmount
+            );
+
+        if (
+            $expenseMainUpdated !== 1
+            || $payableMainUpdated !== 1
+        ) {
+            throw new RuntimeException(
+                'Failed to update the special-savings main-account totals.'
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | 9. Mark the subsidiary transaction as posted
+        |--------------------------------------------------------------------------
+        */
+        $transactionUpdated =
+            DB::table('sacco_special_saving_transactions')
+                ->where(
+                    'special_saving_transaction_id',
+                    $specialSavingTransactionId
+                )
+                ->update([
+                    'special_saving_transaction_sub_account_id' =>
+                        $resolvedAccounts['accrued_payable'],
+
+                    'special_saving_transaction_ledger_posted' => 'Y',
+
+                    'special_saving_transaction_ledger_ref' =>
+                        $ledgerReference,
+                ]);
+
+        if ($transactionUpdated !== 1) {
+            throw new RuntimeException(
+                'The General Ledger was created, but the special-savings '
+                . 'transaction could not be marked as ledger-posted.'
+            );
+        }
+
+        Log::info(
+            'Special-savings interest posted to the General Ledger.',
+            [
+                'special_saving_transaction_id' =>
+                    $specialSavingTransactionId,
+
+                'member_id' =>
+                    $transaction->special_saving_transaction_member_id,
+
+                'document_number' => $documentNumber,
+                'ledger_reference' => $ledgerReference,
+
+                'interest_amount' => $interestAmount,
+
+                'expense_sub_account_id' =>
+                    $resolvedAccounts['expense'],
+
+                'accrued_payable_sub_account_id' =>
+                    $resolvedAccounts['accrued_payable'],
+
+                'period' => $period,
+                'posting_date' => $postingDate,
+            ]
+        );
+
+        return $ledgerReference;
+    }, 3);
 }
+    }

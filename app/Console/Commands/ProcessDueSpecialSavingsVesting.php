@@ -1287,4 +1287,643 @@ class ProcessDueSpecialSavingsVesting extends Command
             nextVestingDate: null
         );
     }
+
+    /**
+ * Post one completed special-savings interest vesting transaction
+ * to the General Ledger.
+ *
+ * Accounting entry:
+ *   Dr Special Savings Accrued Interest Payable
+ *   Cr Special Savings Available Interest Payable
+ *
+ * @throws RuntimeException
+ */
+private function postSpecialSavingsVestingToLedger(
+    int $specialSavingTransactionId
+): string {
+    return DB::transaction(function () use ($specialSavingTransactionId): string {
+        /*
+        |--------------------------------------------------------------------------
+        | 1. Lock and validate the subsidiary transaction
+        |--------------------------------------------------------------------------
+        */
+        $transaction = DB::table('sacco_special_saving_transactions')
+            ->where(
+                'special_saving_transaction_id',
+                $specialSavingTransactionId
+            )
+            ->lockForUpdate()
+            ->first();
+
+        if (!$transaction) {
+            throw new RuntimeException(
+                "Special-savings transaction {$specialSavingTransactionId} "
+                . 'was not found.'
+            );
+        }
+
+        if (
+            strtoupper(trim(
+                (string) $transaction->special_saving_transaction_type
+            )) !== 'INTEREST_VESTING'
+        ) {
+            throw new RuntimeException(
+                "Special-savings transaction {$specialSavingTransactionId} "
+                . 'is not an interest vesting transaction.'
+            );
+        }
+
+        if (
+            strtoupper(trim(
+                (string) $transaction->special_saving_transaction_deleted
+            )) === 'Y'
+            ||
+            strtoupper(trim(
+                (string) $transaction->special_saving_transaction_reversed
+            )) === 'Y'
+        ) {
+            throw new RuntimeException(
+                "Special-savings transaction {$specialSavingTransactionId} "
+                . 'is deleted or reversed and cannot be posted.'
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Already posted
+        |--------------------------------------------------------------------------
+        */
+        if (
+            strtoupper(trim(
+                (string) $transaction
+                    ->special_saving_transaction_ledger_posted
+            )) === 'Y'
+        ) {
+            return (string) (
+                $transaction->special_saving_transaction_ledger_ref
+                ?? $transaction->special_saving_transaction_doc_no
+            );
+        }
+
+        $vestingAmount = round(
+            (float) $transaction
+                ->special_saving_transaction_interest_amount,
+            2
+        );
+
+        if ($vestingAmount <= 0) {
+            throw new RuntimeException(
+                "Special-savings transaction {$specialSavingTransactionId} "
+                . 'has an invalid vesting amount.'
+            );
+        }
+
+        $documentNumber = trim(
+            (string) $transaction
+                ->special_saving_transaction_doc_no
+        );
+
+        if ($documentNumber === '') {
+            throw new RuntimeException(
+                "Special-savings transaction {$specialSavingTransactionId} "
+                . 'does not have a document number.'
+            );
+        }
+
+        $period = trim(
+            (string) $transaction
+                ->special_saving_transaction_period
+        );
+
+        if (!preg_match('/^\d{6}$/', $period)) {
+            throw new RuntimeException(
+                "Special-savings transaction {$specialSavingTransactionId} "
+                . "has an invalid accounting period [{$period}]."
+            );
+        }
+
+        $postingDate =
+            $transaction->special_saving_transaction_date;
+
+        if (empty($postingDate)) {
+            throw new RuntimeException(
+                "Special-savings transaction {$specialSavingTransactionId} "
+                . 'does not have a posting date.'
+            );
+        }
+
+        $description = trim(
+            (string) $transaction
+                ->special_saving_transaction_description
+        );
+
+        if ($description === '') {
+            $description =
+                'Automatic special-savings interest vesting.';
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | 2. Resolve the two required ledger defaults
+        |--------------------------------------------------------------------------
+        */
+        $requiredDefaults = [
+            'accrued_payable' =>
+                'special_savings_ledger_accrued_interest_payable_account',
+
+            'available_payable' =>
+                'special_savings_ledger_available_interest_payable_account',
+        ];
+
+        $resolvedAccounts = [];
+
+        foreach ($requiredDefaults as $key => $defaultName) {
+            $defaultRows = DB::table('sacco_defaults')
+                ->where('default_name', $defaultName)
+                ->lockForUpdate()
+                ->get();
+
+            if ($defaultRows->count() !== 1) {
+                Log::error(
+                    'Required special-savings vesting ledger default is missing or duplicated.',
+                    [
+                        'default_name' => $defaultName,
+                        'rows_found' => $defaultRows->count(),
+                        'special_saving_transaction_id' =>
+                            $specialSavingTransactionId,
+                    ]
+                );
+
+                throw new RuntimeException(
+                    "Required ledger default [{$defaultName}] is missing "
+                    . 'or duplicated. No vesting ledger entry was posted.'
+                );
+            }
+
+            $configuredValue = trim(
+                (string) $defaultRows->first()->default_value
+            );
+
+            if (
+                $configuredValue === ''
+                || !ctype_digit($configuredValue)
+                || (int) $configuredValue <= 0
+            ) {
+                Log::error(
+                    'Required special-savings vesting ledger default is invalid.',
+                    [
+                        'default_name' => $defaultName,
+                        'default_value' => $configuredValue,
+                        'special_saving_transaction_id' =>
+                            $specialSavingTransactionId,
+                    ]
+                );
+
+                throw new RuntimeException(
+                    "Ledger default [{$defaultName}] does not contain "
+                    . 'a valid sub-account ID.'
+                );
+            }
+
+            $resolvedAccounts[$key] =
+                (int) $configuredValue;
+        }
+
+        if (
+            $resolvedAccounts['accrued_payable']
+            === $resolvedAccounts['available_payable']
+        ) {
+            throw new RuntimeException(
+                'The accrued-interest payable account and available-interest '
+                . 'payable account cannot be the same sub-account.'
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | 3. Validate both liability sub-accounts
+        |--------------------------------------------------------------------------
+        */
+        $accounts = DB::table('sacco_sub_account as sub')
+            ->join(
+                'sacco_main_account as main',
+                'main.main_account_id',
+                '=',
+                'sub.sub_account_main_account'
+            )
+            ->whereIn('sub.sub_account_id', [
+                $resolvedAccounts['accrued_payable'],
+                $resolvedAccounts['available_payable'],
+            ])
+            ->whereRaw(
+                "UPPER(COALESCE(sub.sub_account_deleted, 'N')) <> 'Y'"
+            )
+            ->whereRaw(
+                "UPPER(COALESCE(main.main_account_deleted, 'N')) <> 'Y'"
+            )
+            ->lockForUpdate()
+            ->select([
+                'sub.sub_account_id',
+                'sub.sub_account_name',
+                'sub.sub_account_code',
+                'sub.sub_account_main_account',
+
+                'main.main_account_id',
+                'main.main_account_code',
+                'main.main_account_name',
+            ])
+            ->get()
+            ->keyBy('sub_account_id');
+
+        $accruedPayableAccount = $accounts->get(
+            $resolvedAccounts['accrued_payable']
+        );
+
+        $availablePayableAccount = $accounts->get(
+            $resolvedAccounts['available_payable']
+        );
+
+        if (!$accruedPayableAccount) {
+            throw new RuntimeException(
+                'The configured accrued-interest payable sub-account '
+                . 'does not exist or is deleted.'
+            );
+        }
+
+        if (!$availablePayableAccount) {
+            throw new RuntimeException(
+                'The configured available-interest payable sub-account '
+                . 'does not exist or is deleted.'
+            );
+        }
+
+        foreach (
+            [
+                'accrued payable' => $accruedPayableAccount,
+                'available payable' => $availablePayableAccount,
+            ] as $label => $account
+        ) {
+            $mainCode = strtoupper(trim(
+                (string) $account->main_account_code
+            ));
+
+            if (!preg_match('/^L\d{3}$/', $mainCode)) {
+                throw new RuntimeException(
+                    "The configured {$label} account is not under "
+                    . 'a correctly classified L### liability main account.'
+                );
+            }
+
+            $subCode = trim(
+                (string) $account->sub_account_code
+            );
+
+            if (!preg_match('/^\d{3}$/', $subCode)) {
+                throw new RuntimeException(
+                    "The configured {$label} sub-account code must "
+                    . 'contain exactly three numeric digits.'
+                );
+            }
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | 4. Prevent duplicate ledger posting
+        |--------------------------------------------------------------------------
+        */
+        $existingLedgerRows = DB::table('sacco_accounts_trans')
+            ->where(
+                'accounts_trans_doc_no',
+                $documentNumber
+            )
+            ->where(
+                'accounts_trans_source',
+                self::SYSTEM_SOURCE
+            )
+            ->lockForUpdate()
+            ->get();
+
+        $ledgerReference =
+            'SSV-GL-' . $specialSavingTransactionId;
+
+        if ($existingLedgerRows->isNotEmpty()) {
+            $accruedDebit = round(
+                (float) $existingLedgerRows
+                    ->where(
+                        'accounts_trans_sub_account',
+                        $resolvedAccounts['accrued_payable']
+                    )
+                    ->sum('accounts_trans_debit'),
+                2
+            );
+
+            $availableCredit = round(
+                (float) $existingLedgerRows
+                    ->where(
+                        'accounts_trans_sub_account',
+                        $resolvedAccounts['available_payable']
+                    )
+                    ->sum('accounts_trans_credit'),
+                2
+            );
+
+            $totalDebit = round(
+                (float) $existingLedgerRows
+                    ->sum('accounts_trans_debit'),
+                2
+            );
+
+            $totalCredit = round(
+                (float) $existingLedgerRows
+                    ->sum('accounts_trans_credit'),
+                2
+            );
+
+            $isCorrectExistingLedger =
+                $existingLedgerRows->count() === 2
+                && abs($accruedDebit - $vestingAmount) < 0.005
+                && abs($availableCredit - $vestingAmount) < 0.005
+                && abs($totalDebit - $totalCredit) < 0.005;
+
+            if (!$isCorrectExistingLedger) {
+                throw new RuntimeException(
+                    'A conflicting or incomplete General Ledger entry '
+                    . "already exists for document [{$documentNumber}]."
+                );
+            }
+
+            DB::table('sacco_special_saving_transactions')
+                ->where(
+                    'special_saving_transaction_id',
+                    $specialSavingTransactionId
+                )
+                ->update([
+                    'special_saving_transaction_sub_account_id' =>
+                        $resolvedAccounts['available_payable'],
+
+                    'special_saving_transaction_ledger_posted' =>
+                        'Y',
+
+                    'special_saving_transaction_ledger_ref' =>
+                        $ledgerReference,
+                ]);
+
+            return $ledgerReference;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | 5. Create the balanced General Ledger journal
+        |--------------------------------------------------------------------------
+        */
+        $ledgerRows = [
+            /*
+             * Debit accrued interest payable.
+             *
+             * This reduces the accrued-interest liability.
+             */
+            [
+                'accounts_trans_sub_account' =>
+                    $resolvedAccounts['accrued_payable'],
+
+                'accounts_trans_period' => $period,
+
+                'accounts_trans_debit' => $vestingAmount,
+                'accounts_trans_credit' => 0,
+
+                'accounts_trans_doc_no' =>
+                    $documentNumber,
+
+                'accounts_trans_decription' =>
+                    $description
+                    . ' | Debit: '
+                    . $accruedPayableAccount->sub_account_name,
+
+                'accounts_trans_dat_date' =>
+                    $postingDate,
+
+                'accounts_trans_user_id' => null,
+
+                'accounts_trans_member_id' =>
+                    $transaction
+                        ->special_saving_transaction_member_id,
+
+                'accounts_trans_ip' => self::SYSTEM_IP,
+                'accounts_trans_source' => self::SYSTEM_SOURCE,
+                'accounts_trans_app_name' => 'iSacco',
+            ],
+
+            /*
+             * Credit available interest payable.
+             *
+             * This creates the member-withdrawable interest liability.
+             */
+            [
+                'accounts_trans_sub_account' =>
+                    $resolvedAccounts['available_payable'],
+
+                'accounts_trans_period' => $period,
+
+                'accounts_trans_debit' => 0,
+                'accounts_trans_credit' => $vestingAmount,
+
+                'accounts_trans_doc_no' =>
+                    $documentNumber,
+
+                'accounts_trans_decription' =>
+                    $description
+                    . ' | Credit: '
+                    . $availablePayableAccount->sub_account_name,
+
+                'accounts_trans_dat_date' =>
+                    $postingDate,
+
+                'accounts_trans_user_id' => null,
+
+                'accounts_trans_member_id' =>
+                    $transaction
+                        ->special_saving_transaction_member_id,
+
+                'accounts_trans_ip' => self::SYSTEM_IP,
+                'accounts_trans_source' => self::SYSTEM_SOURCE,
+                'accounts_trans_app_name' => 'iSacco',
+            ],
+        ];
+
+        $totalDebit = round(
+            array_sum(
+                array_column(
+                    $ledgerRows,
+                    'accounts_trans_debit'
+                )
+            ),
+            2
+        );
+
+        $totalCredit = round(
+            array_sum(
+                array_column(
+                    $ledgerRows,
+                    'accounts_trans_credit'
+                )
+            ),
+            2
+        );
+
+        if (abs($totalDebit - $totalCredit) >= 0.005) {
+            throw new RuntimeException(
+                'Special-savings vesting ledger is not balanced. '
+                . 'Debit: '
+                . number_format($totalDebit, 2)
+                . ', Credit: '
+                . number_format($totalCredit, 2)
+                . '.'
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | 6. Insert the authoritative General Ledger rows
+        |--------------------------------------------------------------------------
+        */
+        DB::table('sacco_accounts_trans')
+            ->insert($ledgerRows);
+
+        /*
+        |--------------------------------------------------------------------------
+        | 7. Update the sub-account cached totals
+        |--------------------------------------------------------------------------
+        */
+        $accruedUpdated = DB::table('sacco_sub_account')
+            ->where(
+                'sub_account_id',
+                $resolvedAccounts['accrued_payable']
+            )
+            ->increment(
+                'sub_account_debit',
+                $vestingAmount
+            );
+
+        $availableUpdated = DB::table('sacco_sub_account')
+            ->where(
+                'sub_account_id',
+                $resolvedAccounts['available_payable']
+            )
+            ->increment(
+                'sub_account_credit',
+                $vestingAmount
+            );
+
+        if (
+            $accruedUpdated !== 1
+            || $availableUpdated !== 1
+        ) {
+            throw new RuntimeException(
+                'Failed to update the special-savings vesting '
+                . 'sub-account totals.'
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | 8. Update main-account cached totals
+        |--------------------------------------------------------------------------
+        */
+        $accruedMainUpdated = DB::table('sacco_main_account')
+            ->where(
+                'main_account_id',
+                $accruedPayableAccount->main_account_id
+            )
+            ->increment(
+                'main_account_debit',
+                $vestingAmount
+            );
+
+        $availableMainUpdated = DB::table('sacco_main_account')
+            ->where(
+                'main_account_id',
+                $availablePayableAccount->main_account_id
+            )
+            ->increment(
+                'main_account_credit',
+                $vestingAmount
+            );
+
+        if (
+            $accruedMainUpdated !== 1
+            || $availableMainUpdated !== 1
+        ) {
+            throw new RuntimeException(
+                'Failed to update the special-savings vesting '
+                . 'main-account totals.'
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | 9. Mark the subsidiary transaction as ledger-posted
+        |--------------------------------------------------------------------------
+        */
+        $transactionUpdated =
+            DB::table('sacco_special_saving_transactions')
+                ->where(
+                    'special_saving_transaction_id',
+                    $specialSavingTransactionId
+                )
+                ->update([
+                    /*
+                     * Link vesting to the resulting available-interest
+                     * liability account.
+                     */
+                    'special_saving_transaction_sub_account_id' =>
+                        $resolvedAccounts['available_payable'],
+
+                    'special_saving_transaction_ledger_posted' =>
+                        'Y',
+
+                    'special_saving_transaction_ledger_ref' =>
+                        $ledgerReference,
+                ]);
+
+        if ($transactionUpdated !== 1) {
+            throw new RuntimeException(
+                'The vesting ledger was created, but the '
+                . 'special-savings transaction could not be marked '
+                . 'as ledger-posted.'
+            );
+        }
+
+        Log::info(
+            'Special-savings interest vesting posted to the General Ledger.',
+            [
+                'special_saving_transaction_id' =>
+                    $specialSavingTransactionId,
+
+                'member_id' =>
+                    $transaction
+                        ->special_saving_transaction_member_id,
+
+                'document_number' =>
+                    $documentNumber,
+
+                'ledger_reference' =>
+                    $ledgerReference,
+
+                'vesting_amount' =>
+                    $vestingAmount,
+
+                'accrued_payable_sub_account_id' =>
+                    $resolvedAccounts['accrued_payable'],
+
+                'available_payable_sub_account_id' =>
+                    $resolvedAccounts['available_payable'],
+
+                'period' => $period,
+                'posting_date' => $postingDate,
+            ]
+        );
+
+        return $ledgerReference;
+    }, 3);
+}
 }
