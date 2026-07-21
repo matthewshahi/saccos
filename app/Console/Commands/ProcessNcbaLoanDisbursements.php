@@ -352,6 +352,7 @@ class ProcessNcbaLoanDisbursements extends Command
                         'request_payload' => $this->encodeJson(
                             $payload
                         ),
+                        
 
                         'response_payload' => $this->encodeJson([
                             'message' =>

@@ -565,6 +565,10 @@ class ProcessDueSpecialSavingsVesting extends Command
                 'special_saving_transaction_deleted' => 'N',
             ]);
 
+            $this->postSpecialSavingsVestingToLedger(
+    (int) $transactionId
+);
+
             Log::info('Special-savings interest vested automatically.', [
                 'transaction_id' => $transactionId,
                 'account_id' => $accountId,
