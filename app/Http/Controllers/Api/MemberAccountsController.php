@@ -277,16 +277,34 @@ class MemberAccountsController extends Controller
 
     private function buildSpecialSavings(int $memberId): array
     {
-        $transactionCountSubQuery = DB::table('sacco_special_saving_transactions')
-            ->selectRaw('\n                special_saving_transaction_account_id,\n                COUNT(*) AS transaction_count\n            ')
-            ->where('special_saving_transaction_member_id', $memberId)
-            ->where('special_saving_transaction_deleted', 'N')
-            ->where(function ($query) {
-                $query->where('special_saving_transaction_reversed', 'N')
-                    ->orWhereNull('special_saving_transaction_reversed');
-            })
-            ->groupBy('special_saving_transaction_account_id');
-
+        $transactionCountSubQuery = DB::table(
+    'sacco_special_saving_transactions'
+)
+    ->selectRaw(
+        'special_saving_transaction_account_id, ' .
+        'COUNT(*) AS transaction_count'
+    )
+    ->where(
+        'special_saving_transaction_member_id',
+        $memberId
+    )
+    ->where(
+        'special_saving_transaction_deleted',
+        'N'
+    )
+    ->where(function ($query) {
+        $query
+            ->where(
+                'special_saving_transaction_reversed',
+                'N'
+            )
+            ->orWhereNull(
+                'special_saving_transaction_reversed'
+            );
+    })
+    ->groupBy(
+        'special_saving_transaction_account_id'
+    );
         $accountRows = DB::table('sacco_special_saving_accounts as a')
             ->leftJoin(
                 'sacco_special_saving_products as p',
