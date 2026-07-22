@@ -676,8 +676,11 @@ class LoanApplicationController extends Controller
         $legacyRequest->headers->set('Accept', 'application/json');
         $legacyRequest->headers->set('X-Requested-With', 'XMLHttpRequest');
 
-        $legacyResponse = app(\App\Http\Controllers\HomeController::class)
-            ->submitLoanApplication($legacyRequest);
+        // $legacyResponse = app(\App\Http\Controllers\HomeController::class)
+        //     ->submitLoanApplication($legacyRequest);
+
+        $legacyResponse = app(\App\Http\Controllers\LoanApplicationSelfServiceController::class)
+    ->submitLoanApplication($legacyRequest);
 
         // Normalize legacy response (expected to be JSON)
         if ($legacyResponse instanceof \Illuminate\Http\JsonResponse) {
