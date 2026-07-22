@@ -299,7 +299,7 @@ Route::middleware(['auth.api'])
         Route::post(
             '/apply',
             [LoanApplicationController::class, 'apply']
-        );
+        )->middleware('throttle:5,1');
     });
 
 

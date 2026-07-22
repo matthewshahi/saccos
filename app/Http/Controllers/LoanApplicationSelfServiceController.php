@@ -182,10 +182,10 @@ class LoanApplicationSelfServiceController extends Controller
                 ->where('batch_trans_deleted', '<>', 'Y')
                 ->select(
                     'sacco_loan_batch_trans_members.*',
-'sacco_loan_types.loan_type_id as loan_type_id',
-'sacco_loan_types.loan_type_name',
-'sacco_loan_types.loan_type_max_amount as loan_type_max_amount',
-'sacco_loan_types.loan_type_acount',
+                    'sacco_loan_types.loan_type_id as loan_type_id',
+                    'sacco_loan_types.loan_type_name',
+                    'sacco_loan_types.loan_type_max_amount as loan_type_max_amount',
+                    'sacco_loan_types.loan_type_acount',
                     'sacco_loan_types.loan_type_guaranteable_percent',
                     'sacco_loan_types.loan_type_commission_effect',
                     'sacco_loan_types.loan_type_insurance_effect',
@@ -206,18 +206,18 @@ class LoanApplicationSelfServiceController extends Controller
 | edited the application.
 |--------------------------------------------------------------------------
 */
-$memberLimitValidation = app(MemberLoanLimitService::class)
-    ->validateRequestedAmount(
-        (int) $loan->batch_trans_member_id,
-        $loan,
-        (float) $loan->batch_trans_loan_amount
-    );
+            $memberLimitValidation = app(MemberLoanLimitService::class)
+                ->validateRequestedAmount(
+                    (int) $loan->batch_trans_member_id,
+                    $loan,
+                    (float) $loan->batch_trans_loan_amount
+                );
 
-if (!$memberLimitValidation['is_valid']) {
-    throw new \Exception(
-        $memberLimitValidation['message']
-    );
-}
+            if (!$memberLimitValidation['is_valid']) {
+                throw new \Exception(
+                    $memberLimitValidation['message']
+                );
+            }
 
             $default_bank_account = $this->getDefaultAccount('default_bank_account');
             $default_insurance_account = $this->getDefaultAccount('default_insurance_account');
@@ -643,8 +643,20 @@ if (!$memberLimitValidation['is_valid']) {
             $principal = Auth::user();
         }
 
-        $trustedMemberId = isset($principal->member_id) ? (int) $principal->member_id : null;
-        $actorUserId = Auth::id();
+        $trustedMemberId = isset($principal->member_id)
+            ? (int) $principal->member_id
+            : null;
+
+        /*
+|--------------------------------------------------------------------------
+| Resolve the authoritative audit actor
+|--------------------------------------------------------------------------
+| Web requests use the standard authenticated guard.
+| Mobile API requests use the member resolved by auth.api.
+|--------------------------------------------------------------------------
+*/
+        $actorUserId = Auth::id()
+            ?? $trustedMemberId;
 
         if (!$trustedMemberId) {
             return $respondError('Unauthenticated.', 401);
@@ -779,7 +791,7 @@ if (!$memberLimitValidation['is_valid']) {
                 $topUpLoan
             );
             $nmsg .= $this->validateMemberEligibility($member, $loanType);
-          
+
 
 
             if (!empty($nmsg)) {
@@ -901,7 +913,10 @@ if (!$memberLimitValidation['is_valid']) {
                 'message' => $e->getMessage(),
             ]);
 
-            return $respondError('Failed to submit loan application. ' . $e->getMessage(), 500);
+            return $respondError(
+                'Failed to submit the loan application. Please try again or contact support.',
+                500
+            );
         }
     }
 
@@ -1034,7 +1049,8 @@ if (!$memberLimitValidation['is_valid']) {
         }
 
         $trustedMemberId = isset($principal->member_id) ? (int) $principal->member_id : null;
-        $actorUserId = Auth::id();
+        $actorUserId = Auth::id()
+            ?? $trustedMemberId;
 
         if (!$trustedMemberId) {
             return $respondError('Unauthenticated.', 401);
@@ -1408,7 +1424,10 @@ if (!$memberLimitValidation['is_valid']) {
                 'message' => $e->getMessage(),
             ]);
 
-            return $respondError('Failed to update loan application. ' . $e->getMessage(), 500);
+            return $respondError(
+                'Failed to update the loan application. Please try again or contact support.',
+                500
+            );
         }
     }
 
@@ -1546,7 +1565,8 @@ if (!$memberLimitValidation['is_valid']) {
         }
 
         $trustedMemberId = isset($principal->member_id) ? (int) $principal->member_id : null;
-        $actorUserId = Auth::id();
+        $actorUserId = Auth::id()
+            ?? $trustedMemberId;
 
         if (!$trustedMemberId) {
             return $respondError('Unauthenticated.', 401);
@@ -1607,7 +1627,10 @@ if (!$memberLimitValidation['is_valid']) {
                 'message' => $e->getMessage(),
             ]);
 
-            return $respondError('Failed to delete guarantor. ' . $e->getMessage(), 500);
+           return $respondError(
+    'Failed to delete the guarantor. Please try again or contact support.',
+    500
+);
         }
     }
 
@@ -1658,7 +1681,8 @@ if (!$memberLimitValidation['is_valid']) {
         }
 
         $trustedMemberId = isset($principal->member_id) ? (int) $principal->member_id : null;
-        $actorUserId = Auth::id();
+        $actorUserId = Auth::id()
+            ?? $trustedMemberId;
 
         if (!$trustedMemberId) {
             return $respondError('Unauthenticated.', 401);
@@ -2036,7 +2060,10 @@ if (!$memberLimitValidation['is_valid']) {
                 'message' => $e->getMessage(),
             ]);
 
-            return $respondError('Failed to process loan application. ' . $e->getMessage(), 500);
+            return $respondError(
+    'Failed to process the loan application. Please try again or contact support.',
+    500
+);
         }
     }
     private function validateAndProcessGuarantors($data, $loanType, $batchTransId, $loanAmount, bool $saveGuarantors = true)
@@ -2045,6 +2072,36 @@ if (!$memberLimitValidation['is_valid']) {
         $desiredGuarantors = [];
         $totalGuaranteed = 0.00;
         $seenGuarantorIds = [];
+
+
+        $borrowerMemberId = (int) (
+            $data['batch_trans_member_id'] ?? 0
+        );
+
+        $requestPrincipal = request()->user();
+
+        $actorUserId = Auth::id()
+            ?? (
+                isset($requestPrincipal->member_id)
+                ? (int) $requestPrincipal->member_id
+                : null
+            )
+            ?? (
+                $borrowerMemberId > 0
+                ? $borrowerMemberId
+                : null
+            );
+
+        if (!$actorUserId) {
+            return [
+                'success' => false,
+                'message' => 'Unauthenticated.',
+                'guarantors' => [],
+                'total_guaranteed' => 0.00,
+                'required_guarantee' => 0.00,
+            ];
+        }
+
 
         $maximumNoOfGuarantors = (int) (
             DB::table('sacco_defaults')
@@ -2062,7 +2119,7 @@ if (!$memberLimitValidation['is_valid']) {
                     'default_name' => $defaultName,
                     'default_value' => 1,
                     'default_transdate' => now(),
-                    'default_userid' => auth()->id(),
+                    'default_userid' => $actorUserId,
                     'default_ip' => request()->ip(),
                 ]);
             }
@@ -2080,7 +2137,7 @@ if (!$memberLimitValidation['is_valid']) {
             ->value('default_value') ?? 1
         );
 
-        $borrowerMemberId = (int) ($data['batch_trans_member_id'] ?? 0);
+        
 
         /*
     |--------------------------------------------------------------------------
@@ -2389,7 +2446,7 @@ if (!$memberLimitValidation['is_valid']) {
                 ->whereRaw("COALESCE(guarantors_deleted, 'N') <> 'Y'")
                 ->update([
                     'guarantors_deleted' => 'Y',
-                    'guarantors_deleted_by' => auth()->id(),
+                    'guarantors_deleted_by' => $actorUserId,
                     'guarantors_deleted_on' => now(),
                     'guarantors_deleted_ip' => request()->ip(),
                 ]);
@@ -2403,7 +2460,7 @@ if (!$memberLimitValidation['is_valid']) {
                     'guarantors_transfered' => null,
                     'guarantors_approved' => 'N',
                     'guarantors_email_sent' => 'N',
-                    'guarantors_by' => auth()->id(),
+                    'guarantors_by' => $actorUserId,
                     'guarantors_on' => now(),
                     'guarantors_ip' => request()->ip(),
                     'guarantors_deleted' => 'N',
@@ -2450,19 +2507,42 @@ if (!$memberLimitValidation['is_valid']) {
     }
 
     private function validateMemberEligibility($member, $loanType)
-    {
-        if (!$member) {
-            return "Error: Member not found in the database.";
-        }
-
-        $membershipDurationRequired = $loanType->loan_type_qualification_period;
-
-        if (strtotime($member->member_date_joined) > strtotime("-{$membershipDurationRequired} months")) {
-            return "Error: Member must be {$membershipDurationRequired} months old in the SACCO to take this loan.";
-        }
-
-        return null; // No errors
+{
+    if (!$member) {
+        return 'Error: Member not found in the database.';
     }
+
+    $rawInstant = $loanType->loan_type_instant_qualification ?? 0;
+
+    $isInstant =
+        (is_numeric($rawInstant) && (int) $rawInstant === 1)
+        || in_array(
+            strtoupper(trim((string) $rawInstant)),
+            ['Y', 'YES', 'TRUE'],
+            true
+        );
+
+    if ($isInstant) {
+        return null;
+    }
+
+    $membershipDurationRequired = max(
+        0,
+        (int) ($loanType->loan_type_qualification_period ?? 0)
+    );
+
+    if (
+        $membershipDurationRequired > 0
+        && !empty($member->member_date_joined)
+        && strtotime($member->member_date_joined)
+            > strtotime("-{$membershipDurationRequired} months")
+    ) {
+        return "Error: Member must be {$membershipDurationRequired} "
+            . 'months old in the SACCO to take this loan.';
+    }
+
+    return null;
+}
 
 
 

@@ -443,7 +443,7 @@ class LoanApplicationController extends Controller
             'loan_category_id'  => 'nullable|integer',
             'amount'            => 'required|numeric|min:1',
             'duration_months'   => 'required|integer|min:1',
-            'reason'            => 'nullable|string|max:255',
+            'reason' => 'required|string|max:50',
 
             'topup_loan_id'     => 'nullable|integer',
             'payroll_number'    => 'nullable|string|max:50',
@@ -472,8 +472,16 @@ class LoanApplicationController extends Controller
         // Validate + normalize guarantors BEFORE throttling/saving
         // ------------------------------------------------------------
         $loanType = DB::table('sacco_loan_types')
-            ->select('loan_type_id', 'loan_type_guaranteable_percent')
-            ->where('loan_type_id', (int) $validated['loan_type_id'])
+            ->select(
+                'loan_type_id',
+                'loan_type_guaranteable_percent'
+            )
+            ->where(
+                'loan_type_id',
+                (int) $validated['loan_type_id']
+            )
+            ->where('loan_type_deleted', 'N')
+            ->where('loan_type_active', 1)
             ->first();
 
         if (!$loanType) {
@@ -671,16 +679,39 @@ class LoanApplicationController extends Controller
             $legacyBase['guarantors_amount_guaranteed'] = $legacyGuarantorAmounts;
         }
 
-        $legacyRequest = Request::create('/api/legacy/submit-loan', 'POST', $legacyBase);
-        $legacyRequest->setUserResolver(fn() => $request->user());
-        $legacyRequest->headers->set('Accept', 'application/json');
-        $legacyRequest->headers->set('X-Requested-With', 'XMLHttpRequest');
+        $legacyRequest = Request::create(
+            '/api/legacy/submit-loan',
+            'POST',
+            $legacyBase
+        );
+
+        $legacyRequest->setUserResolver(
+            fn() => $request->user()
+        );
+
+        $legacyRequest->server->set(
+            'REMOTE_ADDR',
+            $request->ip()
+        );
+
+        $legacyRequest->headers->set(
+            'Accept',
+            'application/json'
+        );
+
+        $legacyRequest->headers->set(
+            'X-Requested-With',
+            'XMLHttpRequest'
+        );
+        // $legacyRequest->setUserResolver(fn() => $request->user());
+        // $legacyRequest->headers->set('Accept', 'application/json');
+        // $legacyRequest->headers->set('X-Requested-With', 'XMLHttpRequest');
 
         // $legacyResponse = app(\App\Http\Controllers\HomeController::class)
         //     ->submitLoanApplication($legacyRequest);
 
         $legacyResponse = app(\App\Http\Controllers\LoanApplicationSelfServiceController::class)
-    ->submitLoanApplication($legacyRequest);
+            ->submitLoanApplication($legacyRequest);
 
         // Normalize legacy response (expected to be JSON)
         if ($legacyResponse instanceof \Illuminate\Http\JsonResponse) {
@@ -706,6 +737,24 @@ class LoanApplicationController extends Controller
             }
 
             // If legacy FAILED, do NOT save into sacco_mobile_app_loan_applications
+            if ($status >= 500) {
+                Log::error(
+                    'Mobile loan application failed in shared controller',
+                    [
+                        'member_id' => $memberId,
+                        'status' => $status,
+                        'response' => $data,
+                    ]
+                );
+
+                return response()->json([
+                    'success' => false,
+                    'message' =>
+                    'The loan application could not be submitted. '
+                        . 'Please try again or contact support.',
+                ], 500);
+            }
+
             if ($status < 200 || $status >= 300) {
                 return response()->json($data, $status);
             }
