@@ -11,7 +11,7 @@ use App\Http\Controllers\Api\MpesaApiTheController;
 use App\Http\Controllers\Api\PublicRegistrationApiController;
 use App\Http\Controllers\Api\GuaranteeRequestController;
 use App\Http\Controllers\Api\MpesaB2cCallbackController;
-
+use App\Http\Controllers\Api\MemberAccountsController;
 
 // Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 //     return $request->user();
@@ -143,19 +143,23 @@ Route::middleware(['auth.api'])->group(function () {
         [MemberDashboardController::class, 'index']
     );
 
-    // Share Savings
+    Route::get(
+        '/auth/accounts',
+        [MemberAccountsController::class, 'index']
+    )
+        ->middleware('throttle:60,1');
+
+    // Old endpoints retained temporarily for existing Flutter screens.
     Route::get(
         '/auth/savings',
         [MemberDashboardController::class, 'savings']
     );
 
-    // FOSA Savings
     Route::get(
         '/auth/fosa',
         [MemberDashboardController::class, 'fosaSavings']
     );
 
-    // Loans
     Route::get(
         '/auth/loans',
         [MemberDashboardController::class, 'loans']
@@ -166,7 +170,6 @@ Route::middleware(['auth.api'])->group(function () {
         [MemberDashboardController::class, 'profile']
     );
 });
-
 
 /*
 |--------------------------------------------------------------------------
