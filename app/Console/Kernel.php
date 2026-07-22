@@ -67,7 +67,7 @@ class Kernel extends ConsoleKernel
         | Picks a maximum of 10 eligible approved loans created within the last
         | 24 hours and creates disbursement records for provider processing.
         |--------------------------------------------------------------------------
-        */
+         
 
         $schedule->command(
             'loans:queue-disbursements --limit=10'
@@ -86,7 +86,7 @@ class Kernel extends ConsoleKernel
         | The --live option permits submission to the configured NCBA endpoint.
         | In the current environment, this should point to the NCBA UAT endpoint.
         |--------------------------------------------------------------------------
-        */
+         
 
         $schedule->command(
             'ncba:process-loan-disbursements --live --limit=1'
@@ -103,7 +103,7 @@ class Kernel extends ConsoleKernel
         |--------------------------------------------------------------------------
         | Checks the bank status of disbursements already submitted to NCBA.
         |--------------------------------------------------------------------------
-        */
+        
 
         $schedule->command(
             'ncba:confirm-loan-disbursements --limit=10'
