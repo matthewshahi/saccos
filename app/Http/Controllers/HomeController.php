@@ -936,7 +936,7 @@ class HomeController extends Controller
             )
                 ? $request->input('member_guardian_id')
                 : null,
-
+            'member_mobile_banking_active' => 'N',
             'member_active' => 'Y',
             'member_deleted' => 'N',
             'member_ip' => $request->ip(),
