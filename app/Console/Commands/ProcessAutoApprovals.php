@@ -46,6 +46,21 @@ class ProcessAutoApprovals extends Command
             return self::FAILURE;
         }
 
+        if (
+            !Schema::hasColumn(
+                'sacco_members',
+                'member_mobile_banking_active'
+            )
+        ) {
+            $this->error(
+                'The sacco_members.member_mobile_banking_active column does not exist. '
+                    . 'Run the mobile banking eligibility migration first.'
+            );
+
+            return self::FAILURE;
+        }
+
+
         $limit = max(
             1,
             min(
@@ -238,16 +253,27 @@ class ProcessAutoApprovals extends Command
         $autoApprovalCutoff
     ) {
         /*
-        |--------------------------------------------------------------------------
-        | Candidate scan pool
-        |--------------------------------------------------------------------------
-        | Scan beyond the approval limit so one invalid application does not
-        | permanently prevent later eligible applications from being considered.
-        | Top-up applications are deliberately excluded and remain pending for
-        | manual approval.
-        |--------------------------------------------------------------------------
-        */
-        $scanLimit = max(100, min(1000, $approvalLimit * 10));
+    |--------------------------------------------------------------------------
+    | Candidate scan pool
+    |--------------------------------------------------------------------------
+    | Scan beyond the approval limit so one invalid application does not
+    | permanently prevent later eligible applications from being considered.
+    |
+    | Only active, non-deleted members explicitly enabled for mobile banking
+    | are considered for automatic approval.
+    |
+    | Top-up applications are deliberately excluded and remain pending for
+    | manual approval.
+    |--------------------------------------------------------------------------
+    */
+
+        $scanLimit = max(
+            100,
+            min(
+                1000,
+                $approvalLimit * 10
+            )
+        );
 
         $query = DB::table(
             'sacco_loan_batch_trans_members as trans'
@@ -258,10 +284,50 @@ class ProcessAutoApprovals extends Command
                 '=',
                 'loan_types.loan_type_id'
             )
+            ->join(
+                'sacco_members as members',
+                'trans.batch_trans_member_id',
+                '=',
+                'members.member_id'
+            )
+
+            /*
+        |--------------------------------------------------------------------------
+        | Loan-product eligibility
+        |--------------------------------------------------------------------------
+        */
+
             ->where(
                 'loan_types.loan_type_auto_approval',
                 1
             )
+            ->whereRaw(
+                "COALESCE(loan_types.loan_type_deleted, 'N') <> 'Y'"
+            )
+
+            /*
+        |--------------------------------------------------------------------------
+        | Member eligibility
+        |--------------------------------------------------------------------------
+        */
+
+            ->where(
+                'members.member_active',
+                'Y'
+            )
+            ->whereRaw(
+                "COALESCE(members.member_deleted, 'N') <> 'Y'"
+            )
+            ->whereRaw(
+                "COALESCE(members.member_mobile_banking_active, 'N') = 'Y'"
+            )
+
+            /*
+        |--------------------------------------------------------------------------
+        | Pending application eligibility
+        |--------------------------------------------------------------------------
+        */
+
             ->whereRaw(
                 "COALESCE(trans.batch_trans_updated, 'N') = 'N'"
             )
@@ -269,17 +335,22 @@ class ProcessAutoApprovals extends Command
                 "COALESCE(trans.batch_trans_deleted, 'N') <> 'Y'"
             )
             ->whereRaw(
-                "COALESCE(loan_types.loan_type_deleted, 'N') <> 'Y'"
-            )
-            ->whereRaw(
                 'COALESCE(trans.batch_trans_loan_to_top_up, 0) = 0'
             )
-            ->whereNotNull('trans.batch_trans_on')
+            ->whereNotNull(
+                'trans.batch_trans_on'
+            )
             ->where(
                 'trans.batch_trans_on',
                 '>=',
                 $autoApprovalCutoff
             );
+
+        /*
+    |--------------------------------------------------------------------------
+    | Optional loan-product active column
+    |--------------------------------------------------------------------------
+    */
 
         if (
             Schema::hasColumn(
@@ -294,10 +365,20 @@ class ProcessAutoApprovals extends Command
         }
 
         return $query
-            ->orderBy('trans.batch_trans_on', 'asc')
-            ->orderBy('trans.batch_trans_id', 'asc')
-            ->limit($scanLimit)
-            ->pluck('trans.batch_trans_id');
+            ->orderBy(
+                'trans.batch_trans_on',
+                'asc'
+            )
+            ->orderBy(
+                'trans.batch_trans_id',
+                'asc'
+            )
+            ->limit(
+                $scanLimit
+            )
+            ->pluck(
+                'trans.batch_trans_id'
+            );
     }
 
     /**
@@ -406,6 +487,7 @@ class ProcessAutoApprovals extends Command
                         'members.member_name',
                         'members.member_sacco_id',
                         'members.member_active',
+                        'members.member_mobile_banking_active',
                         'members.member_deleted',
                         'members.member_date_joined',
                         'members.member_total_share',
@@ -1142,6 +1224,23 @@ class ProcessAutoApprovals extends Command
         }
 
         if (
+            strtoupper(
+                trim(
+                    (string) (
+                        $loan->member_mobile_banking_active
+                        ?? 'N'
+                    )
+                )
+            ) !== 'Y'
+        ) {
+            throw new RuntimeException(
+                'Member is not enabled for mobile banking automatic loan approval.'
+            );
+        }
+
+
+
+        if (
             strtoupper(trim((string) ($loan->member_deleted ?? 'N'))) === 'Y'
         ) {
             throw new RuntimeException('Member has been deleted.');
@@ -1283,20 +1382,20 @@ class ProcessAutoApprovals extends Command
 
         $currentOutstanding = (float) (
             DB::table('sacco_loans')
-                ->where(
-                    'loan_member',
-                    $loan->batch_trans_member_id
-                )
-                ->selectRaw(
-                    'COALESCE(SUM('
-                        . 'GREATEST('
-                        . 'COALESCE(loan_amount, 0) '
-                        . '- COALESCE(loan_loan_paid, 0), '
-                        . '0'
-                        . ')'
-                        . '), 0) as outstanding'
-                )
-                ->value('outstanding') ?? 0
+            ->where(
+                'loan_member',
+                $loan->batch_trans_member_id
+            )
+            ->selectRaw(
+                'COALESCE(SUM('
+                    . 'GREATEST('
+                    . 'COALESCE(loan_amount, 0) '
+                    . '- COALESCE(loan_loan_paid, 0), '
+                    . '0'
+                    . ')'
+                    . '), 0) as outstanding'
+            )
+            ->value('outstanding') ?? 0
         );
 
         $availableQualification = round(
