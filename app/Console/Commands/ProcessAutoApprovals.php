@@ -520,33 +520,7 @@ class ProcessAutoApprovals extends Command
                     ];
                 }
 
-                /*
-                |--------------------------------------------------------------------------
-                | Prevent duplicate approved loans
-                |--------------------------------------------------------------------------
-                */
-
-                if (
-                    Schema::hasColumn(
-                        'sacco_loans',
-                        'loan_batch_trans_id'
-                    )
-                ) {
-                    $existingLoanId = DB::table('sacco_loans')
-                        ->where(
-                            'loan_batch_trans_id',
-                            $applicationId
-                        )
-                        ->value('loan_id');
-
-                    if ($existingLoanId) {
-                        throw new RuntimeException(
-                            'Application has already created loan ID '
-                                . $existingLoanId
-                                . '.'
-                        );
-                    }
-                }
+                
 
                 /*
                 |--------------------------------------------------------------------------
@@ -838,10 +812,10 @@ class ProcessAutoApprovals extends Command
                 */
 
                 $batchNumber =
-                    'Self Applied Loan-'
-                    . $loan->batch_trans_id
-                    . '-'
-                    . $loan->member_name;
+    'Self Applied Loan-'
+    . $loan->batch_trans_id
+    . '-'
+    . $loan->member_name;
 
                 $loanInsert = [
                     'loan_member' =>
