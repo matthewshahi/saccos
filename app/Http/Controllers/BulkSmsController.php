@@ -1406,6 +1406,394 @@ protected function memberFirstName(
             ->with('error', 'ADTEL token test exception: ' . $e->getMessage());
     }
 }
+/**
+ * Show the Custom Bulk SMS form.
+ *
+ * The form must submit:
+ *
+ * phone_numbers - comma-separated phone numbers
+ * subject       - optional internal subject
+ * message       - the common SMS message
+ */
+public function customSend()
+{
+    $readiness = $this->config->readiness();
 
+    return view(
+        'bulk_sms.custom_send',
+        compact('readiness')
+    );
+}
+
+/**
+ * Validate and queue a Custom Bulk SMS batch.
+ *
+ * Important rules:
+ *
+ * - Phone numbers must be separated by commas only.
+ * - Spaces inside an individual phone number are allowed.
+ * - Every phone number must be valid.
+ * - Duplicate numbers are rejected.
+ * - If any number is invalid, empty or duplicated, the entire batch is rejected.
+ * - Every valid number creates its own independent outbox record.
+ * - No provider request is made from the web request.
+ * - The existing scheduled dispatch command sends the queued records.
+ */
+public function queueCustomMessages(Request $request)
+{
+    $validated = $request->validate([
+        'phone_numbers' => [
+            'required',
+            'string',
+            'max:50000',
+        ],
+
+        'subject' => [
+            'nullable',
+            'string',
+            'max:180',
+        ],
+
+        'message' => [
+            'required',
+            'string',
+            'max:1000',
+        ],
+    ], [
+        'phone_numbers.required' =>
+            'Please enter at least one phone number.',
+
+        'phone_numbers.max' =>
+            'The phone-number list is too large.',
+
+        'subject.max' =>
+            'The subject may not exceed 180 characters.',
+
+        'message.required' =>
+            'Please enter the SMS message.',
+
+        'message.max' =>
+            'The SMS message may not exceed 1,000 characters.',
+    ]);
+
+    /*
+     * Do not create records that cannot be dispatched by the scheduled
+     * outbox command.
+     */
+    if (!$this->config->isEnabled()) {
+        return back()
+            ->withInput()
+            ->with(
+                'error',
+                'Bulk SMS is disabled. No messages were queued.'
+            );
+    }
+
+    if ($this->config->isDemoMode()) {
+        return back()
+            ->withInput()
+            ->with(
+                'error',
+                'Bulk SMS demo mode is enabled. Disable demo mode before queueing this batch.'
+            );
+    }
+
+    $readiness = $this->config->readiness();
+
+    if (!($readiness['ready_to_send'] ?? false)) {
+        $issues = $readiness['issues']
+            ?? ['Bulk SMS is not ready to send.'];
+
+        return back()
+            ->withInput()
+            ->with(
+                'error',
+                implode(' ', $issues)
+            );
+    }
+
+    $message = trim(
+        (string) $validated['message']
+    );
+
+    if ($message === '') {
+        return back()
+            ->withInput()
+            ->with(
+                'error',
+                'Please enter a valid SMS message.'
+            );
+    }
+
+    /*
+     * Validate the complete phone-number list before inserting anything.
+     */
+    $phoneResult = $this->parseCustomSmsPhoneNumbers(
+        (string) $validated['phone_numbers']
+    );
+
+    if (!empty($phoneResult['errors'])) {
+        return back()
+            ->withInput()
+            ->with(
+                'error',
+                'The entire batch was rejected. '
+                    . implode(' ', $phoneResult['errors'])
+            );
+    }
+
+    $recipients = $phoneResult['recipients'];
+
+    if (empty($recipients)) {
+        return back()
+            ->withInput()
+            ->with(
+                'error',
+                'No valid phone numbers were provided.'
+            );
+    }
+
+    $subject = trim(
+        (string) ($validated['subject'] ?? '')
+    );
+
+    if ($subject === '') {
+        $subject = 'Custom Bulk SMS';
+    }
+
+    /*
+     * One reference groups all independent SMS records in this submission.
+     */
+    $batchReference = 'CUSTOM-'
+        . now()->format('YmdHis')
+        . '-'
+        . strtoupper(Str::random(8));
+
+    $recipientCount = count($recipients);
+    $queuedCount = 0;
+
+    try {
+        /*
+         * Atomic queueing:
+         *
+         * If even one record fails to become queued, every insert from
+         * this batch is rolled back.
+         */
+        DB::transaction(function () use (
+            $recipients,
+            $recipientCount,
+            $subject,
+            $message,
+            $batchReference,
+            $request,
+            &$queuedCount
+        ) {
+            foreach ($recipients as $index => $recipient) {
+                $sequence = $index + 1;
+
+                $requestReference = $batchReference
+                    . '-'
+                    . str_pad(
+                        (string) $sequence,
+                        4,
+                        '0',
+                        STR_PAD_LEFT
+                    );
+
+                $result = $this->outbox->queue([
+                    /*
+                     * Use the already-normalized number so the outbox receives
+                     * a clean dispatch-ready Kenyan mobile number.
+                     */
+                    'phone' => $recipient['normalized'],
+
+                    'recipient_name' => 'Custom Recipient',
+
+                    'subject' => $subject,
+
+                    'message' => $message,
+
+                    'request_reference' => $requestReference,
+
+                    'meta' => [
+                        'source' => 'bulk_sms_custom_send',
+                        'batch_reference' => $batchReference,
+                        'batch_sequence' => $sequence,
+                        'batch_recipient_count' => $recipientCount,
+                        'original_phone' => $recipient['raw'],
+                        'validated_phone' => $recipient['normalized'],
+                        'queued_by_user_id' => auth()->id(),
+                        'queued_from_ip' => $request->ip(),
+                    ],
+                ]);
+
+                $status = strtolower(
+                    trim(
+                        (string) ($result['status'] ?? '')
+                    )
+                );
+
+                /*
+                 * The scheduled command selects only sms_status = queued.
+                 *
+                 * Therefore, anything other than queued causes the complete
+                 * database transaction to roll back.
+                 */
+                if ($status !== 'queued') {
+                    throw new \RuntimeException(
+                        sprintf(
+                            'SMS item %d could not be queued. Returned status: %s.',
+                            $sequence,
+                            $status !== '' ? $status : 'unknown'
+                        )
+                    );
+                }
+
+                $queuedCount++;
+            }
+        });
+    } catch (\Throwable $exception) {
+        report($exception);
+
+        return back()
+            ->withInput()
+            ->with(
+                'error',
+                'The complete Custom SMS batch could not be queued. '
+                    . 'No messages from this submission were saved.'
+            );
+    }
+
+    return redirect()
+        ->route('bulk_sms.messages', [
+            'search' => $batchReference,
+        ])
+        ->with(
+            'success',
+            sprintf(
+                'Custom SMS batch %s was queued successfully. '
+                    . '%d independent SMS messages are ready for automatic dispatch.',
+                $batchReference,
+                $queuedCount
+            )
+        );
+}
+
+/**
+ * Parse and validate comma-separated Custom SMS phone numbers.
+ *
+ * Only commas separate recipients.
+ *
+ * Valid examples:
+ *
+ * 0722400737,0712345678
+ * 254 722 400737, +254 712 345678
+ *
+ * Invalid examples:
+ *
+ * 0722400737 0712345678
+ * 0722400737;0712345678
+ * 0722400737,
+ *
+ * The returned recipients are not inserted until every item is valid.
+ */
+protected function parseCustomSmsPhoneNumbers(
+    string $phoneNumbers
+): array {
+    /*
+     * Comma is intentionally the only recipient separator.
+     */
+    $entries = explode(
+        ',',
+        $phoneNumbers
+    );
+
+    /*
+     * Protect the web request against accidentally pasted extremely
+     * large lists. Adjust this number later if required.
+     */
+    if (count($entries) > 1000) {
+        return [
+            'recipients' => [],
+            'errors' => [
+                'A maximum of 1,000 phone numbers may be submitted in one batch.',
+            ],
+        ];
+    }
+
+    $recipients = [];
+    $errors = [];
+    $seenNumbers = [];
+
+    foreach ($entries as $index => $entry) {
+        $position = $index + 1;
+
+        /*
+         * trim() removes whitespace around the number but preserves
+         * internal spaces such as 254 722 400737.
+         */
+        $rawPhone = trim(
+            (string) $entry
+        );
+
+        /*
+         * Reject trailing commas, consecutive commas and empty items.
+         */
+        if ($rawPhone === '') {
+            $errors[] = sprintf(
+                'Phone-number item %d is empty.',
+                $position
+            );
+
+            continue;
+        }
+
+        $normalizedPhone = $this->outbox
+            ->normalizeKenyanPhone($rawPhone);
+
+        if ($normalizedPhone === null) {
+            $errors[] = sprintf(
+                'Phone-number item %d, "%s", has an invalid or unsupported format.',
+                $position,
+                $rawPhone
+            );
+
+            continue;
+        }
+
+        /*
+         * Reject the entire submission when the same normalized number
+         * appears more than once.
+         *
+         * For example:
+         *
+         * 0722400737
+         * 254722400737
+         *
+         * are treated as the same recipient.
+         */
+        if (isset($seenNumbers[$normalizedPhone])) {
+            $errors[] = sprintf(
+                'Phone-number item %d duplicates item %d after normalization.',
+                $position,
+                $seenNumbers[$normalizedPhone]
+            );
+
+            continue;
+        }
+
+        $seenNumbers[$normalizedPhone] = $position;
+
+        $recipients[] = [
+            'raw' => $rawPhone,
+            'normalized' => $normalizedPhone,
+        ];
+    }
+
+    return [
+        'recipients' => $recipients,
+        'errors' => $errors,
+    ];
+}
 
 }

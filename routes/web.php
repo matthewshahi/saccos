@@ -916,6 +916,32 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
 
 
             /*
+|--------------------------------------------------------------------------
+| Custom Bulk SMS
+|--------------------------------------------------------------------------
+| Allows an authorised user to paste comma-separated phone numbers and
+| queue the same message for every validated recipient.
+|
+| Validation will be all-or-nothing:
+| if any supplied number cannot be normalised, no messages are queued.
+|--------------------------------------------------------------------------
+*/
+
+            Route::get(
+                '/custom-send',
+                [BulkSmsController::class, 'customSend']
+            )
+                ->name('custom_send')
+                ->middleware('check_user_rights:bulk_sms_send');
+
+            Route::post(
+                '/custom-send/queue',
+                [BulkSmsController::class, 'queueCustomMessages']
+            )
+                ->name('custom_send.queue')
+                ->middleware('check_user_rights:bulk_sms_send');
+
+            /*
         |--------------------------------------------------------------------------
         | Reports
         |--------------------------------------------------------------------------

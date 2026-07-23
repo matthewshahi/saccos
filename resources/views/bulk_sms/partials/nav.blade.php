@@ -1,3 +1,4 @@
+```blade
 {{-- resources/views/bulk_sms/partials/nav.blade.php --}}
 
 @php
@@ -22,6 +23,12 @@
             'route' => 'bulk_sms.compose',
             'icon' => 'i-Mail-Send',
             'active' => request()->routeIs('bulk_sms.compose*'),
+        ],
+        [
+            'label' => 'Custom Send',
+            'route' => 'bulk_sms.custom_send',
+            'icon' => 'i-Phone-SMS',
+            'active' => request()->routeIs('bulk_sms.custom_send*'),
         ],
         [
             'label' => 'Settings',
@@ -257,3 +264,4 @@
         </button>
     </div>
 @endif
+```
