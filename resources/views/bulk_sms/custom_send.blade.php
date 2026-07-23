@@ -1,4 +1,3 @@
-```blade
 {{-- resources/views/bulk_sms/custom_send.blade.php --}}
 
 @extends('layouts.app')
