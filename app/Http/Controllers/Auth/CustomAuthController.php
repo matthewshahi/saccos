@@ -470,3 +470,4 @@ class CustomAuthController extends Controller
         ]);
     }
 }
+
