@@ -660,7 +660,7 @@ class LoanController extends Controller
         $members = DB::table('sacco_members')
             ->select('member_id', 'member_name', 'member_sacco_id')
             ->where('member_active', 'Y')
-            ->where('member_total_share', '>', 0)
+            // ->where('member_total_share', '>', 0)
             ->where('member_deleted', '<>', 'Y')
             ->where(function ($q) use ($query) {
                 $q->where('member_sacco_id', 'LIKE', $query . '%')
