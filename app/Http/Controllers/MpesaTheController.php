@@ -644,94 +644,319 @@ class MpesaTheController extends Controller
             ]);
     }
 
+    // public function registerUrls()
+    // {
+    //     try {
+    //         // Retrieve the shortcode configuration from the database
+    //         $config = DB::table('mpesa_configs')
+    //             ->where('api_type', 'c2b')
+    //             ->first();
+
+    //         if (!$config) {
+    //             throw new Exception('M-Pesa configuration for C2B not found.');
+    //         }
+
+    //         // Load dynamic configuration
+    //         $this->consumerKey = $config->consumer_key;
+    //         $this->consumerSecret = $config->consumer_secret;
+    //         $this->shortCode = $config->shortcode;
+    //         $this->callbackUrl = [
+    //             'ConfirmationURL' => $config->confirmation_url,
+    //             'ValidationURL' => $config->validation_url,
+    //         ];
+
+    //         $accessToken = $this->getAccessToken();
+
+    //         // Dynamic API URL based on environment
+    //         $queryUrl = $this->mpesaEnv() === 'live'
+    //             ? $this->mpesaBaseUrl() . '/mpesa/c2b/v2/queryurl'
+    //             : $this->mpesaBaseUrl() . '/mpesa/c2b/v1/queryurl';
+
+    //         // First, fetch the current registered URLs
+    //         $currentUrls = $this->getRegisteredUrls($accessToken);
+
+    //         // Check if URLs are already registered and match
+    //         if (
+    //             $currentUrls['ConfirmationURL'] === $config->confirmation_url &&
+    //             $currentUrls['ValidationURL'] === $config->validation_url
+    //         ) {
+    //             Log::info('URLs are already registered and up to date.');
+    //             return response()->json([
+    //                 'message' => 'URLs are already registered and up to date.',
+    //             ]);
+    //         }
+
+    //         // Register new URLs
+    //         $ch = curl_init($validationUrl);
+    //         curl_setopt($ch, CURLOPT_HTTPHEADER, [
+    //             'Authorization: Bearer ' . $accessToken,
+    //             'Content-Type: application/json',
+    //         ]);
+    //         curl_setopt($ch, CURLOPT_POST, 1);
+    //         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    //         curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
+    //             "ShortCode" => $this->shortCode,
+    //             "ResponseType" => $config->response_type,
+    //             "ConfirmationURL" => $this->callbackUrl['ConfirmationURL'],
+    //             "ValidationURL" => $this->callbackUrl['ValidationURL'],
+    //         ]));
+    //         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+
+    //         $response = curl_exec($ch);
+    //         if (curl_errno($ch)) {
+    //             throw new Exception('Curl error: ' . curl_error($ch));
+    //         }
+
+    //         curl_close($ch);
+
+    //         $responseBody = json_decode($response, true);
+
+    //         // Log and return response
+    //         Log::info('URL Registration Response:', [
+    //             'response' => $responseBody,
+    //             'config' => $config,
+    //         ]);
+
+    //         if (isset($responseBody['errorCode']) && $responseBody['errorCode'] === '500.003.1001') {
+    //             throw new Exception('URLs are already registered.');
+    //         }
+
+    //         return response()->json([
+    //             'message' => 'URLs registered successfully.',
+    //             'response' => $responseBody,
+    //         ]);
+    //     } catch (Exception $e) {
+    //         Log::error('Error registering URLs:', ['error' => $e->getMessage()]);
+    //         return response()->json([
+    //             'error' => $e->getMessage(),
+    //         ], 500);
+    //     }
+    // }
+
     public function registerUrls()
-    {
-        try {
-            // Retrieve the shortcode configuration from the database
-            $config = DB::table('mpesa_configs')
-                ->where('api_type', 'c2b')
-                ->first();
+{
+    try {
 
-            if (!$config) {
-                throw new Exception('M-Pesa configuration for C2B not found.');
-            }
+        /*
+        |--------------------------------------------------------------------------
+        | Load C2B Configuration
+        |--------------------------------------------------------------------------
+        */
 
-            // Load dynamic configuration
-            $this->consumerKey = $config->consumer_key;
-            $this->consumerSecret = $config->consumer_secret;
-            $this->shortCode = $config->shortcode;
-            $this->callbackUrl = [
-                'ConfirmationURL' => $config->confirmation_url,
-                'ValidationURL' => $config->validation_url,
-            ];
+        $config = DB::table('mpesa_configs')
+            ->where('api_type', 'c2b')
+            ->first();
 
-            $accessToken = $this->getAccessToken();
-
-            // Dynamic API URL based on environment
-            $queryUrl = $this->mpesaEnv() === 'live'
-                ? $this->mpesaBaseUrl() . '/mpesa/c2b/v2/queryurl'
-                : $this->mpesaBaseUrl() . '/mpesa/c2b/v1/queryurl';
-
-            // First, fetch the current registered URLs
-            $currentUrls = $this->getRegisteredUrls($accessToken);
-
-            // Check if URLs are already registered and match
-            if (
-                $currentUrls['ConfirmationURL'] === $config->confirmation_url &&
-                $currentUrls['ValidationURL'] === $config->validation_url
-            ) {
-                Log::info('URLs are already registered and up to date.');
-                return response()->json([
-                    'message' => 'URLs are already registered and up to date.',
-                ]);
-            }
-
-            // Register new URLs
-            $ch = curl_init($validationUrl);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, [
-                'Authorization: Bearer ' . $accessToken,
-                'Content-Type: application/json',
-            ]);
-            curl_setopt($ch, CURLOPT_POST, 1);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
-                "ShortCode" => $this->shortCode,
-                "ResponseType" => $config->response_type,
-                "ConfirmationURL" => $this->callbackUrl['ConfirmationURL'],
-                "ValidationURL" => $this->callbackUrl['ValidationURL'],
-            ]));
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-
-            $response = curl_exec($ch);
-            if (curl_errno($ch)) {
-                throw new Exception('Curl error: ' . curl_error($ch));
-            }
-
-            curl_close($ch);
-
-            $responseBody = json_decode($response, true);
-
-            // Log and return response
-            Log::info('URL Registration Response:', [
-                'response' => $responseBody,
-                'config' => $config,
-            ]);
-
-            if (isset($responseBody['errorCode']) && $responseBody['errorCode'] === '500.003.1001') {
-                throw new Exception('URLs are already registered.');
-            }
-
-            return response()->json([
-                'message' => 'URLs registered successfully.',
-                'response' => $responseBody,
-            ]);
-        } catch (Exception $e) {
-            Log::error('Error registering URLs:', ['error' => $e->getMessage()]);
-            return response()->json([
-                'error' => $e->getMessage(),
-            ], 500);
+        if (!$config) {
+            throw new Exception(
+                'M-Pesa configuration for C2B not found.'
+            );
         }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Load Credentials
+        |--------------------------------------------------------------------------
+        */
+
+        $this->consumerKey       = $config->consumer_key;
+        $this->consumerSecret    = $config->consumer_secret;
+        $this->shortCode         = $config->shortcode;
+        $this->accessToken       = $config->access_token ?? null;
+        $this->tokenExpiresAt    = $config->token_expires_at ?? null;
+
+        $confirmationUrl = $config->confirmation_url;
+        $validationUrl   = $config->validation_url;
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Validate Configuration
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            empty($this->consumerKey) ||
+            empty($this->consumerSecret) ||
+            empty($this->shortCode)
+        ) {
+            throw new Exception(
+                'M-Pesa C2B credentials are incomplete.'
+            );
+        }
+
+        if (empty($confirmationUrl) || empty($validationUrl)) {
+            throw new Exception(
+                'M-Pesa Confirmation URL or Validation URL is missing.'
+            );
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Get OAuth Access Token
+        |--------------------------------------------------------------------------
+        */
+
+        $accessToken = $this->getAccessToken();
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Registration Endpoint
+        |--------------------------------------------------------------------------
+        |
+        | Production:
+        | https://api.safaricom.co.ke/mpesa/c2b/v2/registerurl
+        |
+        | Sandbox:
+        | https://sandbox.safaricom.co.ke/mpesa/c2b/v1/registerurl
+        |
+        */
+
+        $registerUrl = $this->mpesaEnv() === 'live'
+            ? $this->mpesaBaseUrl() . '/mpesa/c2b/v2/registerurl'
+            : $this->mpesaBaseUrl() . '/mpesa/c2b/v1/registerurl';
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Registration Payload
+        |--------------------------------------------------------------------------
+        */
+
+        $payload = [
+            'ShortCode'       => (string) $this->shortCode,
+            'ResponseType'    => $config->response_type,
+            'ConfirmationURL' => $confirmationUrl,
+            'ValidationURL'   => $validationUrl,
+        ];
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Safe Logging
+        |--------------------------------------------------------------------------
+        |
+        | Do NOT log Consumer Secret or access token.
+        |
+        */
+
+        Log::info('Registering M-Pesa C2B URLs', [
+            'environment'      => $this->mpesaEnv(),
+            'endpoint'         => $registerUrl,
+            'shortcode'        => $this->shortCode,
+            'response_type'    => $config->response_type,
+            'confirmation_url' => $confirmationUrl,
+            'validation_url'   => $validationUrl,
+        ]);
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Send Request to Safaricom
+        |--------------------------------------------------------------------------
+        */
+
+        $response = Http::withToken($accessToken)
+            ->acceptJson()
+            ->asJson()
+            ->post($registerUrl, $payload);
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Log Safaricom Response
+        |--------------------------------------------------------------------------
+        */
+
+        Log::info('M-Pesa C2B URL Registration Response', [
+            'http_status' => $response->status(),
+            'response'    => $response->json(),
+        ]);
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Handle HTTP Failure
+        |--------------------------------------------------------------------------
+        */
+
+        if ($response->failed()) {
+
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Safaricom rejected the C2B URL registration request.',
+                'mpesa'   => $response->json(),
+            ], $response->status());
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Safaricom Response
+        |--------------------------------------------------------------------------
+        */
+
+        $responseBody = $response->json();
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Handle Daraja-Level Error
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            isset($responseBody['errorCode']) ||
+            isset($responseBody['errorMessage'])
+        ) {
+
+            return response()->json([
+                'status'  => 'error',
+                'message' => $responseBody['errorMessage']
+                    ?? 'M-Pesa URL registration failed.',
+                'mpesa'   => $responseBody,
+            ], 400);
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Success
+        |--------------------------------------------------------------------------
+        */
+
+        return response()->json([
+            'status' => 'success',
+
+            'message' =>
+                'M-Pesa C2B URLs registered successfully.',
+
+            'shortcode' => $this->shortCode,
+
+            'environment' => $this->mpesaEnv(),
+
+            'confirmation_url' => $confirmationUrl,
+
+            'validation_url' => $validationUrl,
+
+            'mpesa' => $responseBody,
+        ]);
+
+    } catch (\Throwable $e) {
+
+        Log::error('Error registering M-Pesa C2B URLs', [
+            'error' => $e->getMessage(),
+        ]);
+
+        return response()->json([
+            'status' => 'error',
+            'error'  => $e->getMessage(),
+        ], 500);
     }
+}
 
     /**
      * Fetch the currently registered URLs for the shortcode.
