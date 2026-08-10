@@ -632,31 +632,55 @@ class LoanApplicationController extends Controller
 
         $payloadHash = hash('sha256', json_encode($hashSource));
 
-        // 4) Duplicates / cooldown (only applies to SUCCESSFUL submissions we saved)
-        $existsExact = DB::table('sacco_mobile_app_loan_applications')
-            ->where('mobile_app_payload_hash', $payloadHash)
-            ->exists();
+    // -------------------------------------------------
+// 3. Block member if ANY loan application is pending
+// -------------------------------------------------
+// Pending means:
+//   batch_trans_updated = N
+//   AND batch_trans_deleted is not Y
+//
+// There is NO time limit on this rule.
+// A pending application from yesterday, last week, etc.
+// must be completed/rejected/deleted before another can be submitted.
+// -------------------------------------------------
 
-        if ($existsExact) {
-            return response()->json([
-                'success' => false,
-                'message' => 'A similar loan application has already been submitted. Please wait before trying again.'
-            ], 409);
-        }
+$hasPendingApplication = DB::table('sacco_loan_batch_trans_members')
+    ->where('batch_trans_member_id', $memberId)
+    ->whereRaw("COALESCE(batch_trans_updated, 'N') = 'N'")
+    ->whereRaw("COALESCE(batch_trans_deleted, 'N') <> 'Y'")
+    ->exists();
 
-        $recentCutoff = Carbon::now()->subMinutes(2);
+if ($hasPendingApplication) {
+    return response()->json([
+        'success' => false,
+        'code'    => 'PENDING_LOAN_APPLICATION',
+        'message' => 'You already have a loan application awaiting processing. Please wait for it to be approved or rejected before submitting another loan application.',
+    ], 409);
+}
 
-        $existsRecent = DB::table('sacco_mobile_app_loan_applications')
-            ->where('mobile_app_member_id', $memberId)
-            ->where('mobile_app_submitted_at', '>=', $recentCutoff)
-            ->exists();
 
-        if ($existsRecent) {
-            return response()->json([
-                'success' => false,
-                'message' => 'You recently submitted a loan application. Please wait about 2 minutes before trying again.'
-            ], 429);
-        }
+// -------------------------------------------------
+// 4. Member loan application cooldown - 10 minutes
+// -------------------------------------------------
+// Even after the previous application is approved/rejected/deleted,
+// a member cannot submit another application until 10 minutes
+// have passed since the previous submission.
+// -------------------------------------------------
+
+$tenMinutesAgo = Carbon::now()->subMinutes(10);
+
+$recentApplication = DB::table('sacco_loan_batch_trans_members')
+    ->where('batch_trans_member_id', $memberId)
+    ->where('batch_trans_on', '>=', $tenMinutesAgo)
+    ->exists();
+
+if ($recentApplication) {
+    return response()->json([
+        'success' => false,
+        'code'    => 'LOAN_APPLICATION_COOLDOWN',
+        'message' => 'You recently submitted a loan application. Please wait at least 10 minutes before submitting another loan application.',
+    ], 409);
+}
 
         // 5) Forward to legacy FIRST (do NOT save mobile_app table unless legacy succeeds)
         $legacyBase = [
