@@ -37,6 +37,7 @@ class LoansIssuedExport implements FromQuery, WithHeadings, WithMapping, ShouldA
             'Capital Contributions',
 
             // Loan
+            'Loan Type',
             'Loan ID',
             'Loan Amount',
             'Insurance',
@@ -61,15 +62,16 @@ class LoansIssuedExport implements FromQuery, WithHeadings, WithMapping, ShouldA
             $row->company_name ?? '',
 
             // Member balances
-            (float)($row->member_total_share ?? 0),
-            (float)($row->member_total_fosa ?? 0),
-            (float)($row->member_total_share_capital ?? 0),
+            (float) ($row->member_total_share ?? 0),
+            (float) ($row->member_total_fosa ?? 0),
+            (float) ($row->member_total_share_capital ?? 0),
 
             // Loan
+            $row->loan_type_name ?? '',
             $row->loan_id ?? '',
-            (float)($row->loan_amount ?? 0),
-            (float)($row->loan_insurance ?? 0),
-            (float)($row->loan_loan_paid ?? 0),
+            (float) ($row->loan_amount ?? 0),
+            (float) ($row->loan_insurance ?? 0),
+            (float) ($row->loan_loan_paid ?? 0),
             $row->loan_payment_period ?? '',
             $row->loan_taken_period ?? '',
             $row->loan_start_deduction_period ?? '',

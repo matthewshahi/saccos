@@ -9139,11 +9139,13 @@ class HomeController extends Controller
             ->join('sacco_members as m', 'l.loan_member', '=', 'm.member_id')
             ->leftJoin('sacco_department as d', 'm.member_dept', '=', 'd.department_id')
             ->leftJoin('sacco_company as c', 'd.department_company_id', '=', 'c.company_id')
+            ->leftJoin('sacco_loan_types as lt', 'l.loan_loan_type', '=', 'lt.loan_type_id')
             ->select(
                 'l.loan_id',
                 'l.loan_amount',
                 'l.loan_taken_period',
                 'l.loan_start_deduction_period',
+                'lt.loan_type_name',
                 'l.loan_on',
 
                 // extra fields
@@ -9248,9 +9250,10 @@ class HomeController extends Controller
 
         // IMPORTANT: build query WITHOUT ->get() or paginate()
         $query = DB::table('sacco_loans as l')
-            ->join('sacco_members as m', 'l.loan_member', '=', 'm.member_id')
-            ->leftJoin('sacco_department as d', 'm.member_dept', '=', 'd.department_id')
-            ->leftJoin('sacco_company as c', 'd.department_company_id', '=', 'c.company_id')
+    ->join('sacco_members as m', 'l.loan_member', '=', 'm.member_id')
+    ->leftJoin('sacco_department as d', 'm.member_dept', '=', 'd.department_id')
+    ->leftJoin('sacco_company as c', 'd.department_company_id', '=', 'c.company_id')
+    ->leftJoin('sacco_loan_types as lt', 'l.loan_loan_type', '=', 'lt.loan_type_id')
             ->select(
                 // Loan
                 'l.loan_id',
@@ -9264,6 +9267,7 @@ class HomeController extends Controller
                 'l.loan_description',
                 'l.loan_stoped',
                 'l.loan_on',
+                'lt.loan_type_name',
 
                 // Member
                 'm.member_name',

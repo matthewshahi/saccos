@@ -121,6 +121,8 @@
                                     <th scope="col" class="text-end">Capital Contributions</th>
 
                                     {{-- Loan --}}
+                                   
+                                    <th scope="col">Loan Type</th>
                                     <th scope="col" class="text-end">Loan Amount</th>
                                     <th scope="col" class="text-end">Insurance</th>
                                     <th scope="col" class="text-end">Loan Paid</th>
@@ -156,6 +158,7 @@
                                         <td class="text-end">{{ number_format((float)($loan->member_total_share_capital ?? 0), 2) }}</td>
 
                                         {{-- Loan --}}
+                                        <td>{{ $loan->loan_type_name ?? '' }}</td>
                                         <td class="text-end">{{ number_format((float)($loan->loan_amount ?? 0), 2) }}</td>
                                         <td class="text-end">{{ number_format((float)($loan->loan_insurance ?? 0), 2) }}</td>
                                         <td class="text-end">{{ number_format((float)($loan->loan_loan_paid ?? 0), 2) }}</td>
@@ -184,7 +187,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="18" class="text-center text-muted py-4">
+                                        <td colspan="19" class="text-center text-muted py-4">
                                             No loan records found for the selected filters.
                                         </td>
                                     </tr>
