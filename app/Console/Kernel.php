@@ -216,6 +216,24 @@ class Kernel extends ConsoleKernel
             ->onOneServer()
             ->timezone('Africa/Nairobi');
 
+            /*
+|--------------------------------------------------------------------------
+| Sync Missing User Rights Modules
+|--------------------------------------------------------------------------
+| Checks all registered Laravel routes for check_user_rights:* middleware
+| and creates any missing module records in sacco_modules.
+|
+| This only creates missing modules. It does NOT grant rights to users.
+|--------------------------------------------------------------------------
+*/
+
+$schedule->command('modules:sync-route-rights')
+    ->dailyAt('06:00')
+    ->withoutOverlapping(10)
+    ->onOneServer()
+    ->timezone('Africa/Nairobi');
+    
+
         /*
         |--------------------------------------------------------------------------
         | Special Savings Interest Accrual
