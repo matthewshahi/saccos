@@ -1374,29 +1374,51 @@
 </div>
 
 
-{{-- APPLICANT DECLARATION --}}
+{{-- APPLICANT DECLARATION & DIGITAL CONSENT --}}
 <div class="section avoid-break">
     <div class="section-title">
-        Section 7 - Applicant Declaration
+        Section 7 - Applicant Declaration & Digital Consent
     </div>
 
     <div class="declaration">
-        I declare that the information provided in this loan application
-        is true and complete to the best of my knowledge. I authorize the
-        SACCO to process this application in accordance with the applicable
-        loan product rules and, if approved, to recover the loan and related
-        lawful charges in accordance with the agreed repayment terms.
+        <p style="margin:0 0 8px 0;">
+            By submitting this loan application electronically, the applicant
+            confirmed that the information provided was true and complete to
+            the best of their knowledge and agreed to the applicable SACCO
+            loan terms, repayment obligations, deductions, charges, guarantees
+            and recovery conditions associated with the selected loan product.
+        </p>
 
-        <table class="signature-table">
+        <table class="summary-table">
             <tr>
-                <td>
-                    <div class="signature-line"></div>
-                    Applicant Signature
-                </td>
+                <th style="width:25%;">
+                    Consent Status
+                </th>
 
                 <td>
-                    <div class="signature-line"></div>
-                    Date
+                    <span class="status status-pass">
+                        ACCEPTED ELECTRONICALLY
+                    </span>
+                </td>
+            </tr>
+
+            <tr>
+                <th>
+                    Application Submitted
+                </th>
+
+                <td>
+                    {{ $dateTime($loan->loan_created_at) }}
+                </td>
+            </tr>
+
+            <tr>
+                <th>
+                    IP Address
+                </th>
+
+                <td>
+                    {{ $loan->batch_trans_ip ?: '-' }}
                 </td>
             </tr>
         </table>
