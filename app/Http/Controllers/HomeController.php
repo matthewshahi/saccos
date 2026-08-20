@@ -5534,11 +5534,26 @@ class HomeController extends Controller
 
         // Handle approval of guarantee
         if ($request->has('yid') && is_numeric($request->input('yid'))) {
-            DB::table('sacco_loan_batch_guarantors_members')
-                ->where('guarantors_loan_batch_trans_id', $request->input('yid'))
-                ->where('guarantors_guarantor_id', $logged_in_user)
-                ->update(['guarantors_approved' => 'Y']);
-        }
+    DB::table('sacco_loan_batch_guarantors_members')
+        ->where(
+            'guarantors_loan_batch_trans_id',
+            $request->input('yid')
+        )
+        ->where(
+            'guarantors_guarantor_id',
+            $logged_in_user
+        )
+        ->whereRaw(
+            "COALESCE(guarantors_deleted, 'N') <> 'Y'"
+        )
+        ->whereRaw(
+            "COALESCE(guarantors_approved, 'N') <> 'Y'"
+        )
+        ->update([
+            'guarantors_approved' => 'Y',
+            'guarantors_approved_on' => $transdate,
+        ]);
+}
 
         // Fetch loans pending guarantee approval
         $loans = DB::table('sacco_loan_category')
