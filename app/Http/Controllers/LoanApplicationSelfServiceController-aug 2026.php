@@ -14,158 +14,56 @@ class LoanApplicationSelfServiceController extends Controller
 {
     public function listLoansPendingApproval(Request $request)
     {
-        $pendingLoansOnly =
-            $request->has('pending')
-            && $request->input('pending') == '1'
-            ? 'Y'
-            : null;
+        $pendingLoansOnly = $request->has('pending') && $request->input('pending') == '1' ? 'Y' : null;
 
         $query = DB::table('sacco_loan_batch_trans_members AS trans')
-            ->join(
-                'sacco_members AS members',
-                'trans.batch_trans_member_id',
-                '=',
-                'members.member_id'
-            )
-            ->join(
-                'sacco_loan_types AS types',
-                'trans.batch_trans_loan_type',
-                '=',
-                'types.loan_type_id'
-            )
-            ->join(
-                'sacco_loan_category AS category',
-                'trans.batch_trans_loan_category',
-                '=',
-                'category.loan_category_id'
-            )
-            ->leftJoin(
-                'sacco_loan_batch_guarantors_members AS guarantors',
-                function ($join) {
-                    $join->on(
-                        'trans.batch_trans_id',
-                        '=',
-                        'guarantors.guarantors_loan_batch_trans_id'
-                    )
-                        ->where(
-                            'guarantors.guarantors_deleted',
-                            'N'
-                        );
-                }
-            )
-            ->leftJoin(
-                'sacco_members AS g_members',
-                'guarantors.guarantors_guarantor_id',
-                '=',
-                'g_members.member_id'
-            )
+            ->join('sacco_members AS members', 'trans.batch_trans_member_id', '=', 'members.member_id')
+            ->join('sacco_loan_types AS types', 'trans.batch_trans_loan_type', '=', 'types.loan_type_id')
+            ->join('sacco_loan_category AS category', 'trans.batch_trans_loan_category', '=', 'category.loan_category_id')
+            ->leftJoin('sacco_loan_batch_guarantors_members AS guarantors', function ($join) {
+                $join->on('trans.batch_trans_id', '=', 'guarantors.guarantors_loan_batch_trans_id')
+                    ->where('guarantors.guarantors_deleted', 'N');
+            })
+            ->leftJoin('sacco_members AS g_members', 'guarantors.guarantors_guarantor_id', '=', 'g_members.member_id')
             ->select(
                 'trans.*',
                 'members.*',
                 'types.loan_type_name',
                 'category.loan_category_name',
-
-                DB::raw(
-                    'GROUP_CONCAT(
-                    g_members.member_name
-                    ORDER BY guarantors.guarantors_id ASC
-                    SEPARATOR "|"
-                ) AS guarantors_names'
-                ),
-
-                DB::raw(
-                    'GROUP_CONCAT(
-                    guarantors.guarantors_amount_guaranteed
-                    ORDER BY guarantors.guarantors_id ASC
-                    SEPARATOR "|"
-                ) AS guarantors_amounts'
-                ),
-
-                DB::raw(
-                    'GROUP_CONCAT(
-                    guarantors.guarantors_approved
-                    ORDER BY guarantors.guarantors_id ASC
-                    SEPARATOR "|"
-                ) AS guarantors_approval_status'
-                )
+                DB::raw('GROUP_CONCAT(g_members.member_name ORDER BY guarantors.guarantors_id ASC SEPARATOR "|") AS guarantors_names'),
+                DB::raw('GROUP_CONCAT(guarantors.guarantors_amount_guaranteed ORDER BY guarantors.guarantors_id ASC SEPARATOR "|") AS guarantors_amounts'),
+                DB::raw('GROUP_CONCAT(guarantors.guarantors_approved ORDER BY guarantors.guarantors_id ASC SEPARATOR "|") AS guarantors_approval_status')
             )
             ->groupBy('trans.batch_trans_id');
 
         if ($request->has('search')) {
-            $search = trim(
-                (string) $request->input('search')
-            );
-
+            $search = $request->input('search');
             $query->where(function ($q) use ($search) {
-                $q->where(
-                    'members.member_name',
-                    'LIKE',
-                    "%{$search}%"
-                )
-                    ->orWhere(
-                        'members.member_phone_no',
-                        'LIKE',
-                        "%{$search}%"
-                    )
-                    ->orWhere(
-                        'members.member_national_id',
-                        'LIKE',
-                        "%{$search}%"
-                    )
-                    ->orWhere(
-                        'types.loan_type_name',
-                        'LIKE',
-                        "%{$search}%"
-                    );
+                $q->where('members.member_name', 'LIKE', "%$search%")
+                    ->orWhere('members.member_phone_no', 'LIKE', "%$search%")
+                    ->orWhere('members.member_national_id', 'LIKE', "%$search%")
+                    ->orWhere('types.loan_type_name', 'LIKE', "%$search%");
             });
         }
 
         if ($pendingLoansOnly) {
-            $query
-                ->where(
-                    'trans.batch_trans_updated',
-                    'N'
-                )
-                ->where(
-                    'trans.batch_trans_deleted',
-                    '!=',
-                    'Y'
-                );
+            $query->where('batch_trans_updated', 'N')
+                ->where('batch_trans_deleted', '!=', 'Y');
         }
 
-        $loans = $query
-            ->orderBy(
-                'trans.batch_trans_on',
-                'desc'
-            )
+        $loans = $query->orderBy('trans.batch_trans_on', 'desc')
             ->limit(300)
             ->paginate(20);
 
-        /*
-    |--------------------------------------------------------------------------
-    | Existing deduction / charge configuration
-    |--------------------------------------------------------------------------
-    */
-
-        $deductionTypes = DB::table(
-            'sacco_loan_deductions_types'
-        )
-            ->where(
-                'deduction_type_deleted',
-                'N'
-            )
-            ->where(
-                'deduction_type_active',
-                1
-            )
-            ->orderBy(
-                'deduction_type_name',
-                'asc'
-            )
+        $deductionTypes = DB::table('sacco_loan_deductions_types')
+            ->where('deduction_type_deleted', 'N')
+            ->where('deduction_type_active', 1)
+            ->orderBy('deduction_type_name', 'asc')
             ->get();
 
-        $loanIds = $loans
-            ->getCollection()
+
+
+        $loanIds = collect($loans->items())
             ->pluck('batch_trans_id')
             ->filter()
             ->values();
@@ -173,105 +71,18 @@ class LoanApplicationSelfServiceController extends Controller
         $applicationCharges = collect();
 
         if ($loanIds->isNotEmpty()) {
-            $applicationCharges = DB::table(
-                'sacco_loan_batch_trans_members_deductions'
-            )
-                ->whereIn(
-                    'batch_trans_deduction_batch_trans_id',
-                    $loanIds
-                )
-                ->where(
-                    'batch_trans_deduction_deleted',
-                    'N'
-                )
-                ->orderBy(
-                    'batch_trans_deduction_batch_trans_id',
-                    'asc'
-                )
-                ->orderBy(
-                    'batch_trans_deduction_id',
-                    'asc'
-                )
+            $applicationCharges = DB::table('sacco_loan_batch_trans_members_deductions')
+                ->whereIn('batch_trans_deduction_batch_trans_id', $loanIds)
+                ->where('batch_trans_deduction_deleted', 'N')
+                ->orderBy('batch_trans_deduction_batch_trans_id', 'asc')
+                ->orderBy('batch_trans_deduction_id', 'asc')
                 ->get()
-                ->groupBy(
-                    'batch_trans_deduction_batch_trans_id'
-                );
+                ->groupBy('batch_trans_deduction_batch_trans_id');
         }
 
-        /*
-    |--------------------------------------------------------------------------
-    | Credit Committee configuration
-    |--------------------------------------------------------------------------
-    */
-
-        $creditCommitteeConfig =
-            $this->getCreditCommitteeConfig();
-
-        $creditCommitteeMembers =
-            $this->getCreditCommitteeMembers(
-                $creditCommitteeConfig['category']
-            );
-
-        $loggedInMemberId = (int) (
-            Auth::user()->member_id ?? 0
-        );
-
-        /*
-    |--------------------------------------------------------------------------
-    | Is the logged-in user currently in the Credit Committee?
-    |--------------------------------------------------------------------------
-    */
-
-        $authenticatedCreditCommitteeMember =
-            $creditCommitteeMembers->first(
-                function ($member) use ($loggedInMemberId) {
-                    return (int) $member->member_id
-                        === $loggedInMemberId;
-                }
-            );
-
-        /*
-    |--------------------------------------------------------------------------
-    | Attach committee state to every loan
-    |--------------------------------------------------------------------------
-    */
-
-        $loans->getCollection()->transform(
-            function ($loan) use (
-                $creditCommitteeConfig,
-                $creditCommitteeMembers,
-                $loggedInMemberId
-            ) {
-                $loan->credit_committee =
-                    $this->buildCreditCommitteeApprovalState(
-                        $loan->batch_trans_credit_committee_decisions
-                            ?? null,
-
-                        $creditCommitteeMembers,
-
-                        $creditCommitteeConfig['required_approvals'],
-
-                        $creditCommitteeConfig['category'],
-
-                        $loggedInMemberId
-                    );
-
-                return $loan;
-            }
-        );
-
-        return view(
-            'loans.selfservice.pending_approval',
-            compact(
-                'loans',
-                'deductionTypes',
-                'applicationCharges',
-                'creditCommitteeConfig',
-                'creditCommitteeMembers',
-                'authenticatedCreditCommitteeMember'
-            )
-        );
+        return view('loans.selfservice.pending_approval', compact('loans', 'deductionTypes', 'applicationCharges'));
     }
+
 
     public function listLoansPendingApprovalSelf(Request $request)
     {
@@ -381,57 +192,12 @@ class LoanApplicationSelfServiceController extends Controller
                     'sacco_loan_category.loan_category_name',
                     'sacco_members.member_name'
                 )
-                ->lockForUpdate()
                 ->first();
 
             if (!$loan) {
                 throw new \Exception('Loan not found or already processed.');
             }
 
-            /*
-|--------------------------------------------------------------------------
-| Credit Committee final approval gate
-|--------------------------------------------------------------------------
-|
-| Do not trust the Blade disabled button.
-| Recalculate the condition immediately before final loan approval.
-|--------------------------------------------------------------------------
-*/
-
-            $creditCommitteeConfig =
-                $this->getCreditCommitteeConfig();
-
-            $creditCommitteeMembers =
-                $this->getCreditCommitteeMembers(
-                    $creditCommitteeConfig['category']
-                );
-
-            $creditCommitteeState =
-                $this->buildCreditCommitteeApprovalState(
-                    $loan->batch_trans_credit_committee_decisions
-                        ?? null,
-
-                    $creditCommitteeMembers,
-
-                    $creditCommitteeConfig['required_approvals'],
-
-                    $creditCommitteeConfig['category'],
-
-                    (int) (
-                        Auth::user()->member_id
-                        ?? 0
-                    )
-                );
-
-            if (
-                !$creditCommitteeState['can_final_approve']
-            ) {
-                throw new \Exception(
-                    $creditCommitteeState['blocking_message']
-                        ?? 'Credit Committee approval requirements '
-                        . 'have not been satisfied.'
-                );
-            }
             /*
 |--------------------------------------------------------------------------
 | Final product and individual member-limit recheck
@@ -559,8 +325,6 @@ class LoanApplicationSelfServiceController extends Controller
                 'loan_ip' => $myIP,
                 'loan_stoped' => 'N',
                 'loan_taken_start_period' => $currentPeriod,
-                'loan_credit_committee_decisions' =>
-                $loan->batch_trans_credit_committee_decisions,
             ];
 
             if (Schema::hasColumn('sacco_loans', 'loan_requested_amount')) {
@@ -1863,10 +1627,10 @@ class LoanApplicationSelfServiceController extends Controller
                 'message' => $e->getMessage(),
             ]);
 
-            return $respondError(
-                'Failed to delete the guarantor. Please try again or contact support.',
-                500
-            );
+           return $respondError(
+    'Failed to delete the guarantor. Please try again or contact support.',
+    500
+);
         }
     }
 
@@ -2297,9 +2061,9 @@ class LoanApplicationSelfServiceController extends Controller
             ]);
 
             return $respondError(
-                'Failed to process the loan application. Please try again or contact support.',
-                500
-            );
+    'Failed to process the loan application. Please try again or contact support.',
+    500
+);
         }
     }
     private function validateAndProcessGuarantors($data, $loanType, $batchTransId, $loanAmount, bool $saveGuarantors = true)
@@ -2373,7 +2137,7 @@ class LoanApplicationSelfServiceController extends Controller
             ->value('default_value') ?? 1
         );
 
-
+        
 
         /*
     |--------------------------------------------------------------------------
@@ -2743,42 +2507,42 @@ class LoanApplicationSelfServiceController extends Controller
     }
 
     private function validateMemberEligibility($member, $loanType)
-    {
-        if (!$member) {
-            return 'Error: Member not found in the database.';
-        }
+{
+    if (!$member) {
+        return 'Error: Member not found in the database.';
+    }
 
-        $rawInstant = $loanType->loan_type_instant_qualification ?? 0;
+    $rawInstant = $loanType->loan_type_instant_qualification ?? 0;
 
-        $isInstant =
-            (is_numeric($rawInstant) && (int) $rawInstant === 1)
-            || in_array(
-                strtoupper(trim((string) $rawInstant)),
-                ['Y', 'YES', 'TRUE'],
-                true
-            );
-
-        if ($isInstant) {
-            return null;
-        }
-
-        $membershipDurationRequired = max(
-            0,
-            (int) ($loanType->loan_type_qualification_period ?? 0)
+    $isInstant =
+        (is_numeric($rawInstant) && (int) $rawInstant === 1)
+        || in_array(
+            strtoupper(trim((string) $rawInstant)),
+            ['Y', 'YES', 'TRUE'],
+            true
         );
 
-        if (
-            $membershipDurationRequired > 0
-            && !empty($member->member_date_joined)
-            && strtotime($member->member_date_joined)
-            > strtotime("-{$membershipDurationRequired} months")
-        ) {
-            return "Error: Member must be {$membershipDurationRequired} "
-                . 'months old in the SACCO to take this loan.';
-        }
-
+    if ($isInstant) {
         return null;
     }
+
+    $membershipDurationRequired = max(
+        0,
+        (int) ($loanType->loan_type_qualification_period ?? 0)
+    );
+
+    if (
+        $membershipDurationRequired > 0
+        && !empty($member->member_date_joined)
+        && strtotime($member->member_date_joined)
+            > strtotime("-{$membershipDurationRequired} months")
+    ) {
+        return "Error: Member must be {$membershipDurationRequired} "
+            . 'months old in the SACCO to take this loan.';
+    }
+
+    return null;
+}
 
 
 
@@ -3755,916 +3519,99 @@ class LoanApplicationSelfServiceController extends Controller
             ]);
         }
     }
-    /*
-|--------------------------------------------------------------------------
-| Credit Committee configuration
-|--------------------------------------------------------------------------
-*/
-
-    private function getCreditCommitteeConfig(): array
-    {
-        $category = trim(
-            (string) (
-                DB::table('sacco_defaults')
-                ->where(
-                    'default_name',
-                    'CREDIT_COMMITTEE'
-                )
-                ->value('default_value')
-                ?? ''
-            )
-        );
-
-        $requiredValue = DB::table('sacco_defaults')
-            ->where(
-                'default_name',
-                'CREDIT_COMMITTEE_REQUIRED_APPROVALS'
-            )
-            ->value('default_value');
-
-        /*
-     * If this setting is somehow missing or invalid,
-     * fail safely by requiring one approval rather than
-     * accidentally bypassing committee approval.
-     */
-        $requiredApprovals = is_numeric($requiredValue)
-            ? max(0, (int) $requiredValue)
-            : 1;
-
-        return [
-            'category' => $category,
-            'required_approvals' =>
-            $requiredApprovals,
-        ];
-    }
-
-
-    /*
-|--------------------------------------------------------------------------
-| Current active Credit Committee members
-|--------------------------------------------------------------------------
-|
-| Member must:
-| - be position 2
-| - be active
-| - not be deleted
-| - have an active classification
-| - have an active current assignment
-| - belong to the category configured in sacco_defaults
-|
-| Ordering comes from classification_sort_order.
-|--------------------------------------------------------------------------
-*/
-
-    private function getCreditCommitteeMembers(
-        ?string $category = null
-    ) {
-        if ($category === null) {
-            $category = $this
-                ->getCreditCommitteeConfig()['category'];
-        }
-
-        $category = trim((string) $category);
-
-        if ($category === '') {
-            return collect();
-        }
-
-        $members = DB::table(
-            'sacco_members as m'
-        )
-            ->join(
-                'sacco_member_classification_members as mcm',
-                'mcm.member_id',
-                '=',
-                'm.member_id'
-            )
-            ->join(
-                'sacco_member_classifications as c',
-                'c.classification_id',
-                '=',
-                'mcm.classification_id'
-            )
-
-            ->where(
-                'm.member_position',
-                2
-            )
-
-            ->where(
-                'm.member_active',
-                'Y'
-            )
-
-            ->whereRaw(
-                "COALESCE(m.member_deleted, 'N') <> 'Y'"
-            )
-
-            ->where(
-                'c.classification_category',
-                $category
-            )
-
-            ->where(
-                'c.classification_active',
-                'Y'
-            )
-
-            ->where(
-                'mcm.classification_member_active',
-                'Y'
-            )
-
-            ->where(function ($query) {
-                $query
-                    ->whereNull(
-                        'mcm.classification_date_from'
-                    )
-                    ->orWhereDate(
-                        'mcm.classification_date_from',
-                        '<=',
-                        today()
-                    );
-            })
-
-            ->where(function ($query) {
-                $query
-                    ->whereNull(
-                        'mcm.classification_date_to'
-                    )
-                    ->orWhereDate(
-                        'mcm.classification_date_to',
-                        '>=',
-                        today()
-                    );
-            })
-
-            ->select(
-                'm.member_id',
-                'm.member_name',
-                'm.member_sacco_id',
-
-                'c.classification_id',
-                'c.classification_name',
-                'c.classification_code',
-                'c.classification_category',
-                'c.classification_sort_order'
-            )
-
-            ->orderBy(
-                'c.classification_sort_order',
-                'asc'
-            )
-
-            ->orderBy(
-                'c.classification_name',
-                'asc'
-            )
-
-            ->orderBy(
-                'm.member_name',
-                'asc'
-            )
-
-            ->get();
-
-        /*
-     * If somebody accidentally holds two roles inside
-     * CREDIT_COMMITTEE, they must still count as ONE voter.
-     *
-     * The first role is retained because the query has already
-     * been ordered by classification_sort_order.
-     */
-        return $members
-            ->unique('member_id')
-            ->values();
-    }
-
-
-    /*
-|--------------------------------------------------------------------------
-| Current logged-in Credit Committee member
-|--------------------------------------------------------------------------
-*/
-
     private function getAuthenticatedCreditCommitteeMember()
-    {
-        $user = Auth::user();
-
-        if (
-            !$user
-            || empty($user->member_id)
-        ) {
-            return null;
-        }
-
-        $config =
-            $this->getCreditCommitteeConfig();
-
-        return $this
-            ->getCreditCommitteeMembers(
-                $config['category']
-            )
-            ->first(
-                function ($member) use ($user) {
-                    return (int) $member->member_id
-                        === (int) $user->member_id;
-                }
-            );
-    }
-
-
-    /*
-|--------------------------------------------------------------------------
-| Decode saved Credit Committee decisions
-|--------------------------------------------------------------------------
-|
-| Standard format:
-|
-| {
-|   "120": {
-|       "decision": "Y",
-|       "decided_at": "2026-08-20 17:30:00",
-|       "ip": "..."
-|   }
-| }
-|
-| The method also understands an optional older/wrapped:
-| {"decisions": {...}}
-|--------------------------------------------------------------------------
-*/
-
-    private function decodeCreditCommitteeDecisions(
-        $json
-    ): array {
-        if (
-            $json === null
-            || trim((string) $json) === ''
-        ) {
-            return [];
-        }
-
-        $decoded = json_decode(
-            (string) $json,
-            true
-        );
-
-        if (!is_array($decoded)) {
-            return [];
-        }
-
-        if (
-            isset($decoded['decisions'])
-            && is_array($decoded['decisions'])
-        ) {
-            $decoded = $decoded['decisions'];
-        }
-
-        /*
-     * Also support imported legacy arrays such as:
-     *
-     * [
-     *   {"member_id": 10, "decision": "Y"}
-     * ]
-     */
-        if (array_is_list($decoded)) {
-            $normalized = [];
-
-            foreach ($decoded as $row) {
-                if (
-                    !is_array($row)
-                    || empty($row['member_id'])
-                ) {
-                    continue;
-                }
-
-                $normalized[(string) (int) $row['member_id']] = $row;
-            }
-
-            return $normalized;
-        }
-
-        return $decoded;
-    }
-
-
-    /*
-|--------------------------------------------------------------------------
-| Build Credit Committee approval state
-|--------------------------------------------------------------------------
-*/
-
-    private function buildCreditCommitteeApprovalState(
-        $decisionJson,
-        $committeeMembers,
-        int $requiredApprovals,
-        string $category,
-        int $loggedInMemberId = 0
-    ): array {
-
-        $savedState = [];
-
-        if (
-            $decisionJson !== null
-            && trim((string) $decisionJson) !== ''
-        ) {
-            $decoded = json_decode(
-                (string) $decisionJson,
-                true
-            );
-
-            if (is_array($decoded)) {
-                $savedState = $decoded;
-            }
-        }
-
-        /*
-|--------------------------------------------------------------------------
-| An interacted application keeps its original committee requirement
-|--------------------------------------------------------------------------
-*/
-
-        if (
-            array_key_exists(
-                'required_approvals',
-                $savedState
-            )
-            && is_numeric(
-                $savedState['required_approvals']
-            )
-        ) {
-            $requiredApprovals = max(
-                0,
-                (int) $savedState['required_approvals']
-            );
-        }
-
-        if (
-            isset($savedState['category'])
-            && trim(
-                (string) $savedState['category']
-            ) !== ''
-        ) {
-            $category = trim(
-                (string) $savedState['category']
-            );
-        }
-        $decisions =
-            $this->decodeCreditCommitteeDecisions(
-                $decisionJson
-            );
-
-        $rows = [];
-
-        $yesCount = 0;
-        $noCount = 0;
-
-        foreach ($committeeMembers as $member) {
-            $memberId =
-                (int) $member->member_id;
-
-            $saved =
-                $decisions[(string) $memberId]
-                ?? null;
-
-            $decision = null;
-            $decidedAt = null;
-
-            if (is_array($saved)) {
-                $rawDecision = strtoupper(
-                    trim(
-                        (string) (
-                            $saved['decision']
-                            ?? ''
-                        )
-                    )
-                );
-
-                if (
-                    in_array(
-                        $rawDecision,
-                        ['Y', 'N'],
-                        true
-                    )
-                ) {
-                    $decision = $rawDecision;
-                }
-
-                $decidedAt =
-                    $saved['decided_at']
-                    ?? null;
-            } elseif (is_string($saved)) {
-                $rawDecision = strtoupper(
-                    trim($saved)
-                );
-
-                if (
-                    in_array(
-                        $rawDecision,
-                        ['Y', 'N'],
-                        true
-                    )
-                ) {
-                    $decision = $rawDecision;
-                }
-            }
-
-            if ($decision === 'Y') {
-                $yesCount++;
-            }
-
-            if ($decision === 'N') {
-                $noCount++;
-            }
-
-            $rows[] = [
-                'member_id' =>
-                $memberId,
-
-                'member_name' =>
-                $member->member_name,
-
-                'member_sacco_id' =>
-                $member->member_sacco_id,
-
-                'classification_id' =>
-                $member->classification_id,
-
-                'classification_name' =>
-                $member->classification_name,
-
-                'classification_code' =>
-                $member->classification_code,
-
-                'classification_sort_order' =>
-                $member->classification_sort_order,
-
-                'decision' =>
-                $decision,
-
-                'decided_at' =>
-                $decidedAt,
-
-                /*
-             * Only the actual logged-in committee member
-             * will get editable Y/N controls in the Blade.
-             */
-                'can_vote' =>
-                $requiredApprovals > 0
-                    && $loggedInMemberId > 0
-                    && $loggedInMemberId === $memberId,
-            ];
-        }
-
-        $memberCount =
-            count($rows);
-
-        $pendingCount = max(
-            0,
-            $memberCount
-                - $yesCount
-                - $noCount
-        );
-
-        /*
-    |--------------------------------------------------------------------------
-    | Approval condition
-    |--------------------------------------------------------------------------
-    |
-    | required = 0:
-    | committee approval is bypassed completely.
-    |
-    | required > 0:
-    | enough Y votes AND no N votes.
-    |--------------------------------------------------------------------------
-    */
-
-        if ($requiredApprovals === 0) {
-            $canFinalApprove = true;
-            $status = 'NOT_REQUIRED';
-
-            $blockingMessage = null;
-        } elseif ($category === '') {
-            $canFinalApprove = false;
-            $status = 'CONFIGURATION_ERROR';
-
-            $blockingMessage =
-                'Credit Committee approval is required, '
-                . 'but CREDIT_COMMITTEE is not configured.';
-        } elseif ($memberCount === 0) {
-            $canFinalApprove = false;
-            $status = 'CONFIGURATION_ERROR';
-
-            $blockingMessage =
-                'Credit Committee approval is required, '
-                . 'but no active Credit Committee members '
-                . 'are configured.';
-        } elseif ($requiredApprovals > $memberCount) {
-            $canFinalApprove = false;
-            $status = 'CONFIGURATION_ERROR';
-
-            $blockingMessage =
-                'Credit Committee requires '
-                . $requiredApprovals
-                . ' approvals, but only '
-                . $memberCount
-                . ' active committee members are available.';
-        } elseif ($noCount > 0) {
-            $canFinalApprove = false;
-            $status = 'DECLINED';
-
-            $blockingMessage =
-                'Final loan approval is blocked because '
-                . 'one or more Credit Committee members '
-                . 'have selected No.';
-        } elseif ($yesCount < $requiredApprovals) {
-            $canFinalApprove = false;
-            $status = 'PENDING';
-
-            $blockingMessage =
-                'Credit Committee approval is incomplete. '
-                . $yesCount
-                . ' of '
-                . $requiredApprovals
-                . ' required approvals have been received.';
-        } else {
-            $canFinalApprove = true;
-            $status = 'APPROVED';
-
-            $blockingMessage = null;
-        }
-
-        return [
-            'category' =>
-            $category,
-
-            'required' =>
-            $requiredApprovals > 0,
-
-            'required_approvals' =>
-            $requiredApprovals,
-
-            'member_count' =>
-            $memberCount,
-
-            'yes_count' =>
-            $yesCount,
-
-            'no_count' =>
-            $noCount,
-
-            'pending_count' =>
-            $pendingCount,
-
-            'can_final_approve' =>
-            $canFinalApprove,
-
-            'status' =>
-            $status,
-
-            'blocking_message' =>
-            $blockingMessage,
-
-            'members' =>
-            $rows,
-        ];
+{
+    $user = Auth::user();
+
+    if (!$user || empty($user->member_id)) {
+        return null;
     }
 
     /*
-|--------------------------------------------------------------------------
-| Save Credit Committee decision
-|--------------------------------------------------------------------------
-|
-| This is NOT user-right based.
-|
-| The authenticated user must:
-| - be position 2
-| - be active
-| - not be deleted
-| - currently belong to the configured Credit Committee category
-|
-| The client never supplies member_id.
-|--------------------------------------------------------------------------
-*/
-
-    public function saveCreditCommitteeDecision(
-        Request $request,
-        $id
-    ) {
-        $validator =
-            \Illuminate\Support\Facades\Validator::make(
-                $request->all(),
-                [
-                    'decision' => [
-                        'required',
-                        'string',
-                        'in:Y,N',
-                    ],
-                ]
-            );
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' =>
-                'Invalid Credit Committee decision.',
-                'errors' =>
-                $validator->errors(),
-            ], 422);
-        }
-
-        /*
     |--------------------------------------------------------------------------
-    | Resolve committee configuration
+    | Resolve configured Credit Committee category
     |--------------------------------------------------------------------------
     */
+    $creditCommitteeCategory = DB::table('sacco_defaults')
+        ->where('default_name', 'CREDIT_COMMITTEE')
+        ->value('default_value');
 
-        $config =
-            $this->getCreditCommitteeConfig();
-
-        /*
-     * When required approvals = 0 there is no committee
-     * intervention for this workflow.
-     */
-        if (
-            $config['required_approvals'] === 0
-        ) {
-            return response()->json([
-                'success' => false,
-                'message' =>
-                'Credit Committee approval is not required '
-                    . 'for this SACCO configuration.',
-            ], 422);
-        }
-
-        /*
-    |--------------------------------------------------------------------------
-    | Authenticate using CATEGORY membership
-    |--------------------------------------------------------------------------
-    */
-
-        $committeeMember =
-            $this->getAuthenticatedCreditCommitteeMember();
-
-        if (!$committeeMember) {
-            return response()->json([
-                'success' => false,
-                'message' =>
-                'You are not an active Credit Committee member.',
-            ], 403);
-        }
-
-        $decision = strtoupper(
-            trim(
-                (string) $request->input(
-                    'decision'
-                )
-            )
-        );
-
-        DB::beginTransaction();
-
-        try {
-            /*
-        |--------------------------------------------------------------------------
-        | Lock the application
-        |--------------------------------------------------------------------------
-        |
-        | Important because two committee members could vote at nearly
-        | the same time. Without the row lock, one JSON update could
-        | overwrite the other person's decision.
-        |--------------------------------------------------------------------------
-        */
-
-            $loan = DB::table(
-                'sacco_loan_batch_trans_members'
-            )
-                ->where(
-                    'batch_trans_id',
-                    $id
-                )
-                ->where(
-                    'batch_trans_updated',
-                    'N'
-                )
-                ->whereRaw(
-                    "COALESCE(batch_trans_deleted, 'N') <> 'Y'"
-                )
-                ->lockForUpdate()
-                ->first();
-
-            if (!$loan) {
-                DB::rollBack();
-
-                return response()->json([
-                    'success' => false,
-                    'message' =>
-                    'Loan application not found or '
-                        . 'it has already been processed.',
-                ], 404);
-            }
-
-            /*
-        |--------------------------------------------------------------------------
-        | Read existing decisions
-        |--------------------------------------------------------------------------
-        */
-
-            $existingJson =
-                $loan->batch_trans_credit_committee_decisions
-                ?? null;
-
-            $existingState = [];
-
-            if (
-                $existingJson !== null
-                && trim((string) $existingJson) !== ''
-            ) {
-                $decoded = json_decode(
-                    (string) $existingJson,
-                    true
-                );
-
-                if (is_array($decoded)) {
-                    $existingState = $decoded;
-                }
-            }
-
-            /*
-|--------------------------------------------------------------------------
-| Snapshot committee configuration on first committee action
-|--------------------------------------------------------------------------
-*/
-
-            if (
-                isset($existingState['decisions'])
-                && is_array($existingState['decisions'])
-            ) {
-                /*
-     * Already using the current wrapped structure.
-     */
-                $committeeState = $existingState;
-            } else {
-                /*
-     * New application or older flat JSON.
-     */
-                $legacyDecisions =
-                    $this->decodeCreditCommitteeDecisions(
-                        $existingJson
-                    );
-
-                $committeeState = [
-                    'category' =>
-                    $config['category'],
-
-                    'required_approvals' =>
-                    $config['required_approvals'],
-
-                    'decisions' =>
-                    $legacyDecisions,
-                ];
-            }
-
-            $memberKey = (string) (
-                (int) $committeeMember->member_id
-            );
-
-            /*
-        |--------------------------------------------------------------------------
-        | Update ONLY the authenticated member's decision
-        |--------------------------------------------------------------------------
-        */
-
-            $committeeState['decisions'][$memberKey] = [
-                'decision' =>
-                $decision,
-
-                /*
-             * Snapshot the committee role used when voting.
-             */
-                'classification_id' =>
-                (int) $committeeMember
-                    ->classification_id,
-
-                'classification_code' =>
-                $committeeMember
-                    ->classification_code,
-
-                'classification_name' =>
-                $committeeMember
-                    ->classification_name,
-
-                'decided_at' =>
-                now()->format(
-                    'Y-m-d H:i:s'
-                ),
-
-                'ip' =>
-                $request->ip(),
-            ];
-
-            $encodedDecisions = json_encode(
-                $committeeState,
-
-                JSON_UNESCAPED_UNICODE
-                    | JSON_UNESCAPED_SLASHES
-                    | JSON_THROW_ON_ERROR
-            );
-
-            DB::table(
-                'sacco_loan_batch_trans_members'
-            )
-                ->where(
-                    'batch_trans_id',
-                    $id
-                )
-                ->where(
-                    'batch_trans_updated',
-                    'N'
-                )
-                ->whereRaw(
-                    "COALESCE(batch_trans_deleted, 'N') <> 'Y'"
-                )
-                ->update([
-                    'batch_trans_credit_committee_decisions' =>
-                    $encodedDecisions,
-                ]);
-
-            /*
-        |--------------------------------------------------------------------------
-        | Recalculate from authoritative database membership
-        |--------------------------------------------------------------------------
-        */
-
-            $committeeMembers =
-                $this->getCreditCommitteeMembers(
-                    $config['category']
-                );
-
-            $loggedInMemberId = (int) (
-                Auth::user()->member_id
-            );
-
-            $state =
-                $this->buildCreditCommitteeApprovalState(
-                    $encodedDecisions,
-                    $committeeMembers,
-                    $config['required_approvals'],
-                    $config['category'],
-                    $loggedInMemberId
-                );
-
-            DB::commit();
-
-            return response()->json([
-                'success' => true,
-
-                'message' =>
-                $decision === 'Y'
-                    ? 'Credit Committee approval recorded successfully.'
-                    : 'Credit Committee decline recorded successfully.',
-
-                'batch_trans_id' =>
-                (int) $id,
-
-                'member_id' =>
-                (int) $committeeMember->member_id,
-
-                'decision' =>
-                $decision,
-
-                /*
-             * Blade/JavaScript will use this response
-             * to update badges and the final Approve button.
-             */
-                'credit_committee' =>
-                $state,
-            ]);
-        } catch (\Throwable $e) {
-            DB::rollBack();
-
-            Log::error(
-                'Failed to save Credit Committee loan decision',
-                [
-                    'batch_trans_id' =>
-                    (int) $id,
-
-                    'member_id' =>
-                    (int) (
-                        Auth::user()->member_id
-                        ?? 0
-                    ),
-
-                    'message' =>
-                    $e->getMessage(),
-                ]
-            );
-
-            return response()->json([
-                'success' => false,
-                'message' =>
-                'Failed to save the Credit Committee decision.',
-            ], 500);
-        }
+    if (empty($creditCommitteeCategory)) {
+        return null;
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Validate the currently authenticated member
+    |--------------------------------------------------------------------------
+    */
+    return DB::table('sacco_members as m')
+        ->join(
+            'sacco_member_classification_members as mcm',
+            'mcm.member_id',
+            '=',
+            'm.member_id'
+        )
+        ->join(
+            'sacco_member_classifications as c',
+            'c.classification_id',
+            '=',
+            'mcm.classification_id'
+        )
+        ->where('m.member_id', (int) $user->member_id)
+
+        // Must be a SACCO official/staff member
+        ->where('m.member_position', 2)
+
+        // Must be active
+        ->where('m.member_active', 'Y')
+
+        // Must not be deleted
+        ->whereRaw("COALESCE(m.member_deleted, 'N') <> 'Y'")
+
+        // Must belong to the configured Credit Committee category
+        ->where(
+            'c.classification_category',
+            $creditCommitteeCategory
+        )
+
+        // Classification itself must still be active
+        ->where('c.classification_active', 'Y')
+
+        // Member's assignment must still be active
+        ->where('mcm.classification_member_active', 'Y')
+
+        // Assignment must have started
+        ->where(function ($query) {
+            $query->whereNull('mcm.classification_date_from')
+                ->orWhereDate(
+                    'mcm.classification_date_from',
+                    '<=',
+                    today()
+                );
+        })
+
+        // Assignment must not have expired
+        ->where(function ($query) {
+            $query->whereNull('mcm.classification_date_to')
+                ->orWhereDate(
+                    'mcm.classification_date_to',
+                    '>=',
+                    today()
+                );
+        })
+
+        ->select(
+            'm.member_id',
+            'm.member_name',
+            'm.member_sacco_id',
+            'c.classification_id',
+            'c.classification_name',
+            'c.classification_code',
+            'c.classification_category',
+            'c.classification_sort_order'
+        )
+        ->orderBy('c.classification_sort_order')
+        ->first();
+}
 }

@@ -474,8 +474,19 @@ Route::prefix('mobile')->group(function () {
 
 Route::middleware(['auth', 'check_member_position'])->group(function () {
 
+    Route::post(
+        'admin/loans/pending/approval/{id}/credit-committee-decision',
+        [
+            LoanApplicationSelfServiceController::class,
+            'saveCreditCommitteeDecision'
+        ]
+    )
+        ->whereNumber('id')
+        ->name(
+            'loans.pending.approval.credit_committee.decision'
+        );
 
-/*
+    /*
 |--------------------------------------------------------------------------
 | SACCO Member Classifications
 |--------------------------------------------------------------------------
@@ -501,7 +512,7 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
 |--------------------------------------------------------------------------
 */
 
-/*
+    /*
 |--------------------------------------------------------------------------
 | Member Role / Classification Membership
 |--------------------------------------------------------------------------
@@ -509,63 +520,63 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
 |--------------------------------------------------------------------------
 */
 
-Route::get(
-    '/members/{member_id}/classifications',
-    [MemberClassificationController::class, 'memberClassifications']
-)
-    ->whereNumber('member_id')
-    ->name('members.classifications.member')
-    ->middleware('check_user_rights:member_classifications');
-    
-Route::prefix('members/classifications')
-    ->name('members.classifications.')
-    ->middleware('check_user_rights:member_classifications')
-    ->group(function () {
+    Route::get(
+        '/members/{member_id}/classifications',
+        [MemberClassificationController::class, 'memberClassifications']
+    )
+        ->whereNumber('member_id')
+        ->name('members.classifications.member')
+        ->middleware('check_user_rights:member_classifications');
 
-        /*
+    Route::prefix('members/classifications')
+        ->name('members.classifications.')
+        ->middleware('check_user_rights:member_classifications')
+        ->group(function () {
+
+            /*
         |--------------------------------------------------------------------------
         | List classifications
         |--------------------------------------------------------------------------
         */
-        Route::get('/', [
-            MemberClassificationController::class,
-            'index'
-        ])->name('index');
+            Route::get('/', [
+                MemberClassificationController::class,
+                'index'
+            ])->name('index');
 
-        /*
+            /*
         |--------------------------------------------------------------------------
         | Add classification
         |--------------------------------------------------------------------------
         */
-        Route::get('/create', [
-            MemberClassificationController::class,
-            'create'
-        ])->name('create');
+            Route::get('/create', [
+                MemberClassificationController::class,
+                'create'
+            ])->name('create');
 
-        Route::post('/store', [
-            MemberClassificationController::class,
-            'store'
-        ])->name('store');
+            Route::post('/store', [
+                MemberClassificationController::class,
+                'store'
+            ])->name('store');
 
-        /*
+            /*
         |--------------------------------------------------------------------------
         | Edit classification
         |--------------------------------------------------------------------------
         */
-        Route::get('/{id}/edit', [
-            MemberClassificationController::class,
-            'edit'
-        ])
-            ->whereNumber('id')
-            ->name('edit');
+            Route::get('/{id}/edit', [
+                MemberClassificationController::class,
+                'edit'
+            ])
+                ->whereNumber('id')
+                ->name('edit');
 
-        Route::put('/{id}', [
-            MemberClassificationController::class,
-            'update'
-        ])
-            ->whereNumber('id')
-            ->name('update');
-    });
+            Route::put('/{id}', [
+                MemberClassificationController::class,
+                'update'
+            ])
+                ->whereNumber('id')
+                ->name('update');
+        });
 
     Route::prefix('minimum-capital')
         ->name('minimum_capital.')
@@ -1429,26 +1440,99 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
     Route::get('/loans/delete/{loanId}', [HomeController::class, 'deleteLoan'])->name('loans.delete')->middleware('check_user_rights:end_month_processing_loans');
 
     // Route::get('/admin/loans/pending/approval', [HomeController::class, 'adminListLoansPendingApproval'])->name('admin.loans.pending.approval')->middleware('check_user_rights:end_month_processing_loans');
-    Route::get('admin/loans/pending/approval', [LoanApplicationSelfServiceController::class, 'listLoansPendingApproval'])
-        ->name('loans.pending.approval')
-        ->middleware('check_user_rights:end_month_processing_loans');
+    // Route::get('admin/loans/pending/approval', [LoanApplicationSelfServiceController::class, 'listLoansPendingApproval'])
+    //     ->name('loans.pending.approval')
+    //     ->middleware('check_user_rights:listLoansPendingApproval');
 
-    Route::patch('admin/loans/pending/approval/{id}/doc-no', [LoanApplicationSelfServiceController::class, 'updatePendingLoanDocNo'])
+    // Route::patch('admin/loans/pending/approval/{id}/doc-no', [LoanApplicationSelfServiceController::class, 'updatePendingLoanDocNo'])
+    //     ->name('loans.pending.approval.docno.update')
+    //     ->middleware('check_user_rights:list_selfserve_loans');
+
+    // Route::post(
+    //     'admin/loans/approve/{loanId}',
+    //     [LoanApplicationSelfServiceController::class, 'approveLoan']
+    // )->name('loans.approve.self')
+    //     ->middleware('check_user_rights:end_month_processing_loans');
+
+    // // Route::post('admin/loans/approve/{id}', [LoanApplicationSelfServiceController::class, 'approveLoanself'])
+    // //     ->name('loans.approve.self')->middleware('check_user_rights:end_month_processing_loans');
+
+    // Route::post('admin/loans/reject/{id}', [LoanApplicationSelfServiceController::class, 'rejectLoan'])
+    //     ->name('loans.reject')->middleware('check_user_rights:end_month_processing_loans');
+    /*
+|--------------------------------------------------------------------------
+| Self-Service Loan Approval
+|--------------------------------------------------------------------------
+| Access model:
+|
+| listLoansPendingApproval
+|   - Allows officials to view pending self-service loan applications.
+|   - Credit Committee members may be granted this right so they can
+|     access the applications and record their committee decision.
+|
+| Credit Committee voting
+|   - NOT rights based.
+|   - Controller validates active CREDIT_COMMITTEE classification.
+|
+| approveSelfServeLoans
+|   - Restricted final approval authority.
+|   - Only selected officials receive this right.
+|--------------------------------------------------------------------------
+*/
+
+    Route::get(
+        'admin/loans/pending/approval',
+        [
+            LoanApplicationSelfServiceController::class,
+            'listLoansPendingApproval'
+        ]
+    )
+        ->name('loans.pending.approval')
+        ->middleware(
+            'check_user_rights:listLoansPendingApproval'
+        );
+
+
+    Route::patch(
+        'admin/loans/pending/approval/{id}/doc-no',
+        [
+            LoanApplicationSelfServiceController::class,
+            'updatePendingLoanDocNo'
+        ]
+    )
+        ->whereNumber('id')
         ->name('loans.pending.approval.docno.update')
-        ->middleware('check_user_rights:end_month_processing_loans');
+        ->middleware(
+            'check_user_rights:listLoansPendingApproval'
+        );
+
 
     Route::post(
         'admin/loans/approve/{loanId}',
-        [LoanApplicationSelfServiceController::class, 'approveLoan']
-    )->name('loans.approve.self')
-        ->middleware('check_user_rights:end_month_processing_loans');
+        [
+            LoanApplicationSelfServiceController::class,
+            'approveLoan'
+        ]
+    )
+        ->whereNumber('loanId')
+        ->name('loans.approve.self')
+        ->middleware(
+            'check_user_rights:approveSelfServeLoans'
+        );
 
-    // Route::post('admin/loans/approve/{id}', [LoanApplicationSelfServiceController::class, 'approveLoanself'])
-    //     ->name('loans.approve.self')->middleware('check_user_rights:end_month_processing_loans');
 
-    Route::post('admin/loans/reject/{id}', [LoanApplicationSelfServiceController::class, 'rejectLoan'])
-        ->name('loans.reject')->middleware('check_user_rights:end_month_processing_loans');
-
+    Route::post(
+        'admin/loans/reject/{id}',
+        [
+            LoanApplicationSelfServiceController::class,
+            'rejectLoan'
+        ]
+    )
+        ->whereNumber('id')
+        ->name('loans.reject')
+        ->middleware(
+            'check_user_rights:approveSelfServeLoans'
+        );
 
     Route::get('/admin/end-of-year-processing', [HomeController::class, 'showEndOfYearProcessingForm'])->name('admin.show-end-of-year-processing-form')->middleware('check_user_rights:end_of_year_processing');
     Route::post('/admin/end-of-year-processing', [HomeController::class, 'endOfYearProcessing'])->name('admin.end-of-year-processing')->middleware('check_user_rights:end_of_year_processing');
