@@ -63,6 +63,7 @@ class LoanApplicationSelfServiceController extends Controller
                 'trans.*',
                 'members.*',
                 'types.loan_type_name',
+                'types.loan_type_guaranteable_percent',
                 'category.loan_category_name',
 
                 DB::raw(
@@ -255,6 +256,33 @@ class LoanApplicationSelfServiceController extends Controller
 
                         $loggedInMemberId
                     );
+
+                $requiresGuarantors =
+                    (float) ($loan->loan_type_guaranteable_percent ?? 0) > 0;
+
+                $guarantorStatuses = array_values(
+                    array_filter(
+                        explode(
+                            '|',
+                            (string) ($loan->guarantors_approval_status ?? '')
+                        ),
+                        fn($status) => trim($status) !== ''
+                    )
+                );
+
+                $guarantorsReady =
+                    !$requiresGuarantors
+                    ||
+                    (
+                        !empty($guarantorStatuses)
+                        && collect($guarantorStatuses)->every(
+                            fn($status) =>
+                            strtoupper(trim($status)) === 'Y'
+                        )
+                    );
+
+                $loan->credit_committee['voting_open'] =
+                    $guarantorsReady;
 
                 return $loan;
             }
@@ -4463,6 +4491,67 @@ class LoanApplicationSelfServiceController extends Controller
                         . 'it has already been processed.',
                 ], 404);
             }
+
+            /*
+|--------------------------------------------------------------------------
+| Guarantors must complete before Credit Committee voting
+|--------------------------------------------------------------------------
+*/
+
+            $guaranteePercent = (float) (
+                DB::table('sacco_loan_types')
+                ->where(
+                    'loan_type_id',
+                    $loan->batch_trans_loan_type
+                )
+                ->value('loan_type_guaranteable_percent')
+                ?? 0
+            );
+
+            if ($guaranteePercent > 0) {
+
+                $activeGuarantors = DB::table(
+                    'sacco_loan_batch_guarantors_members'
+                )
+                    ->where(
+                        'guarantors_loan_batch_trans_id',
+                        $loan->batch_trans_id
+                    )
+                    ->whereRaw(
+                        "COALESCE(guarantors_deleted, 'N') <> 'Y'"
+                    );
+
+                $hasGuarantors =
+                    (clone $activeGuarantors)->exists();
+
+                $hasUnapprovedGuarantor =
+                    (clone $activeGuarantors)
+                    ->where(function ($query) {
+                        $query
+                            ->whereNull('guarantors_approved')
+                            ->orWhere(
+                                'guarantors_approved',
+                                '<>',
+                                'Y'
+                            );
+                    })
+                    ->exists();
+
+                if (
+                    !$hasGuarantors
+                    || $hasUnapprovedGuarantor
+                ) {
+                    DB::rollBack();
+
+                    return response()->json([
+                        'success' => false,
+                        'message' =>
+                        'All required guarantors must approve '
+                            . 'before Credit Committee review.',
+                    ], 422);
+                }
+            }
+
 
             /*
         |--------------------------------------------------------------------------
