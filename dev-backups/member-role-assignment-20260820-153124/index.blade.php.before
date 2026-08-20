@@ -2,76 +2,42 @@
 
 @section('content')
 
-    <div class="breadcrumb d-flex justify-content-between align-items-start flex-wrap">
-
+    <div class="breadcrumb d-flex justify-content-between align-items-center">
         <div>
-
-            <h1>
-                Member Classifications
-            </h1>
-
+            <h1>Member Classifications</h1>
             <ul>
-                <li>
-                    <a href="{{ route('members.listing') }}">
-                        Members
-                    </a>
-                </li>
-
-                <li>
-                    Roles / Classifications
-                </li>
+                <li>Members</li>
+                <li>Roles / Classifications</li>
             </ul>
-
         </div>
 
-        <div class="d-flex flex-wrap gap-2 mt-2 mt-md-0">
-
-            <a
-                href="{{ route('members.listing') }}"
-                class="btn btn-outline-secondary"
-            >
-                <i class="i-Business-Mens me-1"></i>
-                All Members
-            </a>
-
+        <div class="header-part-right">
             <a
                 href="{{ route('members.classifications.create') }}"
                 class="btn btn-primary"
             >
-                <i class="i-Add me-1"></i>
+                <i class="i-Add"></i>
                 Add Classification
             </a>
-
         </div>
-
     </div>
 
     <div class="separator-breadcrumb border-top"></div>
 
     @if (session('success'))
-
         <div class="alert alert-success">
             {{ session('success') }}
         </div>
-
     @endif
 
     @if ($errors->any())
-
         <div class="alert alert-danger">
-
             <ul class="mb-0">
-
                 @foreach ($errors->all() as $error)
-                    <li>
-                        {{ $error }}
-                    </li>
+                    <li>{{ $error }}</li>
                 @endforeach
-
             </ul>
-
         </div>
-
     @endif
 
     <div class="row">
@@ -79,11 +45,10 @@
         <div class="col-md-12">
 
             <div class="card mb-4">
-
                 <div class="card-body">
 
                     <div class="card-title mb-3">
-                        Classification / Role Catalogue
+                        Classification Catalogue
                     </div>
 
                     <form
@@ -95,7 +60,6 @@
                         <div class="row">
 
                             <div class="col-md-5 form-group mb-3">
-
                                 <label for="search">
                                     Search
                                 </label>
@@ -108,13 +72,11 @@
                                     value="{{ request('search') }}"
                                     placeholder="Name, code, category or description"
                                 >
-
                             </div>
 
                             <div class="col-md-3 form-group mb-3">
-
                                 <label for="category">
-                                    Category / Group
+                                    Category
                                 </label>
 
                                 <select
@@ -122,32 +84,22 @@
                                     id="category"
                                     class="form-control"
                                 >
-
                                     <option value="">
                                         All Categories
                                     </option>
 
                                     @foreach ($categories as $category)
-
                                         <option
                                             value="{{ $category }}"
-                                            {{
-                                                request('category') === $category
-                                                    ? 'selected'
-                                                    : ''
-                                            }}
+                                            {{ request('category') === $category ? 'selected' : '' }}
                                         >
                                             {{ str_replace('_', ' ', $category) }}
                                         </option>
-
                                     @endforeach
-
                                 </select>
-
                             </div>
 
                             <div class="col-md-2 form-group mb-3">
-
                                 <label for="active">
                                     Status
                                 </label>
@@ -157,7 +109,6 @@
                                     id="active"
                                     class="form-control"
                                 >
-
                                     <option value="">
                                         All
                                     </option>
@@ -175,9 +126,7 @@
                                     >
                                         Inactive
                                     </option>
-
                                 </select>
-
                             </div>
 
                             <div class="col-md-2 form-group mb-3 d-flex align-items-end">
@@ -207,37 +156,15 @@
                         <table class="table table-hover table-bordered">
 
                             <thead>
-
                                 <tr>
-                                    <th style="width: 60px;">
-                                        #
-                                    </th>
-
-                                    <th>
-                                        Classification / Role
-                                    </th>
-
-                                    <th>
-                                        Category / Group
-                                    </th>
-
-                                    <th>
-                                        Code
-                                    </th>
-
-                                    <th>
-                                        Status
-                                    </th>
-
-                                    <th style="width: 90px;">
-                                        Order
-                                    </th>
-
-                                    <th style="width: 100px;">
-                                        Action
-                                    </th>
+                                    <th style="width: 60px;">#</th>
+                                    <th>Classification / Role</th>
+                                    <th>Category</th>
+                                    <th>Code</th>
+                                    <th>Status</th>
+                                    <th style="width: 90px;">Order</th>
+                                    <th style="width: 100px;">Action</th>
                                 </tr>
-
                             </thead>
 
                             <tbody>
@@ -251,37 +178,25 @@
                                         </td>
 
                                         <td>
-
                                             <strong>
                                                 {{ $classification->classification_name }}
                                             </strong>
 
                                             @if (!empty($classification->classification_description))
-
                                                 <div class="text-muted text-small mt-1">
                                                     {{ $classification->classification_description }}
                                                 </div>
-
                                             @endif
-
                                         </td>
 
                                         <td>
-
                                             @if ($classification->classification_category)
-
                                                 <span class="badge bg-light text-dark">
-                                                    {{ str_replace(
-                                                        '_',
-                                                        ' ',
-                                                        $classification->classification_category
-                                                    ) }}
+                                                    {{ str_replace('_', ' ', $classification->classification_category) }}
                                                 </span>
-
                                             @else
                                                 —
                                             @endif
-
                                         </td>
 
                                         <td>
@@ -291,21 +206,15 @@
                                         </td>
 
                                         <td>
-
                                             @if ($classification->classification_active === 'Y')
-
                                                 <span class="badge bg-success">
                                                     Active
                                                 </span>
-
                                             @else
-
                                                 <span class="badge bg-secondary">
                                                     Inactive
                                                 </span>
-
                                             @endif
-
                                         </td>
 
                                         <td>
@@ -313,7 +222,6 @@
                                         </td>
 
                                         <td>
-
                                             <a
                                                 href="{{ route(
                                                     'members.classifications.edit',
@@ -323,7 +231,6 @@
                                             >
                                                 Edit
                                             </a>
-
                                         </td>
 
                                     </tr>
@@ -331,14 +238,12 @@
                                 @empty
 
                                     <tr>
-
                                         <td
                                             colspan="7"
                                             class="text-center text-muted py-4"
                                         >
                                             No classifications found.
                                         </td>
-
                                     </tr>
 
                                 @endforelse
@@ -350,7 +255,6 @@
                     </div>
 
                 </div>
-
             </div>
 
         </div>

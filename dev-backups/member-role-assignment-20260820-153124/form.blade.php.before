@@ -4,93 +4,37 @@
 
     @php
         $isEdit = !empty($classification);
-
-        $cancelRoute =
-            !empty($returnMemberId)
-                ? route(
-                    'members.classifications.member',
-                    $returnMemberId
-                )
-                : route(
-                    'members.classifications.index'
-                );
     @endphp
 
-    <div class="breadcrumb d-flex justify-content-between align-items-start flex-wrap">
-
+    <div class="breadcrumb d-flex justify-content-between align-items-center">
         <div>
-
             <h1>
                 {{ $isEdit ? 'Edit Member Classification' : 'Add Member Classification' }}
             </h1>
 
             <ul>
-
-                <li>
-                    <a href="{{ route('members.listing') }}">
-                        Members
-                    </a>
-                </li>
-
                 <li>
                     <a href="{{ route('members.classifications.index') }}">
-                        Classifications
+                        Member Classifications
                     </a>
                 </li>
-
-                @if (!empty($returnMember))
-
-                    <li>
-                        <a href="{{ route(
-                            'members.classifications.member',
-                            $returnMember->member_id
-                        ) }}">
-                            {{ $returnMember->member_name }}
-                        </a>
-                    </li>
-
-                @endif
 
                 <li>
                     {{ $isEdit ? 'Edit' : 'Add' }}
                 </li>
-
             </ul>
-
         </div>
 
-        <div class="d-flex flex-wrap gap-2 mt-2 mt-md-0">
-
-            <a
-                href="{{ route('members.listing') }}"
-                class="btn btn-outline-secondary"
-            >
-                All Members
-            </a>
+        <div class="header-part-right">
 
             <a
                 href="{{ route('members.classifications.index') }}"
-                class="btn btn-outline-primary"
+                class="btn btn-outline-secondary"
             >
-                Classification List
+                Back to Classifications
             </a>
 
-            @if (!empty($returnMemberId))
-
-                <a
-                    href="{{ route(
-                        'members.classifications.member',
-                        $returnMemberId
-                    ) }}"
-                    class="btn btn-outline-success"
-                >
-                    Back to Member Roles
-                </a>
-
-            @endif
-
         </div>
-
     </div>
 
     <div class="separator-breadcrumb border-top"></div>
@@ -104,39 +48,17 @@
                 <div class="card-body">
 
                     <div class="card-title mb-3">
-                        {{ $isEdit ? 'Classification Details' : 'New Classification / Role' }}
+                        {{ $isEdit ? 'Classification Details' : 'New Classification' }}
                     </div>
 
-                    @if (!empty($returnMember))
-
-                        <div class="alert alert-info">
-                            You are creating a classification from
-                            <strong>
-                                {{ $returnMember->member_name }}
-                            </strong>
-                            's role screen. After creating it, you will return to that member.
-                        </div>
-
-                    @endif
-
                     @if ($errors->any())
-
                         <div class="alert alert-danger">
-
                             <ul class="mb-0">
-
                                 @foreach ($errors->all() as $error)
-
-                                    <li>
-                                        {{ $error }}
-                                    </li>
-
+                                    <li>{{ $error }}</li>
                                 @endforeach
-
                             </ul>
-
                         </div>
-
                     @endif
 
                     <form
@@ -147,9 +69,7 @@
                                     'members.classifications.update',
                                     $classification->classification_id
                                 )
-                                : route(
-                                    'members.classifications.store'
-                                )
+                                : route('members.classifications.store')
                         }}"
                     >
 
@@ -157,16 +77,6 @@
 
                         @if ($isEdit)
                             @method('PUT')
-                        @endif
-
-                        @if (!empty($returnMemberId))
-
-                            <input
-                                type="hidden"
-                                name="return_member_id"
-                                value="{{ $returnMemberId }}"
-                            >
-
                         @endif
 
                         <div class="row">
@@ -214,7 +124,7 @@
                                 >
 
                                 <small class="text-muted">
-                                    Automatically normalised to uppercase with underscores.
+                                    Codes are automatically normalised to uppercase with underscores.
                                 </small>
 
                             </div>
@@ -222,7 +132,7 @@
                             <div class="col-md-6 form-group mb-3">
 
                                 <label for="classification_category">
-                                    Category / Group
+                                    Category
                                 </label>
 
                                 <input
@@ -240,17 +150,13 @@
                                 >
 
                                 <datalist id="classification-categories">
-
                                     @foreach ($categories as $category)
-
                                         <option value="{{ $category }}">
-
                                     @endforeach
-
                                 </datalist>
 
                                 <small class="text-muted">
-                                    Used for organisation only. Roles remain independent.
+                                    Category is for grouping and display only. It does not restrict membership.
                                 </small>
 
                             </div>
@@ -267,7 +173,6 @@
                                     class="form-control"
                                     required
                                 >
-
                                     <option
                                         value="Y"
                                         {{
@@ -295,7 +200,6 @@
                                     >
                                         Inactive
                                     </option>
-
                                 </select>
 
                             </div>
@@ -348,15 +252,11 @@
                                     type="submit"
                                     class="btn btn-primary"
                                 >
-                                    {{
-                                        $isEdit
-                                            ? 'Update Classification'
-                                            : 'Add Classification'
-                                    }}
+                                    {{ $isEdit ? 'Update Classification' : 'Add Classification' }}
                                 </button>
 
                                 <a
-                                    href="{{ $cancelRoute }}"
+                                    href="{{ route('members.classifications.index') }}"
                                     class="btn btn-outline-secondary"
                                 >
                                     Cancel
