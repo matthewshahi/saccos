@@ -47,12 +47,10 @@
         Upload Member Docs
     </a>
 
-    @if ((int) $data['member']->member_position === 2)
-<a href="{{ route('members.classifications.member', $data['member']->member_id) }}"
+    <a href="{{ route('members.classifications.member', $data['member']->member_id) }}"
         class="btn btn-sm btn-outline-success ml-2">
         Roles / Classifications
     </a>
-                            @endif
 
                             <a
                                 href="{{ route('members.listing') }}"

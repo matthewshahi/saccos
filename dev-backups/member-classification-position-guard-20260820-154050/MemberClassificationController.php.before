@@ -320,15 +320,6 @@ class MemberClassificationController extends Controller
     {
         $member = $this->findMemberOrFail($member_id);
 
-        /*
-         * Only member_position = 2 represents a SACCO official/staff
-         * member who may receive detailed classifications.
-         *
-         * We still allow this screen to display historical roles for
-         * former officials, but assignment controls are disabled.
-         */
-        $canClassify = ((int) $member->member_position === 2);
-
         $classifications = DB::table(
             'sacco_member_classification_members as mcm'
         )
@@ -400,43 +391,38 @@ class MemberClassificationController extends Controller
             ->map(fn ($id) => (int) $id)
             ->all();
 
-        if ($canClassify) {
-            $availableQuery = DB::table(
-                'sacco_member_classifications'
-            )
-                ->where(
-                    'classification_active',
-                    'Y'
-                );
+        $availableQuery = DB::table(
+            'sacco_member_classifications'
+        )
+            ->where(
+                'classification_active',
+                'Y'
+            );
 
-            if (!empty($currentClassificationIds)) {
-                $availableQuery->whereNotIn(
-                    'classification_id',
-                    $currentClassificationIds
-                );
-            }
-
-            $availableClassifications = $availableQuery
-                ->orderBy(
-                    'classification_category'
-                )
-                ->orderBy(
-                    'classification_sort_order'
-                )
-                ->orderBy(
-                    'classification_name'
-                )
-                ->get();
-
-            $availableByCategory = $availableClassifications
-                ->groupBy(function ($classification) {
-                    return $classification->classification_category
-                        ?: 'OTHER';
-                });
-        } else {
-            $availableClassifications = collect();
-            $availableByCategory = collect();
+        if (!empty($currentClassificationIds)) {
+            $availableQuery->whereNotIn(
+                'classification_id',
+                $currentClassificationIds
+            );
         }
+
+        $availableClassifications = $availableQuery
+            ->orderBy(
+                'classification_category'
+            )
+            ->orderBy(
+                'classification_sort_order'
+            )
+            ->orderBy(
+                'classification_name'
+            )
+            ->get();
+
+        $availableByCategory = $availableClassifications
+            ->groupBy(function ($classification) {
+                return $classification->classification_category
+                    ?: 'OTHER';
+            });
 
         return view(
             'members.classifications.member',
@@ -446,8 +432,7 @@ class MemberClassificationController extends Controller
                 'currentClassifications',
                 'previousClassifications',
                 'availableClassifications',
-                'availableByCategory',
-                'canClassify'
+                'availableByCategory'
             )
         );
     }
@@ -467,20 +452,6 @@ class MemberClassificationController extends Controller
         int $member_id
     ) {
         $member = $this->findMemberOrFail($member_id);
-
-        /*
-         * SECURITY / BUSINESS RULE:
-         *
-         * Detailed SACCO classifications are ONLY available to
-         * officials/staff represented by member_position = 2.
-         *
-         * Never rely only on the Blade/UI restriction.
-         */
-        abort_unless(
-            (int) $member->member_position === 2,
-            403,
-            'Only SACCO officials/staff can be assigned roles or classifications.'
-        );
 
         $validated = $request->validate([
             'classification_id' => [

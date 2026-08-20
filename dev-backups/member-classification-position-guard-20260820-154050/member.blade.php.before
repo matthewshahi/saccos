@@ -62,20 +62,16 @@
                 Manage Classifications
             </a>
 
-            @if ($canClassify)
-
-                <a
-                    href="{{ route(
-                        'members.classifications.create',
-                        ['member_id' => $member->member_id]
-                    ) }}"
-                    class="btn btn-primary"
-                >
-                    <i class="i-Add me-1"></i>
-                    Add New Classification
-                </a>
-
-            @endif
+            <a
+                href="{{ route(
+                    'members.classifications.create',
+                    ['member_id' => $member->member_id]
+                ) }}"
+                class="btn btn-primary"
+            >
+                <i class="i-Add me-1"></i>
+                Add New Classification
+            </a>
 
         </div>
 
@@ -181,8 +177,6 @@
 
 
     {{-- ASSIGN A ROLE --}}
-    @if ($canClassify)
-
     <div class="row mb-4" id="assign-role">
 
         <div class="col-md-12">
@@ -364,50 +358,6 @@
         </div>
 
     </div>
-
-    @else
-
-        <div class="row mb-4">
-
-            <div class="col-md-12">
-
-                <div class="card">
-
-                    <div class="card-body">
-
-                        <div class="card-title mb-2">
-                            Role / Classification Eligibility
-                        </div>
-
-                        <div class="alert alert-secondary mb-0">
-
-                            <strong>
-                                Ordinary Member
-                            </strong>
-
-                            <div class="mt-1">
-                                This member cannot be assigned additional
-                                SACCO roles or classifications.
-                            </div>
-
-                            <div class="mt-1">
-                                Detailed classifications are available only
-                                where the member's Position/Role is
-                                <strong>SACCO Official / Staff</strong>
-                                (member_position = 2).
-                            </div>
-
-                        </div>
-
-                    </div>
-
-                </div>
-
-            </div>
-
-        </div>
-
-    @endif
 
 
     {{-- CURRENT ROLES --}}
