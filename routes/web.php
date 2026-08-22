@@ -77,6 +77,7 @@ use App\Http\Controllers\SaccoBankIpnController;
 use App\Http\Middleware\VerifyCsrfToken;
 use App\Http\Controllers\MemberLoanLimitController;
 use App\Http\Controllers\MemberClassificationController;
+use App\Http\Controllers\ReportCrbController;
 
 /* good imports
 Route::prefix('kass')->group(function () {
@@ -2537,6 +2538,143 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
 
 
     Route::middleware(['auth', 'check_member_position'])->group(function () {
+
+    /*
+|--------------------------------------------------------------------------
+| CRB Reports
+|--------------------------------------------------------------------------
+| Controller: ReportCrbController
+| User Right: reports_crb
+|--------------------------------------------------------------------------
+*/
+
+Route::prefix('reports/crb')
+    ->name('reports.crb.')
+    ->middleware('check_user_rights:reports_crb')
+    ->group(function () {
+
+        /*
+        |--------------------------------------------------------------------------
+        | CRB Dashboard
+        |--------------------------------------------------------------------------
+        */
+
+        Route::get(
+            '/',
+            [ReportCrbController::class, 'index']
+        )->name('index');
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Live CRB Position / Readiness
+        |--------------------------------------------------------------------------
+        | Calculated directly from current SACCO data.
+        | Does NOT create a permanent snapshot.
+        |--------------------------------------------------------------------------
+        */
+
+        Route::get(
+            '/preview',
+            [ReportCrbController::class, 'preview']
+        )->name('preview');
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Generate CRB Report Snapshot
+        |--------------------------------------------------------------------------
+        */
+
+        Route::post(
+            '/generate',
+            [ReportCrbController::class, 'generate']
+        )->name('generate');
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Report History
+        |--------------------------------------------------------------------------
+        */
+
+        Route::get(
+            '/history',
+            [ReportCrbController::class, 'history']
+        )->name('history');
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Individual CRB Report
+        |--------------------------------------------------------------------------
+        */
+
+        Route::get(
+            '/{report}',
+            [ReportCrbController::class, 'show']
+        )
+            ->whereNumber('report')
+            ->name('show');
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Revalidate Draft
+        |--------------------------------------------------------------------------
+        */
+
+        Route::post(
+            '/{report}/validate',
+            [ReportCrbController::class, 'validateReport']
+        )
+            ->whereNumber('report')
+            ->name('validate');
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Finalise / Lock Report
+        |--------------------------------------------------------------------------
+        */
+
+        Route::post(
+            '/{report}/finalise',
+            [ReportCrbController::class, 'finalise']
+        )
+            ->whereNumber('report')
+            ->name('finalise');
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Download Generated CRB File
+        |--------------------------------------------------------------------------
+        */
+
+        Route::get(
+            '/{report}/download',
+            [ReportCrbController::class, 'download']
+        )
+            ->whereNumber('report')
+            ->name('download');
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Mark Report Submitted
+        |--------------------------------------------------------------------------
+        */
+
+        Route::post(
+            '/{report}/submitted',
+            [ReportCrbController::class, 'markSubmitted']
+        )
+            ->whereNumber('report')
+            ->name('submitted');
+    });
+
+
         Route::prefix('admin/route-audit-logs')
             ->name('route.audit.logs.')
             ->middleware('check_user_rights:view_system_logs')

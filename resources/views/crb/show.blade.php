@@ -1,0 +1,312 @@
+@extends('layouts.app')
+
+@section('content')
+<div class="breadcrumb">
+    <h1>CRB Report #{{ $reportRow->id }}</h1>
+    <ul>
+        <li><a href="{{ url('/dashboard') }}">Dashboard</a></li>
+        <li><a href="{{ route('reports.crb.index') }}">CRB Reports</a></li>
+        <li><a href="{{ route('reports.crb.history') }}">History</a></li>
+        <li>#{{ $reportRow->id }}</li>
+    </ul>
+</div>
+
+<div class="separator-breadcrumb border-top"></div>
+
+@include('crb.partials.nav')
+
+@if (session('success'))
+    <div class="alert alert-success">{{ session('success') }}</div>
+@endif
+
+@if (session('error'))
+    <div class="alert alert-danger">{{ session('error') }}</div>
+@endif
+
+@php
+    $isImmutable = in_array($reportRow->status, ['FINALISED', 'FINALIZED', 'SUBMITTED'], true);
+    $isFinalised = in_array($reportRow->status, ['FINALISED', 'FINALIZED'], true);
+    $isSubmitted = $reportRow->status === 'SUBMITTED';
+@endphp
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card o-hidden mb-4">
+            <div class="card-header d-flex align-items-center justify-content-between">
+                <h3 class="card-title m-0">
+                    {{ $reportRow->code }} — {{ $types[$reportRow->code]['title'] ?? 'CRB Report' }}
+                </h3>
+
+                @php
+                    $statusBadge = match ($reportRow->status) {
+                        'SUBMITTED' => 'bg-success',
+                        'FINALISED', 'FINALIZED' => 'bg-primary',
+                        'VALIDATED' => 'bg-info',
+                        default => $reportRow->error_records > 0 ? 'bg-danger' : 'bg-warning',
+                    };
+                @endphp
+                <span class="badge {{ $statusBadge }}">{{ $reportRow->status }}</span>
+            </div>
+
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-bordered table-sm mb-0">
+                        <tbody>
+                            <tr>
+                                <th style="width: 240px;">Report Date</th>
+                                <td>{{ optional($reportRow->report_date)->format('d M Y') }}</td>
+                            </tr>
+                            <tr>
+                                <th>Frequency</th>
+                                <td>{{ $reportRow->frequency }}</td>
+                            </tr>
+                            <tr>
+                                <th>Version</th>
+                                <td>{{ str_pad((string) $reportRow->version, 3, '0', STR_PAD_LEFT) }}</td>
+                            </tr>
+                            <tr>
+                                <th>Records</th>
+                                <td>
+                                    {{ number_format($reportRow->total_records) }} total /
+                                    <span class="text-success">{{ number_format($reportRow->valid_records) }} valid</span> /
+                                    <span class="text-warning">{{ number_format($reportRow->warning_records) }} warning</span> /
+                                    <span class="text-danger">{{ number_format($reportRow->error_records) }} error</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Generated</th>
+                                <td>{{ $reportRow->generated_at ?: '—' }}</td>
+                            </tr>
+                            <tr>
+                                <th>Finalised</th>
+                                <td>{{ $reportRow->finalised_at ?: '—' }}</td>
+                            </tr>
+                            <tr>
+                                <th>Submitted</th>
+                                <td>{{ $reportRow->submitted_at ?: '—' }}</td>
+                            </tr>
+                            <tr>
+                                <th>File Name</th>
+                                <td>
+                                    @if ($reportRow->file_name)
+                                        <code>{{ $reportRow->file_name }}</code>
+                                    @else
+                                        <span class="text-muted">Not finalised</span>
+                                    @endif
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>SHA-256</th>
+                                <td style="word-break: break-all;">
+                                    @if ($reportRow->file_hash)
+                                        <code>{{ $reportRow->file_hash }}</code>
+                                    @else
+                                        <span class="text-muted">Not available</span>
+                                    @endif
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card o-hidden mb-4">
+            <div class="card-header">
+                <h3 class="card-title m-0">Actions</h3>
+            </div>
+
+            <div class="card-body">
+                @if (!$isImmutable)
+                    <form method="POST" action="{{ route('reports.crb.validate', $reportRow->id) }}" class="mb-2">
+                        @csrf
+                        <button type="submit" class="btn btn-outline-primary w-100">
+                            Validate Frozen Draft
+                        </button>
+                    </form>
+
+                    <form method="POST"
+                          action="{{ route('reports.crb.finalise', $reportRow->id) }}"
+                          onsubmit="return confirm('Finalise this CRB report? The frozen records and generated file will become immutable.');"
+                          class="mb-2">
+                        @csrf
+                        <button type="submit"
+                                class="btn btn-success w-100"
+                                @disabled($reportRow->error_records > 0 || empty($readiness['ready']) || $reportRow->total_records < 1)>
+                            Finalise CRB File
+                        </button>
+                    </form>
+                @endif
+
+                @if ($isImmutable)
+                    <a href="{{ route('reports.crb.download', $reportRow->id) }}" class="btn btn-outline-success w-100 mb-2">
+                        Download Final File
+                    </a>
+                @endif
+
+                @if ($isFinalised)
+                    <form method="POST"
+                          action="{{ route('reports.crb.submitted', $reportRow->id) }}"
+                          onsubmit="return confirm('Confirm that this exact CRB file has been submitted to the bureau?');">
+                        @csrf
+                        <button type="submit" class="btn btn-primary w-100">
+                            Mark as Submitted
+                        </button>
+                    </form>
+                @endif
+
+                @if ($isSubmitted)
+                    <div class="alert alert-success mb-0">
+                        This report is recorded as submitted. Corrections must be generated as a new version rather than changing this file.
+                    </div>
+                @elseif (!$isImmutable && ($reportRow->error_records > 0 || empty($readiness['ready'])))
+                    <div class="alert alert-warning mt-3 mb-0">
+                        Finalisation remains disabled until all record errors are cleared and the global CRB configuration is complete.
+                    </div>
+                @endif
+            </div>
+        </div>
+
+        <div class="card o-hidden mb-4">
+            <div class="card-header">
+                <h3 class="card-title m-0">Global Readiness</h3>
+            </div>
+            <div class="card-body">
+                @if (!empty($readiness['ready']))
+                    <div class="alert alert-success mb-0">Required CRB institution configuration is complete.</div>
+                @else
+                    <div class="alert alert-warning mb-0">
+                        <ul class="mb-0 ps-3">
+                            @foreach ($readiness['issues'] as $issue)
+                                <li>{{ $issue['message'] ?? 'Configuration issue' }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card o-hidden mb-4">
+    <div class="card-header d-flex align-items-center justify-content-between">
+        <h3 class="card-title m-0">Frozen Report Records</h3>
+        <span class="text-muted">{{ number_format($records->total()) }} record(s)</span>
+    </div>
+
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-bordered table-hover table-sm mb-0">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Status</th>
+                        <th>Member</th>
+                        <th>Loan</th>
+                        <th style="min-width: 230px;">Summary</th>
+                        <th style="min-width: 360px;">Issues</th>
+                        <th style="min-width: 420px;">DST Pipe Record</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse ($records as $record)
+                        @php
+                            $badge = $record->validation_status === 'ERROR'
+                                ? 'bg-danger'
+                                : ($record->validation_status === 'WARNING' ? 'bg-warning' : 'bg-success');
+                        @endphp
+                        <tr>
+                            <td>{{ $record->sequence ?: $record->id }}</td>
+                            <td><span class="badge {{ $badge }}">{{ $record->validation_status }}</span></td>
+                            <td>{{ $record->member_id ?: '—' }}</td>
+                            <td>{{ $record->loan_id ?: '—' }}</td>
+                            <td>
+                                @forelse ($record->summary as $key => $value)
+                                    <div>
+                                        <span class="text-muted">{{ ucwords(str_replace('_', ' ', $key)) }}:</span>
+                                        {{ is_scalar($value) ? $value : json_encode($value) }}
+                                    </div>
+                                @empty
+                                    <span class="text-muted">—</span>
+                                @endforelse
+                            </td>
+                            <td>
+                                @forelse ($record->issues as $issue)
+                                    <div class="mb-1">
+                                        <span class="badge {{ ($issue['level'] ?? '') === 'ERROR' ? 'bg-danger' : 'bg-warning' }}">
+                                            {{ $issue['level'] ?? 'INFO' }}
+                                        </span>
+                                        <strong>{{ $issue['code'] ?? '' }}</strong>
+                                        <div class="small text-muted">{{ $issue['message'] ?? '' }}</div>
+                                    </div>
+                                @empty
+                                    <span class="text-success">No issues.</span>
+                                @endforelse
+                            </td>
+                            <td style="max-width: 520px;">
+                                <div style="overflow-x:auto; white-space:nowrap;">
+                                    <code>{{ $record->pipe_row }}</code>
+                                </div>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="7" class="text-center text-muted py-4">No records stored for this report.</td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    @if ($records->hasPages())
+        <div class="card-footer">
+            {{ $records->links() }}
+        </div>
+    @endif
+</div>
+
+<div class="card o-hidden mb-4">
+    <div class="card-header">
+        <h3 class="card-title m-0">Audit Log</h3>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-bordered table-sm mb-0">
+                <thead>
+                    <tr>
+                        <th>When</th>
+                        <th>Action</th>
+                        <th>Status</th>
+                        <th>Message</th>
+                        <th>User</th>
+                        <th>IP / Source</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse ($logs as $log)
+                        <tr>
+                            <td>{{ $log->created_at ?: '—' }}</td>
+                            <td><strong>{{ $log->action }}</strong></td>
+                            <td>
+                                <span class="badge {{ $log->status === 'SUCCESS' ? 'bg-success' : 'bg-danger' }}">
+                                    {{ $log->status }}
+                                </span>
+                            </td>
+                            <td>{{ $log->message }}</td>
+                            <td>{{ $log->user_id ?: 'System' }}</td>
+                            <td>{{ $log->ip ?: '—' }}</td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="6" class="text-center text-muted">No audit events recorded.</td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+@endsection

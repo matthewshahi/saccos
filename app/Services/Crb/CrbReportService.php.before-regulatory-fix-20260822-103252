@@ -1,0 +1,2607 @@
+<?php
+
+namespace App\Services\Crb;
+
+use Carbon\Carbon;
+use Generator;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Query\Builder;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
+use RuntimeException;
+use stdClass;
+
+class CrbReportService
+{
+    private const APP_TZ = 'Africa/Nairobi';
+
+    /**
+     * Current implementation scope. Other DST file types can be added later
+     * without changing the report storage model.
+     */
+    private const REPORT_TYPES = [
+        'CE' => [
+            'title' => 'Individual Consumer, Employer and Account',
+            'frequency' => 'MONTHLY',
+            'description' => 'Monthly individual borrower and account information.',
+        ],
+        'GI' => [
+            'title' => 'Guarantor Information',
+            'frequency' => 'MONTHLY',
+            'description' => 'Monthly guarantor information linked to reported loan accounts.',
+        ],
+        'CA' => [
+            'title' => 'Credit Application',
+            'frequency' => 'MONTHLY',
+            'description' => 'Monthly individual credit applications and their current application status.',
+        ],
+        'DP' => [
+            'title' => 'Daily Payment Information',
+            'frequency' => 'DAILY',
+            'description' => 'Daily payment updates for accounts already reported to the CRB.',
+        ],
+        'MF' => [
+            'title' => 'New Mobile Facilities',
+            'frequency' => 'DAILY',
+            'description' => 'Daily newly-disbursed instant/mobile loan facilities.',
+        ],
+    ];
+
+    private const FIELD_NAMES = [
+        'CE' => [
+            'Surname',
+            'Forename 1',
+            'Forename 2',
+            'Forename 3',
+            'Trading As',
+            'Date of Birth',
+            'Client Number',
+            'Account Number',
+            'Old Account Number',
+            'Gender',
+            'Nationality',
+            'Marital Status',
+            'Primary Identification Document Type',
+            'Primary Identification Document Number',
+            'Secondary Identification Document Type',
+            'Secondary Identification Document Number',
+            'Other Identification Document Type',
+            'Other Identification Document Number',
+            'Passport Country Code',
+            'Mobile Telephone Number',
+            'Home Telephone Number',
+            'Work Telephone Number',
+            'Postal Address 1',
+            'Postal Address 2',
+            'Postal Town',
+            'Postal Country',
+            'Postcode',
+            'Physical Address 1',
+            'Physical Address 2',
+            'Plot Number',
+            'Physical Location Town',
+            'Physical Location Country',
+            'Residency Type',
+            'PIN Number',
+            'Email Address',
+            'Employer Name',
+            'Occupational Industry Type',
+            'Employment Date',
+            'Employment Type',
+            'Income Amount',
+            'Lenders Registered Name',
+            'Lenders Trading Name',
+            'Lenders Branch Name',
+            'Lenders Branch Code',
+            'Joint or Single Account',
+            'Account Product Type',
+            'Date Account Opened',
+            'Instalment Due Date',
+            'Original Amount',
+            'Currency',
+            'Current Balance in Kenya Shillings',
+            'Current Balance',
+            'Overdue Balance',
+            'Overdue Date',
+            'Days in Arrears',
+            'Instalments in Arrears',
+            'Prudential Risk Classification',
+            'Account Status',
+            'Account Status Date',
+            'Account Closure Reason',
+            'Repayment Period',
+            'Deferred Payment Date',
+            'Deferred Payment Amount',
+            'Payment Frequency',
+            'Disbursement Date',
+            'Next Instalment Amount',
+            'Date of Latest Payment',
+            'Last Payment Amount',
+            'Type of Security',
+            'Group ID',
+        ],
+        'GI' => [
+            'Lenders Registered Name',
+            'Lenders Trading Name',
+            'Lenders Branch Name',
+            'Lenders Branch Code',
+            'Borrower Client Number',
+            'Account Number',
+            'Surname',
+            'Forename 1',
+            'Forename 2',
+            'Forename 3',
+            'Company or Corporate Name',
+            'Date of Birth or Registration Date',
+            'Gender',
+            'Nationality',
+            'Marital Status',
+            'Guarantee Type',
+            'Guarantor Relationship',
+            'Guarantee Limit',
+            'Primary Identification Document',
+            'Primary Identification Document Number',
+            'Secondary Identification Document',
+            'Secondary Identification Document Number',
+            'Other Identification Document',
+            'Other Identification Document Number',
+            'Employer Name',
+            'Employment Type',
+            'Income Band',
+            'Mobile Telephone Number',
+            'Home Telephone Number',
+            'Work Telephone Number',
+            'Postal Address 1',
+            'Postal Address 2',
+            'Town',
+            'Country',
+            'Postcode',
+            'Physical Address 1',
+            'Physical Address 2',
+            'Plot Number',
+            'Physical Location Town',
+            'Physical Location Country',
+            'Email Address',
+        ],
+        'CA' => [
+            'Lenders Registered Name',
+            'Lenders Trading Name',
+            'Lenders Branch Name',
+            'Lenders Branch Code',
+            'Type of Client',
+            'Surname',
+            'Forename 1',
+            'Forename 2',
+            'Forename 3',
+            'Registered Name',
+            'Trading Name',
+            'Primary Identification Document',
+            'Primary Identification Document Number',
+            'Secondary Identification Document',
+            'Secondary Identification Document Number',
+            'Other Identification Document',
+            'Other Identification Document Number',
+            'Client Number',
+            'PIN Number',
+            'Account Number',
+            'Application Date',
+            'Application Number',
+            'Facility Application Type',
+            'Application Amount',
+            'Application Currency',
+            'Product Type',
+            'Term of Loan',
+            'Application Status',
+            'Application Decline Reason Code',
+            'Application Status Date',
+            'Application Status Update Reason',
+        ],
+        'DP' => [
+            'Snapshot Date',
+            'Client Type',
+            'Surname',
+            'Forename 1',
+            'Forename 2',
+            'Forename 3',
+            'Company Name',
+            'Primary Identification Document Type',
+            'Primary Identification Document Number',
+            'Account Number',
+            'Currency',
+            'Original Amount',
+            'Payment Amount',
+            'Payment Date',
+            'Current Balance',
+            'Instalments in Arrears',
+            'Days in Arrears',
+            'Account Status',
+        ],
+        'MF' => [
+            'Surname',
+            'Forename 1',
+            'Forename 2',
+            'Forename 3',
+            'Trading As',
+            'Date of Birth',
+            'Client Number',
+            'Account Number',
+            'Gender',
+            'Nationality',
+            'Primary Identification Document Type',
+            'Primary Identification Document Number',
+            'Mobile Phone Number',
+            'Account Product Type',
+            'Instalment Due Date',
+            'Original Amount',
+            'Currency',
+            'Current Balance in Kenya Shillings',
+            'Current Balance',
+            'Overdue Balance',
+            'Overdue Date',
+            'Days in Arrears',
+            'Instalments in Arrears',
+            'Prudential Risk Classification',
+            'Account Status',
+            'Account Status Date',
+            'Repayment Period',
+            'Disbursement Date',
+            'Instalment Amount',
+            'Date of Latest Payment',
+            'Last Payment Amount',
+        ],
+    ];
+
+    /**
+     * Logical storage fields -> possible physical column names.
+     * The migration created for this module uses crb_* names, but keeping
+     * these aliases makes the service tolerant of harmless naming differences.
+     */
+    private const COLUMN_CANDIDATES = [
+        'reports' => [
+            'id' => ['crb_report_id', 'report_id', 'id'],
+            'code' => ['crb_report_code', 'crb_report_type', 'report_code', 'report_type', 'file_type'],
+            'frequency' => ['crb_report_frequency', 'report_frequency', 'frequency', 'batch_type'],
+            'date' => ['crb_report_date', 'report_date', 'snapshot_date', 'status_date'],
+            'period' => ['crb_report_period', 'report_period', 'period'],
+            'version' => ['crb_report_version', 'report_version', 'version'],
+            'status' => ['crb_report_status', 'report_status', 'status'],
+            'total' => ['crb_report_total_records', 'crb_report_record_count', 'crb_report_total', 'total_records', 'record_count'],
+            'valid' => ['crb_report_valid_records', 'crb_report_valid_count', 'valid_records', 'valid_count'],
+            'warning' => ['crb_report_warning_records', 'crb_report_warning_count', 'warning_records', 'warning_count'],
+            'error' => ['crb_report_error_records', 'crb_report_error_count', 'error_records', 'error_count'],
+            'file_name' => ['crb_report_file_name', 'crb_report_filename', 'file_name', 'filename'],
+            'file_path' => ['crb_report_file_path', 'crb_report_filepath', 'file_path', 'filepath'],
+            'file_hash' => ['crb_report_file_hash', 'crb_report_hash', 'file_hash', 'sha256'],
+            'generated_by' => ['crb_report_generated_by', 'generated_by', 'crb_report_by', 'report_by'],
+            'generated_at' => ['crb_report_generated_at', 'generated_at', 'crb_report_on', 'report_on'],
+            'finalised_by' => ['crb_report_finalised_by', 'crb_report_finalized_by', 'finalised_by', 'finalized_by'],
+            'finalised_at' => ['crb_report_finalised_at', 'crb_report_finalized_at', 'finalised_at', 'finalized_at'],
+            'submitted_by' => ['crb_report_submitted_by', 'submitted_by'],
+            'submitted_at' => ['crb_report_submitted_at', 'submitted_at'],
+            'notes' => ['crb_report_notes', 'report_notes', 'notes'],
+            'ip' => ['crb_report_ip', 'report_ip', 'ip'],
+            'created_at' => ['created_at'],
+            'updated_at' => ['updated_at'],
+        ],
+        'records' => [
+            'id' => ['crb_record_id', 'report_record_id', 'id'],
+            'report_id' => ['crb_record_report_id', 'crb_report_id', 'report_id'],
+            'sequence' => ['crb_record_sequence', 'record_sequence', 'sequence'],
+            'member_id' => ['crb_record_member_id', 'member_id'],
+            'loan_id' => ['crb_record_loan_id', 'loan_id'],
+            'source_type' => ['crb_record_source_type', 'source_type'],
+            'source_id' => ['crb_record_source_id', 'source_id'],
+            'status' => ['crb_record_validation_status', 'validation_status', 'record_status', 'status'],
+            'data' => ['crb_record_data', 'crb_record_payload', 'crb_record_row_data', 'record_data', 'record_payload', 'data'],
+            'errors' => ['crb_record_errors', 'crb_record_issues', 'crb_record_validation_errors', 'record_errors', 'record_issues', 'validation_errors', 'errors'],
+            'created_at' => ['created_at', 'crb_record_created_at'],
+            'updated_at' => ['updated_at', 'crb_record_updated_at'],
+        ],
+        'logs' => [
+            'id' => ['crb_log_id', 'report_log_id', 'id'],
+            'report_id' => ['crb_log_report_id', 'crb_report_id', 'report_id'],
+            'action' => ['crb_log_action', 'log_action', 'action'],
+            'status' => ['crb_log_status', 'log_status', 'status'],
+            'message' => ['crb_log_message', 'log_message', 'message'],
+            'total' => ['crb_log_total', 'log_total', 'total', 'record_count'],
+            'context' => ['crb_log_context', 'log_context', 'context'],
+            'user_id' => ['crb_log_user_id', 'user_id', 'created_by'],
+            'ip' => ['crb_log_ip', 'ip'],
+            'created_at' => ['created_at', 'crb_log_created_at', 'crb_log_on'],
+        ],
+    ];
+
+    private array $columnCache = [];
+    private array $paymentStatsCache = [];
+    private array $priorReportedCache = [];
+    private ?array $defaultsCache = null;
+
+    public function reportTypes(): array
+    {
+        return self::REPORT_TYPES;
+    }
+
+    public function fieldNames(string $code): array
+    {
+        $code = $this->normaliseCode($code);
+
+        return self::FIELD_NAMES[$code];
+    }
+
+    public function readiness(): array
+    {
+        $required = [
+            'CRB_REGISTERED_NAME' => 'Registered lender name',
+            'CRB_TRADING_NAME' => 'Trading name',
+            'CRB_INSTITUTION_CODE' => 'CRB institution code',
+            'CRB_BRANCH_NAME' => 'Branch name',
+            'CRB_BRANCH_CODE' => 'Branch code',
+            'CRB_SPECIFICATION_CODE' => 'CRB specification code (B, M, D or F)',
+            'CRB_RISK_CLASSIFICATION_BASIS' => 'Risk classification basis (BANK or MFB)',
+        ];
+
+        $issues = [];
+        $settings = [];
+
+        foreach ($required as $name => $label) {
+            $value = trim((string) $this->default($name, ''));
+            $settings[$name] = $value;
+
+            if ($value === '') {
+                $issues[] = [
+                    'level' => 'ERROR',
+                    'code' => 'CONFIG_MISSING',
+                    'message' => "{$label} is not configured ({$name}).",
+                ];
+            }
+        }
+
+        $spec = strtoupper($settings['CRB_SPECIFICATION_CODE'] ?? '');
+        if ($spec !== '' && !in_array($spec, ['B', 'M', 'D', 'F'], true)) {
+            $issues[] = [
+                'level' => 'ERROR',
+                'code' => 'INVALID_SPECIFICATION_CODE',
+                'message' => 'CRB_SPECIFICATION_CODE must be one of B, M, D or F as defined by the DST filename convention.',
+            ];
+        }
+
+        $riskBasis = strtoupper($settings['CRB_RISK_CLASSIFICATION_BASIS'] ?? '');
+        if ($riskBasis !== '' && !in_array($riskBasis, ['BANK', 'MFB'], true)) {
+            $issues[] = [
+                'level' => 'ERROR',
+                'code' => 'INVALID_RISK_BASIS',
+                'message' => 'CRB_RISK_CLASSIFICATION_BASIS must be BANK or MFB. The system will not guess the applicable prudential band for a SACCO.',
+            ];
+        }
+
+        $institution = preg_replace('/\D+/', '', (string) ($settings['CRB_INSTITUTION_CODE'] ?? ''));
+        if (($settings['CRB_INSTITUTION_CODE'] ?? '') !== '' && ($institution === '' || strlen($institution) > 3)) {
+            $issues[] = [
+                'level' => 'ERROR',
+                'code' => 'INVALID_INSTITUTION_CODE',
+                'message' => 'CRB_INSTITUTION_CODE must contain a numeric institution identifier of at most three digits.',
+            ];
+        }
+
+        if (($settings['CRB_BRANCH_CODE'] ?? '') !== '' && $this->branchCode() === '') {
+            $issues[] = [
+                'level' => 'ERROR',
+                'code' => 'INVALID_BRANCH_CODE',
+                'message' => 'CRB_BRANCH_CODE must be either the numeric branch identifier (up to three digits) or the full SXXXYYY SACCO branch code.',
+            ];
+        }
+
+        $currency = strtoupper((string) $this->default('CRB_DEFAULT_CURRENCY', 'KES'));
+        if (!preg_match('/^[A-Z]{3}$/', $currency)) {
+            $issues[] = [
+                'level' => 'ERROR',
+                'code' => 'INVALID_DEFAULT_CURRENCY',
+                'message' => 'CRB_DEFAULT_CURRENCY must be a three-letter ISO currency code.',
+            ];
+        }
+
+        $nationality = strtoupper((string) $this->default('CRB_DEFAULT_NATIONALITY', 'KE'));
+        if (!preg_match('/^[A-Z]{2}$/', $nationality)) {
+            $issues[] = [
+                'level' => 'ERROR',
+                'code' => 'INVALID_DEFAULT_NATIONALITY',
+                'message' => 'CRB_DEFAULT_NATIONALITY must be a two-letter ISO country code.',
+            ];
+        }
+
+        $hasErrors = collect($issues)->contains(fn ($issue) => $issue['level'] === 'ERROR');
+
+        return [
+            'ready' => !$hasErrors,
+            'issues' => $issues,
+            'settings' => [
+                'registered_name' => $this->default('CRB_REGISTERED_NAME', ''),
+                'trading_name' => $this->default('CRB_TRADING_NAME', ''),
+                'institution_code' => $this->institutionCode(),
+                'branch_name' => $this->default('CRB_BRANCH_NAME', ''),
+                'branch_code' => $this->branchCode(),
+                'specification_code' => $spec,
+                'risk_basis' => $riskBasis,
+                'currency' => $currency,
+                'nationality' => $nationality,
+                'db_timezone' => $this->dbTimezone(),
+                'negative_information_threshold' => (float) $this->default('CRB_NEGATIVE_INFORMATION_THRESHOLD', 1000),
+                'apply_negative_threshold' => strtoupper((string) $this->default('CRB_APPLY_NEGATIVE_THRESHOLD', 'N')) === 'Y',
+            ],
+        ];
+    }
+
+    public function defaultReportDate(string $code): Carbon
+    {
+        $code = $this->normaliseCode($code);
+        $now = Carbon::now(self::APP_TZ)->startOfDay();
+
+        if (self::REPORT_TYPES[$code]['frequency'] === 'MONTHLY') {
+            return $now->copy()->subMonthNoOverflow()->endOfMonth()->startOfDay();
+        }
+
+        return $now->copy()->subDay();
+    }
+
+    public function normaliseReportDate(string $code, Carbon|string|null $date): Carbon
+    {
+        $code = $this->normaliseCode($code);
+
+        if ($date instanceof Carbon) {
+            $resolved = $date->copy()->setTimezone(self::APP_TZ)->startOfDay();
+        } elseif ($date === null || trim((string) $date) === '') {
+            $resolved = $this->defaultReportDate($code);
+        } else {
+            try {
+                $resolved = Carbon::createFromFormat('Y-m-d', (string) $date, self::APP_TZ)->startOfDay();
+            } catch (\Throwable) {
+                throw new RuntimeException('Invalid CRB report date. Expected YYYY-MM-DD.');
+            }
+        }
+
+        if (self::REPORT_TYPES[$code]['frequency'] === 'MONTHLY') {
+            $resolved = $resolved->endOfMonth()->startOfDay();
+        }
+
+        return $resolved;
+    }
+
+    public function preview(string $code, Carbon|string|null $date, int $limit = 100): array
+    {
+        $code = $this->normaliseCode($code);
+        $date = $this->normaliseReportDate($code, $date);
+        $limit = max(1, min($limit, 250));
+
+        $sample = [];
+        $sampleCounts = ['VALID' => 0, 'WARNING' => 0, 'ERROR' => 0];
+
+        foreach ($this->recordIterator($code, $date) as $record) {
+            $status = $this->validationStatus($record['issues']);
+            $record['validation_status'] = $status;
+            $sampleCounts[$status]++;
+
+            $sample[] = $record;
+
+            if (count($sample) >= $limit) {
+                break;
+            }
+        }
+
+        return [
+            'code' => $code,
+            'type' => self::REPORT_TYPES[$code],
+            'date' => $date,
+            'candidate_count' => $this->candidateCount($code, $date),
+            'sample_limit' => $limit,
+            'sample_count' => count($sample),
+            'sample_counts' => $sampleCounts,
+            'field_names' => self::FIELD_NAMES[$code],
+            'records' => $sample,
+            'readiness' => $this->readiness(),
+        ];
+    }
+
+    public function generate(
+        string $code,
+        Carbon|string|null $date,
+        ?int $userId = null,
+        ?string $ip = null,
+        bool $ifMissing = false
+    ): ?int {
+        $code = $this->normaliseCode($code);
+        $date = $this->normaliseReportDate($code, $date);
+
+        if ($ifMissing && $this->reportExists($code, $date)) {
+            return null;
+        }
+
+        $candidateCount = $this->candidateCount($code, $date);
+        if ($candidateCount < 1 && $ifMissing) {
+            return null;
+        }
+
+        if ($candidateCount < 1) {
+            throw new RuntimeException("No {$code} CRB records were found for {$date->format('Y-m-d')}.");
+        }
+
+        return DB::transaction(function () use ($code, $date, $userId, $ip, $ifMissing) {
+            if ($ifMissing && $this->reportExists($code, $date, true)) {
+                return null;
+            }
+
+            $version = $this->nextVersion($code, $date);
+            $reportId = $this->insertReport([
+                'code' => $code,
+                'frequency' => self::REPORT_TYPES[$code]['frequency'],
+                'date' => $date->format('Y-m-d'),
+                'period' => $date->format('Ym'),
+                'version' => $version,
+                'status' => 'DRAFT',
+                'total' => 0,
+                'valid' => 0,
+                'warning' => 0,
+                'error' => 0,
+                'generated_by' => $userId,
+                'generated_at' => now(),
+                'ip' => $ip,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $counts = ['VALID' => 0, 'WARNING' => 0, 'ERROR' => 0];
+            $sequence = 0;
+            $batch = [];
+
+            foreach ($this->recordIterator($code, $date) as $record) {
+                $sequence++;
+                $status = $this->validationStatus($record['issues']);
+                $counts[$status]++;
+
+                $payload = [
+                    'field_names' => self::FIELD_NAMES[$code],
+                    'fields' => $record['fields'],
+                    'summary' => $record['summary'],
+                    'meta' => [
+                        'report_code' => $code,
+                        'report_date' => $date->format('Y-m-d'),
+                        'issues' => $record['issues'],
+                    ],
+                ];
+
+                $batch[] = $this->recordInsertPayload([
+                    'report_id' => $reportId,
+                    'sequence' => $sequence,
+                    'member_id' => $record['member_id'],
+                    'loan_id' => $record['loan_id'],
+                    'source_type' => $record['source_type'],
+                    'source_id' => $record['source_id'],
+                    'status' => $status,
+                    'data' => json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+                    'errors' => json_encode($record['issues'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+                if (count($batch) >= 250) {
+                    DB::table('sacco_crb_report_records')->insert($batch);
+                    $batch = [];
+                }
+            }
+
+            if ($batch !== []) {
+                DB::table('sacco_crb_report_records')->insert($batch);
+            }
+
+            if ($sequence < 1) {
+                if ($ifMissing) {
+                    $this->deleteReportInternally($reportId);
+
+                    return null;
+                }
+
+                throw new RuntimeException("No usable {$code} CRB records remained after source filtering.");
+            }
+
+            $this->updateReport($reportId, [
+                'total' => $sequence,
+                'valid' => $counts['VALID'],
+                'warning' => $counts['WARNING'],
+                'error' => $counts['ERROR'],
+                'updated_at' => now(),
+            ]);
+
+            $this->log($reportId, 'GENERATE', 'SUCCESS', "Generated {$code} report draft.", $sequence, [
+                'report_date' => $date->format('Y-m-d'),
+                'version' => $version,
+                'valid' => $counts['VALID'],
+                'warnings' => $counts['WARNING'],
+                'errors' => $counts['ERROR'],
+            ], $userId, $ip);
+
+            return $reportId;
+        }, 3);
+    }
+
+    public function generateIfMissing(
+        string $code,
+        Carbon|string|null $date,
+        ?int $userId = null,
+        ?string $ip = null
+    ): ?int {
+        return $this->generate($code, $date, $userId, $ip, true);
+    }
+
+    public function reportStats(): array
+    {
+        $statusCol = $this->requireColumn('reports', 'status');
+
+        $grouped = DB::table('sacco_crb_reports')
+            ->select($statusCol, DB::raw('COUNT(*) AS total'))
+            ->groupBy($statusCol)
+            ->pluck('total', $statusCol)
+            ->mapWithKeys(fn ($value, $key) => [strtoupper((string) $key) => (int) $value])
+            ->all();
+
+        $errorCol = $this->column('reports', 'error');
+
+        return [
+            'total' => array_sum($grouped),
+            'draft' => ($grouped['DRAFT'] ?? 0) + ($grouped['VALIDATED'] ?? 0),
+            'finalised' => ($grouped['FINALISED'] ?? 0) + ($grouped['FINALIZED'] ?? 0),
+            'submitted' => $grouped['SUBMITTED'] ?? 0,
+            'with_errors' => $errorCol
+                ? DB::table('sacco_crb_reports')->where($errorCol, '>', 0)->count()
+                : 0,
+        ];
+    }
+
+    public function recentReports(int $limit = 10)
+    {
+        $idCol = $this->requireColumn('reports', 'id');
+
+        return DB::table('sacco_crb_reports')
+            ->orderByDesc($idCol)
+            ->limit(max(1, min($limit, 50)))
+            ->get()
+            ->map(fn ($row) => $this->normaliseReportRow($row));
+    }
+
+    public function paginateReports(array $filters = [], int $perPage = 25): LengthAwarePaginator
+    {
+        $query = DB::table('sacco_crb_reports');
+
+        if (!empty($filters['code'])) {
+            $query->where($this->requireColumn('reports', 'code'), strtoupper((string) $filters['code']));
+        }
+
+        if (!empty($filters['status'])) {
+            $query->where($this->requireColumn('reports', 'status'), strtoupper((string) $filters['status']));
+        }
+
+        if (!empty($filters['date_from'])) {
+            $query->whereDate($this->requireColumn('reports', 'date'), '>=', $filters['date_from']);
+        }
+
+        if (!empty($filters['date_to'])) {
+            $query->whereDate($this->requireColumn('reports', 'date'), '<=', $filters['date_to']);
+        }
+
+        $paginator = $query
+            ->orderByDesc($this->requireColumn('reports', 'id'))
+            ->paginate(max(10, min($perPage, 100)))
+            ->withQueryString();
+
+        $paginator->setCollection(
+            $paginator->getCollection()->map(fn ($row) => $this->normaliseReportRow($row))
+        );
+
+        return $paginator;
+    }
+
+    public function getReport(int $id): stdClass
+    {
+        $row = DB::table('sacco_crb_reports')
+            ->where($this->requireColumn('reports', 'id'), $id)
+            ->first();
+
+        if (!$row) {
+            throw new RuntimeException('CRB report not found.');
+        }
+
+        return $this->normaliseReportRow($row);
+    }
+
+    public function paginateReportRecords(int $reportId, int $perPage = 50): LengthAwarePaginator
+    {
+        $query = DB::table('sacco_crb_report_records')
+            ->where($this->requireColumn('records', 'report_id'), $reportId);
+
+        $orderCol = $this->column('records', 'sequence') ?: $this->requireColumn('records', 'id');
+
+        $paginator = $query
+            ->orderBy($orderCol)
+            ->paginate(max(10, min($perPage, 100)))
+            ->withQueryString();
+
+        $paginator->setCollection(
+            $paginator->getCollection()->map(fn ($row) => $this->normaliseRecordRow($row))
+        );
+
+        return $paginator;
+    }
+
+    public function reportLogs(int $reportId)
+    {
+        $orderCol = $this->column('logs', 'id') ?: $this->column('logs', 'created_at');
+
+        $query = DB::table('sacco_crb_report_logs')
+            ->where($this->requireColumn('logs', 'report_id'), $reportId);
+
+        if ($orderCol) {
+            $query->orderByDesc($orderCol);
+        }
+
+        return $query->limit(100)->get()->map(fn ($row) => $this->normaliseLogRow($row));
+    }
+
+    public function validateStoredReport(int $reportId, ?int $userId = null, ?string $ip = null): stdClass
+    {
+        $report = $this->getReport($reportId);
+
+        if (in_array($report->status, ['FINALISED', 'FINALIZED', 'SUBMITTED'], true)) {
+            throw new RuntimeException('Finalised or submitted CRB reports are immutable.');
+        }
+
+        $reportIdCol = $this->requireColumn('records', 'report_id');
+        $statusCol = $this->requireColumn('records', 'status');
+
+        $counts = DB::table('sacco_crb_report_records')
+            ->select($statusCol, DB::raw('COUNT(*) AS total'))
+            ->where($reportIdCol, $reportId)
+            ->groupBy($statusCol)
+            ->pluck('total', $statusCol)
+            ->mapWithKeys(fn ($value, $key) => [strtoupper((string) $key) => (int) $value])
+            ->all();
+
+        $total = array_sum($counts);
+        $errors = $counts['ERROR'] ?? 0;
+        $warnings = $counts['WARNING'] ?? 0;
+        $valid = $counts['VALID'] ?? 0;
+        $newStatus = $errors === 0 && $total > 0 ? 'VALIDATED' : 'DRAFT';
+
+        $this->updateReport($reportId, [
+            'total' => $total,
+            'valid' => $valid,
+            'warning' => $warnings,
+            'error' => $errors,
+            'status' => $newStatus,
+            'updated_at' => now(),
+        ]);
+
+        $this->log(
+            $reportId,
+            'VALIDATE',
+            $errors === 0 ? 'SUCCESS' : 'ERROR',
+            $errors === 0
+                ? "Validation completed with {$warnings} warning record(s)."
+                : "Validation found {$errors} record(s) with errors.",
+            $total,
+            compact('valid', 'warnings', 'errors'),
+            $userId,
+            $ip
+        );
+
+        return $this->getReport($reportId);
+    }
+
+    public function finalise(int $reportId, ?int $userId = null, ?string $ip = null): stdClass
+    {
+        return DB::transaction(function () use ($reportId, $userId, $ip) {
+            $report = $this->validateStoredReport($reportId, $userId, $ip);
+
+            $readiness = $this->readiness();
+            if (!$readiness['ready']) {
+                $messages = collect($readiness['issues'])->pluck('message')->implode(' ');
+
+                throw new RuntimeException('CRB configuration is not ready. ' . $messages);
+            }
+
+            if ($report->error_records > 0) {
+                throw new RuntimeException("This report has {$report->error_records} record(s) with errors and cannot be finalised.");
+            }
+
+            if ($report->total_records < 1) {
+                throw new RuntimeException('An empty CRB report cannot be finalised.');
+            }
+
+            $filename = $this->fileName($report);
+            $path = 'crb/' . $report->report_date->format('Ymd') . '/' . $filename;
+
+            $content = $this->renderStoredReportContent($reportId);
+
+            if ($content === '') {
+                throw new RuntimeException('The CRB report file would be empty.');
+            }
+
+            Storage::disk('local')->put($path, $content);
+
+            $hash = hash('sha256', $content);
+
+            $this->updateReport($reportId, [
+                'status' => 'FINALISED',
+                'file_name' => $filename,
+                'file_path' => $path,
+                'file_hash' => $hash,
+                'finalised_by' => $userId,
+                'finalised_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $this->log($reportId, 'FINALISE', 'SUCCESS', 'CRB submission file finalised.', $report->total_records, [
+                'file_name' => $filename,
+                'sha256' => $hash,
+            ], $userId, $ip);
+
+            return $this->getReport($reportId);
+        }, 3);
+    }
+
+    public function downloadFile(int $reportId): array
+    {
+        $report = $this->getReport($reportId);
+
+        if (!in_array($report->status, ['FINALISED', 'FINALIZED', 'SUBMITTED'], true)) {
+            throw new RuntimeException('Only finalised or submitted CRB files can be downloaded.');
+        }
+
+        if (!$report->file_path || !Storage::disk('local')->exists($report->file_path)) {
+            throw new RuntimeException('The finalised CRB file is not present in storage.');
+        }
+
+        return [
+            'path' => Storage::disk('local')->path($report->file_path),
+            'name' => $report->file_name ?: basename($report->file_path),
+        ];
+    }
+
+    public function markSubmitted(int $reportId, ?int $userId = null, ?string $ip = null): stdClass
+    {
+        $report = $this->getReport($reportId);
+
+        if (!in_array($report->status, ['FINALISED', 'FINALIZED'], true)) {
+            throw new RuntimeException('Only a finalised CRB report can be marked as submitted.');
+        }
+
+        $this->updateReport($reportId, [
+            'status' => 'SUBMITTED',
+            'submitted_by' => $userId,
+            'submitted_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->log($reportId, 'SUBMIT', 'SUCCESS', 'CRB report marked as submitted by an authorised user.', $report->total_records, [], $userId, $ip);
+
+        return $this->getReport($reportId);
+    }
+
+    public function reportExists(string $code, Carbon|string $date, bool $lock = false): bool
+    {
+        $code = $this->normaliseCode($code);
+        $date = $this->normaliseReportDate($code, $date);
+
+        $query = DB::table('sacco_crb_reports')
+            ->where($this->requireColumn('reports', 'code'), $code)
+            ->whereDate($this->requireColumn('reports', 'date'), $date->format('Y-m-d'));
+
+        if ($lock) {
+            $query->lockForUpdate();
+        }
+
+        return $query->exists();
+    }
+
+    private function recordIterator(string $code, Carbon $date): Generator
+    {
+        $this->paymentStats($date);
+
+        yield from match ($code) {
+            'CE' => $this->ceRecords($date),
+            'GI' => $this->giRecords($date),
+            'CA' => $this->caRecords($date),
+            'DP' => $this->dpRecords($date),
+            'MF' => $this->mfRecords($date),
+            default => throw new RuntimeException("Unsupported CRB report code {$code}."),
+        };
+    }
+
+    private function ceRecords(Carbon $date): Generator
+    {
+        foreach ($this->baseLoanQuery($date)->orderBy('l.loan_id')->cursor() as $row) {
+            yield $this->buildCeRecord($row, $date);
+        }
+    }
+
+    private function giRecords(Carbon $date): Generator
+    {
+        $query = DB::table('sacco_loan_guarantors as g')
+            ->join('sacco_loans as l', 'l.loan_id', '=', 'g.loan_guar_loan_id')
+            ->join('sacco_members as b', 'b.member_id', '=', 'l.loan_member')
+            ->join('sacco_members as gm', 'gm.member_id', '=', 'g.loan_guar_guarantor_id')
+            ->leftJoin('sacco_department as gd', 'gd.department_id', '=', 'gm.member_dept')
+            ->leftJoin('sacco_company as gc', 'gc.company_id', '=', 'gd.department_company_id')
+            ->where(function ($q) use ($date) {
+                $q->where('l.loan_taken_period', '<=', (int) $date->format('Ym'))
+                    ->orWhere('l.loan_on', '<=', $this->snapshotEndDb($date));
+            })
+            ->where('l.loan_amount', '>', 0)
+            ->where(function ($q) {
+                $q->whereNull('g.loan_guar_deleted')
+                    ->orWhere('g.loan_guar_deleted', '<>', 'Y');
+            })
+            ->select([
+                'g.*',
+                'l.loan_id',
+                'l.loan_amount',
+                'l.loan_on',
+                'l.loan_taken_period',
+                'b.member_id as borrower_member_id',
+                'b.member_sacco_id as borrower_client_number',
+                'gm.member_id as guarantor_member_id',
+                'gm.member_name as guarantor_name',
+                'gm.member_national_id as guarantor_national_id',
+                'gm.member_phone_no as guarantor_phone',
+                'gm.member_gender as guarantor_gender',
+                'gm.member_dob as guarantor_dob',
+                'gm.member_email as guarantor_email',
+                'gm.member_postal_address as guarantor_address',
+                'gc.company_name as guarantor_employer',
+            ])
+            ->orderBy('g.loan_guar_id');
+
+        foreach ($query->cursor() as $row) {
+            yield $this->buildGiRecord($row, $date);
+        }
+    }
+
+    private function caRecords(Carbon $date): Generator
+    {
+        [$startDb, $endDb] = $this->monthDbRange($date);
+
+        $query = DB::table('sacco_loan_batch_trans_members as a')
+            ->join('sacco_members as m', 'm.member_id', '=', 'a.batch_trans_member_id')
+            ->leftJoin('sacco_loan_types as lt', 'lt.loan_type_id', '=', 'a.batch_trans_loan_type')
+            ->leftJoin('sacco_loans as l', 'l.loan_batch_trans_id', '=', 'a.batch_trans_id')
+            ->whereBetween('a.batch_trans_on', [$startDb, $endDb])
+            ->select([
+                'a.*',
+                'm.member_id as crb_member_id',
+                'm.member_name as crb_member_name',
+                'm.member_sacco_id as crb_member_sacco_id',
+                'm.member_national_id as crb_member_national_id',
+                'm.member_kra_pin as crb_member_kra_pin',
+                'lt.loan_type_name as crb_loan_type_name',
+                'lt.loan_type_instant_disbursement as crb_instant',
+                'l.loan_id as crb_linked_loan_id',
+                'l.loan_on as crb_linked_loan_on',
+            ])
+            ->orderBy('a.batch_trans_id');
+
+        foreach ($query->cursor() as $row) {
+            yield $this->buildCaRecord($row, $date);
+        }
+    }
+
+    private function dpRecords(Carbon $date): Generator
+    {
+        $day = $date->format('Y-m-d');
+
+        $daily = DB::table('sacco_loan_payments')
+            ->select([
+                'loan_payments_loan_id',
+                DB::raw('SUM(COALESCE(loan_payments_amount, 0)) AS crb_day_principal'),
+                DB::raw('SUM(COALESCE(loan_payments_interest, 0)) AS crb_day_interest'),
+                DB::raw('SUM(COALESCE(loan_payments_amount, 0) + COALESCE(loan_payments_interest, 0)) AS crb_day_cash'),
+            ])
+            ->whereDate('loan_payments_paid_on', $day)
+            ->groupBy('loan_payments_loan_id');
+
+        $query = $this->baseLoanQuery($date)
+            ->joinSub($daily, 'dp', 'dp.loan_payments_loan_id', '=', 'l.loan_id')
+            ->addSelect([
+                'dp.crb_day_principal',
+                'dp.crb_day_interest',
+                'dp.crb_day_cash',
+            ])
+            ->orderBy('l.loan_id');
+
+        $known = $this->priorReportedLoanIds($date);
+
+        foreach ($query->cursor() as $row) {
+            $cash = (float) ($row->crb_day_cash ?? 0);
+
+            if (abs($cash) < 0.005) {
+                continue;
+            }
+
+            yield $this->buildDpRecord($row, $date, isset($known[(int) $row->loan_id]));
+        }
+    }
+
+    private function mfRecords(Carbon $date): Generator
+    {
+        [$startDb, $endDb] = $this->dayDbRange($date);
+
+        $query = $this->baseLoanQuery($date)
+            ->where('lt.loan_type_instant_disbursement', 1)
+            ->whereBetween('l.loan_on', [$startDb, $endDb])
+            ->orderBy('l.loan_id');
+
+        foreach ($query->cursor() as $row) {
+            yield $this->buildMfRecord($row, $date);
+        }
+    }
+
+    private function baseLoanQuery(Carbon $date): Builder
+    {
+        return DB::table('sacco_loans as l')
+            ->join('sacco_members as m', 'm.member_id', '=', 'l.loan_member')
+            ->leftJoin('sacco_loan_types as lt', 'lt.loan_type_id', '=', 'l.loan_loan_type')
+            ->leftJoin('sacco_loan_batch_trans_members as a', 'a.batch_trans_id', '=', 'l.loan_batch_trans_id')
+            ->leftJoin('sacco_department as d', 'd.department_id', '=', 'm.member_dept')
+            ->leftJoin('sacco_company as c', 'c.company_id', '=', 'd.department_company_id')
+            ->where('l.loan_amount', '>', 0)
+            ->where(function ($q) use ($date) {
+                $q->where('l.loan_taken_period', '<=', (int) $date->format('Ym'))
+                    ->orWhere('l.loan_on', '<=', $this->snapshotEndDb($date));
+            })
+            ->select([
+                'l.*',
+                'm.member_id as crb_member_id',
+                'm.member_name as crb_member_name',
+                'm.member_sacco_id as crb_member_sacco_id',
+                'm.member_national_id as crb_member_national_id',
+                'm.member_phone_no as crb_member_phone',
+                'm.member_gender as crb_member_gender',
+                'm.member_email as crb_member_email',
+                'm.member_postal_address as crb_member_address',
+                'm.member_kra_pin as crb_member_kra_pin',
+                'm.member_dob as crb_member_dob',
+                'c.company_name as crb_employer_name',
+                'a.batch_trans_present_designation as crb_designation',
+                'a.batch_trans_terms_of_employment as crb_employment_terms',
+                'a.batch_trans_payroll_number as crb_payroll_number',
+                'lt.loan_type_name as crb_loan_type_name',
+                'lt.loan_type_duration as crb_loan_type_duration',
+                'lt.loan_type_instant_disbursement as crb_instant',
+            ]);
+    }
+
+    private function buildCeRecord(object $row, Carbon $date): array
+    {
+        $issues = [];
+        $names = $this->splitName((string) $row->crb_member_name, $issues);
+        $identity = $this->identity($row, $issues, true);
+        $phone = $this->phone((string) ($row->crb_member_phone ?? ''), $issues, false);
+        $opened = $this->loanOpenedDate($row, $date, $issues);
+        $financial = $this->loanFinancialState($row, $date, $issues);
+        $status = $this->accountStatus($row, $financial, $date, $issues);
+        $risk = $this->riskClass((int) $financial['days_in_arrears'], (float) $financial['overdue_balance'], $issues);
+        $duration = $this->repaymentPeriod($row, $issues);
+        $account = $this->accountNumber((int) $row->loan_id, $issues);
+        $client = $this->clientNumber($row, $issues);
+        $currency = strtoupper((string) $this->default('CRB_DEFAULT_CURRENCY', 'KES'));
+        $nationality = strtoupper((string) $this->default('CRB_DEFAULT_NATIONALITY', 'KE'));
+        $security = strtoupper((string) $this->default('CRB_DEFAULT_SECURITY_TYPE', 'U'));
+
+        if ($security === '') {
+            $security = 'U';
+        }
+
+        $this->warn($issues, 'SECURITY_DEFAULTED_TO_U', 'Security type is currently defaulted to U (Unsecured) until a facility-specific collateral/security mapping is configured.');
+        $this->warn($issues, 'NAME_DERIVED_FROM_FULL_NAME', 'Surname and forenames were derived from member_name because the member master stores a full name.');
+
+        $address = $this->cleanText((string) ($row->crb_member_address ?? ''), 70);
+        if ($address !== '') {
+            $this->warn($issues, 'ADDRESS_DERIVED_FROM_MEMBER_ADDRESS', 'The available member address was reused for CRB postal/physical address fields.');
+        } else {
+            $this->warn($issues, 'ADDRESS_MISSING', 'No reliable postal/physical address is stored for this member.');
+        }
+
+        $employer = $this->cleanText((string) ($row->crb_employer_name ?? ''), 100);
+        if ($employer === '') {
+            $this->warn($issues, 'EMPLOYER_MISSING', 'Employer name is not available for this borrower.');
+        }
+
+        $this->warn($issues, 'OCCUPATIONAL_INDUSTRY_MISSING', 'No reliable CRB occupational industry code is currently stored.');
+        $this->warn($issues, 'INCOME_MISSING', 'No reliable borrower income amount is currently stored.');
+
+        $last = $this->paymentStat((int) $row->loan_id, $date);
+        $nextInstalment = $financial['current_balance'] > 0
+            ? $this->nextInstalmentAmount($row, $financial)
+            : 0;
+
+        if ($currency !== 'KES') {
+            $this->error($issues, 'KES_BALANCE_CONVERSION_UNAVAILABLE', 'Current Balance in Kenya Shillings cannot be calculated because the configured currency is not KES and no FX conversion source is configured.');
+        }
+
+        $fields = [
+            $names['surname'],
+            $names['forename1'],
+            $names['forename2'],
+            $names['forename3'],
+            '',
+            $this->date8($row->crb_member_dob ?? null, $issues, 'DATE_OF_BIRTH_MISSING', true),
+            $client,
+            $account,
+            '',
+            $this->gender($row->crb_member_gender ?? null, $issues, true),
+            $nationality,
+            '',
+            $identity['type'],
+            $identity['number'],
+            '',
+            '',
+            '',
+            '',
+            '',
+            $phone,
+            '',
+            '',
+            $address,
+            '',
+            '',
+            '',
+            '',
+            $address,
+            '',
+            '',
+            '',
+            '',
+            '',
+            $this->cleanText((string) ($row->crb_member_kra_pin ?? ''), 20),
+            $this->cleanText((string) ($row->crb_member_email ?? ''), 100),
+            $employer,
+            '',
+            '',
+            '',
+            '',
+            $this->lenderRegisteredName(),
+            $this->lenderTradingName(),
+            $this->branchName(),
+            $this->branchCode(),
+            'S',
+            $this->productType($row, $issues),
+            $opened ? $opened->format('Ymd') : '',
+            $financial['instalment_due_date'] ? $financial['instalment_due_date']->format('Ymd') : '',
+            $this->money((float) $row->loan_amount),
+            $currency,
+            $currency === 'KES' ? $this->money($financial['current_balance']) : '',
+            $this->money($financial['current_balance']),
+            $this->money($financial['overdue_balance']),
+            $financial['overdue_date'] ? $financial['overdue_date']->format('Ymd') : '',
+            (string) $financial['days_in_arrears'],
+            (string) $financial['instalments_in_arrears'],
+            $risk,
+            $status['code'],
+            $status['date']->format('Ymd'),
+            '',
+            str_pad((string) $duration, 3, '0', STR_PAD_LEFT),
+            '',
+            '',
+            $this->paymentFrequency($row),
+            $opened ? $opened->format('Ymd') : '',
+            $this->money($nextInstalment),
+            $last['latest_date'] ? Carbon::parse($last['latest_date'], self::APP_TZ)->format('Ymd') : '',
+            $this->money((float) $last['latest_cash']),
+            $security,
+            '',
+        ];
+
+        return $this->recordEnvelope('CE', $fields, $issues, (int) $row->crb_member_id, (int) $row->loan_id, 'sacco_loans', (int) $row->loan_id, [
+            'member' => $row->crb_member_name,
+            'client_number' => $client,
+            'account_number' => $account,
+            'loan_type' => $row->crb_loan_type_name,
+            'original_amount' => (float) $row->loan_amount,
+            'current_balance' => $financial['current_balance'],
+            'overdue_balance' => $financial['overdue_balance'],
+            'days_in_arrears' => $financial['days_in_arrears'],
+            'account_status' => $status['code'],
+            'risk_classification' => $risk,
+        ]);
+    }
+
+    private function buildGiRecord(object $row, Carbon $date): array
+    {
+        $issues = [];
+        $names = $this->splitName((string) $row->guarantor_name, $issues);
+        $identity = $this->identityFromValues($row->guarantor_national_id ?? null, $issues, true);
+        $phone = $this->phone((string) ($row->guarantor_phone ?? ''), $issues, false);
+        $account = $this->accountNumber((int) $row->loan_id, $issues);
+        $borrowerClient = trim((string) ($row->borrower_client_number ?? ''));
+
+        if ($borrowerClient === '') {
+            $borrowerClient = (string) $row->borrower_member_id;
+            $this->warn($issues, 'BORROWER_CLIENT_NUMBER_FALLBACK', 'Borrower member ID was used because member_sacco_id is blank.');
+        }
+
+        $limit = (float) ($row->loan_guar_amount_guaranteed ?? 0);
+        if ($limit <= 0) {
+            $limit = (float) $row->loan_amount;
+            $this->warn($issues, 'GUARANTEE_LIMIT_FALLBACK', 'Guarantee limit was blank/zero and has been defaulted to the original loan amount.');
+        }
+
+        $address = $this->cleanText((string) ($row->guarantor_address ?? ''), 70);
+        if ($address === '') {
+            $this->warn($issues, 'GUARANTOR_ADDRESS_MISSING', 'No reliable guarantor postal/physical address is stored.');
+        } else {
+            $this->warn($issues, 'GUARANTOR_ADDRESS_DERIVED', 'The available guarantor address was reused for postal/physical address fields.');
+        }
+
+        if (trim((string) ($row->guarantor_employer ?? '')) === '') {
+            $this->warn($issues, 'GUARANTOR_EMPLOYER_MISSING', 'Employer name is not available for this guarantor.');
+        }
+
+        $this->warn($issues, 'GUARANTOR_EMPLOYMENT_TYPE_MISSING', 'No reliable CRB employment type code is currently stored for the guarantor.');
+        $this->warn($issues, 'GUARANTOR_INCOME_BAND_MISSING', 'No reliable CRB guarantor income band is currently stored.');
+        $this->warn($issues, 'NAME_DERIVED_FROM_FULL_NAME', 'Surname and forenames were derived from member_name because the member master stores a full name.');
+
+        $fields = [
+            $this->lenderRegisteredName(),
+            $this->lenderTradingName(),
+            $this->branchName(),
+            $this->branchCode(),
+            $this->cleanText($borrowerClient, 20),
+            $account,
+            $names['surname'],
+            $names['forename1'],
+            $names['forename2'],
+            $names['forename3'],
+            '',
+            $this->date8($row->guarantor_dob ?? null, $issues, 'GUARANTOR_DATE_OF_BIRTH_MISSING', true),
+            $this->gender($row->guarantor_gender ?? null, $issues, true),
+            strtoupper((string) $this->default('CRB_DEFAULT_NATIONALITY', 'KE')),
+            '',
+            'B',
+            '',
+            $this->money($limit),
+            $identity['type'],
+            $identity['number'],
+            '',
+            '',
+            '',
+            '',
+            $this->cleanText((string) ($row->guarantor_employer ?? ''), 100),
+            '',
+            '',
+            $phone,
+            '',
+            '',
+            $address,
+            '',
+            '',
+            '',
+            '',
+            $address,
+            '',
+            '',
+            '',
+            '',
+            $this->cleanText((string) ($row->guarantor_email ?? ''), 100),
+        ];
+
+        return $this->recordEnvelope('GI', $fields, $issues, (int) $row->guarantor_member_id, (int) $row->loan_id, 'sacco_loan_guarantors', (int) $row->loan_guar_id, [
+            'guarantor' => $row->guarantor_name,
+            'borrower_client_number' => $borrowerClient,
+            'account_number' => $account,
+            'guarantee_limit' => $limit,
+        ]);
+    }
+
+    private function buildCaRecord(object $row, Carbon $date): array
+    {
+        $issues = [];
+        $names = $this->splitName((string) $row->crb_member_name, $issues);
+        $identity = $this->identityFromValues($row->crb_member_national_id ?? null, $issues, true);
+        $client = trim((string) ($row->crb_member_sacco_id ?? ''));
+
+        if ($client === '') {
+            $client = (string) $row->crb_member_id;
+            $this->warn($issues, 'CLIENT_NUMBER_FALLBACK', 'Member ID was used because member_sacco_id is blank.');
+        }
+
+        $applicationDate = $this->dbDateToNairobi($row->batch_trans_on ?? null);
+        if (!$applicationDate) {
+            $this->error($issues, 'APPLICATION_DATE_MISSING', 'Application date is missing or invalid.');
+        }
+
+        $deleted = strtoupper((string) ($row->batch_trans_deleted ?? 'N')) === 'Y';
+        $updated = strtoupper((string) ($row->batch_trans_updated ?? 'N')) === 'Y';
+
+        if ($deleted) {
+            $applicationStatus = 'D';
+            $statusDate = $this->dbDateToNairobi($row->batch_trans_deleted_on ?? null) ?: $applicationDate ?: $date;
+            $declineReason = '';
+            $this->error($issues, 'DECLINE_REASON_MISSING', 'This application is rejected, but no CRB LOV25 decline reason code is stored.');
+        } elseif ($updated) {
+            $applicationStatus = 'H';
+            $statusDate = $this->dbDateToNairobi($row->crb_linked_loan_on ?? null) ?: $applicationDate ?: $date;
+            $declineReason = '';
+        } else {
+            $applicationStatus = 'A';
+            $statusDate = $applicationDate ?: $date;
+            $declineReason = '';
+        }
+
+        $linkedLoanId = (int) ($row->crb_linked_loan_id ?? 0);
+        $account = $linkedLoanId > 0 ? $this->accountNumber($linkedLoanId, $issues) : '';
+        $applicationNumber = 'APP' . str_pad((string) $row->batch_trans_id, 12, '0', STR_PAD_LEFT);
+
+        $this->warn($issues, 'NAME_DERIVED_FROM_FULL_NAME', 'Surname and forenames were derived from member_name because the member master stores a full name.');
+
+        $fields = [
+            $this->lenderRegisteredName(),
+            $this->lenderTradingName(),
+            $this->branchName(),
+            $this->branchCode(),
+            'A',
+            $names['surname'],
+            $names['forename1'],
+            $names['forename2'],
+            $names['forename3'],
+            '',
+            '',
+            $identity['type'],
+            $identity['number'],
+            '',
+            '',
+            '',
+            '',
+            $this->cleanText($client, 20),
+            $this->cleanText((string) ($row->crb_member_kra_pin ?? ''), 20),
+            $account,
+            $applicationDate ? $applicationDate->format('Ymd') : '',
+            $this->cleanText($applicationNumber, 20),
+            'U',
+            $this->money((float) ($row->batch_trans_loan_amount ?? 0)),
+            strtoupper((string) $this->default('CRB_DEFAULT_CURRENCY', 'KES')),
+            ((int) ($row->crb_instant ?? 0) === 1) ? 'I' : 'H',
+            str_pad((string) max(1, (int) ($row->batch_trans_loan_duration ?? 1)), 3, '0', STR_PAD_LEFT),
+            $applicationStatus,
+            $declineReason,
+            $statusDate->format('Ymd'),
+            '',
+        ];
+
+        return $this->recordEnvelope('CA', $fields, $issues, (int) $row->crb_member_id, $linkedLoanId ?: null, 'sacco_loan_batch_trans_members', (int) $row->batch_trans_id, [
+            'applicant' => $row->crb_member_name,
+            'application_number' => $applicationNumber,
+            'application_amount' => (float) ($row->batch_trans_loan_amount ?? 0),
+            'application_status' => $applicationStatus,
+            'linked_loan_id' => $linkedLoanId ?: null,
+        ]);
+    }
+
+    private function buildDpRecord(object $row, Carbon $date, bool $previouslyReported): array
+    {
+        $issues = [];
+        $names = $this->splitName((string) $row->crb_member_name, $issues);
+        $identity = $this->identity($row, $issues, true);
+        $financial = $this->loanFinancialState($row, $date, $issues);
+        $status = $this->accountStatus($row, $financial, $date, $issues);
+        $account = $this->accountNumber((int) $row->loan_id, $issues);
+        $payment = (float) ($row->crb_day_cash ?? 0);
+
+        if (!$previouslyReported) {
+            $this->error($issues, 'ACCOUNT_NOT_PREVIOUSLY_REPORTED', 'Daily Payment can only update an account that has already been reported in a finalised/submitted CE or MF report.');
+        }
+
+        $this->warn($issues, 'NAME_DERIVED_FROM_FULL_NAME', 'Surname and forenames were derived from member_name because the member master stores a full name.');
+
+        $fields = [
+            $date->format('Ymd'),
+            'A',
+            $names['surname'],
+            $names['forename1'],
+            $names['forename2'],
+            $names['forename3'],
+            '',
+            $identity['type'],
+            $identity['number'],
+            $account,
+            strtoupper((string) $this->default('CRB_DEFAULT_CURRENCY', 'KES')),
+            $this->money((float) $row->loan_amount),
+            $this->money($payment),
+            $date->format('Ymd'),
+            $this->money($financial['current_balance']),
+            (string) $financial['instalments_in_arrears'],
+            (string) $financial['days_in_arrears'],
+            $status['code'],
+        ];
+
+        return $this->recordEnvelope('DP', $fields, $issues, (int) $row->crb_member_id, (int) $row->loan_id, 'sacco_loan_payments', (int) $row->loan_id, [
+            'member' => $row->crb_member_name,
+            'account_number' => $account,
+            'payment_amount' => $payment,
+            'current_balance' => $financial['current_balance'],
+            'days_in_arrears' => $financial['days_in_arrears'],
+            'account_status' => $status['code'],
+        ]);
+    }
+
+    private function buildMfRecord(object $row, Carbon $date): array
+    {
+        $issues = [];
+        $names = $this->splitName((string) $row->crb_member_name, $issues);
+        $identity = $this->identity($row, $issues, true);
+        $phone = $this->phone((string) ($row->crb_member_phone ?? ''), $issues, true);
+        $opened = $this->loanOpenedDate($row, $date, $issues);
+        $financial = $this->loanFinancialState($row, $date, $issues);
+        $status = $this->accountStatus($row, $financial, $date, $issues);
+        $risk = $this->riskClass((int) $financial['days_in_arrears'], (float) $financial['overdue_balance'], $issues);
+        $duration = $this->repaymentPeriod($row, $issues);
+        $account = $this->accountNumber((int) $row->loan_id, $issues);
+        $client = $this->clientNumber($row, $issues);
+        $currency = strtoupper((string) $this->default('CRB_DEFAULT_CURRENCY', 'KES'));
+        $last = $this->paymentStat((int) $row->loan_id, $date);
+
+        if ($currency !== 'KES') {
+            $this->error($issues, 'KES_BALANCE_CONVERSION_UNAVAILABLE', 'Current Balance in Kenya Shillings cannot be calculated because the configured currency is not KES and no FX conversion source is configured.');
+        }
+
+        $this->warn($issues, 'NAME_DERIVED_FROM_FULL_NAME', 'Surname and forenames were derived from member_name because the member master stores a full name.');
+
+        $instalment = (float) ($row->loan_monthly_repayment_amount ?? 0);
+        if ($instalment <= 0) {
+            $instalment = min((float) $row->loan_amount, $financial['current_balance']);
+            $this->warn($issues, 'INSTALMENT_AMOUNT_DERIVED', 'Instalment amount was derived because loan_monthly_repayment_amount is blank/zero.');
+        }
+
+        $fields = [
+            $names['surname'],
+            $names['forename1'],
+            $names['forename2'],
+            $names['forename3'],
+            '',
+            $this->date8($row->crb_member_dob ?? null, $issues, 'DATE_OF_BIRTH_MISSING', true),
+            $client,
+            $account,
+            $this->gender($row->crb_member_gender ?? null, $issues, true),
+            strtoupper((string) $this->default('CRB_DEFAULT_NATIONALITY', 'KE')),
+            $identity['type'],
+            $identity['number'],
+            $phone,
+            'I',
+            $financial['instalment_due_date'] ? $financial['instalment_due_date']->format('Ymd') : '',
+            $this->money((float) $row->loan_amount),
+            $currency,
+            $currency === 'KES' ? $this->money($financial['current_balance']) : '',
+            $this->money($financial['current_balance']),
+            $this->money($financial['overdue_balance']),
+            $financial['overdue_date'] ? $financial['overdue_date']->format('Ymd') : '',
+            (string) $financial['days_in_arrears'],
+            (string) $financial['instalments_in_arrears'],
+            $risk,
+            $status['code'],
+            $status['date']->format('Ymd'),
+            str_pad((string) $duration, 3, '0', STR_PAD_LEFT),
+            $opened ? $opened->format('Ymd') : '',
+            $this->money($instalment),
+            $last['latest_date'] ? Carbon::parse($last['latest_date'], self::APP_TZ)->format('Ymd') : '',
+            $this->money((float) $last['latest_cash']),
+        ];
+
+        return $this->recordEnvelope('MF', $fields, $issues, (int) $row->crb_member_id, (int) $row->loan_id, 'sacco_loans', (int) $row->loan_id, [
+            'member' => $row->crb_member_name,
+            'client_number' => $client,
+            'account_number' => $account,
+            'original_amount' => (float) $row->loan_amount,
+            'current_balance' => $financial['current_balance'],
+            'overdue_balance' => $financial['overdue_balance'],
+            'days_in_arrears' => $financial['days_in_arrears'],
+            'account_status' => $status['code'],
+            'risk_classification' => $risk,
+        ]);
+    }
+
+    private function recordEnvelope(
+        string $code,
+        array $fields,
+        array $issues,
+        ?int $memberId,
+        ?int $loanId,
+        string $sourceType,
+        ?int $sourceId,
+        array $summary
+    ): array {
+        if (count($fields) !== count(self::FIELD_NAMES[$code])) {
+            throw new RuntimeException("Internal {$code} field-count mismatch: " . count($fields) . ' values for ' . count(self::FIELD_NAMES[$code]) . ' DST fields.');
+        }
+
+        $fields = array_map(fn ($value) => $this->cleanField($value), $fields);
+
+        return [
+            'fields' => $fields,
+            'issues' => $issues,
+            'member_id' => $memberId,
+            'loan_id' => $loanId,
+            'source_type' => $sourceType,
+            'source_id' => $sourceId,
+            'summary' => $summary,
+            'pipe_row' => implode('|', $fields),
+        ];
+    }
+
+    private function candidateCount(string $code, Carbon $date): int
+    {
+        return match ($code) {
+            'CE' => $this->baseLoanQuery($date)->count(),
+            'GI' => DB::table('sacco_loan_guarantors as g')
+                ->join('sacco_loans as l', 'l.loan_id', '=', 'g.loan_guar_loan_id')
+                ->where('l.loan_amount', '>', 0)
+                ->where(function ($q) use ($date) {
+                    $q->where('l.loan_taken_period', '<=', (int) $date->format('Ym'))
+                        ->orWhere('l.loan_on', '<=', $this->snapshotEndDb($date));
+                })
+                ->where(function ($q) {
+                    $q->whereNull('g.loan_guar_deleted')
+                        ->orWhere('g.loan_guar_deleted', '<>', 'Y');
+                })
+                ->count(),
+            'CA' => (function () use ($date) {
+                [$startDb, $endDb] = $this->monthDbRange($date);
+
+                return DB::table('sacco_loan_batch_trans_members')
+                    ->whereBetween('batch_trans_on', [$startDb, $endDb])
+                    ->count();
+            })(),
+            'DP' => DB::table('sacco_loan_payments')
+                ->whereDate('loan_payments_paid_on', $date->format('Y-m-d'))
+                ->distinct('loan_payments_loan_id')
+                ->count('loan_payments_loan_id'),
+            'MF' => (function () use ($date) {
+                [$startDb, $endDb] = $this->dayDbRange($date);
+
+                return DB::table('sacco_loans as l')
+                    ->join('sacco_loan_types as lt', 'lt.loan_type_id', '=', 'l.loan_loan_type')
+                    ->where('l.loan_amount', '>', 0)
+                    ->where('lt.loan_type_instant_disbursement', 1)
+                    ->whereBetween('l.loan_on', [$startDb, $endDb])
+                    ->count();
+            })(),
+            default => 0,
+        };
+    }
+
+    private function loanFinancialState(object $row, Carbon $date, array &$issues): array
+    {
+        $original = max(0, (float) ($row->loan_amount ?? 0));
+        $stat = $this->paymentStat((int) $row->loan_id, $date);
+        $principalPaid = (float) $stat['principal_total'];
+        $today = Carbon::now(self::APP_TZ)->startOfDay();
+
+        if ($date->greaterThanOrEqualTo($today)) {
+            $headerPaid = (float) ($row->loan_loan_paid ?? 0);
+            $currentBalance = max(0, $original - $headerPaid);
+
+            if (abs($headerPaid - $principalPaid) > 1.00) {
+                $this->warn($issues, 'HEADER_LEDGER_PAYMENT_VARIANCE', 'loan_loan_paid differs from the principal-payment ledger by more than KES 1. Current live balance trusts loan_amount - loan_loan_paid.');
+            }
+        } else {
+            $currentBalance = max(0, $original - $principalPaid);
+            $this->warn($issues, 'HISTORICAL_BALANCE_DERIVED_FROM_LEDGER', 'Historical current balance was reconstructed from principal payments posted on or before the CRB snapshot date.');
+        }
+
+        if ($currentBalance > $original + 1.00) {
+            $this->warn($issues, 'BALANCE_EXCEEDS_ORIGINAL', 'Derived current balance exceeds original amount, usually because of a payment reversal or historical data adjustment.');
+        }
+
+        $schedule = $this->principalSchedule($row, $date, $issues);
+        $availablePaid = max(0, $principalPaid);
+        $overdue = 0.0;
+        $overdueDate = null;
+        $arrearsCount = 0;
+        $nextUnpaidDue = null;
+
+        foreach ($schedule as $instalment) {
+            $scheduled = (float) $instalment['amount'];
+            $allocated = min($scheduled, max(0, $availablePaid));
+            $availablePaid -= $allocated;
+            $unpaid = max(0, $scheduled - $allocated);
+
+            if ($unpaid <= 0.005) {
+                continue;
+            }
+
+            /** @var Carbon $due */
+            $due = $instalment['due'];
+
+            if ($due->lessThanOrEqualTo($date)) {
+                $overdue += $unpaid;
+                $arrearsCount++;
+
+                if ($overdueDate === null) {
+                    $overdueDate = $due->copy();
+                }
+            } elseif ($nextUnpaidDue === null) {
+                $nextUnpaidDue = $due->copy();
+            }
+        }
+
+        $overdue = min(max(0, $overdue), $currentBalance);
+        $days = $overdueDate ? max(0, $overdueDate->diffInDays($date, false)) : 0;
+
+        if ($overdue <= 0.005 || $currentBalance <= 0.005) {
+            $overdue = 0.0;
+            $overdueDate = null;
+            $days = 0;
+            $arrearsCount = 0;
+        }
+
+        $threshold = (float) $this->default('CRB_NEGATIVE_INFORMATION_THRESHOLD', 1000);
+        if ($overdue > 0 && $overdue <= $threshold) {
+            $this->warn($issues, 'NEGATIVE_INFORMATION_THRESHOLD_REVIEW', 'The overdue amount is at or below the configured negative-information threshold. Review current CRB/CIS treatment before final submission.');
+
+            if (strtoupper((string) $this->default('CRB_APPLY_NEGATIVE_THRESHOLD', 'N')) === 'Y') {
+                $this->warn($issues, 'NEGATIVE_INFORMATION_SUPPRESSED', 'Arrears fields were suppressed because CRB_APPLY_NEGATIVE_THRESHOLD=Y.');
+                $overdue = 0.0;
+                $overdueDate = null;
+                $days = 0;
+                $arrearsCount = 0;
+            }
+        }
+
+        $instalmentDueDate = $overdueDate ?: $nextUnpaidDue;
+
+        return [
+            'current_balance' => round($currentBalance, 2),
+            'overdue_balance' => round($overdue, 2),
+            'overdue_date' => $overdueDate,
+            'days_in_arrears' => (int) $days,
+            'instalments_in_arrears' => (int) $arrearsCount,
+            'instalment_due_date' => $instalmentDueDate,
+            'next_unpaid_due' => $nextUnpaidDue,
+            'principal_paid_to_date' => round($principalPaid, 2),
+        ];
+    }
+
+    private function principalSchedule(object $row, Carbon $date, array &$issues): array
+    {
+        $original = max(0, (float) ($row->loan_amount ?? 0));
+        $duration = $this->repaymentPeriod($row, $issues);
+        $opened = $this->loanOpenedDate($row, $date, $issues);
+        $instant = (int) ($row->crb_instant ?? 0) === 1;
+
+        if ($original <= 0 || $duration <= 0) {
+            return [];
+        }
+
+        if ($instant) {
+            $due = ($opened ?: $date)->copy()->addMonthNoOverflow()->startOfDay();
+
+            return [[
+                'number' => 1,
+                'due' => $due,
+                'amount' => $original,
+            ]];
+        }
+
+        $firstDue = $this->firstScheduledDueDate($row, $date, $issues);
+        $principal = (float) ($row->loan_monthly_repayment_principal ?? 0);
+
+        if ($principal <= 0) {
+            $principal = $original / $duration;
+            $this->warn($issues, 'MONTHLY_PRINCIPAL_DERIVED', 'Monthly principal was derived from original amount divided by repayment period because loan_monthly_repayment_principal is blank/zero.');
+        }
+
+        $schedule = [];
+        $remaining = $original;
+
+        for ($i = 1; $i <= $duration; $i++) {
+            $due = $firstDue->copy()->addMonthsNoOverflow($i - 1)->endOfMonth()->startOfDay();
+
+            if ($i === $duration) {
+                $amount = $remaining;
+            } else {
+                $amount = min($principal, $remaining);
+            }
+
+            $amount = max(0, $amount);
+            $remaining = max(0, $remaining - $amount);
+
+            $schedule[] = [
+                'number' => $i,
+                'due' => $due,
+                'amount' => $amount,
+            ];
+        }
+
+        if ($remaining > 0.005 && $schedule !== []) {
+            $last = array_key_last($schedule);
+            $schedule[$last]['amount'] += $remaining;
+        }
+
+        return $schedule;
+    }
+
+    private function firstScheduledDueDate(object $row, Carbon $date, array &$issues): Carbon
+    {
+        $periods = [
+            (int) ($row->loan_start_deduction_period ?? 0),
+            (int) ($row->loan_taken_start_period ?? 0),
+            (int) ($row->loan_taken_period ?? 0),
+        ];
+
+        foreach ($periods as $period) {
+            $text = (string) $period;
+
+            if (preg_match('/^\d{6}$/', $text) && substr($text, 4, 2) >= '01' && substr($text, 4, 2) <= '12') {
+                return Carbon::createFromFormat('Ym', $text, self::APP_TZ)->endOfMonth()->startOfDay();
+            }
+        }
+
+        $opened = $this->loanOpenedDate($row, $date, $issues);
+
+        if ($opened) {
+            $this->warn($issues, 'FIRST_DUE_DATE_DERIVED_FROM_OPEN_DATE', 'First contractual due month was unavailable; due date was derived from the loan opening month.');
+
+            return $opened->copy()->endOfMonth()->startOfDay();
+        }
+
+        $this->error($issues, 'FIRST_DUE_DATE_MISSING', 'Unable to derive the first contractual instalment due date.');
+
+        return $date->copy()->endOfMonth()->startOfDay();
+    }
+
+    private function repaymentPeriod(object $row, array &$issues): int
+    {
+        $duration = (int) ($row->loan_payment_period ?? 0);
+
+        if ($duration <= 0) {
+            $duration = (int) ($row->crb_loan_type_duration ?? 0);
+            if ($duration > 0) {
+                $this->warn($issues, 'REPAYMENT_PERIOD_FROM_LOAN_TYPE', 'Loan repayment period was blank/zero and was taken from the current loan-type duration.');
+            }
+        }
+
+        if ($duration <= 0) {
+            $duration = 1;
+            $this->error($issues, 'REPAYMENT_PERIOD_MISSING', 'Repayment period is missing; a temporary value of 1 month was used for validation output.');
+        }
+
+        return min($duration, 999);
+    }
+
+    private function loanOpenedDate(object $row, Carbon $snapshot, array &$issues): ?Carbon
+    {
+        $opened = $this->dbDateToNairobi($row->loan_on ?? null);
+
+        if ($opened && $opened->lessThanOrEqualTo($snapshot->copy()->endOfDay())) {
+            return $opened->startOfDay();
+        }
+
+        $period = (string) ((int) ($row->loan_taken_period ?? 0));
+
+        if (preg_match('/^\d{6}$/', $period) && substr($period, 4, 2) >= '01' && substr($period, 4, 2) <= '12') {
+            $derived = Carbon::createFromFormat('Ym', $period, self::APP_TZ)->startOfMonth()->startOfDay();
+
+            if ($opened && $opened->greaterThan($snapshot)) {
+                $this->warn($issues, 'OPEN_DATE_DERIVED_FROM_PERIOD_FOR_MIGRATED_LOAN', 'loan_on is later than the historical snapshot; opening/disbursement date was derived from loan_taken_period for this migrated loan.');
+            } else {
+                $this->warn($issues, 'OPEN_DATE_DERIVED_FROM_PERIOD', 'Opening/disbursement date was derived from loan_taken_period because loan_on is unavailable.');
+            }
+
+            return $derived;
+        }
+
+        $this->error($issues, 'OPEN_DATE_MISSING', 'Loan opening/disbursement date cannot be determined.');
+
+        return null;
+    }
+
+    private function accountStatus(object $row, array $financial, Carbon $date, array &$issues): array
+    {
+        if ((float) $financial['current_balance'] <= 0.005) {
+            $stat = $this->paymentStat((int) $row->loan_id, $date);
+            $closed = $stat['latest_date']
+                ? Carbon::parse($stat['latest_date'], self::APP_TZ)->startOfDay()
+                : $date->copy();
+
+            if (!$stat['latest_date']) {
+                $this->warn($issues, 'CLOSED_STATUS_DATE_FALLBACK', 'Settled loan has no payment date available; CRB status date was defaulted to the report date.');
+            }
+
+            return ['code' => 'A', 'date' => $closed];
+        }
+
+        $stopped = strtoupper((string) ($row->loan_stoped ?? 'N')) === 'Y';
+
+        if ($stopped) {
+            $suspended = null;
+
+            foreach (['loan_suspended_on', 'loan_stopped_on', 'loan_stoped_on'] as $field) {
+                if (property_exists($row, $field) && $row->{$field}) {
+                    $suspended = $this->dbDateToNairobi($row->{$field});
+                    if ($suspended) {
+                        break;
+                    }
+                }
+            }
+
+            if (!$suspended) {
+                $suspended = $date->copy();
+                $this->warn($issues, 'SUSPENSION_DATE_FALLBACK', 'Loan is stopped/suspended but no suspension date is stored; CRB status date was defaulted to the report date.');
+            }
+
+            return ['code' => 'K', 'date' => $suspended->startOfDay()];
+        }
+
+        return ['code' => 'F', 'date' => $date->copy()];
+    }
+
+    private function riskClass(int $days, float $overdue, array &$issues): string
+    {
+        if ($overdue <= 0.005) {
+            return 'A';
+        }
+
+        $basis = strtoupper(trim((string) $this->default('CRB_RISK_CLASSIFICATION_BASIS', '')));
+
+        if ($basis === 'BANK') {
+            return match (true) {
+                $days <= 30 => 'A',
+                $days <= 90 => 'B',
+                $days <= 180 => 'C',
+                $days <= 360 => 'D',
+                default => 'E',
+            };
+        }
+
+        if ($basis === 'MFB') {
+            return match (true) {
+                $days <= 0 => 'A',
+                $days <= 30 => 'B',
+                $days <= 60 => 'C',
+                $days <= 90 => 'D',
+                default => 'E',
+            };
+        }
+
+        $this->error($issues, 'RISK_BASIS_NOT_CONFIGURED', 'Prudential risk classification cannot be produced until CRB_RISK_CLASSIFICATION_BASIS is configured as BANK or MFB.');
+
+        return '';
+    }
+
+    private function nextInstalmentAmount(object $row, array $financial): float
+    {
+        if ((float) $financial['current_balance'] <= 0.005) {
+            return 0;
+        }
+
+        if ((int) ($row->crb_instant ?? 0) === 1) {
+            return (float) $financial['current_balance'];
+        }
+
+        $emi = (float) ($row->loan_monthly_repayment_amount ?? 0);
+
+        if ($emi > 0) {
+            return $emi;
+        }
+
+        $principal = (float) ($row->loan_monthly_repayment_principal ?? 0);
+
+        return $principal > 0
+            ? min($principal, (float) $financial['current_balance'])
+            : (float) $financial['current_balance'];
+    }
+
+    private function paymentFrequency(object $row): string
+    {
+        return (int) ($row->crb_instant ?? 0) === 1 ? 'B' : 'M';
+    }
+
+    private function productType(object $row, array &$issues): string
+    {
+        if ((int) ($row->crb_instant ?? 0) === 1) {
+            return 'I';
+        }
+
+        $this->warn($issues, 'PRODUCT_TYPE_DEFAULTED_TO_H', 'Non-instant SACCO loan is currently mapped to LOV7 H (Personal Loans) until product-specific CRB mapping is configured.');
+
+        return 'H';
+    }
+
+    private function identity(object $row, array &$issues, bool $required): array
+    {
+        return $this->identityFromValues($row->crb_member_national_id ?? null, $issues, $required);
+    }
+
+    private function identityFromValues(mixed $nationalId, array &$issues, bool $required): array
+    {
+        $number = $this->cleanText((string) ($nationalId ?? ''), 30);
+
+        if ($number === '') {
+            if ($required) {
+                $this->error($issues, 'PRIMARY_ID_MISSING', 'Primary identification document number is missing.');
+            }
+
+            return ['type' => '', 'number' => ''];
+        }
+
+        return ['type' => '001', 'number' => $number];
+    }
+
+    private function splitName(string $fullName, array &$issues): array
+    {
+        $fullName = trim(preg_replace('/\s+/u', ' ', $fullName) ?? '');
+        $parts = $fullName === '' ? [] : preg_split('/\s+/u', $fullName);
+
+        if (!$parts || count($parts) < 2) {
+            $this->error($issues, 'NAME_COMPONENTS_INSUFFICIENT', 'CRB requires at least a surname and first forename; member_name cannot be reliably split.');
+
+            return [
+                'surname' => $this->cleanText($parts[0] ?? '', 50),
+                'forename1' => '',
+                'forename2' => '',
+                'forename3' => '',
+            ];
+        }
+
+        $forename1 = array_shift($parts);
+        $surname = array_pop($parts);
+        $forename2 = $parts[0] ?? '';
+        $forename3 = count($parts) > 1 ? implode(' ', array_slice($parts, 1)) : '';
+
+        return [
+            'surname' => $this->cleanText($surname, 50),
+            'forename1' => $this->cleanText($forename1, 50),
+            'forename2' => $this->cleanText($forename2, 50),
+            'forename3' => $this->cleanText($forename3, 50),
+        ];
+    }
+
+    private function clientNumber(object $row, array &$issues): string
+    {
+        $client = trim((string) ($row->crb_member_sacco_id ?? ''));
+
+        if ($client === '') {
+            $client = (string) ($row->crb_member_id ?? '');
+            $this->warn($issues, 'CLIENT_NUMBER_FALLBACK', 'Member ID was used because member_sacco_id is blank.');
+        }
+
+        return $this->cleanText($client, 20);
+    }
+
+    private function accountNumber(int $loanId, array &$issues): string
+    {
+        $this->warn($issues, 'ACCOUNT_NUMBER_DERIVED_FROM_LOAN_ID', 'CRB account number is currently derived deterministically from loan_id. Keep this identifier stable once production CRB reporting begins.');
+
+        return 'LN' . str_pad((string) $loanId, 12, '0', STR_PAD_LEFT);
+    }
+
+    private function gender(mixed $value, array &$issues, bool $required): string
+    {
+        $gender = strtoupper(trim((string) ($value ?? '')));
+
+        if (in_array($gender, ['M', 'F'], true)) {
+            return $gender;
+        }
+
+        if ($required) {
+            $this->error($issues, 'GENDER_MISSING_OR_INVALID', 'Gender must be M or F for this CRB record.');
+        }
+
+        return '';
+    }
+
+    private function phone(string $value, array &$issues, bool $required): string
+    {
+        $digits = preg_replace('/\D+/', '', $value) ?? '';
+
+        if ($digits === '') {
+            if ($required) {
+                $this->error($issues, 'MOBILE_PHONE_MISSING', 'Mobile phone number is mandatory for this CRB record.');
+            } else {
+                $this->warn($issues, 'MOBILE_PHONE_MISSING', 'Mobile phone number is not available.');
+            }
+
+            return '';
+        }
+
+        if (str_starts_with($digits, '0')) {
+            $digits = '254' . substr($digits, 1);
+        } elseif (strlen($digits) === 9 && in_array($digits[0] ?? '', ['1', '7'], true)) {
+            $digits = '254' . $digits;
+        }
+
+        if (!str_starts_with($digits, '254') || strlen($digits) < 11 || strlen($digits) > 13) {
+            if ($required) {
+                $this->error($issues, 'MOBILE_PHONE_INVALID', 'Mobile phone number cannot be normalised to a valid CRB A13 Kenyan number.');
+            } else {
+                $this->warn($issues, 'MOBILE_PHONE_INVALID', 'Mobile phone number could not be confidently normalised.');
+            }
+        }
+
+        return substr($digits, 0, 13);
+    }
+
+    private function date8(mixed $value, array &$issues, string $missingCode, bool $required): string
+    {
+        if ($value === null || trim((string) $value) === '' || (string) $value === '0000-00-00') {
+            if ($required) {
+                $this->error($issues, $missingCode, 'Required date is missing.');
+            }
+
+            return '';
+        }
+
+        try {
+            return Carbon::parse((string) $value)->format('Ymd');
+        } catch (\Throwable) {
+            if ($required) {
+                $this->error($issues, $missingCode, 'Required date is invalid.');
+            }
+
+            return '';
+        }
+    }
+
+    private function paymentStats(Carbon $date): array
+    {
+        $key = $date->format('Y-m-d');
+
+        if (isset($this->paymentStatsCache[$key])) {
+            return $this->paymentStatsCache[$key];
+        }
+
+        $stats = [];
+
+        DB::table('sacco_loan_payments')
+            ->whereDate('loan_payments_paid_on', '<=', $key)
+            ->orderBy('loan_payments_loan_id')
+            ->orderBy('loan_payments_paid_on')
+            ->orderBy('loan_payments_id')
+            ->select([
+                'loan_payments_loan_id',
+                'loan_payments_amount',
+                'loan_payments_interest',
+                'loan_payments_paid_on',
+            ])
+            ->chunk(5000, function ($rows) use (&$stats) {
+                foreach ($rows as $payment) {
+                    $loanId = (int) $payment->loan_payments_loan_id;
+
+                    if (!isset($stats[$loanId])) {
+                        $stats[$loanId] = [
+                            'principal_total' => 0.0,
+                            'latest_date' => null,
+                            'latest_cash' => 0.0,
+                        ];
+                    }
+
+                    $principal = (float) ($payment->loan_payments_amount ?? 0);
+                    $interest = (float) ($payment->loan_payments_interest ?? 0);
+                    $day = $payment->loan_payments_paid_on ? (string) $payment->loan_payments_paid_on : null;
+
+                    $stats[$loanId]['principal_total'] += $principal;
+
+                    if ($day !== null) {
+                        if ($stats[$loanId]['latest_date'] === null || $day > $stats[$loanId]['latest_date']) {
+                            $stats[$loanId]['latest_date'] = $day;
+                            $stats[$loanId]['latest_cash'] = $principal + $interest;
+                        } elseif ($day === $stats[$loanId]['latest_date']) {
+                            $stats[$loanId]['latest_cash'] += $principal + $interest;
+                        }
+                    }
+                }
+            });
+
+        $this->paymentStatsCache[$key] = $stats;
+
+        return $stats;
+    }
+
+    private function paymentStat(int $loanId, Carbon $date): array
+    {
+        $stats = $this->paymentStats($date);
+
+        return $stats[$loanId] ?? [
+            'principal_total' => 0.0,
+            'latest_date' => null,
+            'latest_cash' => 0.0,
+        ];
+    }
+
+    private function priorReportedLoanIds(Carbon $date): array
+    {
+        $key = $date->format('Y-m-d');
+
+        if (isset($this->priorReportedCache[$key])) {
+            return $this->priorReportedCache[$key];
+        }
+
+        $recordLoanCol = $this->column('records', 'loan_id');
+        $recordReportCol = $this->column('records', 'report_id');
+
+        if (!$recordLoanCol || !$recordReportCol) {
+            return $this->priorReportedCache[$key] = [];
+        }
+
+        $reportIdCol = $this->requireColumn('reports', 'id');
+        $reportCodeCol = $this->requireColumn('reports', 'code');
+        $reportStatusCol = $this->requireColumn('reports', 'status');
+        $reportDateCol = $this->requireColumn('reports', 'date');
+
+        $ids = DB::table('sacco_crb_report_records as rr')
+            ->join('sacco_crb_reports as r', "r.{$reportIdCol}", '=', "rr.{$recordReportCol}")
+            ->whereIn("r.{$reportCodeCol}", ['CE', 'MF'])
+            ->whereIn("r.{$reportStatusCol}", ['FINALISED', 'FINALIZED', 'SUBMITTED'])
+            ->whereDate("r.{$reportDateCol}", '<=', $key)
+            ->whereNotNull("rr.{$recordLoanCol}")
+            ->distinct()
+            ->pluck("rr.{$recordLoanCol}")
+            ->mapWithKeys(fn ($id) => [(int) $id => true])
+            ->all();
+
+        return $this->priorReportedCache[$key] = $ids;
+    }
+
+    private function fileName(stdClass $report): string
+    {
+        $readiness = $this->readiness();
+
+        if (!$readiness['ready']) {
+            throw new RuntimeException('CRB filename cannot be built while required CRB configuration is incomplete.');
+        }
+
+        $spec = strtoupper((string) $readiness['settings']['specification_code']);
+        $periodCode = $report->frequency === 'MONTHLY' ? 'M' : 'D';
+        $version = str_pad((string) $report->version, 3, '0', STR_PAD_LEFT);
+
+        return 'CRB'
+            . $spec
+            . $periodCode
+            . $report->code
+            . $report->report_date->format('Ymd')
+            . $version
+            . '.S'
+            . $this->institutionCode();
+    }
+
+    private function renderStoredReportContent(int $reportId): string
+    {
+        $dataCol = $this->requireColumn('records', 'data');
+        $reportCol = $this->requireColumn('records', 'report_id');
+        $orderCol = $this->column('records', 'sequence') ?: $this->requireColumn('records', 'id');
+
+        $lines = [];
+
+        DB::table('sacco_crb_report_records')
+            ->where($reportCol, $reportId)
+            ->orderBy($orderCol)
+            ->select($dataCol)
+            ->chunk(1000, function ($rows) use (&$lines, $dataCol) {
+                foreach ($rows as $row) {
+                    $payload = json_decode((string) $row->{$dataCol}, true);
+                    $fields = is_array($payload['fields'] ?? null) ? $payload['fields'] : [];
+                    $line = implode('|', array_map(fn ($value) => $this->cleanField($value), $fields));
+                    $line = $this->ascii($line);
+                    $lines[] = $line;
+                }
+            });
+
+        if ($lines === []) {
+            return '';
+        }
+
+        return implode("\r\n", $lines) . "\r\n";
+    }
+
+    private function nextVersion(string $code, Carbon $date): int
+    {
+        $versionCol = $this->requireColumn('reports', 'version');
+
+        $max = DB::table('sacco_crb_reports')
+            ->where($this->requireColumn('reports', 'code'), $code)
+            ->whereDate($this->requireColumn('reports', 'date'), $date->format('Y-m-d'))
+            ->max($versionCol);
+
+        return min(999, ((int) $max) + 1);
+    }
+
+    private function insertReport(array $logical): int
+    {
+        $payload = $this->payload('reports', $logical);
+        $idCol = $this->requireColumn('reports', 'id');
+
+        return (int) DB::table('sacco_crb_reports')->insertGetId($payload, $idCol);
+    }
+
+    private function updateReport(int $reportId, array $logical): void
+    {
+        $payload = $this->payload('reports', $logical);
+
+        if ($payload === []) {
+            return;
+        }
+
+        DB::table('sacco_crb_reports')
+            ->where($this->requireColumn('reports', 'id'), $reportId)
+            ->update($payload);
+    }
+
+    private function recordInsertPayload(array $logical): array
+    {
+        $payload = $this->payload('records', $logical);
+
+        foreach (['report_id', 'status', 'data'] as $required) {
+            if (!array_key_exists($this->requireColumn('records', $required), $payload)) {
+                throw new RuntimeException("CRB record storage column {$required} is unavailable.");
+            }
+        }
+
+        return $payload;
+    }
+
+    private function deleteReportInternally(int $reportId): void
+    {
+        DB::table('sacco_crb_report_records')
+            ->where($this->requireColumn('records', 'report_id'), $reportId)
+            ->delete();
+
+        if ($this->column('logs', 'report_id')) {
+            DB::table('sacco_crb_report_logs')
+                ->where($this->requireColumn('logs', 'report_id'), $reportId)
+                ->delete();
+        }
+
+        DB::table('sacco_crb_reports')
+            ->where($this->requireColumn('reports', 'id'), $reportId)
+            ->delete();
+    }
+
+    private function log(
+        int $reportId,
+        string $action,
+        string $status,
+        string $message,
+        int $total,
+        array $context,
+        ?int $userId,
+        ?string $ip
+    ): void {
+        $payload = $this->payload('logs', [
+            'report_id' => $reportId,
+            'action' => $action,
+            'status' => $status,
+            'message' => $message,
+            'total' => $total,
+            'context' => json_encode($context, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+            'user_id' => $userId,
+            'ip' => $ip,
+            'created_at' => now(),
+        ]);
+
+        if ($payload !== []) {
+            DB::table('sacco_crb_report_logs')->insert($payload);
+        }
+    }
+
+    private function normaliseReportRow(object $row): stdClass
+    {
+        $obj = new stdClass();
+
+        $obj->id = (int) $this->rowValue($row, 'reports', 'id', 0);
+        $obj->code = strtoupper((string) $this->rowValue($row, 'reports', 'code', ''));
+        $obj->frequency = strtoupper((string) $this->rowValue($row, 'reports', 'frequency', ''));
+        $date = $this->rowValue($row, 'reports', 'date', null);
+        $obj->report_date = $date ? Carbon::parse((string) $date, self::APP_TZ)->startOfDay() : null;
+        $obj->period = (string) $this->rowValue($row, 'reports', 'period', '');
+        $obj->version = (int) $this->rowValue($row, 'reports', 'version', 1);
+        $obj->status = strtoupper((string) $this->rowValue($row, 'reports', 'status', 'DRAFT'));
+        $obj->total_records = (int) $this->rowValue($row, 'reports', 'total', 0);
+        $obj->valid_records = (int) $this->rowValue($row, 'reports', 'valid', 0);
+        $obj->warning_records = (int) $this->rowValue($row, 'reports', 'warning', 0);
+        $obj->error_records = (int) $this->rowValue($row, 'reports', 'error', 0);
+        $obj->file_name = $this->rowValue($row, 'reports', 'file_name', null);
+        $obj->file_path = $this->rowValue($row, 'reports', 'file_path', null);
+        $obj->file_hash = $this->rowValue($row, 'reports', 'file_hash', null);
+        $obj->generated_by = $this->rowValue($row, 'reports', 'generated_by', null);
+        $obj->generated_at = $this->rowValue($row, 'reports', 'generated_at', null);
+        $obj->finalised_by = $this->rowValue($row, 'reports', 'finalised_by', null);
+        $obj->finalised_at = $this->rowValue($row, 'reports', 'finalised_at', null);
+        $obj->submitted_by = $this->rowValue($row, 'reports', 'submitted_by', null);
+        $obj->submitted_at = $this->rowValue($row, 'reports', 'submitted_at', null);
+        $obj->notes = $this->rowValue($row, 'reports', 'notes', null);
+
+        return $obj;
+    }
+
+    private function normaliseRecordRow(object $row): stdClass
+    {
+        $obj = new stdClass();
+        $obj->id = (int) $this->rowValue($row, 'records', 'id', 0);
+        $obj->report_id = (int) $this->rowValue($row, 'records', 'report_id', 0);
+        $obj->sequence = (int) $this->rowValue($row, 'records', 'sequence', 0);
+        $obj->member_id = $this->rowValue($row, 'records', 'member_id', null);
+        $obj->loan_id = $this->rowValue($row, 'records', 'loan_id', null);
+        $obj->source_type = $this->rowValue($row, 'records', 'source_type', null);
+        $obj->source_id = $this->rowValue($row, 'records', 'source_id', null);
+        $obj->validation_status = strtoupper((string) $this->rowValue($row, 'records', 'status', ''));
+        $obj->payload = json_decode((string) $this->rowValue($row, 'records', 'data', '{}'), true) ?: [];
+        $obj->issues = json_decode((string) $this->rowValue($row, 'records', 'errors', '[]'), true) ?: [];
+        $obj->summary = $obj->payload['summary'] ?? [];
+        $obj->fields = $obj->payload['fields'] ?? [];
+        $obj->field_names = $obj->payload['field_names'] ?? [];
+        $obj->pipe_row = implode('|', $obj->fields);
+
+        return $obj;
+    }
+
+    private function normaliseLogRow(object $row): stdClass
+    {
+        $obj = new stdClass();
+        $obj->id = (int) $this->rowValue($row, 'logs', 'id', 0);
+        $obj->action = (string) $this->rowValue($row, 'logs', 'action', '');
+        $obj->status = strtoupper((string) $this->rowValue($row, 'logs', 'status', ''));
+        $obj->message = (string) $this->rowValue($row, 'logs', 'message', '');
+        $obj->total = (int) $this->rowValue($row, 'logs', 'total', 0);
+        $obj->context = json_decode((string) $this->rowValue($row, 'logs', 'context', '{}'), true) ?: [];
+        $obj->user_id = $this->rowValue($row, 'logs', 'user_id', null);
+        $obj->ip = $this->rowValue($row, 'logs', 'ip', null);
+        $obj->created_at = $this->rowValue($row, 'logs', 'created_at', null);
+
+        return $obj;
+    }
+
+    private function payload(string $tableKey, array $logical): array
+    {
+        $payload = [];
+
+        foreach ($logical as $key => $value) {
+            $column = $this->column($tableKey, $key);
+
+            if ($column) {
+                $payload[$column] = $value;
+            }
+        }
+
+        return $payload;
+    }
+
+    private function rowValue(object $row, string $tableKey, string $logical, mixed $default = null): mixed
+    {
+        $column = $this->column($tableKey, $logical);
+
+        if (!$column || !property_exists($row, $column)) {
+            return $default;
+        }
+
+        return $row->{$column};
+    }
+
+    private function column(string $tableKey, string $logical): ?string
+    {
+        $table = match ($tableKey) {
+            'reports' => 'sacco_crb_reports',
+            'records' => 'sacco_crb_report_records',
+            'logs' => 'sacco_crb_report_logs',
+            default => throw new RuntimeException("Unknown CRB table key {$tableKey}."),
+        };
+
+        $cacheKey = "{$tableKey}.{$logical}";
+
+        if (array_key_exists($cacheKey, $this->columnCache)) {
+            return $this->columnCache[$cacheKey];
+        }
+
+        $columnsKey = "{$tableKey}.__columns";
+
+        if (!isset($this->columnCache[$columnsKey])) {
+            $this->columnCache[$columnsKey] = Schema::getColumnListing($table);
+        }
+
+        $columns = $this->columnCache[$columnsKey];
+
+        foreach (self::COLUMN_CANDIDATES[$tableKey][$logical] ?? [] as $candidate) {
+            if (in_array($candidate, $columns, true)) {
+                return $this->columnCache[$cacheKey] = $candidate;
+            }
+        }
+
+        return $this->columnCache[$cacheKey] = null;
+    }
+
+    private function requireColumn(string $tableKey, string $logical): string
+    {
+        $column = $this->column($tableKey, $logical);
+
+        if (!$column) {
+            $table = match ($tableKey) {
+                'reports' => 'sacco_crb_reports',
+                'records' => 'sacco_crb_report_records',
+                'logs' => 'sacco_crb_report_logs',
+            };
+
+            throw new RuntimeException("CRB storage schema mismatch: cannot find logical column '{$logical}' on {$table}.");
+        }
+
+        return $column;
+    }
+
+    private function default(string $name, mixed $fallback = null): mixed
+    {
+        if ($this->defaultsCache === null) {
+            $this->defaultsCache = DB::table('sacco_defaults')
+                ->where('default_name', 'like', 'CRB_%')
+                ->pluck('default_value', 'default_name')
+                ->all();
+        }
+
+        return array_key_exists($name, $this->defaultsCache)
+            ? $this->defaultsCache[$name]
+            : $fallback;
+    }
+
+    private function lenderRegisteredName(): string
+    {
+        return $this->cleanText((string) $this->default('CRB_REGISTERED_NAME', ''), 50);
+    }
+
+    private function lenderTradingName(): string
+    {
+        return $this->cleanText((string) $this->default('CRB_TRADING_NAME', ''), 50);
+    }
+
+    private function branchName(): string
+    {
+        return $this->cleanText((string) $this->default('CRB_BRANCH_NAME', ''), 50);
+    }
+
+    private function institutionCode(): string
+    {
+        $digits = preg_replace('/\D+/', '', (string) $this->default('CRB_INSTITUTION_CODE', '')) ?? '';
+
+        if ($digits === '' || strlen($digits) > 3) {
+            return '';
+        }
+
+        return str_pad($digits, 3, '0', STR_PAD_LEFT);
+    }
+
+    private function branchCode(): string
+    {
+        $raw = strtoupper(trim((string) $this->default('CRB_BRANCH_CODE', '')));
+
+        if (preg_match('/^S\d{6}$/', $raw)) {
+            return $raw;
+        }
+
+        $branchDigits = preg_replace('/\D+/', '', $raw) ?? '';
+        $institution = $this->institutionCode();
+
+        if ($institution === '' || $branchDigits === '' || strlen($branchDigits) > 3) {
+            return '';
+        }
+
+        return 'S' . $institution . str_pad($branchDigits, 3, '0', STR_PAD_LEFT);
+    }
+
+    private function dbTimezone(): string
+    {
+        $timezone = trim((string) $this->default('CRB_DB_TIMEZONE', 'UTC'));
+
+        try {
+            new \DateTimeZone($timezone);
+
+            return $timezone;
+        } catch (\Throwable) {
+            return 'UTC';
+        }
+    }
+
+    private function dbDateToNairobi(mixed $value): ?Carbon
+    {
+        if ($value === null || trim((string) $value) === '') {
+            return null;
+        }
+
+        try {
+            return Carbon::parse((string) $value, $this->dbTimezone())->setTimezone(self::APP_TZ);
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private function snapshotEndDb(Carbon $date): string
+    {
+        return $date->copy()->endOfDay()->setTimezone($this->dbTimezone())->format('Y-m-d H:i:s');
+    }
+
+    private function dayDbRange(Carbon $date): array
+    {
+        return [
+            $date->copy()->startOfDay()->setTimezone($this->dbTimezone())->format('Y-m-d H:i:s'),
+            $date->copy()->endOfDay()->setTimezone($this->dbTimezone())->format('Y-m-d H:i:s'),
+        ];
+    }
+
+    private function monthDbRange(Carbon $date): array
+    {
+        return [
+            $date->copy()->startOfMonth()->startOfDay()->setTimezone($this->dbTimezone())->format('Y-m-d H:i:s'),
+            $date->copy()->endOfMonth()->endOfDay()->setTimezone($this->dbTimezone())->format('Y-m-d H:i:s'),
+        ];
+    }
+
+    private function money(float|int|string|null $value): string
+    {
+        $amount = is_numeric($value) ? (float) $value : 0.0;
+        $cents = (int) round($amount * 100, 0, PHP_ROUND_HALF_UP);
+
+        return (string) $cents;
+    }
+
+    private function cleanField(mixed $value): string
+    {
+        return $this->cleanText((string) ($value ?? ''), null);
+    }
+
+    private function cleanText(string $value, ?int $maxLength = null): string
+    {
+        $value = str_replace(["|", "\r", "\n", "\t"], ' ', $value);
+        $value = preg_replace('/\s+/u', ' ', $value) ?? '';
+        $value = trim($value);
+        $value = $this->ascii($value);
+
+        if ($maxLength !== null && $maxLength > 0) {
+            $value = substr($value, 0, $maxLength);
+        }
+
+        return $value;
+    }
+
+    private function ascii(string $value): string
+    {
+        if ($value === '') {
+            return '';
+        }
+
+        $converted = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $value);
+
+        return $converted === false ? preg_replace('/[^\x20-\x7E]/', '', $value) ?? '' : $converted;
+    }
+
+    private function validationStatus(array $issues): string
+    {
+        foreach ($issues as $issue) {
+            if (($issue['level'] ?? '') === 'ERROR') {
+                return 'ERROR';
+            }
+        }
+
+        return $issues === [] ? 'VALID' : 'WARNING';
+    }
+
+    private function warn(array &$issues, string $code, string $message): void
+    {
+        $issues[] = ['level' => 'WARNING', 'code' => $code, 'message' => $message];
+    }
+
+    private function error(array &$issues, string $code, string $message): void
+    {
+        $issues[] = ['level' => 'ERROR', 'code' => $code, 'message' => $message];
+    }
+
+    private function normaliseCode(string $code): string
+    {
+        $code = strtoupper(trim($code));
+
+        if (!isset(self::REPORT_TYPES[$code])) {
+            throw new RuntimeException('Unsupported CRB report code. Supported codes: ' . implode(', ', array_keys(self::REPORT_TYPES)) . '.');
+        }
+
+        return $code;
+    }
+}

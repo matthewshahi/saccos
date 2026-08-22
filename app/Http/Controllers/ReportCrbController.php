@@ -1,0 +1,213 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Services\Crb\CrbReportService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
+use Throwable;
+
+class ReportCrbController extends Controller
+{
+    public function __construct(
+        protected CrbReportService $crb
+    ) {
+    }
+
+    public function index()
+    {
+        $types = $this->crb->reportTypes();
+        $readiness = $this->crb->readiness();
+        $stats = $this->crb->reportStats();
+        $recentReports = $this->crb->recentReports(10);
+
+        $defaultDates = [];
+        foreach (array_keys($types) as $code) {
+            $defaultDates[$code] = $this->crb->defaultReportDate($code)->format('Y-m-d');
+        }
+
+        return view('crb.index', compact(
+            'types',
+            'readiness',
+            'stats',
+            'recentReports',
+            'defaultDates'
+        ));
+    }
+
+    public function preview(Request $request)
+    {
+        $validated = $request->validate([
+            'report_code' => ['required', Rule::in(array_keys($this->crb->reportTypes()))],
+            'report_date' => ['required', 'date_format:Y-m-d'],
+        ]);
+
+        try {
+            $preview = $this->crb->preview(
+                $validated['report_code'],
+                $validated['report_date'],
+                100
+            );
+
+            return view('crb.preview', [
+                'types' => $this->crb->reportTypes(),
+                'preview' => $preview,
+            ]);
+        } catch (Throwable $e) {
+            Log::error('CRB preview failed', [
+                'report_code' => $validated['report_code'],
+                'report_date' => $validated['report_date'],
+                'error' => $e->getMessage(),
+            ]);
+
+            return redirect()
+                ->route('reports.crb.index')
+                ->withInput()
+                ->with('error', 'CRB preview failed: ' . $e->getMessage());
+        }
+    }
+
+    public function generate(Request $request)
+    {
+        $validated = $request->validate([
+            'report_code' => ['required', Rule::in(array_keys($this->crb->reportTypes()))],
+            'report_date' => ['required', 'date_format:Y-m-d'],
+        ]);
+
+        try {
+            $reportId = $this->crb->generate(
+                $validated['report_code'],
+                $validated['report_date'],
+                auth()->id(),
+                $request->ip()
+            );
+
+            return redirect()
+                ->route('reports.crb.show', $reportId)
+                ->with('success', 'CRB report draft generated successfully. Review and validate it before finalising.');
+        } catch (Throwable $e) {
+            Log::error('CRB report generation failed', [
+                'report_code' => $validated['report_code'],
+                'report_date' => $validated['report_date'],
+                'error' => $e->getMessage(),
+            ]);
+
+            return back()
+                ->withInput()
+                ->with('error', 'CRB report generation failed: ' . $e->getMessage());
+        }
+    }
+
+    public function history(Request $request)
+    {
+        $validated = $request->validate([
+            'code' => ['nullable', Rule::in(array_keys($this->crb->reportTypes()))],
+            'status' => ['nullable', Rule::in(['DRAFT', 'VALIDATED', 'FINALISED', 'FINALIZED', 'SUBMITTED'])],
+            'date_from' => ['nullable', 'date_format:Y-m-d'],
+            'date_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:date_from'],
+        ]);
+
+        $reports = $this->crb->paginateReports($validated, 25);
+        $types = $this->crb->reportTypes();
+
+        return view('crb.history', compact('reports', 'types'));
+    }
+
+    public function show(int $report)
+    {
+        try {
+            $reportRow = $this->crb->getReport($report);
+            $records = $this->crb->paginateReportRecords($report, 50);
+            $logs = $this->crb->reportLogs($report);
+            $readiness = $this->crb->readiness();
+            $types = $this->crb->reportTypes();
+
+            return view('crb.show', compact(
+                'reportRow',
+                'records',
+                'logs',
+                'readiness',
+                'types'
+            ));
+        } catch (Throwable $e) {
+            return redirect()
+                ->route('reports.crb.history')
+                ->with('error', $e->getMessage());
+        }
+    }
+
+    public function validateReport(Request $request, int $report)
+    {
+        try {
+            $validated = $this->crb->validateStoredReport(
+                $report,
+                auth()->id(),
+                $request->ip()
+            );
+
+            $message = $validated->error_records > 0
+                ? "Validation completed with {$validated->error_records} error record(s) and {$validated->warning_records} warning record(s)."
+                : "Validation completed. No error records found; {$validated->warning_records} warning record(s) remain.";
+
+            return back()->with(
+                $validated->error_records > 0 ? 'error' : 'success',
+                $message
+            );
+        } catch (Throwable $e) {
+            return back()->with('error', 'CRB validation failed: ' . $e->getMessage());
+        }
+    }
+
+    public function finalise(Request $request, int $report)
+    {
+        try {
+            $reportRow = $this->crb->finalise(
+                $report,
+                auth()->id(),
+                $request->ip()
+            );
+
+            return redirect()
+                ->route('reports.crb.show', $reportRow->id)
+                ->with('success', 'CRB file finalised successfully. The file is now immutable and ready for controlled download/submission.');
+        } catch (Throwable $e) {
+            return back()->with('error', 'CRB finalisation failed: ' . $e->getMessage());
+        }
+    }
+
+    public function download(int $report)
+    {
+        try {
+            $file = $this->crb->downloadFile($report);
+
+            return response()->download(
+                $file['path'],
+                $file['name'],
+                [
+                    'Content-Type' => 'text/plain; charset=US-ASCII',
+                    'Cache-Control' => 'no-store, no-cache',
+                ]
+            );
+        } catch (Throwable $e) {
+            return back()->with('error', 'CRB download failed: ' . $e->getMessage());
+        }
+    }
+
+    public function markSubmitted(Request $request, int $report)
+    {
+        try {
+            $reportRow = $this->crb->markSubmitted(
+                $report,
+                auth()->id(),
+                $request->ip()
+            );
+
+            return redirect()
+                ->route('reports.crb.show', $reportRow->id)
+                ->with('success', 'CRB report marked as submitted.');
+        } catch (Throwable $e) {
+            return back()->with('error', 'Unable to mark CRB report as submitted: ' . $e->getMessage());
+        }
+    }
+}

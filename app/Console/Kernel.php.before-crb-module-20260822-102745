@@ -277,31 +277,6 @@ $schedule->command('modules:sync-route-rights')
         //     ->onOneServer()
         //     ->timezone('Africa/Nairobi')
         //     ->runInBackground();
-        /*
-        |--------------------------------------------------------------------------
-        | SACCO CRB REPORTING SCHEDULE
-        |--------------------------------------------------------------------------
-        | These jobs PREPARE versioned DRAFT reports only.
-        |
-        | They do NOT finalise files, transmit data to a CRB, or mark submissions.
-        | Daily DP/MF drafts are prepared after the prior day's processing.
-        | Monthly CE/GI/CA drafts are prepared on the first day of each month
-        | for the previous month-end.
-        |--------------------------------------------------------------------------
-        */
-
-        $schedule->command('crb:prepare-daily')
-            ->dailyAt('01:30')
-            ->withoutOverlapping(30)
-            ->onOneServer()
-            ->timezone('Africa/Nairobi');
-
-        $schedule->command('crb:prepare-monthly')
-            ->monthlyOn(1, '04:30')
-            ->withoutOverlapping(30)
-            ->onOneServer()
-            ->timezone('Africa/Nairobi');
-
     }
 
     protected function commands(): void
