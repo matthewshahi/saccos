@@ -2,79 +2,6 @@
 
 @section('title', 'Member Financial Position')
 
-@section('styles')
-<style>
-    /* ✅ Card overflow fix: o-hidden clips scrollbars */
-    .mfp-card { overflow: visible !important; }
-
-    /* ✅ Main table viewport (vertical + horizontal scroll) */
-    .mfp-table-wrap{
-        width: 100%;
-        max-width: 100%;
-        overflow-x: auto;   /* horizontal */
-        overflow-y: auto;   /* vertical */
-        max-height: 70vh;
-        -webkit-overflow-scrolling: touch;
-
-        /* keep gutter so the scrollbar area doesn’t “jump” */
-        scrollbar-gutter: stable both-edges;
-    }
-
-    /* ✅ Force table to grow wide so horizontal scroll exists */
-    .mfp-table{
-        width: max-content;
-        min-width: 100%;
-    }
-
-    .mfp-table th,
-    .mfp-table td{
-        white-space: nowrap;
-        vertical-align: middle;
-    }
-
-    .mfp-table thead th{
-        position: sticky;
-        top: 0;
-        z-index: 2;
-        background: #fff;
-    }
-
-    .mfp-table tfoot th,
-    .mfp-table tfoot td{
-        position: sticky;
-        bottom: 0;
-        z-index: 2;
-        background: #fff;
-        border-top: 2px solid #dee2e6;
-        font-weight: 700;
-    }
-
-    /* ✅ Dedicated horizontal scroller (always visible under the table) */
-    .mfp-hscroll{
-        width: 100%;
-        max-width: 100%;
-        overflow-x: auto;
-        overflow-y: hidden;
-        height: 18px;                 /* a bit easier to grab than 16px */
-        margin-top: 10px;
-        background: #fff;
-        border: 1px solid #dee2e6;
-        border-radius: 6px;
-
-        scrollbar-gutter: stable both-edges;
-    }
-
-    .mfp-hscroll-inner{
-        height: 1px; /* only to create scrollable width */
-    }
-
-    .mfp-report-meta{
-        font-size: .875rem;
-        line-height: 1.5;
-    }
-</style>
-@endsection
-
 @section('content')
 @php
     $periodValue = $currentPeriod ?? date('Ym');
@@ -89,15 +16,393 @@
     $periodValue = (string) $periodValue;
 @endphp
 
-<div class="container-fluid">
+{{--
+    Keep these styles inside the rendered content intentionally.
+    The current layouts.app does not render @section('styles'), so putting
+    this CSS here guarantees that the report layout and scrolling controls
+    are actually applied on desktop and mobile.
+--}}
+<style id="mfp-page-styles">
+    #mfpReportPage,
+    #mfpReportPage * {
+        box-sizing: border-box;
+    }
+
+    #mfpReportPage {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+    }
+
+    #mfpReportPage .mfp-card {
+        width: 100%;
+        max-width: 100%;
+        overflow: hidden !important;
+    }
+
+    #mfpReportPage .mfp-card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: .75rem;
+    }
+
+    #mfpReportPage .mfp-card-title {
+        margin: 0;
+        min-width: 0;
+        font-size: 1.2rem;
+        line-height: 1.3;
+    }
+
+    /* ---------------------------------------------------------
+     * Filter form
+     * --------------------------------------------------------- */
+    #mfpReportPage .mfp-filter-grid {
+        display: grid;
+        grid-template-columns: minmax(150px, 210px) minmax(280px, 1fr) auto;
+        align-items: end;
+        gap: .85rem;
+        width: 100%;
+        margin: 0;
+    }
+
+    #mfpReportPage .mfp-field {
+        min-width: 0;
+    }
+
+    #mfpReportPage .mfp-field label {
+        display: block;
+        margin: 0 0 .35rem 0;
+        font-weight: 600;
+        line-height: 1.25;
+    }
+
+    #mfpReportPage .mfp-field .form-control {
+        width: 100%;
+        min-width: 0;
+        height: 38px;
+    }
+
+    #mfpReportPage .mfp-actions {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: .5rem;
+        white-space: nowrap;
+    }
+
+    #mfpReportPage .mfp-actions .btn {
+        min-height: 38px;
+    }
+
+    #mfpReportPage .mfp-report-meta {
+        margin-bottom: .8rem;
+        font-size: .875rem;
+        line-height: 1.55;
+        overflow-wrap: anywhere;
+    }
+
+    /* ---------------------------------------------------------
+     * Highly visible horizontal navigation
+     * --------------------------------------------------------- */
+    #mfpReportPage .mfp-scroll-panel {
+        width: 100%;
+        max-width: 100%;
+        padding: .5rem .6rem;
+        background: #f8f9fa;
+        border: 1px solid #d8dde3;
+        border-radius: .45rem;
+    }
+
+    #mfpReportPage .mfp-scroll-panel-top {
+        margin-bottom: .55rem;
+    }
+
+    #mfpReportPage .mfp-scroll-panel-bottom {
+        margin-top: .55rem;
+    }
+
+    #mfpReportPage .mfp-scroll-caption {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: .75rem;
+        margin-bottom: .35rem;
+        color: #555;
+        font-size: .78rem;
+        line-height: 1.25;
+    }
+
+    #mfpReportPage .mfp-scroll-caption strong {
+        color: #333;
+    }
+
+    #mfpReportPage .mfp-scroll-controls {
+        display: grid;
+        grid-template-columns: 44px minmax(120px, 1fr) 44px;
+        align-items: center;
+        gap: .55rem;
+        width: 100%;
+    }
+
+    #mfpReportPage .mfp-scroll-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 44px;
+        min-width: 44px;
+        height: 38px;
+        padding: 0;
+        font-size: 1.15rem;
+        font-weight: 700;
+        line-height: 1;
+        border: 1px solid #c9ced4;
+        border-radius: .4rem;
+        background: #fff;
+        color: #333;
+        cursor: pointer;
+        user-select: none;
+        touch-action: manipulation;
+    }
+
+    #mfpReportPage .mfp-scroll-btn:hover,
+    #mfpReportPage .mfp-scroll-btn:focus {
+        border-color: #663399;
+        color: #663399;
+        outline: none;
+        box-shadow: 0 0 0 .12rem rgba(102, 51, 153, .12);
+    }
+
+    #mfpReportPage .mfp-scroll-range {
+        display: block;
+        width: 100%;
+        min-width: 0;
+        height: 30px;
+        margin: 0;
+        cursor: ew-resize;
+        accent-color: #663399;
+        touch-action: manipulation;
+    }
+
+    #mfpReportPage .mfp-scroll-panel.is-disabled {
+        opacity: .65;
+    }
+
+    #mfpReportPage .mfp-scroll-panel.is-disabled .mfp-scroll-btn,
+    #mfpReportPage .mfp-scroll-panel.is-disabled .mfp-scroll-range {
+        cursor: default;
+    }
+
+    /* ---------------------------------------------------------
+     * Table viewport
+     * --------------------------------------------------------- */
+    #mfpReportPage .mfp-table-wrap {
+        position: relative;
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        max-height: 68vh;
+        overflow: auto;
+        border: 1px solid #dee2e6;
+        border-radius: .35rem;
+        background: #fff;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain;
+        scrollbar-gutter: stable both-edges;
+        scrollbar-width: auto;
+        scrollbar-color: #777 #eceff2;
+    }
+
+    /* Make the browser scrollbar easier to see/grab on desktop WebKit/Chromium. */
+    #mfpReportPage .mfp-table-wrap::-webkit-scrollbar {
+        width: 14px;
+        height: 16px;
+    }
+
+    #mfpReportPage .mfp-table-wrap::-webkit-scrollbar-track {
+        background: #eceff2;
+        border-radius: 10px;
+    }
+
+    #mfpReportPage .mfp-table-wrap::-webkit-scrollbar-thumb {
+        background: #777;
+        border: 3px solid #eceff2;
+        border-radius: 10px;
+    }
+
+    #mfpReportPage .mfp-table-wrap::-webkit-scrollbar-thumb:hover {
+        background: #555;
+    }
+
+    #mfpReportPage .mfp-table {
+        width: max-content;
+        min-width: 100%;
+        margin: 0;
+        border-collapse: separate;
+        border-spacing: 0;
+        font-size: 13px;
+    }
+
+    #mfpReportPage .mfp-table th,
+    #mfpReportPage .mfp-table td {
+        padding: .55rem .65rem;
+        white-space: nowrap;
+        vertical-align: middle;
+        background-clip: padding-box;
+    }
+
+    #mfpReportPage .mfp-table thead th {
+        position: sticky;
+        top: 0;
+        z-index: 4;
+        background: #fff;
+        border-bottom: 2px solid #dfe3e7;
+    }
+
+    #mfpReportPage .mfp-table tfoot th,
+    #mfpReportPage .mfp-table tfoot td {
+        position: sticky;
+        bottom: 0;
+        z-index: 4;
+        background: #fff;
+        border-top: 2px solid #cfd4da;
+        font-weight: 700;
+    }
+
+    /* Freeze row number + member name so users do not lose context horizontally. */
+    #mfpReportPage .mfp-table thead th:nth-child(1),
+    #mfpReportPage .mfp-table tbody td:nth-child(1) {
+        position: sticky;
+        left: 0;
+        z-index: 3;
+        width: 52px;
+        min-width: 52px;
+        max-width: 52px;
+        background: #fff;
+    }
+
+    #mfpReportPage .mfp-table thead th:nth-child(2),
+    #mfpReportPage .mfp-table tbody td:nth-child(2) {
+        position: sticky;
+        left: 52px;
+        z-index: 3;
+        min-width: 210px;
+        background: #fff;
+        box-shadow: 2px 0 0 rgba(0, 0, 0, .06);
+    }
+
+    #mfpReportPage .mfp-table thead th:nth-child(1),
+    #mfpReportPage .mfp-table thead th:nth-child(2) {
+        z-index: 7;
+    }
+
+    #mfpReportPage .mfp-mobile-scroll-hint {
+        display: none;
+    }
+
+    @media (max-width: 991.98px) {
+        #mfpReportPage .mfp-filter-grid {
+            grid-template-columns: minmax(140px, 190px) minmax(220px, 1fr);
+        }
+
+        #mfpReportPage .mfp-actions {
+            grid-column: 1 / -1;
+            justify-content: flex-start;
+        }
+    }
+
+    @media (max-width: 767.98px) {
+        #mfpReportPage .card-body {
+            padding-left: .75rem;
+            padding-right: .75rem;
+        }
+
+        #mfpReportPage .mfp-card-header {
+            align-items: flex-start;
+        }
+
+        #mfpReportPage .mfp-card-title {
+            flex: 1 1 100%;
+            font-size: 1.05rem;
+        }
+
+        #mfpReportPage #exportBtn {
+            width: 100%;
+        }
+
+        #mfpReportPage .mfp-filter-grid {
+            grid-template-columns: 1fr;
+            gap: .7rem;
+        }
+
+        #mfpReportPage .mfp-actions {
+            grid-column: auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            width: 100%;
+        }
+
+        #mfpReportPage .mfp-actions .btn {
+            width: 100%;
+            min-height: 42px;
+        }
+
+        #mfpReportPage .mfp-scroll-panel {
+            padding: .55rem;
+        }
+
+        #mfpReportPage .mfp-scroll-caption {
+            display: block;
+            margin-bottom: .45rem;
+        }
+
+        #mfpReportPage .mfp-mobile-scroll-hint {
+            display: inline;
+        }
+
+        #mfpReportPage .mfp-scroll-controls {
+            grid-template-columns: 46px minmax(80px, 1fr) 46px;
+            gap: .4rem;
+        }
+
+        #mfpReportPage .mfp-scroll-btn {
+            width: 46px;
+            min-width: 46px;
+            height: 44px;
+        }
+
+        #mfpReportPage .mfp-scroll-range {
+            height: 38px;
+        }
+
+        #mfpReportPage .mfp-table-wrap {
+            max-height: 62vh;
+        }
+
+        #mfpReportPage .mfp-table {
+            font-size: 12px;
+        }
+
+        #mfpReportPage .mfp-table th,
+        #mfpReportPage .mfp-table td {
+            padding: .5rem .55rem;
+        }
+
+        #mfpReportPage .mfp-table thead th:nth-child(2),
+        #mfpReportPage .mfp-table tbody td:nth-child(2) {
+            min-width: 170px;
+        }
+    }
+</style>
+
+<div class="container-fluid" id="mfpReportPage">
     <div class="row">
         <div class="col-12">
-
             <div class="card mb-4 mfp-card">
 
-                {{-- HEADER --}}
-                <div class="card-header d-flex align-items-center justify-content-between">
-                    <h3 class="card-title mb-0">Member Financial Position (As At)</h3>
+                <div class="card-header mfp-card-header">
+                    <h3 class="card-title mfp-card-title">Member Financial Position (As At)</h3>
 
                     <a href="#" id="exportBtn" class="btn btn-sm btn-outline-success disabled" aria-disabled="true">
                         Export CSV
@@ -106,52 +411,59 @@
 
                 <div class="card-body">
 
-                    {{-- FILTER BAR --}}
-                    <form id="filterForm" class="row gx-3 gy-2 align-items-center" onsubmit="return false;">
-
-                        <div class="col-md-2">
-                            <label class="form-label mb-1 fw-semibold">Period (YYYYMM)</label>
+                    <form id="filterForm" class="mfp-filter-grid" onsubmit="return false;">
+                        <div class="mfp-field">
+                            <label for="period">Period (YYYYMM)</label>
                             <input
                                 type="text"
                                 id="period"
                                 name="period"
                                 class="form-control"
                                 value="{{ $periodValue }}"
-                                placeholder="YYYYMM"
+                                placeholder="e.g. 202601"
                                 maxlength="6"
+                                inputmode="numeric"
                                 autocomplete="off">
-                            <small class="text-muted">Example: 202601</small>
                         </div>
 
-                        <div class="col-md-5">
-                            <label class="form-label mb-1 fw-semibold">Search</label>
+                        <div class="mfp-field">
+                            <label for="pms_srch">Search members</label>
                             <input
-                                type="text"
+                                type="search"
                                 id="pms_srch"
                                 name="pms_srch"
                                 class="form-control"
-                                placeholder="Name, Sacco ID, National ID, Email, Phone, Company, Department, Position..."
+                                placeholder="Name, Sacco ID, National ID, email, phone, company, department or position"
                                 autocomplete="off">
                         </div>
 
-                        <div class="col-md-5 d-flex justify-content-end align-items-center">
+                        <div class="mfp-actions">
                             <button type="button" id="loadReport" class="btn btn-primary">Load Report</button>
-                            <button type="button" id="clearBtn" class="btn btn-outline-secondary ms-2">Clear</button>
+                            <button type="button" id="clearBtn" class="btn btn-outline-secondary">Clear</button>
                         </div>
-
                     </form>
 
                     <hr class="my-4">
 
-                    {{-- REPORT AUDIT CONTEXT --}}
                     <div id="reportMeta" class="alert alert-light border mfp-report-meta d-none"></div>
 
-                    {{-- STATES --}}
                     <div id="loading" class="text-center text-muted d-none">Loading report, please wait…</div>
                     <div id="emptyState" class="text-center text-muted d-none">No data found for the selected period.</div>
 
-                    {{-- TABLE --}}
-                    <div id="tableWrapper" class="mfp-table-wrap d-none">
+                    {{-- Visible horizontal navigator above the table. --}}
+                    <div id="topScrollPanel" class="mfp-scroll-panel mfp-scroll-panel-top d-none" aria-label="Horizontal table navigation">
+                        <div class="mfp-scroll-caption">
+                            <span><strong>Horizontal navigation</strong> — drag the bar or use the arrows.</span>
+                            <span class="mfp-mobile-scroll-hint">You can also swipe the table left/right.</span>
+                        </div>
+                        <div class="mfp-scroll-controls">
+                            <button type="button" class="mfp-scroll-btn" data-scroll-dir="-1" aria-label="Scroll table left">&#8592;</button>
+                            <input id="topScrollRange" class="mfp-scroll-range" type="range" min="0" max="0" value="0" step="1" aria-label="Horizontal table position">
+                            <button type="button" class="mfp-scroll-btn" data-scroll-dir="1" aria-label="Scroll table right">&#8594;</button>
+                        </div>
+                    </div>
+
+                    <div id="tableWrapper" class="mfp-table-wrap d-none" tabindex="0" aria-label="Member Financial Position table. Scroll horizontally and vertically to view all columns and records.">
                         <table class="table table-hover table-bordered text-center mfp-table mb-0">
                             <thead id="reportHead"></thead>
                             <tbody id="reportBody"></tbody>
@@ -159,14 +471,21 @@
                         </table>
                     </div>
 
-                    {{-- ✅ ALWAYS-VISIBLE HORIZONTAL SCROLLER --}}
-                    <div id="hScroll" class="mfp-hscroll d-none" aria-label="Horizontal scroller">
-                        <div id="hScrollInner" class="mfp-hscroll-inner"></div>
+                    {{-- Same navigator below the table so it is always easy to reach. --}}
+                    <div id="bottomScrollPanel" class="mfp-scroll-panel mfp-scroll-panel-bottom d-none" aria-label="Horizontal table navigation">
+                        <div class="mfp-scroll-caption">
+                            <span><strong>Horizontal navigation</strong> — drag the bar or use the arrows.</span>
+                            <span class="mfp-mobile-scroll-hint">You can also swipe the table left/right.</span>
+                        </div>
+                        <div class="mfp-scroll-controls">
+                            <button type="button" class="mfp-scroll-btn" data-scroll-dir="-1" aria-label="Scroll table left">&#8592;</button>
+                            <input id="bottomScrollRange" class="mfp-scroll-range" type="range" min="0" max="0" value="0" step="1" aria-label="Horizontal table position">
+                            <button type="button" class="mfp-scroll-btn" data-scroll-dir="1" aria-label="Scroll table right">&#8594;</button>
+                        </div>
                     </div>
 
                 </div>
             </div>
-
         </div>
     </div>
 </div>
@@ -191,12 +510,17 @@
 
     const exportBtn  = document.getElementById('exportBtn');
 
-    const hScroll      = document.getElementById('hScroll');
-    const hScrollInner = document.getElementById('hScrollInner');
+    const topScrollPanel    = document.getElementById('topScrollPanel');
+    const bottomScrollPanel = document.getElementById('bottomScrollPanel');
+    const topScrollRange    = document.getElementById('topScrollRange');
+    const bottomScrollRange = document.getElementById('bottomScrollRange');
+    const scrollRanges      = [topScrollRange, bottomScrollRange];
+    const scrollPanels      = [topScrollPanel, bottomScrollPanel];
+    const scrollButtons     = Array.from(document.querySelectorAll('.mfp-scroll-btn'));
 
     const PAGE_SIZE = 5000;
 
-    let syncing = false;
+    let scrollUiBound = false;
     let ro = null;
     let activeAbortController = null;
 
@@ -231,6 +555,22 @@
         }).format(new Date(year, month - 1, 1));
     }
 
+    function resetHorizontalNavigation() {
+        scrollPanels.forEach(panel => {
+            panel.classList.add('d-none');
+            panel.classList.remove('is-disabled');
+        });
+
+        scrollRanges.forEach(range => {
+            range.min = '0';
+            range.max = '0';
+            range.value = '0';
+            range.disabled = true;
+        });
+
+        tableWrap.scrollLeft = 0;
+    }
+
     function resetUI() {
         loading.classList.add('d-none');
         loading.textContent = 'Loading report, please wait…';
@@ -248,52 +588,78 @@
         exportBtn.setAttribute('aria-disabled', 'true');
         exportBtn.href = '#';
 
-        hScroll.classList.add('d-none');
-        hScroll.scrollLeft = 0;
-        tableWrap.scrollLeft = 0;
-        hScrollInner.style.width = '0px';
+        resetHorizontalNavigation();
     }
 
-    function syncScroll(from, to) {
-        if (syncing) return;
-        syncing = true;
-        to.scrollLeft = from.scrollLeft;
-        requestAnimationFrame(() => { syncing = false; });
+    function maxHorizontalScroll() {
+        return Math.max(0, Math.round(tableWrap.scrollWidth - tableWrap.clientWidth));
     }
 
-    function setupHorizontalScroller() {
-        const setWidth = () => {
-            const w = Math.max(tableWrap.scrollWidth || 0, tableWrap.clientWidth || 0);
-            hScrollInner.style.width = w + 'px';
-        };
+    function syncRangesFromTable() {
+        const max = maxHorizontalScroll();
+        const current = Math.max(0, Math.min(max, Math.round(tableWrap.scrollLeft)));
 
-        setWidth();
-        hScroll.classList.remove('d-none');
+        scrollRanges.forEach(range => {
+            range.max = String(max);
+            range.value = String(current);
+            range.disabled = max <= 0;
+        });
 
-        if (!tableWrap.dataset.hsync) {
-            tableWrap.dataset.hsync = '1';
+        scrollPanels.forEach(panel => {
+            panel.classList.toggle('is-disabled', max <= 0);
+        });
+    }
 
-            tableWrap.addEventListener('scroll', function () {
-                syncScroll(tableWrap, hScroll);
-            }, { passive: true });
+    function refreshHorizontalNavigation() {
+        scrollPanels.forEach(panel => panel.classList.remove('d-none'));
+        syncRangesFromTable();
+    }
 
-            hScroll.addEventListener('scroll', function () {
-                syncScroll(hScroll, tableWrap);
-            }, { passive: true });
+    function setupHorizontalNavigation() {
+        refreshHorizontalNavigation();
 
-            window.addEventListener('resize', setWidth);
+        if (!scrollUiBound) {
+            scrollUiBound = true;
+
+            tableWrap.addEventListener('scroll', syncRangesFromTable, { passive: true });
+
+            scrollRanges.forEach(range => {
+                range.addEventListener('input', function () {
+                    tableWrap.scrollLeft = Number(range.value || 0);
+                    syncRangesFromTable();
+                });
+            });
+
+            scrollButtons.forEach(button => {
+                button.addEventListener('click', function () {
+                    const direction = Number(button.dataset.scrollDir || 0);
+                    const max = maxHorizontalScroll();
+
+                    if (!direction || max <= 0) return;
+
+                    const amount = Math.max(260, Math.round(tableWrap.clientWidth * 0.72));
+
+                    tableWrap.scrollBy({
+                        left: direction * amount,
+                        behavior: 'smooth'
+                    });
+                });
+            });
+
+            window.addEventListener('resize', refreshHorizontalNavigation);
 
             if (window.ResizeObserver) {
-                ro = new ResizeObserver(() => setWidth());
+                ro = new ResizeObserver(refreshHorizontalNavigation);
                 ro.observe(tableWrap);
+
                 const table = tableWrap.querySelector('table');
                 if (table) ro.observe(table);
             }
         }
 
-        requestAnimationFrame(setWidth);
-        setTimeout(setWidth, 60);
-        setTimeout(setWidth, 180);
+        requestAnimationFrame(refreshHorizontalNavigation);
+        setTimeout(refreshHorizontalNavigation, 60);
+        setTimeout(refreshHorizontalNavigation, 180);
     }
 
     function buildDataUrl(period, pms_srch, page) {
@@ -451,7 +817,7 @@
         reportMeta.classList.remove('d-none');
 
         tableWrap.classList.remove('d-none');
-        setupHorizontalScroller();
+        setupHorizontalNavigation();
 
         const exportUrl = new URL(`{{ route('reports.members.financial_position.export') }}`, window.location.origin);
         exportUrl.searchParams.set('period', period);
