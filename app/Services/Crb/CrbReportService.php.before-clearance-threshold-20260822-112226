@@ -1587,42 +1587,12 @@ class CrbReportService
             $this->warn($issues, 'HISTORICAL_BALANCE_DERIVED_FROM_LEDGER', 'Historical current balance was reconstructed from principal payments posted on or before the CRB snapshot date.');
         }
 
-        /*
-         * SACCO loan-clearance rule.
-         *
-         * The operational application already treats a loan as cleared when:
-         *
-         *     loan_amount - loan_loan_paid <= threshold_amount
-         *
-         * The same rule must govern CRB account closure.
-         *
-         * Examples:
-         * threshold_amount = 0  => balance 0 or any overpayment is cleared
-         * threshold_amount = 10 => balances from KES 0.00 through KES 10.00
-         *                          are considered cleared
-         *
-         * CRB Current Balance must never be negative. Once the member no
-         * longer owes principal under the SACCO clearance rule, report zero.
-         */
-        $rawCurrentBalance = $currentBalance;
-        $clearanceThreshold = $this->loanClearanceThreshold();
-
-        if ($rawCurrentBalance <= $clearanceThreshold) {
-            if ($rawCurrentBalance < -0.005) {
-                $this->warn(
-                    $issues,
-                    'OVERPAID_BALANCE_NORMALISED_TO_ZERO',
-                    'The calculated principal balance is below zero because principal paid exceeds the original loan amount. The facility is cleared under the SACCO threshold rule and CRB Current Balance is reported as zero.'
-                );
-            } elseif ($rawCurrentBalance > 0.005 && $clearanceThreshold > 0) {
-                $this->warn(
-                    $issues,
-                    'BALANCE_WITHIN_CLEARANCE_THRESHOLD',
-                    'The remaining principal balance is within the SACCO threshold_amount and is therefore treated as cleared for CRB reporting.'
-                );
-            }
-
-            $currentBalance = 0.0;
+        if ($currentBalance < -0.005) {
+            $this->error(
+                $issues,
+                'NEGATIVE_CURRENT_BALANCE',
+                'Current Balance is negative. CRB balance must not be silently clamped; reconcile loan_amount and principal paid before finalisation.'
+            );
         }
 
         if ($currentBalance > $original + 1.00) {
@@ -1683,8 +1653,6 @@ class CrbReportService
         $instalmentDueDate = $overdueDate ?: $nextUnpaidDue;
 
         return [
-            'raw_current_balance' => round($rawCurrentBalance, 2),
-            'clearance_threshold' => round($clearanceThreshold, 2),
             'current_balance' => round($currentBalance, 2),
             'overdue_balance' => round($overdue, 2),
             'overdue_date' => $overdueDate,
@@ -1694,23 +1662,6 @@ class CrbReportService
             'next_unpaid_due' => $nextUnpaidDue,
             'principal_paid_to_date' => round($principalPaid, 2),
         ];
-    }
-
-    /**
-     * SACCO operational threshold below/at which a loan is considered cleared.
-     *
-     * This is an existing SACCO-wide setting used by the loan module; CRB must
-     * not maintain a separate competing clearance threshold.
-     */
-    private function loanClearanceThreshold(): float
-    {
-        $value = $this->default('threshold_amount', 0);
-
-        if (!is_numeric($value)) {
-            return 0.0;
-        }
-
-        return max(0.0, (float) $value);
     }
 
     private function principalSchedule(object $row, Carbon $date, array &$issues): array
