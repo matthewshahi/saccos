@@ -410,33 +410,51 @@ class HomeController extends Controller
 
 
     public function membersList(Request $request)
-    {
-        DB::table('sacco_loans')->whereNull('loan_loan_paid')->update(['loan_loan_paid' => 0]);
-        DB::table('sacco_loans')->whereNull('loan_start_deduction_period')->update(['loan_start_deduction_period' => '00000']);
+{
+    DB::table('sacco_loans')
+        ->whereNull('loan_loan_paid')
+        ->update(['loan_loan_paid' => 0]);
 
-        $orderby    = $request->input('orderby', 'member_name');
-        $sort_order = 'asc';
-        $search     = $request->input('pms_srch', '');
+    DB::table('sacco_loans')
+        ->whereNull('loan_start_deduction_period')
+        ->update(['loan_start_deduction_period' => '00000']);
 
-        // NEW optional filters from the dropdowns
-        $memberActive  = $request->input('member_active', '');     // Y/N or ''
-        $isJunior      = $request->input('member_is_junior', '');  // 0/1 or ''
-        $memberDeleted = $request->input('member_deleted', '');    // Y/N or ''
+    $orderby    = $request->input('orderby', 'member_name');
+    $sort_order = 'asc';
+    $search     = $request->input('pms_srch', '');
 
-        // Convert '' to null (so it truly does not filter)
-        $memberActive  = ($memberActive === '' ? null : $memberActive);
-        $isJunior      = ($isJunior === '' ? null : $isJunior);
-        $memberDeleted = ($memberDeleted === '' ? null : $memberDeleted);
+    // Optional member filters
+    $memberActive  = $request->input('member_active', '');
+    $isJunior      = $request->input('member_is_junior', '');
+    $memberDeleted = $request->input('member_deleted', '');
 
-        $members = $this->getMembersListFiltered($orderby, $sort_order, $search, null, $memberActive, $isJunior, $memberDeleted);
+    // Empty means "do not filter"
+    $memberActiveFilter  = $memberActive === '' ? null : $memberActive;
+    $isJuniorFilter      = $isJunior === '' ? null : $isJunior;
+    $memberDeletedFilter = $memberDeleted === '' ? null : $memberDeleted;
 
-        return view('members.list', [
-            'members'    => $members,
-            'orderby'    => $orderby,
-            'sort_order' => $sort_order,
-            'pms_srch'   => $search,
-        ]);
-    }
+    $members = $this->getMembersListFiltered(
+        $orderby,
+        $sort_order,
+        $search,
+        null,
+        $memberActiveFilter,
+        $isJuniorFilter,
+        $memberDeletedFilter
+    );
+
+    return view('members.list', [
+        'members'          => $members,
+        'orderby'          => $orderby,
+        'sort_order'       => $sort_order,
+        'pms_srch'         => $search,
+
+        // Keep selected dropdown values
+        'member_active'    => $memberActive,
+        'member_is_junior' => $isJunior,
+        'member_deleted'   => $memberDeleted,
+    ]);
+}
     private function getMembersListFiltered(
         $orderby = 'member_name',
         $sort_order = 'asc',
@@ -9449,66 +9467,370 @@ class HomeController extends Controller
         return response()->json(['data' => $loanRepayments]);
     }
     public function membersListCsv(Request $request)
-    {
-        $orderby = $request->input('orderby', 'member_name');
-        $sort_order = 'asc';
-        $search = $request->input('pms_srch', '');
+{
+    /*
+    |--------------------------------------------------------------------------
+    | Use the SAME filtering logic as the member listing
+    |--------------------------------------------------------------------------
+    */
 
-        $members = $this->getMembers($orderby, $sort_order, $search, 50000); // large export
+    $orderby    = $request->input('orderby', 'member_name');
+    $sort_order = 'asc';
+    $search     = $request->input('pms_srch', '');
 
-        $filename = "members_" . date('Ymd_His') . ".csv";
+    $memberActive  = $request->input('member_active', '');
+    $isJunior      = $request->input('member_is_junior', '');
+    $memberDeleted = $request->input('member_deleted', '');
 
-        $headers = [
-            "Content-Type"        => "text/csv",
-            "Content-Disposition" => "attachment; filename=$filename",
-            "Pragma"              => "no-cache",
-            "Cache-Control"       => "must-revalidate, post-check=0, pre-check=0",
-            "Expires"             => "0"
-        ];
+    $memberActive  = $memberActive === '' ? null : $memberActive;
+    $isJunior      = $isJunior === '' ? null : $isJunior;
+    $memberDeleted = $memberDeleted === '' ? null : $memberDeleted;
 
-        $columns = [
-            'Name',
-            'Sacco ID',
-            'National ID',
-            'Phone',
-            'Email',
-            'Company',
-            'Department',
-            'Position',
-            'Status',
-            'Account Type',
-        ];
+    /*
+    |--------------------------------------------------------------------------
+    | Get export population
+    |--------------------------------------------------------------------------
+    | Large limit for CSV, but still uses exactly the same search/filter
+    | engine as the member listing.
+    |--------------------------------------------------------------------------
+    */
 
-        $callback = function () use ($members, $columns) {
-            $file = fopen('php://output', 'w');
+    $members = $this->getMembersListFiltered(
+        $orderby,
+        $sort_order,
+        $search,
+        50000,
+        $memberActive,
+        $isJunior,
+        $memberDeleted
+    );
 
-            // Header row
-            fputcsv($file, $columns);
+    /*
+    |--------------------------------------------------------------------------
+    | Resolve Junior Account Guardians
+    |--------------------------------------------------------------------------
+    | Do this in one batch rather than querying once per member.
+    |--------------------------------------------------------------------------
+    */
 
-            foreach ($members as $m) {
+    $guardianIds = $members
+        ->pluck('member_guardian_id')
+        ->filter()
+        ->unique()
+        ->values();
 
-                // Ensure Excel treats these values as TEXT
-                $saccoId     = '="' . $m->member_sacco_id . '"';
-                $nationalId  = '="' . $m->member_national_id . '"';
-                $phone       = '="' . $m->member_phone_no . '"';
+    $guardians = collect();
 
-                fputcsv($file, [
-                    $m->member_name,
-                    $saccoId,
-                    $nationalId,
-                    $phone,
-                    $m->member_email,
-                    $m->company_name,
-                    $m->department_name,
-                    $m->position_name,
-                    $m->member_active == 'Y' ? 'Active' : 'Inactive',
-                    $m->member_is_junior ? 'Junior' : 'Standard',
-                ]);
+    if ($guardianIds->isNotEmpty()) {
+        $guardians = DB::table('sacco_members')
+            ->whereIn('member_id', $guardianIds)
+            ->select(
+                'member_id',
+                'member_name',
+                'member_sacco_id',
+                'member_national_id'
+            )
+            ->get()
+            ->keyBy('member_id');
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | CSV filename
+    |--------------------------------------------------------------------------
+    */
+
+    $filename = 'members_' . date('Ymd_His') . '.csv';
+
+    $headers = [
+        'Content-Type'        => 'text/csv; charset=UTF-8',
+        'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+        'Pragma'              => 'no-cache',
+        'Cache-Control'       => 'must-revalidate, post-check=0, pre-check=0',
+        'Expires'             => '0',
+    ];
+
+    /*
+    |--------------------------------------------------------------------------
+    | Rich Member Master columns
+    |--------------------------------------------------------------------------
+    */
+
+    $columns = [
+        'System Member ID',
+
+        // Identity
+        'Name',
+        'Sacco ID',
+        'National ID',
+        'KRA PIN',
+        'Date of Birth',
+        'Gender',
+
+        // Contact
+        'Phone',
+        'Email',
+        'Postal Address',
+
+        // Membership
+        'Date Joined',
+        'Company',
+        'Department',
+        'Position',
+        'Status',
+        'Date Deactivated',
+        'Deleted',
+        'Deleted On',
+        'Account Type',
+
+        // Junior account
+        'Guardian Name',
+        'Guardian Sacco ID',
+        'Guardian National ID',
+
+        // Digital access
+        'Mobile Banking',
+        'Last Mobile Login',
+
+        // Monthly contribution settings
+        'Monthly Savings Contribution',
+        'Monthly Other Savings Contribution',
+
+        // Current stored member totals
+        'Current Savings Total',
+        'Current Other Savings Total',
+        'Current Share Capital Total',
+        'Current Loan Total',
+        'Tied Shares - Others',
+        'Tied Shares - Self',
+
+        // Banking
+        'Bank Name',
+        'Bank Branch',
+        'Bank Account Number',
+
+        // Record information
+        'Record Created',
+    ];
+
+    /*
+    |--------------------------------------------------------------------------
+    | Stream CSV
+    |--------------------------------------------------------------------------
+    */
+
+    $callback = function () use ($members, $columns, $guardians) {
+        $file = fopen('php://output', 'w');
+
+        /*
+         * UTF-8 BOM makes Excel handle names/special characters better.
+         */
+        fwrite($file, "\xEF\xBB\xBF");
+
+        fputcsv($file, $columns);
+
+        /*
+         * Preserve identifiers exactly as text in Excel.
+         *
+         * This prevents:
+         * 00123 becoming 123
+         * long account numbers becoming scientific notation
+         * phone numbers losing + or leading zeroes
+         */
+        $excelText = function ($value) {
+            if ($value === null || $value === '') {
+                return '';
             }
 
-            fclose($file);
+            $value = (string) $value;
+            $value = str_replace('"', '""', $value);
+
+            return '="' . $value . '"';
         };
 
-        return response()->stream($callback, 200, $headers);
-    }
+        /*
+         * Protect normal textual CSV values against Excel formula execution.
+         */
+        $safeText = function ($value) {
+            if ($value === null) {
+                return '';
+            }
+
+            $value = (string) $value;
+
+            if (
+                $value !== ''
+                && in_array(substr($value, 0, 1), ['=', '+', '-', '@'], true)
+            ) {
+                return "'" . $value;
+            }
+
+            return $value;
+        };
+
+        /*
+         * Consistent date formatting.
+         */
+        $formatDate = function ($value, $includeTime = false) {
+            if (empty($value)) {
+                return '';
+            }
+
+            try {
+                return \Carbon\Carbon::parse($value)->format(
+                    $includeTime ? 'Y-m-d H:i:s' : 'Y-m-d'
+                );
+            } catch (\Throwable $e) {
+                return (string) $value;
+            }
+        };
+
+        foreach ($members as $m) {
+
+            /*
+             * Junior guardian information
+             */
+            $guardian = null;
+
+            if (!empty($m->member_guardian_id)) {
+                $guardian = $guardians->get(
+                    $m->member_guardian_id
+                );
+            }
+
+            /*
+             * Human-readable gender
+             */
+            $gender = match (strtoupper((string) ($m->member_gender ?? ''))) {
+                'M' => 'Male',
+                'F' => 'Female',
+                default => (string) ($m->member_gender ?? ''),
+            };
+
+            /*
+             * Human-readable member status
+             */
+            $status = strtoupper((string) ($m->member_active ?? 'N')) === 'Y'
+                ? 'Active'
+                : 'Inactive';
+
+            /*
+             * Junior / Standard account
+             */
+            $accountType = (int) ($m->member_is_junior ?? 0) === 1
+                ? 'Junior'
+                : 'Standard';
+
+            /*
+             * Deleted status
+             */
+            $deleted = strtoupper((string) ($m->member_deleted ?? 'N')) === 'Y'
+                ? 'Yes'
+                : 'No';
+
+            /*
+             * Mobile banking status
+             */
+            $mobileBanking = strtoupper(
+                (string) ($m->member_mobile_banking_active ?? 'N')
+            ) === 'Y'
+                ? 'Active'
+                : 'Inactive';
+
+            fputcsv($file, [
+                /*
+                 * System
+                 */
+                $m->member_id,
+
+                /*
+                 * Identity
+                 */
+                $safeText($m->member_name),
+                $excelText($m->member_sacco_id),
+                $excelText($m->member_national_id),
+                $excelText($m->member_kra_pin),
+                $formatDate($m->member_dob),
+                $gender,
+
+                /*
+                 * Contact
+                 */
+                $excelText($m->member_phone_no),
+                $safeText($m->member_email),
+                $safeText($m->member_postal_address),
+
+                /*
+                 * Membership
+                 */
+                $formatDate($m->member_date_joined),
+                $safeText($m->company_name),
+                $safeText($m->department_name),
+                $safeText($m->position_name),
+                $status,
+                $formatDate($m->member_date_dactivated),
+                $deleted,
+                $formatDate($m->member_deleted_on, true),
+                $accountType,
+
+                /*
+                 * Junior guardian
+                 */
+                $guardian
+                    ? $safeText($guardian->member_name)
+                    : '',
+
+                $guardian
+                    ? $excelText($guardian->member_sacco_id)
+                    : '',
+
+                $guardian
+                    ? $excelText($guardian->member_national_id)
+                    : '',
+
+                /*
+                 * Digital access
+                 */
+                $mobileBanking,
+                $formatDate($m->member_last_mobile_login, true),
+
+                /*
+                 * Monthly contribution settings
+                 */
+                (float) ($m->member_share_contr_monthly ?? 0),
+                (float) ($m->member_fosa_contr_monthly ?? 0),
+
+                /*
+                 * Current stored member totals
+                 */
+                (float) ($m->member_total_share ?? 0),
+                (float) ($m->member_total_fosa ?? 0),
+                (float) ($m->member_total_share_capital ?? 0),
+                (float) ($m->member_total_loan ?? 0),
+                (float) ($m->member_tied_shares ?? 0),
+                (float) ($m->member_tied_shares_self ?? 0),
+
+                /*
+                 * Bank information
+                 */
+                $safeText($m->bank_name),
+                $safeText($m->bank_branch),
+                $excelText($m->bank_account_number),
+
+                /*
+                 * Record information
+                 */
+                $formatDate($m->member_transdate, true),
+            ]);
+        }
+
+        fclose($file);
+    };
+
+    return response()->stream(
+        $callback,
+        200,
+        $headers
+    );
+}
 }
