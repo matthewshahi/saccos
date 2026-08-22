@@ -67,6 +67,11 @@
     .mfp-hscroll-inner{
         height: 1px; /* only to create scrollable width */
     }
+
+    .mfp-report-meta{
+        font-size: .875rem;
+        line-height: 1.5;
+    }
 </style>
 @endsection
 
@@ -125,7 +130,7 @@
                                 id="pms_srch"
                                 name="pms_srch"
                                 class="form-control"
-                                placeholder="Name, Sacco ID, National ID, Email, Company, Department..."
+                                placeholder="Name, Sacco ID, National ID, Email, Phone, Company, Department, Position..."
                                 autocomplete="off">
                         </div>
 
@@ -137,6 +142,9 @@
                     </form>
 
                     <hr class="my-4">
+
+                    {{-- REPORT AUDIT CONTEXT --}}
+                    <div id="reportMeta" class="alert alert-light border mfp-report-meta d-none"></div>
 
                     {{-- STATES --}}
                     <div id="loading" class="text-center text-muted d-none">Loading report, please wait…</div>
@@ -175,6 +183,7 @@
     const loading    = document.getElementById('loading');
     const tableWrap  = document.getElementById('tableWrapper');
     const emptyState = document.getElementById('emptyState');
+    const reportMeta = document.getElementById('reportMeta');
 
     const thead      = document.getElementById('reportHead');
     const tbody      = document.getElementById('reportBody');
@@ -185,8 +194,11 @@
     const hScroll      = document.getElementById('hScroll');
     const hScrollInner = document.getElementById('hScrollInner');
 
+    const PAGE_SIZE = 5000;
+
     let syncing = false;
     let ro = null;
+    let activeAbortController = null;
 
     function escHtml(s) {
         return String(s ?? '')
@@ -199,13 +211,34 @@
 
     function money(n) {
         const x = Number(n || 0);
-        return x.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        return x.toLocaleString(undefined, {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
+    }
+
+    function periodLabel(period) {
+        if (!/^\d{6}$/.test(period)) return period;
+
+        const year = Number(period.substring(0, 4));
+        const month = Number(period.substring(4, 6));
+
+        if (month < 1 || month > 12) return period;
+
+        return new Intl.DateTimeFormat(undefined, {
+            month: 'long',
+            year: 'numeric'
+        }).format(new Date(year, month - 1, 1));
     }
 
     function resetUI() {
         loading.classList.add('d-none');
+        loading.textContent = 'Loading report, please wait…';
+
         tableWrap.classList.add('d-none');
         emptyState.classList.add('d-none');
+        reportMeta.classList.add('d-none');
+        reportMeta.innerHTML = '';
 
         thead.innerHTML = '';
         tbody.innerHTML = '';
@@ -229,7 +262,6 @@
     }
 
     function setupHorizontalScroller() {
-        // ✅ use WRAPPER scrollWidth (most reliable) rather than table.scrollWidth
         const setWidth = () => {
             const w = Math.max(tableWrap.scrollWidth || 0, tableWrap.clientWidth || 0);
             hScrollInner.style.width = w + 'px';
@@ -238,7 +270,6 @@
         setWidth();
         hScroll.classList.remove('d-none');
 
-        // bind once
         if (!tableWrap.dataset.hsync) {
             tableWrap.dataset.hsync = '1';
 
@@ -252,7 +283,6 @@
 
             window.addEventListener('resize', setWidth);
 
-            // ✅ keep width correct when table content changes (best-effort)
             if (window.ResizeObserver) {
                 ro = new ResizeObserver(() => setWidth());
                 ro.observe(tableWrap);
@@ -261,15 +291,186 @@
             }
         }
 
-        // after paint
         requestAnimationFrame(setWidth);
         setTimeout(setWidth, 60);
         setTimeout(setWidth, 180);
     }
 
+    function buildDataUrl(period, pms_srch, page) {
+        const url = new URL(`{{ route('reports.members.financial_position.data') }}`, window.location.origin);
+        url.searchParams.set('period', period);
+        url.searchParams.set('page', String(page));
+        url.searchParams.set('per_page', String(PAGE_SIZE));
+
+        if (pms_srch.length) {
+            url.searchParams.set('pms_srch', pms_srch);
+        }
+
+        return url;
+    }
+
+    async function fetchPage(period, pms_srch, page, signal) {
+        const res = await fetch(buildDataUrl(period, pms_srch, page).toString(), {
+            headers: { 'Accept': 'application/json' },
+            signal
+        });
+
+        let resp = null;
+        try {
+            resp = await res.json();
+        } catch (e) {
+            throw new Error(`Server returned HTTP ${res.status}`);
+        }
+
+        if (!res.ok) {
+            throw new Error(resp?.error || `Server returned HTTP ${res.status}`);
+        }
+
+        return resp;
+    }
+
+    function renderReport(data, period, pms_srch, meta) {
+        if (!Array.isArray(data) || data.length === 0) {
+            emptyState.classList.remove('d-none');
+            return;
+        }
+
+        const loanCols = (data[0].loans || []).map(l => ({
+            name: l.loan_type_name
+        }));
+
+        let head = `<tr>
+            <th>#</th>
+            <th class="text-start">Names</th>
+            <th>Sacco ID</th>
+            <th>National ID</th>
+            <th>Email</th>
+            <th>Phone</th>
+            <th>Gender</th>
+            <th>Active</th>
+            <th>Company</th>
+            <th>Department</th>
+            <th>Position</th>
+            <th class="text-end">Savings</th>
+            <th class="text-end">FOSA</th>
+            <th class="text-end">Capital</th>
+            <th class="text-end">Overall Exposure</th>
+        `;
+
+        loanCols.forEach(c => {
+            head += `<th class="text-end">${escHtml(c.name)} Taken</th>`;
+            head += `<th class="text-end">${escHtml(c.name)} Bal</th>`;
+        });
+
+        head += `</tr>`;
+        thead.innerHTML = head;
+
+        let rows = '';
+        let totalSavings = 0;
+        let totalFosa = 0;
+        let totalCapital = 0;
+        let totalExposure = 0;
+
+        const totalLoanTaken = new Array(loanCols.length).fill(0);
+        const totalLoanBal   = new Array(loanCols.length).fill(0);
+
+        data.forEach((row, i) => {
+            const savings  = Number(row.savings || 0);
+            const fosa     = Number(row.fosa || 0);
+            const capital  = Number(row.capital || 0);
+            const exposure = Number(row.overall_exposure || 0);
+
+            totalSavings += savings;
+            totalFosa += fosa;
+            totalCapital += capital;
+            totalExposure += exposure;
+
+            rows += `<tr>
+                <td>${i + 1}</td>
+                <td class="text-start">${escHtml(row.member_name)}</td>
+                <td>${escHtml(row.member_sacco_id)}</td>
+                <td>${escHtml(row.member_national_id)}</td>
+                <td class="text-start">${escHtml(row.member_email)}</td>
+                <td>${escHtml(row.member_phone_no)}</td>
+                <td>${escHtml(row.member_gender)}</td>
+                <td>${escHtml(row.member_active)}</td>
+                <td class="text-start">${escHtml(row.company)}</td>
+                <td class="text-start">${escHtml(row.department)}</td>
+                <td class="text-start">${escHtml(row.position)}</td>
+                <td class="text-end">${money(savings)}</td>
+                <td class="text-end">${money(fosa)}</td>
+                <td class="text-end">${money(capital)}</td>
+                <td class="text-end fw-semibold">${money(exposure)}</td>
+            `;
+
+            loanCols.forEach((c, idx) => {
+                const loan = (row.loans || [])[idx] || {};
+                const taken = Number(loan.taken || 0);
+                const bal   = Number(loan.balance || 0);
+
+                totalLoanTaken[idx] += taken;
+                totalLoanBal[idx] += bal;
+
+                rows += `<td class="text-end">${money(taken)}</td>`;
+                rows += `<td class="text-end">${money(bal)}</td>`;
+            });
+
+            rows += `</tr>`;
+        });
+
+        tbody.innerHTML = rows;
+
+        let foot = `<tr>
+            <th colspan="11" class="text-end">TOTALS</th>
+            <th class="text-end">${money(totalSavings)}</th>
+            <th class="text-end">${money(totalFosa)}</th>
+            <th class="text-end">${money(totalCapital)}</th>
+            <th class="text-end">${money(totalExposure)}</th>
+        `;
+
+        loanCols.forEach((c, idx) => {
+            foot += `<th class="text-end">${money(totalLoanTaken[idx] || 0)}</th>`;
+            foot += `<th class="text-end">${money(totalLoanBal[idx] || 0)}</th>`;
+        });
+
+        foot += `</tr>`;
+        tfoot.innerHTML = foot;
+
+        const searchLabel = pms_srch.length ? pms_srch : 'All members';
+        reportMeta.innerHTML = `
+            <strong>As At:</strong> ${escHtml(period)} (${escHtml(periodLabel(period))})
+            &nbsp; | &nbsp;
+            <strong>Generated:</strong> ${escHtml(meta?.generated_at || '')}
+            &nbsp; | &nbsp;
+            <strong>Generated By:</strong> ${escHtml(meta?.generated_by || '')}
+            &nbsp; | &nbsp;
+            <strong>Records:</strong> ${Number(data.length).toLocaleString()}
+            &nbsp; | &nbsp;
+            <strong>Search:</strong> ${escHtml(searchLabel)}
+        `;
+        reportMeta.classList.remove('d-none');
+
+        tableWrap.classList.remove('d-none');
+        setupHorizontalScroller();
+
+        const exportUrl = new URL(`{{ route('reports.members.financial_position.export') }}`, window.location.origin);
+        exportUrl.searchParams.set('period', period);
+        if (pms_srch.length) exportUrl.searchParams.set('pms_srch', pms_srch);
+
+        exportBtn.href = exportUrl.toString();
+        exportBtn.classList.remove('disabled');
+        exportBtn.setAttribute('aria-disabled', 'false');
+    }
+
     clearBtn.addEventListener('click', function () {
+        if (activeAbortController) {
+            activeAbortController.abort();
+            activeAbortController = null;
+        }
+
         periodInp.value = '{{ $periodValue }}';
         searchInp.value = '';
+        loadBtn.disabled = false;
         resetUI();
     });
 
@@ -282,7 +483,7 @@
         });
     });
 
-    loadBtn.addEventListener('click', function () {
+    loadBtn.addEventListener('click', async function () {
         const period = periodInp.value.trim();
         const pms_srch = searchInp.value.trim();
 
@@ -291,123 +492,70 @@
             return;
         }
 
+        if (activeAbortController) {
+            activeAbortController.abort();
+        }
+
+        activeAbortController = new AbortController();
+        const signal = activeAbortController.signal;
+
         resetUI();
+        loadBtn.disabled = true;
         loading.classList.remove('d-none');
 
-        const url = new URL(`{{ route('reports.members.financial_position.data') }}`, window.location.origin);
-        url.searchParams.set('period', period);
-        url.searchParams.set('page', '1');
-        url.searchParams.set('per_page', '5000'); // ✅ use your controller’s 5000
-        if (pms_srch.length) url.searchParams.set('pms_srch', pms_srch);
+        try {
+            const allData = [];
+            let page = 1;
+            let firstMeta = null;
+            let expectedTotal = null;
 
-        fetch(url.toString(), { headers: { 'Accept': 'application/json' } })
-            .then(res => res.json())
-            .then(resp => {
-                loading.classList.add('d-none');
+            while (true) {
+                const resp = await fetchPage(period, pms_srch, page, signal);
 
-                if (!resp || !Array.isArray(resp.data) || resp.data.length === 0) {
-                    emptyState.classList.remove('d-none');
-                    return;
+                if (!resp || !Array.isArray(resp.data)) {
+                    throw new Error('Invalid report response');
                 }
 
-                const data = resp.data;
-                const loanCols = (data[0].loans || []).map(l => ({ name: l.loan_type_name }));
+                if (!firstMeta) {
+                    firstMeta = resp.meta || {};
+                }
 
-                // HEADER
-                let head = `<tr>
-                    <th>#</th>
-                    <th class="text-start">Names</th>
-                    <th>Sacco ID</th>
-                    <th>National ID</th>
-                    <th>Gender</th>
-                    <th>Active</th>
-                    <th class="text-end">Savings</th>
-                    <th class="text-end">FOSA</th>
-                    <th class="text-end">CAPITAL</th>
-                `;
-                loanCols.forEach(c => {
-                    head += `<th class="text-end">${escHtml(c.name)} Taken</th>`;
-                    head += `<th class="text-end">${escHtml(c.name)} Bal</th>`;
-                });
-                head += `</tr>`;
-                thead.innerHTML = head;
+                expectedTotal = Number(resp.meta?.total || 0);
+                allData.push(...resp.data);
 
-                // BODY + TOTALS
-                let rows = '';
-                let totalSavings = 0, totalFosa = 0, totalCapital = 0;
-                const totalLoanTaken = new Array(loanCols.length).fill(0);
-                const totalLoanBal   = new Array(loanCols.length).fill(0);
+                loading.textContent = expectedTotal > 0
+                    ? `Loading report… ${allData.length.toLocaleString()} of ${expectedTotal.toLocaleString()} members loaded.`
+                    : 'Loading report…';
 
-                data.forEach((row, i) => {
-                    const savings = Number(row.savings || 0);
-                    const fosa    = Number(row.fosa || 0);
-                    const capital = Number(row.capital || 0);
+                if (!resp.meta?.has_more) {
+                    break;
+                }
 
-                    totalSavings += savings;
-                    totalFosa    += fosa;
-                    totalCapital += capital;
+                page += 1;
+            }
 
-                    rows += `<tr>
-                        <td>${i + 1}</td>
-                        <td class="text-start">${escHtml(row.member_name)}</td>
-                        <td>${escHtml(row.member_sacco_id)}</td>
-                        <td>${escHtml(row.member_national_id)}</td>
-                        <td>${escHtml(row.member_gender)}</td>
-                        <td>${escHtml(row.member_active)}</td>
-                        <td class="text-end">${money(savings)}</td>
-                        <td class="text-end">${money(fosa)}</td>
-                        <td class="text-end">${money(capital)}</td>
-                    `;
+            loading.classList.add('d-none');
 
-                    (row.loans || []).forEach((l, idx) => {
-                        const taken = Number(l.taken || 0);
-                        const bal   = Number(l.balance || 0);
+            if (allData.length === 0) {
+                emptyState.classList.remove('d-none');
+                return;
+            }
 
-                        totalLoanTaken[idx] += taken;
-                        totalLoanBal[idx]   += bal;
+            renderReport(allData, period, pms_srch, firstMeta || {});
 
-                        rows += `<td class="text-end">${money(taken)}</td>`;
-                        rows += `<td class="text-end">${money(bal)}</td>`;
-                    });
+        } catch (err) {
+            loading.classList.add('d-none');
 
-                    rows += `</tr>`;
-                });
+            if (err?.name === 'AbortError') {
+                return;
+            }
 
-                tbody.innerHTML = rows;
-
-                // FOOTER
-                let foot = `<tr>
-                    <th colspan="6" class="text-end">TOTALS</th>
-                    <th class="text-end">${money(totalSavings)}</th>
-                    <th class="text-end">${money(totalFosa)}</th>
-                    <th class="text-end">${money(totalCapital)}</th>
-                `;
-                loanCols.forEach((c, idx) => {
-                    foot += `<th class="text-end">${money(totalLoanTaken[idx] || 0)}</th>`;
-                    foot += `<th class="text-end">${money(totalLoanBal[idx] || 0)}</th>`;
-                });
-                foot += `</tr>`;
-                tfoot.innerHTML = foot;
-
-                tableWrap.classList.remove('d-none');
-
-                // ✅ show & sync always-visible horizontal scroller
-                setupHorizontalScroller();
-
-                // EXPORT LINK
-                const exportUrl = new URL(`{{ route('reports.members.financial_position.export') }}`, window.location.origin);
-                exportUrl.searchParams.set('period', period);
-                if (pms_srch.length) exportUrl.searchParams.set('pms_srch', pms_srch);
-
-                exportBtn.href = exportUrl.toString();
-                exportBtn.classList.remove('disabled');
-                exportBtn.setAttribute('aria-disabled', 'false');
-            })
-            .catch(err => {
-                loading.classList.add('d-none');
-                console.error(err);
-                alert('Failed to load report');
-            });
+            console.error(err);
+            alert(err?.message || 'Failed to load report');
+        } finally {
+            loadBtn.disabled = false;
+            activeAbortController = null;
+        }
     });
 })();
 </script>

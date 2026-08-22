@@ -32,14 +32,38 @@ class MemberFinancialPositionController extends Controller
                 $qq->where('sacco_members.member_name', 'like', "%{$pms_srch}%")
                     ->orWhere('sacco_members.member_sacco_id', 'like', "%{$pms_srch}%")
                     ->orWhere('sacco_members.member_national_id', 'like', "%{$pms_srch}%")
+                    ->orWhere('sacco_members.member_email', 'like', "%{$pms_srch}%")
+                    ->orWhere('sacco_members.member_phone_no', 'like', "%{$pms_srch}%")
                     ->orWhere('sacco_company.company_name', 'like', "%{$pms_srch}%")
-                    ->orWhere('sacco_department.department_name', 'like', "%{$pms_srch}%");
+                    ->orWhere('sacco_department.department_name', 'like', "%{$pms_srch}%")
+                    ->orWhere('sacco_position.position_name', 'like', "%{$pms_srch}%");
             });
         }
 
         return $q;
     }
 
+    /**
+     * Human-readable audit label for the authenticated user generating/viewing
+     * this financial position report.
+     */
+    protected function generatedByLabel(): string
+    {
+        $user = auth()->user();
+
+        if (!$user) {
+            return 'System';
+        }
+
+        foreach (['member_name', 'name', 'email', 'member_email'] as $field) {
+            $value = trim((string) ($user->{$field} ?? ''));
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        return auth()->id() ? ('User #' . auth()->id()) : 'Authenticated user';
+    }
     /**
      * Loan types (include even "deleted" types => no record escapes)
      */
@@ -175,7 +199,9 @@ class MemberFinancialPositionController extends Controller
         $loanTypes = $this->loanTypes();
         $base      = $this->membersBaseQuery($pms_srch);
 
-        $total = (clone $base)->distinct('sacco_members.member_id')->count('sacco_members.member_id');
+        $total = (clone $base)
+            ->distinct()
+            ->count('sacco_members.member_id');
 
         $members = (clone $base)
             ->select([
@@ -183,6 +209,8 @@ class MemberFinancialPositionController extends Controller
                 'sacco_members.member_name',
                 'sacco_members.member_sacco_id',
                 'sacco_members.member_national_id',
+                'sacco_members.member_email',
+                'sacco_members.member_phone_no',
                 'sacco_members.member_gender',
                 DB::raw('sacco_members.member_active as member_active'),
                 'sacco_department.department_name',
@@ -190,6 +218,7 @@ class MemberFinancialPositionController extends Controller
                 'sacco_position.position_name',
             ])
             ->orderBy('sacco_members.member_name')
+            ->orderBy('sacco_members.member_id')
             ->offset(($page - 1) * $perPage)
             ->limit($perPage)
             ->get();
@@ -201,17 +230,22 @@ class MemberFinancialPositionController extends Controller
         foreach ($members as $m) {
             $mid = (int) $m->member_id;
 
-            $active  = (strtoupper(trim((string)($m->member_active ?? ''))) === 'Y') ? 'Yes' : 'No';
+            $active  = (strtoupper(trim((string) ($m->member_active ?? ''))) === 'Y') ? 'Yes' : 'No';
             $savings = (float) ($agg['savings'][$mid] ?? 0);
             $fosa    = (float) ($agg['fosa'][$mid] ?? 0);
             $capital = (float) ($agg['capital'][$mid] ?? 0);
 
-            $loanData = [];
+            $loanData        = [];
+            $overallExposure = 0.0;
+
             foreach ($loanTypes as $lt) {
                 $tid = (int) $lt->loan_type_id;
 
                 $taken   = (float) ($agg['loanTaken'][$mid][$tid] ?? 0);
-                $balance = (float) ($agg['loanBalance'][$mid][$tid] ?? 0); // ✅ aligned to audit SQL
+                $balance = (float) ($agg['loanBalance'][$mid][$tid] ?? 0);
+
+                // Negative balances are intentionally preserved.
+                $overallExposure += $balance;
 
                 $loanData[] = [
                     'loan_type_name' => $lt->loan_type_name,
@@ -224,6 +258,8 @@ class MemberFinancialPositionController extends Controller
                 'member_name'        => $m->member_name,
                 'member_sacco_id'    => $m->member_sacco_id,
                 'member_national_id' => $m->member_national_id,
+                'member_email'       => $m->member_email,
+                'member_phone_no'    => $m->member_phone_no,
                 'member_gender'      => $m->member_gender,
                 'member_active'      => $active,
                 'company'            => $m->company_name,
@@ -232,6 +268,7 @@ class MemberFinancialPositionController extends Controller
                 'savings'            => round($savings, 2),
                 'fosa'               => round($fosa, 2),
                 'capital'            => round($capital, 2),
+                'overall_exposure'   => round($overallExposure, 2),
                 'loans'              => $loanData,
             ];
         }
@@ -240,14 +277,16 @@ class MemberFinancialPositionController extends Controller
             'period' => $period,
             'data'   => $rows,
             'meta'   => [
-                'page'     => $page,
-                'per_page' => $perPage,
-                'total'    => $total,
-                'has_more' => (($page * $perPage) < $total),
+                'page'         => $page,
+                'per_page'     => $perPage,
+                'total'        => $total,
+                'has_more'     => (($page * $perPage) < $total),
+                'generated_at' => now()->format('Y-m-d H:i:s T'),
+                'generated_by' => $this->generatedByLabel(),
+                'search'       => $pms_srch,
             ],
         ]);
     }
-
     /**
      * CSV EXPORT - STREAM + CHUNK (handles 100k+ safely)
      */
@@ -260,17 +299,40 @@ class MemberFinancialPositionController extends Controller
             abort(400, 'Invalid period');
         }
 
-        $loanTypes = $this->loanTypes();
-        $filename  = "member_financial_position_{$period}.csv";
+        $loanTypes   = $this->loanTypes();
+        $filename    = "member_financial_position_{$period}.csv";
+        $generatedAt = now()->format('Y-m-d H:i:s T');
+        $generatedBy = $this->generatedByLabel();
 
-        return response()->stream(function () use ($period, $pms_srch, $loanTypes) {
+        $totalMembers = (clone $this->membersBaseQuery($pms_srch))
+            ->distinct()
+            ->count('sacco_members.member_id');
 
+        return response()->stream(function () use (
+            $period,
+            $pms_srch,
+            $loanTypes,
+            $generatedAt,
+            $generatedBy,
+            $totalMembers
+        ) {
             $out = fopen('php://output', 'w');
+
+            // Audit/report context.
+            fputcsv($out, ['Report', 'Member Financial Position']);
+            fputcsv($out, ['As At Period', $period]);
+            fputcsv($out, ['Generated At', $generatedAt]);
+            fputcsv($out, ['Generated By', $generatedBy]);
+            fputcsv($out, ['Search', $pms_srch !== '' ? $pms_srch : 'All members']);
+            fputcsv($out, ['Total Members', $totalMembers]);
+            fputcsv($out, []);
 
             $header = [
                 'Name',
                 'Sacco ID',
                 'National ID',
+                'Email',
+                'Phone',
                 'Gender',
                 'Active',
                 'Company',
@@ -279,6 +341,7 @@ class MemberFinancialPositionController extends Controller
                 'Savings',
                 'FOSA',
                 'Capital',
+                'Overall Exposure',
             ];
 
             foreach ($loanTypes as $l) {
@@ -296,6 +359,8 @@ class MemberFinancialPositionController extends Controller
                     'sacco_members.member_name',
                     'sacco_members.member_sacco_id',
                     'sacco_members.member_national_id',
+                    'sacco_members.member_email',
+                    'sacco_members.member_phone_no',
                     'sacco_members.member_gender',
                     DB::raw('sacco_members.member_active as member_active'),
                     'sacco_department.department_name',
@@ -305,22 +370,29 @@ class MemberFinancialPositionController extends Controller
                 ->orderBy('sacco_members.member_id');
 
             $membersQuery->chunkById($chunkSize, function ($chunk) use ($out, $period, $loanTypes) {
-
                 $memberIds = $chunk->pluck('member_id')->map(fn ($v) => (int) $v)->all();
                 $agg = $this->aggregatesForMembers($memberIds, $period);
 
                 foreach ($chunk as $m) {
                     $mid = (int) $m->member_id;
 
-                    $active  = (strtoupper(trim((string)($m->member_active ?? ''))) === 'Y') ? 'Yes' : 'No';
+                    $active  = (strtoupper(trim((string) ($m->member_active ?? ''))) === 'Y') ? 'Yes' : 'No';
                     $savings = round((float) ($agg['savings'][$mid] ?? 0), 2);
                     $fosa    = round((float) ($agg['fosa'][$mid] ?? 0), 2);
                     $capital = round((float) ($agg['capital'][$mid] ?? 0), 2);
+
+                    $overallExposure = 0.0;
+                    foreach ($loanTypes as $lt) {
+                        $tid = (int) $lt->loan_type_id;
+                        $overallExposure += (float) ($agg['loanBalance'][$mid][$tid] ?? 0);
+                    }
 
                     $line = [
                         $m->member_name,
                         $m->member_sacco_id,
                         $m->member_national_id,
+                        $m->member_email,
+                        $m->member_phone_no,
                         $m->member_gender,
                         $active,
                         $m->company_name,
@@ -329,13 +401,14 @@ class MemberFinancialPositionController extends Controller
                         $savings,
                         $fosa,
                         $capital,
+                        round($overallExposure, 2),
                     ];
 
                     foreach ($loanTypes as $lt) {
                         $tid = (int) $lt->loan_type_id;
 
                         $taken   = (float) ($agg['loanTaken'][$mid][$tid] ?? 0);
-                        $balance = (float) ($agg['loanBalance'][$mid][$tid] ?? 0); // ✅ aligned to audit SQL
+                        $balance = (float) ($agg['loanBalance'][$mid][$tid] ?? 0);
 
                         $line[] = round($taken, 2);
                         $line[] = round($balance, 2);
@@ -348,7 +421,6 @@ class MemberFinancialPositionController extends Controller
             }, 'sacco_members.member_id', 'member_id');
 
             fclose($out);
-
         }, 200, [
             'Content-Type'        => 'text/csv',
             'Content-Disposition' => "attachment; filename={$filename}",

@@ -1931,21 +1931,21 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
                 [MemberFinancialPositionController::class, 'index']
             )
                 ->name('reports.members.financial_position')
-                ->middleware('check_user_rights:rpt_reports');
+                ->middleware('check_user_rights:rpt_financial_reports');
 
             Route::get(
                 '/financial-position/data',
                 [MemberFinancialPositionController::class, 'data']
             )
                 ->name('reports.members.financial_position.data')
-                ->middleware('check_user_rights:rpt_reports');
+                ->middleware('check_user_rights:rpt_financial_reports');
 
             Route::get(
                 '/financial-position/export',
                 [MemberFinancialPositionController::class, 'export']
             )
                 ->name('reports.members.financial_position.export')
-                ->middleware('check_user_rights:rpt_reports');
+                ->middleware('check_user_rights:rpt_financial_reports');
         });
 
     Route::prefix('fosa/transfers')->group(function () {
@@ -2539,7 +2539,7 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
 
     Route::middleware(['auth', 'check_member_position'])->group(function () {
 
-    /*
+        /*
 |--------------------------------------------------------------------------
 | CRB Reports
 |--------------------------------------------------------------------------
@@ -2548,24 +2548,24 @@ Route::middleware(['auth', 'check_member_position'])->group(function () {
 |--------------------------------------------------------------------------
 */
 
-Route::prefix('reports/crb')
-    ->name('reports.crb.')
-    ->middleware('check_user_rights:reports_crb')
-    ->group(function () {
+        Route::prefix('reports/crb')
+            ->name('reports.crb.')
+            ->middleware('check_user_rights:reports_crb')
+            ->group(function () {
 
-        /*
+                /*
         |--------------------------------------------------------------------------
         | CRB Dashboard
         |--------------------------------------------------------------------------
         */
 
-        Route::get(
-            '/',
-            [ReportCrbController::class, 'index']
-        )->name('index');
+                Route::get(
+                    '/',
+                    [ReportCrbController::class, 'index']
+                )->name('index');
 
 
-        /*
+                /*
         |--------------------------------------------------------------------------
         | Live CRB Position / Readiness
         |--------------------------------------------------------------------------
@@ -2574,112 +2574,112 @@ Route::prefix('reports/crb')
         |--------------------------------------------------------------------------
         */
 
-        Route::get(
-            '/preview',
-            [ReportCrbController::class, 'preview']
-        )->name('preview');
+                Route::get(
+                    '/preview',
+                    [ReportCrbController::class, 'preview']
+                )->name('preview');
 
 
-        /*
+                /*
         |--------------------------------------------------------------------------
         | Generate CRB Report Snapshot
         |--------------------------------------------------------------------------
         */
 
-        Route::post(
-            '/generate',
-            [ReportCrbController::class, 'generate']
-        )->name('generate');
+                Route::post(
+                    '/generate',
+                    [ReportCrbController::class, 'generate']
+                )->name('generate');
 
 
-        /*
+                /*
         |--------------------------------------------------------------------------
         | Report History
         |--------------------------------------------------------------------------
         */
 
-        Route::get(
-            '/history',
-            [ReportCrbController::class, 'history']
-        )->name('history');
+                Route::get(
+                    '/history',
+                    [ReportCrbController::class, 'history']
+                )->name('history');
 
 
-        /*
+                /*
         |--------------------------------------------------------------------------
         | Individual CRB Report
         |--------------------------------------------------------------------------
         */
 
-        Route::get(
-            '/{report}',
-            [ReportCrbController::class, 'show']
-        )
-            ->whereNumber('report')
-            ->name('show');
+                Route::get(
+                    '/{report}',
+                    [ReportCrbController::class, 'show']
+                )
+                    ->whereNumber('report')
+                    ->name('show');
 
 
-        /*
+                /*
         |--------------------------------------------------------------------------
         | Revalidate Draft
         |--------------------------------------------------------------------------
         */
 
-        Route::post(
-            '/{report}/validate',
-            [ReportCrbController::class, 'validateReport']
-        )
-            ->whereNumber('report')
-            ->name('validate');
+                Route::post(
+                    '/{report}/validate',
+                    [ReportCrbController::class, 'validateReport']
+                )
+                    ->whereNumber('report')
+                    ->name('validate');
 
 
-        /*
+                /*
         |--------------------------------------------------------------------------
         | Finalise / Lock Report
         |--------------------------------------------------------------------------
         */
 
-        Route::post(
-            '/{report}/finalise',
-            [ReportCrbController::class, 'finalise']
-        )
-            ->whereNumber('report')
-            ->name('finalise');
+                Route::post(
+                    '/{report}/finalise',
+                    [ReportCrbController::class, 'finalise']
+                )
+                    ->whereNumber('report')
+                    ->name('finalise');
 
 
-        /*
+                /*
         |--------------------------------------------------------------------------
         | Download Generated CRB File
         |--------------------------------------------------------------------------
         */
 
-        Route::get(
-            '/{report}/download',
-            [ReportCrbController::class, 'download']
-        )
-            ->whereNumber('report')
-            ->name('download');
+                Route::get(
+                    '/{report}/download',
+                    [ReportCrbController::class, 'download']
+                )
+                    ->whereNumber('report')
+                    ->name('download');
 
 
 
-            Route::get('/{report}/download', [ReportCrbController::class, 'download'])
-    ->name('download');
+                Route::get('/{report}/download', [ReportCrbController::class, 'download'])
+                    ->name('download');
 
-Route::get('/{report}/review-excel', [ReportCrbController::class, 'downloadReviewExcel'])
-    ->name('review_excel');
-    
-        /*
+                Route::get('/{report}/review-excel', [ReportCrbController::class, 'downloadReviewExcel'])
+                    ->name('review_excel');
+
+                /*
         |--------------------------------------------------------------------------
         | Mark Report Submitted
         |--------------------------------------------------------------------------
         */
 
-        Route::post(
-            '/{report}/submitted',
-            [ReportCrbController::class, 'markSubmitted']
-        )
-            ->whereNumber('report')
-            ->name('submitted');
-    });
+                Route::post(
+                    '/{report}/submitted',
+                    [ReportCrbController::class, 'markSubmitted']
+                )
+                    ->whereNumber('report')
+                    ->name('submitted');
+            });
 
 
         Route::prefix('admin/route-audit-logs')
