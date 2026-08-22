@@ -720,6 +720,7 @@
             <th class="text-end">Savings</th>
             <th class="text-end">FOSA</th>
             <th class="text-end">Capital</th>
+            <th class="text-end">Special Savings</th>
             <th class="text-end">Overall Exposure</th>
         `;
 
@@ -735,20 +736,23 @@
         let totalSavings = 0;
         let totalFosa = 0;
         let totalCapital = 0;
+        let totalSpecialSavings = 0;
         let totalExposure = 0;
 
         const totalLoanTaken = new Array(loanCols.length).fill(0);
         const totalLoanBal   = new Array(loanCols.length).fill(0);
 
         data.forEach((row, i) => {
-            const savings  = Number(row.savings || 0);
-            const fosa     = Number(row.fosa || 0);
-            const capital  = Number(row.capital || 0);
-            const exposure = Number(row.overall_exposure || 0);
+            const savings        = Number(row.savings || 0);
+            const fosa           = Number(row.fosa || 0);
+            const capital        = Number(row.capital || 0);
+            const specialSavings = Number(row.special_savings || 0);
+            const exposure       = Number(row.overall_exposure || 0);
 
             totalSavings += savings;
             totalFosa += fosa;
             totalCapital += capital;
+            totalSpecialSavings += specialSavings;
             totalExposure += exposure;
 
             rows += `<tr>
@@ -766,6 +770,7 @@
                 <td class="text-end">${money(savings)}</td>
                 <td class="text-end">${money(fosa)}</td>
                 <td class="text-end">${money(capital)}</td>
+                <td class="text-end">${money(specialSavings)}</td>
                 <td class="text-end fw-semibold">${money(exposure)}</td>
             `;
 
@@ -791,6 +796,7 @@
             <th class="text-end">${money(totalSavings)}</th>
             <th class="text-end">${money(totalFosa)}</th>
             <th class="text-end">${money(totalCapital)}</th>
+            <th class="text-end">${money(totalSpecialSavings)}</th>
             <th class="text-end">${money(totalExposure)}</th>
         `;
 

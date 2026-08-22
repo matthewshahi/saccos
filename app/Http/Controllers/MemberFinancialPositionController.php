@@ -91,10 +91,11 @@ class MemberFinancialPositionController extends Controller
     {
         if (empty($memberIds)) {
             return [
-                'savings'     => [],
-                'fosa'        => [],
-                'capital'     => [],
-                'loanTaken'   => [], // [member_id][loan_type_id] => taken_total
+                'savings'        => [],
+                'fosa'           => [],
+                'capital'        => [],
+                'specialSavings' => [],
+                'loanTaken'      => [], // [member_id][loan_type_id] => taken_total
                 'loanPaid'    => [], // [member_id][loan_type_id] => paid_total
                 'loanBalance' => [], // [member_id][loan_type_id] => balance_total (sum of per-loan balances)
             ];
@@ -133,6 +134,56 @@ class MemberFinancialPositionController extends Controller
             ->where('share_capitalperiod', '<=', $periodInt)
             ->groupBy('share_capitalmember_id')
             ->pluck('total', 'share_capitalmember_id')
+            ->toArray();
+
+        // -------------------------
+        // Special Savings — historical balance AS AT selected period
+        // -------------------------
+        // Reconstruct the member balance from transaction movements instead
+        // of using today's account balance. This preserves historical reporting.
+        //
+        // CREDIT  => increases Special Savings
+        // DEBIT   => reduces Special Savings
+        // INTEREST_VESTING only moves interest from accrued to available,
+        // so it does not change the member's total Special Savings balance.
+        //
+        // If a transaction was reversed AFTER the requested period, it still
+        // belongs to that historical period. If it had already been reversed
+        // by period-end, its original financial effect is excluded.
+        $periodStart = substr($period, 0, 4) . '-' . substr($period, 4, 2) . '-01';
+        $periodEndDate = date('Y-m-t', strtotime($periodStart));
+
+        $specialSavings = DB::table('sacco_special_saving_transactions as sst')
+            ->select(
+                'sst.special_saving_transaction_member_id',
+                DB::raw("
+                    ROUND(SUM(
+                        CASE
+                            WHEN UPPER(COALESCE(sst.special_saving_transaction_type, '')) = 'INTEREST_VESTING'
+                                THEN 0
+                            WHEN UPPER(COALESCE(sst.special_saving_transaction_direction, '')) = 'CREDIT'
+                                THEN COALESCE(sst.special_saving_transaction_amount, 0)
+                            WHEN UPPER(COALESCE(sst.special_saving_transaction_direction, '')) = 'DEBIT'
+                                THEN -COALESCE(sst.special_saving_transaction_amount, 0)
+                            ELSE 0
+                        END
+                    ), 2) as total
+                ")
+            )
+            ->whereIn('sst.special_saving_transaction_member_id', $memberIds)
+            ->where('sst.special_saving_transaction_period', '<=', $periodInt)
+            ->where('sst.special_saving_transaction_deleted', 'N')
+            ->where(function ($q) use ($periodEndDate) {
+                $q->whereNull('sst.special_saving_transaction_reversed')
+                    ->orWhere('sst.special_saving_transaction_reversed', '!=', 'Y')
+                    ->orWhere(function ($rq) use ($periodEndDate) {
+                        $rq->where('sst.special_saving_transaction_reversed', 'Y')
+                            ->whereNotNull('sst.special_saving_transaction_reversed_on')
+                            ->whereDate('sst.special_saving_transaction_reversed_on', '>', $periodEndDate);
+                    });
+            })
+            ->groupBy('sst.special_saving_transaction_member_id')
+            ->pluck('total', 'sst.special_saving_transaction_member_id')
             ->toArray();
 
         // =====================================================
@@ -175,7 +226,7 @@ class MemberFinancialPositionController extends Controller
             $loanBalance[$mid][$tid] = ($loanBalance[$mid][$tid] ?? 0) + $bal;
         }
 
-        return compact('savings', 'fosa', 'capital', 'loanTaken', 'loanPaid', 'loanBalance');
+        return compact('savings', 'fosa', 'capital', 'specialSavings', 'loanTaken', 'loanPaid', 'loanBalance');
     }
 
     /**
@@ -231,9 +282,10 @@ class MemberFinancialPositionController extends Controller
             $mid = (int) $m->member_id;
 
             $active  = (strtoupper(trim((string) ($m->member_active ?? ''))) === 'Y') ? 'Yes' : 'No';
-            $savings = (float) ($agg['savings'][$mid] ?? 0);
-            $fosa    = (float) ($agg['fosa'][$mid] ?? 0);
-            $capital = (float) ($agg['capital'][$mid] ?? 0);
+            $savings        = (float) ($agg['savings'][$mid] ?? 0);
+            $fosa           = (float) ($agg['fosa'][$mid] ?? 0);
+            $capital        = (float) ($agg['capital'][$mid] ?? 0);
+            $specialSavings = (float) ($agg['specialSavings'][$mid] ?? 0);
 
             $loanData        = [];
             $overallExposure = 0.0;
@@ -268,6 +320,7 @@ class MemberFinancialPositionController extends Controller
                 'savings'            => round($savings, 2),
                 'fosa'               => round($fosa, 2),
                 'capital'            => round($capital, 2),
+                'special_savings'    => round($specialSavings, 2),
                 'overall_exposure'   => round($overallExposure, 2),
                 'loans'              => $loanData,
             ];
@@ -341,6 +394,7 @@ class MemberFinancialPositionController extends Controller
                 'Savings',
                 'FOSA',
                 'Capital',
+                'Special Savings',
                 'Overall Exposure',
             ];
 
@@ -377,9 +431,10 @@ class MemberFinancialPositionController extends Controller
                     $mid = (int) $m->member_id;
 
                     $active  = (strtoupper(trim((string) ($m->member_active ?? ''))) === 'Y') ? 'Yes' : 'No';
-                    $savings = round((float) ($agg['savings'][$mid] ?? 0), 2);
-                    $fosa    = round((float) ($agg['fosa'][$mid] ?? 0), 2);
-                    $capital = round((float) ($agg['capital'][$mid] ?? 0), 2);
+                    $savings        = round((float) ($agg['savings'][$mid] ?? 0), 2);
+                    $fosa           = round((float) ($agg['fosa'][$mid] ?? 0), 2);
+                    $capital        = round((float) ($agg['capital'][$mid] ?? 0), 2);
+                    $specialSavings = round((float) ($agg['specialSavings'][$mid] ?? 0), 2);
 
                     $overallExposure = 0.0;
                     foreach ($loanTypes as $lt) {
@@ -401,6 +456,7 @@ class MemberFinancialPositionController extends Controller
                         $savings,
                         $fosa,
                         $capital,
+                        $specialSavings,
                         round($overallExposure, 2),
                     ];
 
