@@ -258,8 +258,8 @@
                         <th>Version</th>
                         <th>Status</th>
                         <th class="text-end">Records</th>
-                        <th class="text-end">Data Warnings</th>
-                        <th class="text-end">Blocking Errors</th>
+                        <th class="text-end">Warnings</th>
+                        <th class="text-end">Errors</th>
                         <th></th>
                     </tr>
                 </thead>

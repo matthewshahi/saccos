@@ -59,15 +59,15 @@
                 <table class="table table-bordered table-sm mb-0">
                     <tbody>
                         <tr>
-                            <th>Clean</th>
+                            <th>Valid</th>
                             <td class="text-end">{{ number_format($preview['sample_counts']['VALID'] ?? 0) }}</td>
                         </tr>
                         <tr>
-                            <th>Data Warnings</th>
+                            <th>Warning</th>
                             <td class="text-end">{{ number_format($preview['sample_counts']['WARNING'] ?? 0) }}</td>
                         </tr>
                         <tr>
-                            <th>Blocking Errors</th>
+                            <th>Error</th>
                             <td class="text-end">{{ number_format($preview['sample_counts']['ERROR'] ?? 0) }}</td>
                         </tr>
                     </tbody>

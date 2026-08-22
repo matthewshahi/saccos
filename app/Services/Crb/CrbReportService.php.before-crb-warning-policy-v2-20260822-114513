@@ -317,12 +317,6 @@ class CrbReportService
     private array $priorReportedCache = [];
     private ?array $defaultsCache = null;
 
-    /**
-     * National IDs attached to more than one member.
-     * Advisory only: duplicates are reported to the SACCO as data warnings.
-     */
-    private ?array $duplicateNationalIdsCache = null;
-
     public function reportTypes(): array
     {
         return self::REPORT_TYPES;
@@ -752,13 +746,6 @@ class CrbReportService
             throw new RuntimeException('Finalised or submitted CRB reports are immutable.');
         }
 
-        /*
-         * DRAFT/VALIDATED snapshots may be revalidated under the current
-         * policy. This only changes issue classification/status, not CRB field
-         * values. Finalised/submitted reports remain immutable.
-         */
-        $this->reclassifyStoredRecordIssues($reportId);
-
         $reportIdCol = $this->requireColumn('records', 'report_id');
         $statusCol = $this->requireColumn('records', 'status');
 
@@ -790,8 +777,8 @@ class CrbReportService
             'VALIDATE',
             $errors === 0 ? 'SUCCESS' : 'ERROR',
             $errors === 0
-                ? "Validation completed with {$warnings} data-warning record(s) and no blocking errors."
-                : "Validation found {$errors} record(s) with blocking system/structural errors.",
+                ? "Validation completed with {$warnings} warning record(s)."
+                : "Validation found {$errors} record(s) with errors.",
             $total,
             compact('valid', 'warnings', 'errors'),
             $userId,
@@ -814,7 +801,7 @@ class CrbReportService
             }
 
             if ($report->error_records > 0) {
-                throw new RuntimeException("This report has {$report->error_records} record(s) with blocking system/structural errors and cannot be finalised.");
+                throw new RuntimeException("This report has {$report->error_records} record(s) with errors and cannot be finalised.");
             }
 
             if ($report->total_records < 1) {
@@ -844,29 +831,10 @@ class CrbReportService
                 'updated_at' => now(),
             ]);
 
-            $finaliseLogStatus = $report->warning_records > 0
-                ? 'SUCCESS_WITH_WARNINGS'
-                : 'SUCCESS';
-
-            $finaliseMessage = $report->warning_records > 0
-                ? "CRB submission file finalised with {$report->warning_records} record(s) carrying data-quality/regulatory warnings."
-                : 'CRB submission file finalised with no data-quality warnings.';
-
-            $this->log(
-                $reportId,
-                'FINALISE',
-                $finaliseLogStatus,
-                $finaliseMessage,
-                $report->total_records,
-                [
-                    'file_name' => $filename,
-                    'sha256' => $hash,
-                    'warning_records' => $report->warning_records,
-                    'blocking_error_records' => $report->error_records,
-                ],
-                $userId,
-                $ip
-            );
+            $this->log($reportId, 'FINALISE', 'SUCCESS', 'CRB submission file finalised.', $report->total_records, [
+                'file_name' => $filename,
+                'sha256' => $hash,
+            ], $userId, $ip);
 
             return $this->getReport($reportId);
         }, 3);
@@ -2040,11 +2008,7 @@ class CrbReportService
 
     private function identity(object $row, array &$issues, bool $required): array
     {
-        return $this->identityFromValues(
-            $row->crb_member_national_id ?? null,
-            $issues,
-            $required
-        );
+        return $this->identityFromValues($row->crb_member_national_id ?? null, $issues, $required);
     }
 
     private function identityFromValues(mixed $nationalId, array &$issues, bool $required): array
@@ -2053,42 +2017,10 @@ class CrbReportService
 
         if ($number === '') {
             if ($required) {
-                $this->error(
-                    $issues,
-                    'PRIMARY_ID_MISSING',
-                    'Primary identification document number is missing.'
-                );
+                $this->error($issues, 'PRIMARY_ID_MISSING', 'Primary identification document number is missing.');
             }
 
             return ['type' => '', 'number' => ''];
-        }
-
-        /*
-         * Known migration artefacts such as:
-         *     11898709_dup1
-         *     27288248_dup2
-         *
-         * Do not fabricate a replacement. Keep the source value visible and
-         * notify the SACCO to correct the member master.
-         */
-        if (preg_match('/_dup\d+$/i', $number) === 1) {
-            $this->warn(
-                $issues,
-                'PRIMARY_ID_SYNTHETIC',
-                'Primary identification number appears to contain a migration duplicate suffix (_dupN). Confirm and correct the member National ID.',
-                'REGULATORY_DATA'
-            );
-        }
-
-        $normalised = strtoupper(trim($number));
-
-        if ($normalised !== '' && isset($this->duplicateNationalIds()[$normalised])) {
-            $this->warn(
-                $issues,
-                'DUPLICATE_PRIMARY_ID',
-                'The same primary identification number is attached to more than one SACCO member record. Review the member master for duplication.',
-                'REGULATORY_DATA'
-            );
         }
 
         return ['type' => '001', 'number' => $number];
@@ -2190,15 +2122,7 @@ class CrbReportService
 
     private function date8(mixed $value, array &$issues, string $missingCode, bool $required): string
     {
-        $raw = trim((string) ($value ?? ''));
-        $isDob = str_contains(strtoupper($missingCode), 'DATE_OF_BIRTH');
-
-        if (
-            $value === null
-            || $raw === ''
-            || $raw === '0000-00-00'
-            || str_starts_with($raw, '0000-00-00')
-        ) {
+        if ($value === null || trim((string) $value) === '' || (string) $value === '0000-00-00') {
             if ($required) {
                 $this->error($issues, $missingCode, 'Required date is missing.');
             }
@@ -2207,40 +2131,10 @@ class CrbReportService
         }
 
         try {
-            $parsed = Carbon::parse($raw);
-
-            if ($isDob) {
-                if ($parsed->isFuture()) {
-                    $this->warn(
-                        $issues,
-                        'DATE_OF_BIRTH_FUTURE',
-                        'Date of birth is in the future and should be corrected in the member master.',
-                        'REGULATORY_DATA'
-                    );
-                }
-
-                if ($parsed->lt(Carbon::now(self::APP_TZ)->subYears(120))) {
-                    $this->warn(
-                        $issues,
-                        'DATE_OF_BIRTH_IMPLAUSIBLE',
-                        'Date of birth implies an age greater than 120 years and should be verified.',
-                        'REGULATORY_DATA'
-                    );
-                }
-            }
-
-            return $parsed->format('Ymd');
+            return Carbon::parse((string) $value)->format('Ymd');
         } catch (\Throwable) {
             if ($required) {
-                $invalidCode = str_ends_with($missingCode, '_MISSING')
-                    ? substr($missingCode, 0, -8) . '_INVALID'
-                    : $missingCode . '_INVALID';
-
-                $this->error(
-                    $issues,
-                    $invalidCode,
-                    'Required date is invalid.'
-                );
+                $this->error($issues, $missingCode, 'Required date is invalid.');
             }
 
             return '';
@@ -2367,63 +2261,6 @@ class CrbReportService
             . $version
             . '.S'
             . $this->institutionCode();
-    }
-
-    private function reclassifyStoredRecordIssues(int $reportId): void
-    {
-        $idCol = $this->requireColumn('records', 'id');
-        $reportCol = $this->requireColumn('records', 'report_id');
-        $statusCol = $this->requireColumn('records', 'status');
-        $errorsCol = $this->requireColumn('records', 'errors');
-        $dataCol = $this->requireColumn('records', 'data');
-
-        DB::table('sacco_crb_report_records')
-            ->where($reportCol, $reportId)
-            ->orderBy($idCol)
-            ->select([$idCol, $errorsCol, $dataCol])
-            ->chunk(500, function ($rows) use (
-                $idCol,
-                $statusCol,
-                $errorsCol,
-                $dataCol
-            ) {
-                foreach ($rows as $row) {
-                    $issues = json_decode((string) ($row->{$errorsCol} ?? ''), true);
-
-                    if (!is_array($issues)) {
-                        $issues = [];
-                    }
-
-                    $issues = $this->normaliseIssues($issues);
-                    $status = $this->validationStatus($issues);
-
-                    $payload = json_decode((string) ($row->{$dataCol} ?? ''), true);
-
-                    if (is_array($payload)) {
-                        if (!isset($payload['meta']) || !is_array($payload['meta'])) {
-                            $payload['meta'] = [];
-                        }
-
-                        $payload['meta']['issues'] = $issues;
-                    }
-
-                    DB::table('sacco_crb_report_records')
-                        ->where($idCol, $row->{$idCol})
-                        ->update([
-                            $statusCol => $status,
-                            $errorsCol => json_encode(
-                                $issues,
-                                JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
-                            ),
-                            $dataCol => is_array($payload)
-                                ? json_encode(
-                                    $payload,
-                                    JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
-                                )
-                                : $row->{$dataCol},
-                        ]);
-                }
-            });
     }
 
     private function renderStoredReportContent(int $reportId): string
@@ -2691,10 +2528,7 @@ class CrbReportService
     {
         if ($this->defaultsCache === null) {
             $this->defaultsCache = DB::table('sacco_defaults')
-                ->where(function ($query) {
-                    $query->where('default_name', 'like', 'CRB_%')
-                        ->orWhere('default_name', 'threshold_amount');
-                })
+                ->where('default_name', 'like', 'CRB_%')
                 ->pluck('default_value', 'default_name')
                 ->all();
         }
@@ -2844,138 +2678,14 @@ class CrbReportService
         return $issues === [] ? 'VALID' : 'WARNING';
     }
 
-    private function warn(
-        array &$issues,
-        string $code,
-        string $message,
-        string $category = 'DATA_QUALITY'
-    ): void {
-        $issues[] = [
-            'level' => 'WARNING',
-            'category' => $category,
-            'code' => strtoupper(trim($code)),
-            'message' => $message,
-        ];
+    private function warn(array &$issues, string $code, string $message): void
+    {
+        $issues[] = ['level' => 'WARNING', 'code' => $code, 'message' => $message];
     }
 
-    /**
-     * Source/member/loan data problems are advisory.
-     *
-     * They must be visible to the SACCO, but they do not make the CRB module
-     * itself fail and do not by themselves block finalisation.
-     *
-     * Only technical/structural conditions remain blocking ERRORs.
-     */
     private function error(array &$issues, string $code, string $message): void
     {
-        $code = strtoupper(trim($code));
-
-        if ($this->isBlockingIssueCode($code)) {
-            $issues[] = [
-                'level' => 'ERROR',
-                'category' => 'BLOCKING_SYSTEM',
-                'code' => $code,
-                'message' => $message,
-            ];
-
-            return;
-        }
-
-        $this->warn(
-            $issues,
-            $code,
-            $message,
-            'REGULATORY_DATA'
-        );
-    }
-
-    private function isBlockingIssueCode(string $code): bool
-    {
-        $code = strtoupper(trim($code));
-
-        /*
-         * These are not merely dirty source data; the generated submission
-         * cannot be relied upon technically/structurally.
-         */
-        if (in_array($code, [
-            'KES_BALANCE_CONVERSION_UNAVAILABLE',
-            'ACCOUNT_NOT_PREVIOUSLY_REPORTED',
-        ], true)) {
-            return true;
-        }
-
-        foreach ([
-            'SYSTEM_',
-            'SCHEMA_',
-            'STORAGE_',
-            'INTERNAL_',
-            'FILE_STRUCTURE_',
-        ] as $prefix) {
-            if (str_starts_with($code, $prefix)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * Re-apply the current policy to a frozen DRAFT created under an older
-     * validation policy. Finalised/submitted reports remain immutable.
-     */
-    private function normaliseIssues(array $issues): array
-    {
-        $normalised = [];
-
-        foreach ($issues as $issue) {
-            if (!is_array($issue)) {
-                continue;
-            }
-
-            $code = strtoupper(trim((string) ($issue['code'] ?? 'UNKNOWN')));
-
-            if ($this->isBlockingIssueCode($code)) {
-                $issue['level'] = 'ERROR';
-                $issue['category'] = 'BLOCKING_SYSTEM';
-            } else {
-                $issue['level'] = 'WARNING';
-                $issue['category'] = $issue['category'] ?? 'REGULATORY_DATA';
-            }
-
-            $issue['code'] = $code;
-            $normalised[] = $issue;
-        }
-
-        return $normalised;
-    }
-
-    private function duplicateNationalIds(): array
-    {
-        if ($this->duplicateNationalIdsCache !== null) {
-            return $this->duplicateNationalIdsCache;
-        }
-
-        $rows = DB::table('sacco_members')
-            ->whereNotNull('member_national_id')
-            ->whereRaw("TRIM(member_national_id) <> ''")
-            ->selectRaw(
-                'UPPER(TRIM(member_national_id)) AS national_id, COUNT(DISTINCT member_id) AS member_count'
-            )
-            ->groupBy(DB::raw('UPPER(TRIM(member_national_id))'))
-            ->havingRaw('COUNT(DISTINCT member_id) > 1')
-            ->get();
-
-        $this->duplicateNationalIdsCache = [];
-
-        foreach ($rows as $row) {
-            $id = strtoupper(trim((string) ($row->national_id ?? '')));
-
-            if ($id !== '') {
-                $this->duplicateNationalIdsCache[$id] = (int) ($row->member_count ?? 0);
-            }
-        }
-
-        return $this->duplicateNationalIdsCache;
+        $issues[] = ['level' => 'ERROR', 'code' => $code, 'message' => $message];
     }
 
     private function normaliseCode(string $code): string

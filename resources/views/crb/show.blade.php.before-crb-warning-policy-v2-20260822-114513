@@ -31,16 +31,7 @@
 
 <div class="row">
     <div class="col-lg-8">
-        @if (($reportRow->warning_records ?? 0) > 0)
-    <div class="alert alert-warning mb-4">
-        <strong>Data quality notice:</strong>
-        {{ number_format($reportRow->warning_records) }} record(s) contain source-data or regulatory warnings.
-        These warnings do not mean the CRB module failed and do not by themselves block finalisation.
-        The SACCO remains responsible for correcting missing, duplicate, synthetic or invalid information.
-        The CRB may reject individual incomplete records.
-    </div>
-@endif
-<div class="card o-hidden mb-4">
+        <div class="card o-hidden mb-4">
             <div class="card-header d-flex align-items-center justify-content-between">
                 <h3 class="card-title m-0">
                     {{ $reportRow->code }} — {{ $types[$reportRow->code]['title'] ?? 'CRB Report' }}

@@ -147,8 +147,8 @@ class ReportCrbController extends Controller
             );
 
             $message = $validated->error_records > 0
-                ? "Validation completed with {$validated->error_records} blocking error record(s) and {$validated->warning_records} data-warning record(s)."
-                : "Validation completed successfully. No blocking errors were found; {$validated->warning_records} data-warning record(s) remain for SACCO review.";
+                ? "Validation completed with {$validated->error_records} error record(s) and {$validated->warning_records} warning record(s)."
+                : "Validation completed. No error records found; {$validated->warning_records} warning record(s) remain.";
 
             return back()->with(
                 $validated->error_records > 0 ? 'error' : 'success',
@@ -168,13 +168,9 @@ class ReportCrbController extends Controller
                 $request->ip()
             );
 
-            $message = $reportRow->warning_records > 0
-                ? "CRB file finalised successfully with {$reportRow->warning_records} data-warning record(s). The SACCO remains responsible for correcting the notified source data. The file is now immutable."
-                : 'CRB file finalised successfully. The file is now immutable and ready for controlled download/submission.';
-
             return redirect()
                 ->route('reports.crb.show', $reportRow->id)
-                ->with('success', $message);
+                ->with('success', 'CRB file finalised successfully. The file is now immutable and ready for controlled download/submission.');
         } catch (Throwable $e) {
             return back()->with('error', 'CRB finalisation failed: ' . $e->getMessage());
         }
