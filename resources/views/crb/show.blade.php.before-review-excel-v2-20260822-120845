@@ -150,14 +150,7 @@
                 @endif
 
                 @if ($isImmutable)
-                    
-<a href="{{ route('reports.crb.review_excel', $reportRow->id) }}"
-   class="btn btn-outline-success btn-block mb-2">
-    Review Excel (.xlsx)
-</a>
-<div class="small text-muted mb-3">
-    Human-readable frozen snapshot — not for CRB submission.
-</div><a href="{{ route('reports.crb.download', $reportRow->id) }}" class="btn btn-outline-success w-100 mb-2">
+                    <a href="{{ route('reports.crb.download', $reportRow->id) }}" class="btn btn-outline-success w-100 mb-2">
                         Download Final File
                     </a>
                 @endif

@@ -198,37 +198,6 @@ class ReportCrbController extends Controller
         }
     }
 
-    public function downloadReviewExcel(Request $request, int $report)
-    {
-        try {
-            $file = $this->crb->reviewExcelFile(
-                $report,
-                auth()->id(),
-                $request->ip()
-            );
-
-            return response()
-                ->download(
-                    $file['path'],
-                    $file['name'],
-                    [
-                        'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                        'Cache-Control' => 'no-store, no-cache',
-                    ]
-                )
-                ->deleteFileAfterSend(true);
-        } catch (Throwable $e) {
-            Log::error('CRB review Excel download failed', [
-                'report_id' => $report,
-                'error' => $e->getMessage(),
-            ]);
-
-            return back()->with(
-                'error',
-                'CRB review Excel download failed: ' . $e->getMessage()
-            );
-        }
-    }
     public function markSubmitted(Request $request, int $report)
     {
         try {

@@ -2660,13 +2660,6 @@ Route::prefix('reports/crb')
             ->name('download');
 
 
-
-            Route::get('/{report}/download', [ReportCrbController::class, 'download'])
-    ->name('download');
-
-Route::get('/{report}/review-excel', [ReportCrbController::class, 'downloadReviewExcel'])
-    ->name('review_excel');
-    
         /*
         |--------------------------------------------------------------------------
         | Mark Report Submitted
