@@ -74,6 +74,110 @@ class MemberFinancialPositionController extends Controller
             ->get();
     }
 
+
+    /**
+     * All configured Other Savings (legacy FOSA) types shown as separate report columns.
+     *
+     * IMPORTANT:
+     * A type is reported whether active or inactive. Inactive only means it is no
+     * longer open for new activity; historical balances must still remain visible
+     * so the financial position reconciles.
+     *
+     * Any FOSA type whose name/prefix matches a live Special Savings product code
+     * is excluded here so products such as FEDHA are not counted twice.
+     */
+    protected function otherSavingsConfiguration(): array
+    {
+        $specialCodes = DB::table('sacco_special_saving_products')
+            ->where('special_saving_product_deleted', 'N')
+            ->pluck('special_saving_product_code')
+            ->map(fn ($code) => strtoupper(trim((string) $code)))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        $specialCodeLookup = array_fill_keys($specialCodes, true);
+
+        $allTypes = DB::table('sacco_fosa_types')
+            ->orderBy('type_name')
+            ->orderBy('type_id')
+            ->get();
+
+        $specialTypeIds = [];
+
+        foreach ($allTypes as $type) {
+            $name   = strtoupper(trim((string) ($type->type_name ?? '')));
+            $prefix = strtoupper(trim((string) ($type->type_prefix ?? '')));
+
+            if (isset($specialCodeLookup[$name]) || isset($specialCodeLookup[$prefix])) {
+                $specialTypeIds[] = (int) $type->type_id;
+            }
+        }
+
+        $types = $allTypes
+            ->filter(function ($type) use ($specialCodeLookup) {
+                $name   = strtoupper(trim((string) ($type->type_name ?? '')));
+                $prefix = strtoupper(trim((string) ($type->type_prefix ?? '')));
+
+                return !isset($specialCodeLookup[$name])
+                    && !isset($specialCodeLookup[$prefix]);
+            })
+            ->values();
+
+        return [
+            'types'            => $types,
+            'report_type_ids'  => $types->pluck('type_id')->map(fn ($id) => (int) $id)->all(),
+            'special_codes'    => $specialCodes,
+            'special_type_ids' => array_values(array_unique($specialTypeIds)),
+        ];
+    }
+
+    /**
+     * Whether the selected report population has a non-zero uncategorised
+     * Other Savings balance. Used to show the General Other Savings column
+     * only when it is actually needed.
+     */
+    protected function hasGeneralOtherSavings(string $period, string $pms_srch, array $config): bool
+    {
+        $reportTypeIds  = $config['report_type_ids'] ?? [];
+        $specialTypeIds = $config['special_type_ids'] ?? [];
+
+        $memberIds = $this->membersBaseQuery($pms_srch)
+            ->select('sacco_members.member_id')
+            ->distinct();
+
+        $q = DB::table('sacco_fosas as f')
+            ->whereIn('f.fosa_member_id', $memberIds)
+            ->where('f.fosa_period', '<=', (int) $period);
+
+        // General = no type, invalid type, or any type that no longer exists in
+        // the configured FOSA type table. Inactive configured types are NOT
+        // generalised; they retain their own report column.
+        if (!empty($reportTypeIds)) {
+            $q->where(function ($w) use ($reportTypeIds) {
+                $w->whereNull('f.fosa_type_id')
+                    ->orWhereNotIn('f.fosa_type_id', $reportTypeIds);
+            });
+        }
+
+        // But never move legacy Special Savings types into General.
+        if (!empty($specialTypeIds)) {
+            $q->where(function ($w) use ($specialTypeIds) {
+                $w->whereNull('f.fosa_type_id')
+                    ->orWhereNotIn('f.fosa_type_id', $specialTypeIds);
+            });
+        }
+
+        return $q
+            ->select('f.fosa_member_id', DB::raw('SUM(COALESCE(f.fosa_amount_paying,0)) as general_balance'))
+            ->groupBy('f.fosa_member_id')
+            ->havingRaw('ABS(SUM(COALESCE(f.fosa_amount_paying,0))) > 0.000001')
+            ->limit(1)
+            ->get()
+            ->isNotEmpty();
+    }
+
     /**
      * Bulk aggregates for a set of member IDs (FAST)
      *
@@ -87,13 +191,15 @@ class MemberFinancialPositionController extends Controller
      *
      * This prevents double counting and matches your phpMyAdmin audit output.
      */
-    protected function aggregatesForMembers(array $memberIds, string $period)
+    protected function aggregatesForMembers(array $memberIds, string $period, array $otherSavingsConfig)
     {
         if (empty($memberIds)) {
             return [
                 'savings'        => [],
-                'fosa'           => [],
-                'capital'        => [],
+                'fosa'                 => [],
+                'fosaByType'           => [],
+                'fosaGeneral'          => [],
+                'capital'              => [],
                 'specialSavings' => [],
                 'loanTaken'      => [], // [member_id][loan_type_id] => taken_total
                 'loanPaid'    => [], // [member_id][loan_type_id] => paid_total
@@ -115,15 +221,54 @@ class MemberFinancialPositionController extends Controller
             ->toArray();
 
         // -------------------------
-        // FOSA
+        // Other Savings (legacy FOSA), grouped by configured type.
         // -------------------------
-        $fosa = DB::table('sacco_fosas')
-            ->select('fosa_member_id', DB::raw('SUM(COALESCE(fosa_amount_paying,0)) as total'))
-            ->whereIn('fosa_member_id', $memberIds)
-            ->where('fosa_period', '<=', $periodInt)
-            ->groupBy('fosa_member_id')
-            ->pluck('total', 'fosa_member_id')
-            ->toArray();
+        // Every configured type, active or inactive, gets its own report column.
+        // Only null/invalid type IDs fall back to General Other Savings.
+        // Legacy FOSA rows matching Special Savings products (e.g. FEDHA)
+        // are excluded to prevent double counting.
+        $reportTypeLookup = array_fill_keys($otherSavingsConfig['report_type_ids'] ?? [], true);
+        $specialCodeLookup = array_fill_keys($otherSavingsConfig['special_codes'] ?? [], true);
+
+        $fosaRows = DB::table('sacco_fosas as f')
+            ->leftJoin('sacco_fosa_types as t', 'f.fosa_type_id', '=', 't.type_id')
+            ->select(
+                'f.fosa_member_id',
+                'f.fosa_type_id',
+                't.type_name',
+                't.type_prefix',
+                DB::raw('SUM(COALESCE(f.fosa_amount_paying,0)) as total')
+            )
+            ->whereIn('f.fosa_member_id', $memberIds)
+            ->where('f.fosa_period', '<=', $periodInt)
+            ->groupBy('f.fosa_member_id', 'f.fosa_type_id', 't.type_name', 't.type_prefix')
+            ->get();
+
+        $fosa        = [];
+        $fosaByType  = [];
+        $fosaGeneral = [];
+
+        foreach ($fosaRows as $row) {
+            $mid    = (int) $row->fosa_member_id;
+            $amount = (float) ($row->total ?? 0);
+            $tid    = is_numeric($row->fosa_type_id ?? null) ? (int) $row->fosa_type_id : null;
+
+            $typeName   = strtoupper(trim((string) ($row->type_name ?? '')));
+            $typePrefix = strtoupper(trim((string) ($row->type_prefix ?? '')));
+
+            // Special Savings products no longer belong in Other Savings.
+            if (isset($specialCodeLookup[$typeName]) || isset($specialCodeLookup[$typePrefix])) {
+                continue;
+            }
+
+            $fosa[$mid] = ($fosa[$mid] ?? 0) + $amount;
+
+            if ($tid !== null && isset($reportTypeLookup[$tid])) {
+                $fosaByType[$mid][$tid] = ($fosaByType[$mid][$tid] ?? 0) + $amount;
+            } else {
+                $fosaGeneral[$mid] = ($fosaGeneral[$mid] ?? 0) + $amount;
+            }
+        }
 
         // -------------------------
         // Capital
@@ -226,7 +371,7 @@ class MemberFinancialPositionController extends Controller
             $loanBalance[$mid][$tid] = ($loanBalance[$mid][$tid] ?? 0) + $bal;
         }
 
-        return compact('savings', 'fosa', 'capital', 'specialSavings', 'loanTaken', 'loanPaid', 'loanBalance');
+        return compact('savings', 'fosa', 'fosaByType', 'fosaGeneral', 'capital', 'specialSavings', 'loanTaken', 'loanPaid', 'loanBalance');
     }
 
     /**
@@ -247,8 +392,10 @@ class MemberFinancialPositionController extends Controller
             return response()->json(['error' => 'Invalid period'], 422);
         }
 
-        $loanTypes = $this->loanTypes();
-        $base      = $this->membersBaseQuery($pms_srch);
+        $loanTypes          = $this->loanTypes();
+        $otherSavingsConfig = $this->otherSavingsConfiguration();
+        $otherSavingsTypes  = $otherSavingsConfig['types'];
+        $base               = $this->membersBaseQuery($pms_srch);
 
         $total = (clone $base)
             ->distinct()
@@ -275,7 +422,7 @@ class MemberFinancialPositionController extends Controller
             ->get();
 
         $memberIds = $members->pluck('member_id')->map(fn ($v) => (int) $v)->all();
-        $agg       = $this->aggregatesForMembers($memberIds, $period);
+        $agg       = $this->aggregatesForMembers($memberIds, $period, $otherSavingsConfig);
 
         $rows = [];
         foreach ($members as $m) {
@@ -283,9 +430,22 @@ class MemberFinancialPositionController extends Controller
 
             $active  = (strtoupper(trim((string) ($m->member_active ?? ''))) === 'Y') ? 'Yes' : 'No';
             $savings        = (float) ($agg['savings'][$mid] ?? 0);
-            $fosa           = (float) ($agg['fosa'][$mid] ?? 0);
+            $fosa           = (float) ($agg['fosa'][$mid] ?? 0); // retained for API compatibility
             $capital        = (float) ($agg['capital'][$mid] ?? 0);
             $specialSavings = (float) ($agg['specialSavings'][$mid] ?? 0);
+
+            $otherSavingsData = [];
+            foreach ($otherSavingsTypes as $type) {
+                $tid = (int) $type->type_id;
+                $otherSavingsData[] = [
+                    'type_id'     => $tid,
+                    'type_name'   => $type->type_name,
+                    'type_prefix' => $type->type_prefix,
+                    'amount'      => round((float) ($agg['fosaByType'][$mid][$tid] ?? 0), 2),
+                ];
+            }
+
+            $generalOtherSavings = (float) ($agg['fosaGeneral'][$mid] ?? 0);
 
             $loanData        = [];
             $overallExposure = 0.0;
@@ -317,11 +477,13 @@ class MemberFinancialPositionController extends Controller
                 'company'            => $m->company_name,
                 'department'         => $m->department_name,
                 'position'           => $m->position_name,
-                'savings'            => round($savings, 2),
-                'fosa'               => round($fosa, 2),
-                'capital'            => round($capital, 2),
-                'special_savings'    => round($specialSavings, 2),
-                'overall_exposure'   => round($overallExposure, 2),
+                'capital'               => round($capital, 2),
+                'savings'               => round($savings, 2),
+                'special_savings'       => round($specialSavings, 2),
+                'other_savings'         => $otherSavingsData,
+                'general_other_savings' => round($generalOtherSavings, 2),
+                'fosa'                  => round($fosa, 2), // consolidated compatibility value; not displayed
+                'overall_exposure'      => round($overallExposure, 2),
                 'loans'              => $loanData,
             ];
         }
@@ -337,6 +499,12 @@ class MemberFinancialPositionController extends Controller
                 'generated_at' => now()->format('Y-m-d H:i:s T'),
                 'generated_by' => $this->generatedByLabel(),
                 'search'       => $pms_srch,
+                'other_savings_types' => $otherSavingsTypes->map(fn ($type) => [
+                    'type_id'     => (int) $type->type_id,
+                    'type_name'   => $type->type_name,
+                    'type_prefix' => $type->type_prefix,
+                    'type_active' => $type->type_active ?? null,
+                ])->values()->all(),
             ],
         ]);
     }
@@ -352,8 +520,10 @@ class MemberFinancialPositionController extends Controller
             abort(400, 'Invalid period');
         }
 
-        $loanTypes   = $this->loanTypes();
-        $filename    = "member_financial_position_{$period}.csv";
+        $loanTypes          = $this->loanTypes();
+        $otherSavingsConfig = $this->otherSavingsConfiguration();
+        $otherSavingsTypes  = $otherSavingsConfig['types'];
+        $filename           = "member_financial_position_{$period}.csv";
         $generatedAt = now()->format('Y-m-d H:i:s T');
         $generatedBy = $this->generatedByLabel();
 
@@ -361,10 +531,19 @@ class MemberFinancialPositionController extends Controller
             ->distinct()
             ->count('sacco_members.member_id');
 
+        $showGeneralOtherSavings = $this->hasGeneralOtherSavings(
+            $period,
+            $pms_srch,
+            $otherSavingsConfig
+        );
+
         return response()->stream(function () use (
             $period,
             $pms_srch,
             $loanTypes,
+            $otherSavingsConfig,
+            $otherSavingsTypes,
+            $showGeneralOtherSavings,
             $generatedAt,
             $generatedBy,
             $totalMembers
@@ -391,12 +570,21 @@ class MemberFinancialPositionController extends Controller
                 'Company',
                 'Department',
                 'Position',
-                'Savings',
-                'FOSA',
                 'Capital',
+                'Savings',
                 'Special Savings',
-                'Overall Exposure',
             ];
+
+            foreach ($otherSavingsTypes as $type) {
+                $header[] = 'Other Savings - ' . $type->type_name;
+            }
+
+            // Safety/fallback bucket appears only when truly uncategorised/invalid balances exist.
+            if ($showGeneralOtherSavings) {
+                $header[] = 'General Other Savings';
+            }
+
+            $header[] = 'Overall Loan Exposure';
 
             foreach ($loanTypes as $l) {
                 $header[] = $l->loan_type_name . ' Taken';
@@ -423,17 +611,16 @@ class MemberFinancialPositionController extends Controller
                 ])
                 ->orderBy('sacco_members.member_id');
 
-            $membersQuery->chunkById($chunkSize, function ($chunk) use ($out, $period, $loanTypes) {
+            $membersQuery->chunkById($chunkSize, function ($chunk) use ($out, $period, $loanTypes, $otherSavingsConfig, $otherSavingsTypes, $showGeneralOtherSavings) {
                 $memberIds = $chunk->pluck('member_id')->map(fn ($v) => (int) $v)->all();
-                $agg = $this->aggregatesForMembers($memberIds, $period);
+                $agg = $this->aggregatesForMembers($memberIds, $period, $otherSavingsConfig);
 
                 foreach ($chunk as $m) {
                     $mid = (int) $m->member_id;
 
                     $active  = (strtoupper(trim((string) ($m->member_active ?? ''))) === 'Y') ? 'Yes' : 'No';
-                    $savings        = round((float) ($agg['savings'][$mid] ?? 0), 2);
-                    $fosa           = round((float) ($agg['fosa'][$mid] ?? 0), 2);
                     $capital        = round((float) ($agg['capital'][$mid] ?? 0), 2);
+                    $savings        = round((float) ($agg['savings'][$mid] ?? 0), 2);
                     $specialSavings = round((float) ($agg['specialSavings'][$mid] ?? 0), 2);
 
                     $overallExposure = 0.0;
@@ -453,12 +640,21 @@ class MemberFinancialPositionController extends Controller
                         $m->company_name,
                         $m->department_name,
                         $m->position_name,
-                        $savings,
-                        $fosa,
                         $capital,
+                        $savings,
                         $specialSavings,
-                        round($overallExposure, 2),
                     ];
+
+                    foreach ($otherSavingsTypes as $type) {
+                        $tid = (int) $type->type_id;
+                        $line[] = round((float) ($agg['fosaByType'][$mid][$tid] ?? 0), 2);
+                    }
+
+                    if ($showGeneralOtherSavings) {
+                        $line[] = round((float) ($agg['fosaGeneral'][$mid] ?? 0), 2);
+                    }
+
+                    $line[] = round($overallExposure, 2);
 
                     foreach ($loanTypes as $lt) {
                         $tid = (int) $lt->loan_type_id;
