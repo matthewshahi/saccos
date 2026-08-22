@@ -844,11 +844,9 @@ class CrbReportService
                 'updated_at' => now(),
             ]);
 
-            /*
-             * Keep crb_log_status within the existing storage contract.
-             * Data-warning detail is already preserved in message/context.
-             */
-            $finaliseLogStatus = 'SUCCESS';
+            $finaliseLogStatus = $report->warning_records > 0
+                ? 'SUCCESS_WITH_WARNINGS'
+                : 'SUCCESS';
 
             $finaliseMessage = $report->warning_records > 0
                 ? "CRB submission file finalised with {$report->warning_records} record(s) carrying data-quality/regulatory warnings."

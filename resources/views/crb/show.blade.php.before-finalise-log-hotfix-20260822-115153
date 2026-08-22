@@ -77,9 +77,9 @@
                                 <th>Records</th>
                                 <td>
                                     {{ number_format($reportRow->total_records) }} total /
-                                    <span class="text-success">{{ number_format($reportRow->valid_records) }} clean</span> /
-                                    <span class="text-warning">{{ number_format($reportRow->warning_records) }} data warning</span> /
-                                    <span class="text-danger">{{ number_format($reportRow->error_records) }} blocking error</span>
+                                    <span class="text-success">{{ number_format($reportRow->valid_records) }} valid</span> /
+                                    <span class="text-warning">{{ number_format($reportRow->warning_records) }} warning</span> /
+                                    <span class="text-danger">{{ number_format($reportRow->error_records) }} error</span>
                                 </td>
                             </tr>
                             <tr>
