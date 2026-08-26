@@ -349,7 +349,11 @@ class MemberDashboardController extends Controller
         // Group repayments by loan ID and calculate balances
         $repaymentsByLoan = $repayments->groupBy('loan_payments_loan_id');
         foreach ($loans as $loan) {
-            $loan->repayments = $repaymentsByLoan[$loan->loan_id] ?? [];
+            $loan->repayments =
+    $repaymentsByLoan->get(
+        $loan->loan_id,
+        collect()
+    );
             $runningBalance = $loan->loan_amount;
 
             foreach ($loan->repayments as $repayment) {
