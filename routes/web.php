@@ -78,6 +78,7 @@ use App\Http\Middleware\VerifyCsrfToken;
 use App\Http\Controllers\MemberLoanLimitController;
 use App\Http\Controllers\MemberClassificationController;
 use App\Http\Controllers\ReportCrbController;
+use App\Http\Controllers\ExistingLoanGuarantorController;
 
 /* good imports
 Route::prefix('kass')->group(function () {
@@ -386,6 +387,59 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/members/status/{self}', [HomeController::class, 'memberStatus']);
     Route::get('/members/status/{id}', [HomeController::class, 'memberStatus'])->name('members.status')->middleware('check_user_rights:rpt_loans_issued');
 
+
+    /*
+|--------------------------------------------------------------------------
+| Existing Loan Guarantor Management
+|--------------------------------------------------------------------------
+|
+| These routes operate ONLY on already-created sacco_loans records.
+|
+| Permissions:
+|
+| search_existing_loan_guarantors
+|     - load modal context
+|     - search eligible members via AJAX
+|
+| update_existing_loan_guarantors
+|     - permanently attach guarantor to existing loan
+|
+*/
+
+    Route::get(
+        '/loans/{loan}/guarantors/context',
+        [ExistingLoanGuarantorController::class, 'context']
+    )
+        ->name('existing.loan.guarantors.context')
+        ->middleware([
+            'check_user_rights:search_existing_loan_guarantors',
+            'throttle:60,1',
+        ])
+        ->whereNumber('loan');
+
+
+    Route::get(
+        '/loans/{loan}/guarantors/search',
+        [ExistingLoanGuarantorController::class, 'search']
+    )
+        ->name('existing.loan.guarantors.search')
+        ->middleware([
+            'check_user_rights:search_existing_loan_guarantors',
+            'throttle:120,1',
+        ])
+        ->whereNumber('loan');
+
+
+    Route::post(
+        '/loans/{loan}/guarantors',
+        [ExistingLoanGuarantorController::class, 'store']
+    )
+        ->name('existing.loan.guarantors.store')
+        ->middleware([
+            'check_user_rights:update_existing_loan_guarantors',
+            'throttle:30,1',
+        ])
+        ->whereNumber('loan');
     // Route::get('/loans/apply', [HomeController::class, 'loansApply'])->name('loans.apply');
     // Route::post('/loans/apply', [HomeController::class, 'submitLoanApplication'])->name('loans.application.submit');
     Route::get('/loans/apply', [LoanApplicationSelfServiceController::class, 'loansApply'])
