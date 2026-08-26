@@ -2039,7 +2039,7 @@ class HomeController extends Controller
         return redirect()->route('members.nextOfKin', $member_id)->with('success', 'Next of kin deleted successfully.');
     }
 
-    public function memberStatus($id)
+    public function memberStatus($id = null)
     {
 
         $showHyperlinks = true;
