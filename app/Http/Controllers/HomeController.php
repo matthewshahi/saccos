@@ -68,10 +68,10 @@ class HomeController extends Controller
 
         return redirect('/register');
     }
-    // public function member_statement_self()
-    // {
-    //     dd("56789 what need sto go here");
-    // }
+    public function member_statement_self()
+    {
+        dd("56789 what need sto go here");
+    }
 
 
     // public function redirectBasedOnAuth()
@@ -410,51 +410,51 @@ class HomeController extends Controller
 
 
     public function membersList(Request $request)
-    {
-        DB::table('sacco_loans')
-            ->whereNull('loan_loan_paid')
-            ->update(['loan_loan_paid' => 0]);
+{
+    DB::table('sacco_loans')
+        ->whereNull('loan_loan_paid')
+        ->update(['loan_loan_paid' => 0]);
 
-        DB::table('sacco_loans')
-            ->whereNull('loan_start_deduction_period')
-            ->update(['loan_start_deduction_period' => '00000']);
+    DB::table('sacco_loans')
+        ->whereNull('loan_start_deduction_period')
+        ->update(['loan_start_deduction_period' => '00000']);
 
-        $orderby    = $request->input('orderby', 'member_name');
-        $sort_order = 'asc';
-        $search     = $request->input('pms_srch', '');
+    $orderby    = $request->input('orderby', 'member_name');
+    $sort_order = 'asc';
+    $search     = $request->input('pms_srch', '');
 
-        // Optional member filters
-        $memberActive  = $request->input('member_active', '');
-        $isJunior      = $request->input('member_is_junior', '');
-        $memberDeleted = $request->input('member_deleted', '');
+    // Optional member filters
+    $memberActive  = $request->input('member_active', '');
+    $isJunior      = $request->input('member_is_junior', '');
+    $memberDeleted = $request->input('member_deleted', '');
 
-        // Empty means "do not filter"
-        $memberActiveFilter  = $memberActive === '' ? null : $memberActive;
-        $isJuniorFilter      = $isJunior === '' ? null : $isJunior;
-        $memberDeletedFilter = $memberDeleted === '' ? null : $memberDeleted;
+    // Empty means "do not filter"
+    $memberActiveFilter  = $memberActive === '' ? null : $memberActive;
+    $isJuniorFilter      = $isJunior === '' ? null : $isJunior;
+    $memberDeletedFilter = $memberDeleted === '' ? null : $memberDeleted;
 
-        $members = $this->getMembersListFiltered(
-            $orderby,
-            $sort_order,
-            $search,
-            null,
-            $memberActiveFilter,
-            $isJuniorFilter,
-            $memberDeletedFilter
-        );
+    $members = $this->getMembersListFiltered(
+        $orderby,
+        $sort_order,
+        $search,
+        null,
+        $memberActiveFilter,
+        $isJuniorFilter,
+        $memberDeletedFilter
+    );
 
-        return view('members.list', [
-            'members'          => $members,
-            'orderby'          => $orderby,
-            'sort_order'       => $sort_order,
-            'pms_srch'         => $search,
+    return view('members.list', [
+        'members'          => $members,
+        'orderby'          => $orderby,
+        'sort_order'       => $sort_order,
+        'pms_srch'         => $search,
 
-            // Keep selected dropdown values
-            'member_active'    => $memberActive,
-            'member_is_junior' => $isJunior,
-            'member_deleted'   => $memberDeleted,
-        ]);
-    }
+        // Keep selected dropdown values
+        'member_active'    => $memberActive,
+        'member_is_junior' => $isJunior,
+        'member_deleted'   => $memberDeleted,
+    ]);
+}
     private function getMembersListFiltered(
         $orderby = 'member_name',
         $sort_order = 'asc',
@@ -3394,487 +3394,109 @@ class HomeController extends Controller
         );
     }
 
-    //     public function viewStatement($id = null)
-    //     {
-
-    //         $migrationMode = config('app.migration_mode', 'N');
-    //         $user = auth()->user();
-
-    //         // If the user is not an official or no ID is provided, use the authenticated user's ID
-    //         if ($user->member_position != 2) {
-    //             $id = $user->member_id;
-    //         }
-
-    //         if ($id === null) {
-    //             $id = $user->member_id;
-    //         }
-
-    //         $member = DB::table('sacco_members')->where('member_id', $id)->first();
-    //         if (!$member) {
-    //             return back()->withErrors(['error' => 'Member not found.']);
-    //         }
-
-    //         // Statement filters
-    //         $period_from = request('period_from', '000000');
-    //         $period_to = request('period_to', '999999');
-
-    //         // Default: show only loans outstanding as at selected period_to.
-    //         $cleared_loans = request('cleared_loans', 'uncleared');
-
-    //         if (!in_array($cleared_loans, ['uncleared', 'cleared', 'all'], true)) {
-    //             $cleared_loans = 'uncleared';
-    //         }
-
-
-    //         /*
-    // |--------------------------------------------------------------------------
-    // | Statement module selection
-    // |--------------------------------------------------------------------------
-    // |
-    // | No sections supplied = preserve existing FULL statement behaviour.
-    // |
-    // | Supported:
-    // | capital
-    // | savings
-    // | fosa
-    // | special_savings
-    // | loans
-    // |
-    // */
-
-    // $allowedSections = [
-    //     'capital',
-    //     'savings',
-    //     'fosa',
-    //     'special_savings',
-    //     'loans',
-    // ];
-
-    // $requestedSections = request()->input('sections', []);
-
-    // if (!is_array($requestedSections)) {
-    //     $requestedSections = [$requestedSections];
-    // }
-
-    // $sections = array_values(
-    //     array_intersect($allowedSections, $requestedSections)
-    // );
-
-    // /*
-    //  * Backward compatibility:
-    //  * existing statement URLs continue showing everything.
-    //  */
-    // if (empty($sections)) {
-    //     $sections = $allowedSections;
-    // }
-
-    // $showCapital = in_array('capital', $sections, true);
-    // $showSavings = in_array('savings', $sections, true);
-    // $showFosa = in_array('fosa', $sections, true);
-    // $showSpecialSavings = in_array('special_savings', $sections, true);
-    // $showLoans = in_array('loans', $sections, true);
-
-
-
-    //         // For statement loan filtering only.
-    //         // User requirement: outstanding loans with balance greater than 0.10.
-    //         $statementLoanBalanceThreshold = 0.10;
-
-    //         // Fetch the threshold amount for determining cleared loans
-    //         $threshold = DB::table('sacco_defaults')
-    //             ->where('default_name', 'threshold_amount')
-    //             ->value('default_value');
-    //         $threshold_amount = $threshold !== null ? (float)$threshold : 1.0;
-
-    //         // Fetch FOSA contributions
-    //         $fosaContributions = DB::table('sacco_fosas')
-    //             ->leftJoin('sacco_fosa_types', 'sacco_fosas.fosa_type_id', '=', 'sacco_fosa_types.type_id')
-    //             ->join('sacco_members', 'sacco_fosas.fosa_member_id', '=', 'sacco_members.member_id')
-    //             ->join('sacco_department', 'sacco_members.member_dept', '=', 'sacco_department.department_id')
-    //             ->join('sacco_company', 'sacco_department.department_company_id', '=', 'sacco_company.company_id')
-    //             ->where('sacco_members.member_deleted', '<>', 'Y')
-    //             ->where('sacco_fosas.fosa_member_id', $id)
-    //             ->orderBy('sacco_fosas.fosa_type_id')
-    //             ->orderBy('sacco_fosas.fosa_period')
-    //             ->orderBy('sacco_fosas.fosa_date_paid')
-    //             ->select(
-    //                 'sacco_fosas.*',
-    //                 'sacco_members.member_name',
-    //                 'sacco_department.department_name',
-    //                 'sacco_company.company_name',
-    //                 'sacco_fosa_types.type_name',
-    //                 'sacco_fosa_types.type_prefix'
-    //             )
-    //             ->get();
-
-
-    //         /*
-    // |--------------------------------------------------------------------------
-    // | Remove Special Savings products from old FOSA/Other Contributions display
-    // |--------------------------------------------------------------------------
-    // | FEDHA now lives in sacco_special_saving_* tables.
-    // | This prevents the old FEDHA/FOSA records from showing under Other Contributions.
-    // */
-    //         $specialSavingProductCodes = DB::table('sacco_special_saving_products')
-    //             ->where('special_saving_product_deleted', 'N')
-    //             ->pluck('special_saving_product_code')
-    //             ->map(fn($code) => strtoupper(trim((string) $code)))
-    //             ->filter()
-    //             ->values()
-    //             ->all();
-
-    //         $fosaContributions = $fosaContributions->reject(function ($row) use ($specialSavingProductCodes) {
-    //             $typeName = strtoupper(trim((string) ($row->type_name ?? '')));
-    //             $typePrefix = strtoupper(trim((string) ($row->type_prefix ?? '')));
-
-    //             return in_array($typeName, $specialSavingProductCodes, true)
-    //                 || in_array($typePrefix, $specialSavingProductCodes, true);
-    //         })->values();
-
-    //         $fosaGrouped = $fosaContributions->groupBy(function ($row) {
-    //             return $row->type_name ?: 'UNSPECIFIED';
-    //         });
-
-
-
-    //         // Calculate opening balance for shares
-    //         $openingBalanceShares = DB::table('sacco_shares')
-    //             ->where('share_member_id', $id)
-    //             ->where('share_period', '<', $period_from)
-    //             ->sum('share_amount_paying');
-
-    //         $shareContributions = DB::table('sacco_shares')
-    //             ->join('sacco_members', 'sacco_shares.share_member_id', '=', 'sacco_members.member_id')
-    //             ->join('sacco_department', 'sacco_members.member_dept', '=', 'sacco_department.department_id')
-    //             ->join('sacco_company', 'sacco_department.department_company_id', '=', 'sacco_company.company_id')
-    //             ->where('sacco_shares.share_member_id', $id)
-    //             ->whereBetween('sacco_shares.share_period', [$period_from, $period_to])
-    //             ->orderBy('sacco_shares.share_period')
-    //             ->orderBy('sacco_shares.share_date_paid')
-    //             ->get();
-
-    //         // Fetch Capital contributions
-    //         $openingBalanceCapital = DB::table('sacco_capital_shares')
-    //             ->where('share_capitalmember_id', $id)
-    //             ->where('share_capitalperiod', '<', $period_from)
-    //             ->sum('share_capitalamount_paying');
-
-    //         $capitalContributions = DB::table('sacco_capital_shares')
-    //             ->join('sacco_members', 'sacco_capital_shares.share_capitalmember_id', '=', 'sacco_members.member_id')
-    //             ->join('sacco_department', 'sacco_members.member_dept', '=', 'sacco_department.department_id')
-    //             ->join('sacco_company', 'sacco_department.department_company_id', '=', 'sacco_company.company_id')
-    //             ->where('sacco_capital_shares.share_capitalmember_id', $id)
-    //             ->whereBetween('sacco_capital_shares.share_capitalperiod', [$period_from, $period_to])
-    //             ->orderBy('sacco_capital_shares.share_capitalperiod')
-    //             ->orderBy('sacco_capital_shares.share_capitaldate_paid')
-    //             ->get();
-
-    //         // Fetch loans
-    //         //     $loans = DB::table('sacco_loans')
-    //         //         ->join('sacco_loan_types', 'sacco_loans.loan_loan_type', '=', 'sacco_loan_types.loan_type_id')
-    //         //         ->join('sacco_loan_category', 'sacco_loans.loan_loan_category', '=', 'sacco_loan_category.loan_category_id')
-    //         //         ->where('sacco_loans.loan_member', $id)
-    //         //         ->select('sacco_loans.*', 'sacco_loan_types.loan_type_name', 'sacco_loan_category.loan_category_name')
-    //         //         ->orderBy('sacco_loans.loan_taken_period')
-    //         //        ->orderBy('sacco_loans.loan_taken_period', 'asc')
-    //         // ->orderBy('sacco_loans.loan_on', 'asc')
-    //         // ->orderBy('sacco_loans.loan_loan_type', 'asc')
-    //         //         ->get();
-
-
-    //         /*
-    // |--------------------------------------------------------------------------
-    // | Loans for Statement
-    // |--------------------------------------------------------------------------
-    // | Default view:
-    // |   - show only loans whose balance as at period_to is greater than 0.10.
-    // |
-    // | Options:
-    // |   - uncleared: outstanding as at period_to > 0.10
-    // |   - cleared: outstanding as at period_to <= 0.10
-    // |   - all: all loans taken up to period_to
-    // |
-    // | Important:
-    // |   Balance is calculated from actual repayments up to period_to,
-    // |   not just the current loan_loan_paid value. This keeps period filters correct.
-    // */
-    //         $loanPaidToPeriodSub = DB::table('sacco_loan_payments')
-    //             ->select(
-    //                 'loan_payments_loan_id',
-    //                 DB::raw('SUM(COALESCE(loan_payments_amount, 0)) as paid_to_period')
-    //             )
-    //             ->where('loan_payments_period', '<=', $period_to)
-    //             ->groupBy('loan_payments_loan_id');
-
-    //         $loansQuery = DB::table('sacco_loans')
-    //             ->join('sacco_loan_types', 'sacco_loans.loan_loan_type', '=', 'sacco_loan_types.loan_type_id')
-    //             ->join('sacco_loan_category', 'sacco_loans.loan_loan_category', '=', 'sacco_loan_category.loan_category_id')
-    //             ->leftJoinSub($loanPaidToPeriodSub, 'paid_period', function ($join) {
-    //                 $join->on('sacco_loans.loan_id', '=', 'paid_period.loan_payments_loan_id');
-    //             })
-    //             ->where('sacco_loans.loan_member', $id)
-    //             ->where('sacco_loans.loan_taken_period', '<=', $period_to)
-    //             ->select(
-    //                 'sacco_loans.*',
-    //                 'sacco_loan_types.loan_type_name',
-    //                 'sacco_loan_category.loan_category_name',
-    //                 DB::raw('COALESCE(paid_period.paid_to_period, 0) as paid_as_at_period_to'),
-    //                 DB::raw('(COALESCE(sacco_loans.loan_amount, 0) - COALESCE(paid_period.paid_to_period, 0)) as balance_as_at_period_to')
-    //             );
-
-    //         if ($cleared_loans === 'uncleared') {
-    //             $loansQuery->whereRaw(
-    //                 '(COALESCE(sacco_loans.loan_amount, 0) - COALESCE(paid_period.paid_to_period, 0)) > ?',
-    //                 [$statementLoanBalanceThreshold]
-    //             );
-    //         }
-
-    //         if ($cleared_loans === 'cleared') {
-    //             $loansQuery->whereRaw(
-    //                 '(COALESCE(sacco_loans.loan_amount, 0) - COALESCE(paid_period.paid_to_period, 0)) <= ?',
-    //                 [$statementLoanBalanceThreshold]
-    //             );
-    //         }
-
-    //         $loans = $loansQuery
-    //             ->orderBy('sacco_loans.loan_taken_period', 'asc')
-    //             ->orderBy('sacco_loans.loan_on', 'asc')
-    //             ->orderBy('sacco_loans.loan_loan_type', 'asc')
-    //             ->get();
-
-
-    //         // Fetch all loan payments
-    //         // $loanPayments = DB::table('sacco_loan_payments')
-    //         //     ->join('sacco_loans', 'sacco_loan_payments.loan_payments_loan_id', '=', 'sacco_loans.loan_id')
-    //         //     ->where('sacco_loans.loan_member', $id)
-    //         //     ->select('sacco_loan_payments.*', 'sacco_loans.loan_loan_type')
-    //         //     ->orderBy('loan_payments_period')
-    //         //     ->orderBy('loan_payments_paid_on')
-    //         //     ->get();
-
-    //         $loanOpeningBalances = DB::table('sacco_loan_payments as lp')
-    //             ->join('sacco_loans as l', 'lp.loan_payments_loan_id', '=', 'l.loan_id')
-    //             ->where('l.loan_member', $id)
-    //             ->where('lp.loan_payments_period', '<', $period_from)
-    //             ->select(
-    //                 'lp.loan_payments_loan_id',
-    //                 DB::raw('SUM(lp.loan_payments_amount) as opening_movement')
-    //             )
-    //             ->groupBy('lp.loan_payments_loan_id')
-    //             ->pluck('opening_movement', 'loan_payments_loan_id');
-
-
-    //         $loanPayments = DB::table('sacco_loan_payments')
-    //             ->join('sacco_loans', 'sacco_loan_payments.loan_payments_loan_id', '=', 'sacco_loans.loan_id')
-    //             ->where('sacco_loans.loan_member', $id)
-    //             ->whereBetween(
-    //                 'sacco_loan_payments.loan_payments_period',
-    //                 [$period_from, $period_to]
-    //             )
-    //             ->select(
-    //                 'sacco_loan_payments.*',
-    //                 'sacco_loans.loan_loan_type'
-    //             )
-    //             ->orderBy('loan_payments_period', 'asc')
-    //             ->orderBy('loan_payments_paid_on', 'asc')
-    //             ->get();
-
-
-
-    //         // Group loan payments by loan_id
-    //         $paymentsByLoan = $loanPayments->groupBy('loan_payments_loan_id');
-
-    //         /*
-    // |--------------------------------------------------------------------------
-    // | Special Savings Statement
-    // |--------------------------------------------------------------------------
-    // | Pulls FEDHA and any future special saving product from the new module.
-    // | It respects period_from / period_to and uses transaction balance-after fields.
-    // */
-    //         $specialSavingAccounts = DB::table('sacco_special_saving_accounts as a')
-    //             ->leftJoin('sacco_special_saving_products as p', 'p.special_saving_product_id', '=', 'a.special_saving_account_product_id')
-    //             ->where('a.special_saving_account_member_id', $id)
-    //             ->where('a.special_saving_account_deleted', 'N')
-    //             ->select(
-    //                 'a.*',
-    //                 'p.special_saving_product_name',
-    //                 'p.special_saving_product_code'
-    //             )
-    //             ->orderBy('p.special_saving_product_name')
-    //             ->orderBy('a.special_saving_account_number')
-    //             ->get();
-
-    //         $specialSavings = $specialSavingAccounts->map(function ($account) use ($period_from, $period_to) {
-    //             $openingTxn = DB::table('sacco_special_saving_transactions')
-    //                 ->where('special_saving_transaction_account_id', $account->special_saving_account_id)
-    //                 ->where('special_saving_transaction_deleted', 'N')
-    //                 ->where(function ($q) {
-    //                     $q->where('special_saving_transaction_reversed', 'N')
-    //                         ->orWhereNull('special_saving_transaction_reversed');
-    //                 })
-    //                 ->where('special_saving_transaction_period', '<', $period_from)
-    //                 ->orderByDesc('special_saving_transaction_period')
-    //                 ->orderByDesc('special_saving_transaction_date')
-    //                 ->orderByDesc('special_saving_transaction_id')
-    //                 ->first();
-
-    //             $transactions = DB::table('sacco_special_saving_transactions')
-    //                 ->where('special_saving_transaction_account_id', $account->special_saving_account_id)
-    //                 ->where('special_saving_transaction_deleted', 'N')
-    //                 ->where(function ($q) {
-    //                     $q->where('special_saving_transaction_reversed', 'N')
-    //                         ->orWhereNull('special_saving_transaction_reversed');
-    //                 })
-    //                 ->whereBetween('special_saving_transaction_period', [$period_from, $period_to])
-    //                 ->orderBy('special_saving_transaction_period')
-    //                 ->orderBy('special_saving_transaction_date')
-    //                 ->orderBy('special_saving_transaction_id')
-    //                 ->get();
-
-    //             $openingPrincipal = $openingTxn ? (float) $openingTxn->special_saving_transaction_principal_balance_after : 0;
-    //             $openingAccruedInterest = $openingTxn ? (float) $openingTxn->special_saving_transaction_accrued_interest_after : 0;
-    //             $openingAvailableInterest = $openingTxn ? (float) $openingTxn->special_saving_transaction_available_interest_after : 0;
-    //             $openingTotal = $openingTxn ? (float) $openingTxn->special_saving_transaction_total_balance_after : 0;
-
-    //             return (object) [
-    //                 'account' => $account,
-    //                 'opening_principal' => $openingPrincipal,
-    //                 'opening_accrued_interest' => $openingAccruedInterest,
-    //                 'opening_available_interest' => $openingAvailableInterest,
-    //                 'opening_total' => $openingTotal,
-    //                 'transactions' => $transactions,
-    //             ];
-    //         })->filter(function ($item) {
-    //             return $item->transactions->count() > 0
-    //                 || abs((float) $item->opening_total) > 0
-    //                 || abs((float) $item->account->special_saving_account_total_balance) > 0;
-    //         })->values();
-
-    //         $data = [
-    //             'member' => $member,
-    //             'fosaContributions' => $fosaContributions,
-    //             'fosaGrouped' => $fosaGrouped,
-    //             'shareContributions' => $shareContributions,
-    //             'capitalContributions' => $capitalContributions,
-    //             'openingBalanceShares' => $openingBalanceShares,
-    //             'openingBalanceCapital' => $openingBalanceCapital,
-    //             'loans' => $loans,
-    //             'paymentsByLoan' => $paymentsByLoan,
-    //             'loanOpeningBalances' => $loanOpeningBalances,
-    //             'period_from' => $period_from,
-    //             'period_to' => $period_to,
-    //             'threshold_amount' => $threshold_amount,
-    //             'migrationMode' => $migrationMode,
-    //             'specialSavings' => $specialSavings,
-    //             'cleared_loans' => $cleared_loans,
-    //             'statementLoanBalanceThreshold' => $statementLoanBalanceThreshold,
-    //         ];
-
-    //         return view('members.statement', compact('data'));
-    //     }
-    //     public function viewContributions($id, Request $request)
-    //     {
-    //         $member = DB::table('sacco_members')
-    //             ->join('sacco_department', 'sacco_members.member_dept', '=', 'sacco_department.department_id')
-    //             ->join('sacco_company', 'sacco_department.department_company_id', '=', 'sacco_company.company_id')
-    //             ->join('sacco_position', 'sacco_members.member_position', '=', 'sacco_position.position_id')
-    //             ->where('sacco_members.member_id', $id)
-    //             ->where('member_deleted', '<>', 'Y')
-    //             ->select('sacco_members.*', 'sacco_company.company_name', 'sacco_department.department_name')
-    //             ->first();
-
-    //         if (!$member) {
-    //             return redirect()->route('members.list');
-    //         }
-
-    //         if ($request->isMethod('post')) {
-    //             $sanitizedData = $request->all();
-    //             foreach ($sanitizedData as $key => $value) {
-    //                 if (is_string($value)) {
-    //                     $sanitizedData[$key] = str_replace(',', '', $value); // Remove commas
-    //                 }
-    //             }
-
-    //             $validatedData = Validator::make($sanitizedData, [
-    //                 'member_share_contr_monthly' => 'required|numeric|min:0',
-    //                 'member_fosa_contr_monthly' => 'required|numeric|min:0',
-    //             ])->validate();
-
-    //             $minFosaContribution = DB::table('sacco_defaults')
-    //                 ->where('default_name', 'min_fosa_contribution')
-    //                 ->value('default_value');
-
-    //             $minShareContribution = DB::table('sacco_defaults')
-    //                 ->where('default_name', 'min_share_contribution')
-    //                 ->value('default_value');
-
-    //             $member_fosa_contr_monthly = $sanitizedData['member_fosa_contr_monthly'];
-    //             $member_share_contr_monthly = $sanitizedData['member_share_contr_monthly'];
-
-    //             if ($member_fosa_contr_monthly < $minFosaContribution && $member_fosa_contr_monthly != 0) {
-    //                 return back()->withErrors(['member_fosa_contr_monthly' => "Invalid monthly FOSA contribution, minimum FOSA contribution is $minFosaContribution"])->withInput();
-    //             }
-
-    //             if ($member_share_contr_monthly < $minShareContribution && $member_share_contr_monthly != 0) {
-    //                 return back()->withErrors(['member_share_contr_monthly' => "Invalid monthly share contribution, minimum SHARE contribution is $minShareContribution"])->withInput();
-    //             }
-
-    //             $loans_no = $request->input('t_loans_no');
-    //             $errors = [];
-
-    //             for ($i = 0; $i < $loans_no; $i++) {
-    //                 $loan_id = $sanitizedData["loan_id{$i}"];
-    //                 $loan_monthly_repayment_amount = $sanitizedData["loan_monthly_repayment_amount{$i}"];
-    //                 $loan_stoped = $sanitizedData["loan_stoped{$i}"];
-
-    //                 if (!is_numeric($loan_monthly_repayment_amount) || $loan_monthly_repayment_amount < 0) {
-    //                     $errors["loan_monthly_repayment_amount{$i}"] = "Invalid EMI contribution in ROW " . ($i + 1);
-    //                 }
-
-    //                 if ($loan_stoped != 'Y' && $loan_stoped != 'N') {
-    //                     $errors["loan_stoped{$i}"] = "Invalid value for stopped field in ROW " . ($i + 1);
-    //                 }
-
-    //                 if (!empty($errors)) {
-    //                     return back()->withErrors($errors)->withInput();
-    //                 }
-
-    //                 DB::table('sacco_loans')
-    //                     ->where('loan_id', $loan_id)
-    //                     ->where('loan_member', $id)
-    //                     ->update([
-    //                         'loan_monthly_repayment_amount' => $loan_monthly_repayment_amount,
-    //                         'loan_stoped' => $loan_stoped,
-    //                     ]);
-    //             }
-
-    //             DB::table('sacco_members')
-    //                 ->where('member_id', $id)
-    //                 ->update([
-    //                     'member_fosa_contr_monthly' => $member_fosa_contr_monthly,
-    //                     'member_share_contr_monthly' => $member_share_contr_monthly,
-    //                 ]);
-
-    //             return back()->with('success', 'Contributions updated successfully.');
-    //         }
-
-
-
-    //         $loans = DB::table('sacco_loans')
-    //             ->join('sacco_loan_types', 'sacco_loans.loan_loan_type', '=', 'sacco_loan_types.loan_type_id')
-    //             ->join('sacco_loan_category', 'sacco_loans.loan_loan_category', '=', 'sacco_loan_category.loan_category_id')
-    //             ->where('sacco_loans.loan_member', $id)
-    //             ->whereRaw('loan_amount > COALESCE(loan_loan_paid, 0)')
-    //             ->select('sacco_loans.*', 'sacco_loan_types.loan_type_name', 'sacco_loan_category.loan_category_name')
-    //             ->get();
-
-    //         $data = [
-    //             'member' => $member,
-    //             'loans' => $loans,
-    //         ];
-
-    //         return view('members.contributions', compact('data'));
-    //     }
+    public function viewContributions($id, Request $request)
+    {
+        $member = DB::table('sacco_members')
+            ->join('sacco_department', 'sacco_members.member_dept', '=', 'sacco_department.department_id')
+            ->join('sacco_company', 'sacco_department.department_company_id', '=', 'sacco_company.company_id')
+            ->join('sacco_position', 'sacco_members.member_position', '=', 'sacco_position.position_id')
+            ->where('sacco_members.member_id', $id)
+            ->where('member_deleted', '<>', 'Y')
+            ->select('sacco_members.*', 'sacco_company.company_name', 'sacco_department.department_name')
+            ->first();
+
+        if (!$member) {
+            return redirect()->route('members.list');
+        }
+
+        if ($request->isMethod('post')) {
+            $sanitizedData = $request->all();
+            foreach ($sanitizedData as $key => $value) {
+                if (is_string($value)) {
+                    $sanitizedData[$key] = str_replace(',', '', $value); // Remove commas
+                }
+            }
+
+            $validatedData = Validator::make($sanitizedData, [
+                'member_share_contr_monthly' => 'required|numeric|min:0',
+                'member_fosa_contr_monthly' => 'required|numeric|min:0',
+            ])->validate();
+
+            $minFosaContribution = DB::table('sacco_defaults')
+                ->where('default_name', 'min_fosa_contribution')
+                ->value('default_value');
+
+            $minShareContribution = DB::table('sacco_defaults')
+                ->where('default_name', 'min_share_contribution')
+                ->value('default_value');
+
+            $member_fosa_contr_monthly = $sanitizedData['member_fosa_contr_monthly'];
+            $member_share_contr_monthly = $sanitizedData['member_share_contr_monthly'];
+
+            if ($member_fosa_contr_monthly < $minFosaContribution && $member_fosa_contr_monthly != 0) {
+                return back()->withErrors(['member_fosa_contr_monthly' => "Invalid monthly FOSA contribution, minimum FOSA contribution is $minFosaContribution"])->withInput();
+            }
+
+            if ($member_share_contr_monthly < $minShareContribution && $member_share_contr_monthly != 0) {
+                return back()->withErrors(['member_share_contr_monthly' => "Invalid monthly share contribution, minimum SHARE contribution is $minShareContribution"])->withInput();
+            }
+
+            $loans_no = $request->input('t_loans_no');
+            $errors = [];
+
+            for ($i = 0; $i < $loans_no; $i++) {
+                $loan_id = $sanitizedData["loan_id{$i}"];
+                $loan_monthly_repayment_amount = $sanitizedData["loan_monthly_repayment_amount{$i}"];
+                $loan_stoped = $sanitizedData["loan_stoped{$i}"];
+
+                if (!is_numeric($loan_monthly_repayment_amount) || $loan_monthly_repayment_amount < 0) {
+                    $errors["loan_monthly_repayment_amount{$i}"] = "Invalid EMI contribution in ROW " . ($i + 1);
+                }
+
+                if ($loan_stoped != 'Y' && $loan_stoped != 'N') {
+                    $errors["loan_stoped{$i}"] = "Invalid value for stopped field in ROW " . ($i + 1);
+                }
+
+                if (!empty($errors)) {
+                    return back()->withErrors($errors)->withInput();
+                }
+
+                DB::table('sacco_loans')
+                    ->where('loan_id', $loan_id)
+                    ->where('loan_member', $id)
+                    ->update([
+                        'loan_monthly_repayment_amount' => $loan_monthly_repayment_amount,
+                        'loan_stoped' => $loan_stoped,
+                    ]);
+            }
+
+            DB::table('sacco_members')
+                ->where('member_id', $id)
+                ->update([
+                    'member_fosa_contr_monthly' => $member_fosa_contr_monthly,
+                    'member_share_contr_monthly' => $member_share_contr_monthly,
+                ]);
+
+            return back()->with('success', 'Contributions updated successfully.');
+        }
+
+
+
+        $loans = DB::table('sacco_loans')
+            ->join('sacco_loan_types', 'sacco_loans.loan_loan_type', '=', 'sacco_loan_types.loan_type_id')
+            ->join('sacco_loan_category', 'sacco_loans.loan_loan_category', '=', 'sacco_loan_category.loan_category_id')
+            ->where('sacco_loans.loan_member', $id)
+            ->whereRaw('loan_amount > COALESCE(loan_loan_paid, 0)')
+            ->select('sacco_loans.*', 'sacco_loan_types.loan_type_name', 'sacco_loan_category.loan_category_name')
+            ->get();
+
+        $data = [
+            'member' => $member,
+            'loans' => $loans,
+        ];
+
+        return view('members.contributions', compact('data'));
+    }
 
 
 
@@ -6630,26 +6252,26 @@ class HomeController extends Controller
 
         // Handle approval of guarantee
         if ($request->has('yid') && is_numeric($request->input('yid'))) {
-            DB::table('sacco_loan_batch_guarantors_members')
-                ->where(
-                    'guarantors_loan_batch_trans_id',
-                    $request->input('yid')
-                )
-                ->where(
-                    'guarantors_guarantor_id',
-                    $logged_in_user
-                )
-                ->whereRaw(
-                    "COALESCE(guarantors_deleted, 'N') <> 'Y'"
-                )
-                ->whereRaw(
-                    "COALESCE(guarantors_approved, 'N') <> 'Y'"
-                )
-                ->update([
-                    'guarantors_approved' => 'Y',
-                    'guarantors_approved_on' => $transdate,
-                ]);
-        }
+    DB::table('sacco_loan_batch_guarantors_members')
+        ->where(
+            'guarantors_loan_batch_trans_id',
+            $request->input('yid')
+        )
+        ->where(
+            'guarantors_guarantor_id',
+            $logged_in_user
+        )
+        ->whereRaw(
+            "COALESCE(guarantors_deleted, 'N') <> 'Y'"
+        )
+        ->whereRaw(
+            "COALESCE(guarantors_approved, 'N') <> 'Y'"
+        )
+        ->update([
+            'guarantors_approved' => 'Y',
+            'guarantors_approved_on' => $transdate,
+        ]);
+}
 
         // Fetch loans pending guarantee approval
         $loans = DB::table('sacco_loan_category')
@@ -10361,10 +9983,10 @@ class HomeController extends Controller
 
         // IMPORTANT: build query WITHOUT ->get() or paginate()
         $query = DB::table('sacco_loans as l')
-            ->join('sacco_members as m', 'l.loan_member', '=', 'm.member_id')
-            ->leftJoin('sacco_department as d', 'm.member_dept', '=', 'd.department_id')
-            ->leftJoin('sacco_company as c', 'd.department_company_id', '=', 'c.company_id')
-            ->leftJoin('sacco_loan_types as lt', 'l.loan_loan_type', '=', 'lt.loan_type_id')
+    ->join('sacco_members as m', 'l.loan_member', '=', 'm.member_id')
+    ->leftJoin('sacco_department as d', 'm.member_dept', '=', 'd.department_id')
+    ->leftJoin('sacco_company as c', 'd.department_company_id', '=', 'c.company_id')
+    ->leftJoin('sacco_loan_types as lt', 'l.loan_loan_type', '=', 'lt.loan_type_id')
             ->select(
                 // Loan
                 'l.loan_id',
@@ -10545,26 +10167,26 @@ class HomeController extends Controller
         return response()->json(['data' => $loanRepayments]);
     }
     public function membersListCsv(Request $request)
-    {
-        /*
+{
+    /*
     |--------------------------------------------------------------------------
     | Use the SAME filtering logic as the member listing
     |--------------------------------------------------------------------------
     */
 
-        $orderby    = $request->input('orderby', 'member_name');
-        $sort_order = 'asc';
-        $search     = $request->input('pms_srch', '');
+    $orderby    = $request->input('orderby', 'member_name');
+    $sort_order = 'asc';
+    $search     = $request->input('pms_srch', '');
 
-        $memberActive  = $request->input('member_active', '');
-        $isJunior      = $request->input('member_is_junior', '');
-        $memberDeleted = $request->input('member_deleted', '');
+    $memberActive  = $request->input('member_active', '');
+    $isJunior      = $request->input('member_is_junior', '');
+    $memberDeleted = $request->input('member_deleted', '');
 
-        $memberActive  = $memberActive === '' ? null : $memberActive;
-        $isJunior      = $isJunior === '' ? null : $isJunior;
-        $memberDeleted = $memberDeleted === '' ? null : $memberDeleted;
+    $memberActive  = $memberActive === '' ? null : $memberActive;
+    $isJunior      = $isJunior === '' ? null : $isJunior;
+    $memberDeleted = $memberDeleted === '' ? null : $memberDeleted;
 
-        /*
+    /*
     |--------------------------------------------------------------------------
     | Get export population
     |--------------------------------------------------------------------------
@@ -10573,17 +10195,17 @@ class HomeController extends Controller
     |--------------------------------------------------------------------------
     */
 
-        $members = $this->getMembersListFiltered(
-            $orderby,
-            $sort_order,
-            $search,
-            50000,
-            $memberActive,
-            $isJunior,
-            $memberDeleted
-        );
+    $members = $this->getMembersListFiltered(
+        $orderby,
+        $sort_order,
+        $search,
+        50000,
+        $memberActive,
+        $isJunior,
+        $memberDeleted
+    );
 
-        /*
+    /*
     |--------------------------------------------------------------------------
     | Resolve Junior Account Guardians
     |--------------------------------------------------------------------------
@@ -10591,123 +10213,123 @@ class HomeController extends Controller
     |--------------------------------------------------------------------------
     */
 
-        $guardianIds = $members
-            ->pluck('member_guardian_id')
-            ->filter()
-            ->unique()
-            ->values();
+    $guardianIds = $members
+        ->pluck('member_guardian_id')
+        ->filter()
+        ->unique()
+        ->values();
 
-        $guardians = collect();
+    $guardians = collect();
 
-        if ($guardianIds->isNotEmpty()) {
-            $guardians = DB::table('sacco_members')
-                ->whereIn('member_id', $guardianIds)
-                ->select(
-                    'member_id',
-                    'member_name',
-                    'member_sacco_id',
-                    'member_national_id'
-                )
-                ->get()
-                ->keyBy('member_id');
-        }
+    if ($guardianIds->isNotEmpty()) {
+        $guardians = DB::table('sacco_members')
+            ->whereIn('member_id', $guardianIds)
+            ->select(
+                'member_id',
+                'member_name',
+                'member_sacco_id',
+                'member_national_id'
+            )
+            ->get()
+            ->keyBy('member_id');
+    }
 
-        /*
+    /*
     |--------------------------------------------------------------------------
     | CSV filename
     |--------------------------------------------------------------------------
     */
 
-        $filename = 'members_' . date('Ymd_His') . '.csv';
+    $filename = 'members_' . date('Ymd_His') . '.csv';
 
-        $headers = [
-            'Content-Type'        => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
-            'Pragma'              => 'no-cache',
-            'Cache-Control'       => 'must-revalidate, post-check=0, pre-check=0',
-            'Expires'             => '0',
-        ];
+    $headers = [
+        'Content-Type'        => 'text/csv; charset=UTF-8',
+        'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+        'Pragma'              => 'no-cache',
+        'Cache-Control'       => 'must-revalidate, post-check=0, pre-check=0',
+        'Expires'             => '0',
+    ];
 
-        /*
+    /*
     |--------------------------------------------------------------------------
     | Rich Member Master columns
     |--------------------------------------------------------------------------
     */
 
-        $columns = [
-            'System Member ID',
+    $columns = [
+        'System Member ID',
 
-            // Identity
-            'Name',
-            'Sacco ID',
-            'National ID',
-            'KRA PIN',
-            'Date of Birth',
-            'Gender',
+        // Identity
+        'Name',
+        'Sacco ID',
+        'National ID',
+        'KRA PIN',
+        'Date of Birth',
+        'Gender',
 
-            // Contact
-            'Phone',
-            'Email',
-            'Postal Address',
+        // Contact
+        'Phone',
+        'Email',
+        'Postal Address',
 
-            // Membership
-            'Date Joined',
-            'Company',
-            'Department',
-            'Position',
-            'Status',
-            'Date Deactivated',
-            'Deleted',
-            'Deleted On',
-            'Account Type',
+        // Membership
+        'Date Joined',
+        'Company',
+        'Department',
+        'Position',
+        'Status',
+        'Date Deactivated',
+        'Deleted',
+        'Deleted On',
+        'Account Type',
 
-            // Junior account
-            'Guardian Name',
-            'Guardian Sacco ID',
-            'Guardian National ID',
+        // Junior account
+        'Guardian Name',
+        'Guardian Sacco ID',
+        'Guardian National ID',
 
-            // Digital access
-            'Mobile Banking',
-            'Last Mobile Login',
+        // Digital access
+        'Mobile Banking',
+        'Last Mobile Login',
 
-            // Monthly contribution settings
-            'Monthly Savings Contribution',
-            'Monthly Other Savings Contribution',
+        // Monthly contribution settings
+        'Monthly Savings Contribution',
+        'Monthly Other Savings Contribution',
 
-            // Current stored member totals
-            'Current Savings Total',
-            'Current Other Savings Total',
-            'Current Share Capital Total',
-            'Current Loan Total',
-            'Tied Shares - Others',
-            'Tied Shares - Self',
+        // Current stored member totals
+        'Current Savings Total',
+        'Current Other Savings Total',
+        'Current Share Capital Total',
+        'Current Loan Total',
+        'Tied Shares - Others',
+        'Tied Shares - Self',
 
-            // Banking
-            'Bank Name',
-            'Bank Branch',
-            'Bank Account Number',
+        // Banking
+        'Bank Name',
+        'Bank Branch',
+        'Bank Account Number',
 
-            // Record information
-            'Record Created',
-        ];
+        // Record information
+        'Record Created',
+    ];
 
-        /*
+    /*
     |--------------------------------------------------------------------------
     | Stream CSV
     |--------------------------------------------------------------------------
     */
 
-        $callback = function () use ($members, $columns, $guardians) {
-            $file = fopen('php://output', 'w');
+    $callback = function () use ($members, $columns, $guardians) {
+        $file = fopen('php://output', 'w');
 
-            /*
+        /*
          * UTF-8 BOM makes Excel handle names/special characters better.
          */
-            fwrite($file, "\xEF\xBB\xBF");
+        fwrite($file, "\xEF\xBB\xBF");
 
-            fputcsv($file, $columns);
+        fputcsv($file, $columns);
 
-            /*
+        /*
          * Preserve identifiers exactly as text in Excel.
          *
          * This prevents:
@@ -10715,200 +10337,200 @@ class HomeController extends Controller
          * long account numbers becoming scientific notation
          * phone numbers losing + or leading zeroes
          */
-            $excelText = function ($value) {
-                if ($value === null || $value === '') {
-                    return '';
-                }
-
-                $value = (string) $value;
-                $value = str_replace('"', '""', $value);
-
-                return '="' . $value . '"';
-            };
-
-            /*
-         * Protect normal textual CSV values against Excel formula execution.
-         */
-            $safeText = function ($value) {
-                if ($value === null) {
-                    return '';
-                }
-
-                $value = (string) $value;
-
-                if (
-                    $value !== ''
-                    && in_array(substr($value, 0, 1), ['=', '+', '-', '@'], true)
-                ) {
-                    return "'" . $value;
-                }
-
-                return $value;
-            };
-
-            /*
-         * Consistent date formatting.
-         */
-            $formatDate = function ($value, $includeTime = false) {
-                if (empty($value)) {
-                    return '';
-                }
-
-                try {
-                    return \Carbon\Carbon::parse($value)->format(
-                        $includeTime ? 'Y-m-d H:i:s' : 'Y-m-d'
-                    );
-                } catch (\Throwable $e) {
-                    return (string) $value;
-                }
-            };
-
-            foreach ($members as $m) {
-
-                /*
-             * Junior guardian information
-             */
-                $guardian = null;
-
-                if (!empty($m->member_guardian_id)) {
-                    $guardian = $guardians->get(
-                        $m->member_guardian_id
-                    );
-                }
-
-                /*
-             * Human-readable gender
-             */
-                $gender = match (strtoupper((string) ($m->member_gender ?? ''))) {
-                    'M' => 'Male',
-                    'F' => 'Female',
-                    default => (string) ($m->member_gender ?? ''),
-                };
-
-                /*
-             * Human-readable member status
-             */
-                $status = strtoupper((string) ($m->member_active ?? 'N')) === 'Y'
-                    ? 'Active'
-                    : 'Inactive';
-
-                /*
-             * Junior / Standard account
-             */
-                $accountType = (int) ($m->member_is_junior ?? 0) === 1
-                    ? 'Junior'
-                    : 'Standard';
-
-                /*
-             * Deleted status
-             */
-                $deleted = strtoupper((string) ($m->member_deleted ?? 'N')) === 'Y'
-                    ? 'Yes'
-                    : 'No';
-
-                /*
-             * Mobile banking status
-             */
-                $mobileBanking = strtoupper(
-                    (string) ($m->member_mobile_banking_active ?? 'N')
-                ) === 'Y'
-                    ? 'Active'
-                    : 'Inactive';
-
-                fputcsv($file, [
-                    /*
-                 * System
-                 */
-                    $m->member_id,
-
-                    /*
-                 * Identity
-                 */
-                    $safeText($m->member_name),
-                    $excelText($m->member_sacco_id),
-                    $excelText($m->member_national_id),
-                    $excelText($m->member_kra_pin),
-                    $formatDate($m->member_dob),
-                    $gender,
-
-                    /*
-                 * Contact
-                 */
-                    $excelText($m->member_phone_no),
-                    $safeText($m->member_email),
-                    $safeText($m->member_postal_address),
-
-                    /*
-                 * Membership
-                 */
-                    $formatDate($m->member_date_joined),
-                    $safeText($m->company_name),
-                    $safeText($m->department_name),
-                    $safeText($m->position_name),
-                    $status,
-                    $formatDate($m->member_date_dactivated),
-                    $deleted,
-                    $formatDate($m->member_deleted_on, true),
-                    $accountType,
-
-                    /*
-                 * Junior guardian
-                 */
-                    $guardian
-                        ? $safeText($guardian->member_name)
-                        : '',
-
-                    $guardian
-                        ? $excelText($guardian->member_sacco_id)
-                        : '',
-
-                    $guardian
-                        ? $excelText($guardian->member_national_id)
-                        : '',
-
-                    /*
-                 * Digital access
-                 */
-                    $mobileBanking,
-                    $formatDate($m->member_last_mobile_login, true),
-
-                    /*
-                 * Monthly contribution settings
-                 */
-                    (float) ($m->member_share_contr_monthly ?? 0),
-                    (float) ($m->member_fosa_contr_monthly ?? 0),
-
-                    /*
-                 * Current stored member totals
-                 */
-                    (float) ($m->member_total_share ?? 0),
-                    (float) ($m->member_total_fosa ?? 0),
-                    (float) ($m->member_total_share_capital ?? 0),
-                    (float) ($m->member_total_loan ?? 0),
-                    (float) ($m->member_tied_shares ?? 0),
-                    (float) ($m->member_tied_shares_self ?? 0),
-
-                    /*
-                 * Bank information
-                 */
-                    $safeText($m->bank_name),
-                    $safeText($m->bank_branch),
-                    $excelText($m->bank_account_number),
-
-                    /*
-                 * Record information
-                 */
-                    $formatDate($m->member_transdate, true),
-                ]);
+        $excelText = function ($value) {
+            if ($value === null || $value === '') {
+                return '';
             }
 
-            fclose($file);
+            $value = (string) $value;
+            $value = str_replace('"', '""', $value);
+
+            return '="' . $value . '"';
         };
 
-        return response()->stream(
-            $callback,
-            200,
-            $headers
-        );
-    }
+        /*
+         * Protect normal textual CSV values against Excel formula execution.
+         */
+        $safeText = function ($value) {
+            if ($value === null) {
+                return '';
+            }
+
+            $value = (string) $value;
+
+            if (
+                $value !== ''
+                && in_array(substr($value, 0, 1), ['=', '+', '-', '@'], true)
+            ) {
+                return "'" . $value;
+            }
+
+            return $value;
+        };
+
+        /*
+         * Consistent date formatting.
+         */
+        $formatDate = function ($value, $includeTime = false) {
+            if (empty($value)) {
+                return '';
+            }
+
+            try {
+                return \Carbon\Carbon::parse($value)->format(
+                    $includeTime ? 'Y-m-d H:i:s' : 'Y-m-d'
+                );
+            } catch (\Throwable $e) {
+                return (string) $value;
+            }
+        };
+
+        foreach ($members as $m) {
+
+            /*
+             * Junior guardian information
+             */
+            $guardian = null;
+
+            if (!empty($m->member_guardian_id)) {
+                $guardian = $guardians->get(
+                    $m->member_guardian_id
+                );
+            }
+
+            /*
+             * Human-readable gender
+             */
+            $gender = match (strtoupper((string) ($m->member_gender ?? ''))) {
+                'M' => 'Male',
+                'F' => 'Female',
+                default => (string) ($m->member_gender ?? ''),
+            };
+
+            /*
+             * Human-readable member status
+             */
+            $status = strtoupper((string) ($m->member_active ?? 'N')) === 'Y'
+                ? 'Active'
+                : 'Inactive';
+
+            /*
+             * Junior / Standard account
+             */
+            $accountType = (int) ($m->member_is_junior ?? 0) === 1
+                ? 'Junior'
+                : 'Standard';
+
+            /*
+             * Deleted status
+             */
+            $deleted = strtoupper((string) ($m->member_deleted ?? 'N')) === 'Y'
+                ? 'Yes'
+                : 'No';
+
+            /*
+             * Mobile banking status
+             */
+            $mobileBanking = strtoupper(
+                (string) ($m->member_mobile_banking_active ?? 'N')
+            ) === 'Y'
+                ? 'Active'
+                : 'Inactive';
+
+            fputcsv($file, [
+                /*
+                 * System
+                 */
+                $m->member_id,
+
+                /*
+                 * Identity
+                 */
+                $safeText($m->member_name),
+                $excelText($m->member_sacco_id),
+                $excelText($m->member_national_id),
+                $excelText($m->member_kra_pin),
+                $formatDate($m->member_dob),
+                $gender,
+
+                /*
+                 * Contact
+                 */
+                $excelText($m->member_phone_no),
+                $safeText($m->member_email),
+                $safeText($m->member_postal_address),
+
+                /*
+                 * Membership
+                 */
+                $formatDate($m->member_date_joined),
+                $safeText($m->company_name),
+                $safeText($m->department_name),
+                $safeText($m->position_name),
+                $status,
+                $formatDate($m->member_date_dactivated),
+                $deleted,
+                $formatDate($m->member_deleted_on, true),
+                $accountType,
+
+                /*
+                 * Junior guardian
+                 */
+                $guardian
+                    ? $safeText($guardian->member_name)
+                    : '',
+
+                $guardian
+                    ? $excelText($guardian->member_sacco_id)
+                    : '',
+
+                $guardian
+                    ? $excelText($guardian->member_national_id)
+                    : '',
+
+                /*
+                 * Digital access
+                 */
+                $mobileBanking,
+                $formatDate($m->member_last_mobile_login, true),
+
+                /*
+                 * Monthly contribution settings
+                 */
+                (float) ($m->member_share_contr_monthly ?? 0),
+                (float) ($m->member_fosa_contr_monthly ?? 0),
+
+                /*
+                 * Current stored member totals
+                 */
+                (float) ($m->member_total_share ?? 0),
+                (float) ($m->member_total_fosa ?? 0),
+                (float) ($m->member_total_share_capital ?? 0),
+                (float) ($m->member_total_loan ?? 0),
+                (float) ($m->member_tied_shares ?? 0),
+                (float) ($m->member_tied_shares_self ?? 0),
+
+                /*
+                 * Bank information
+                 */
+                $safeText($m->bank_name),
+                $safeText($m->bank_branch),
+                $excelText($m->bank_account_number),
+
+                /*
+                 * Record information
+                 */
+                $formatDate($m->member_transdate, true),
+            ]);
+        }
+
+        fclose($file);
+    };
+
+    return response()->stream(
+        $callback,
+        200,
+        $headers
+    );
+}
 }
