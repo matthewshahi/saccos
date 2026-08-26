@@ -4,335 +4,1108 @@
 
 @include('member_name')
 
+@php
+    /*
+    |--------------------------------------------------------------------------
+    | Statement metadata
+    |--------------------------------------------------------------------------
+    */
+
+    $statementGeneratedAt = now();
+
+    $statementReference =
+        'MFS-' .
+        ($member->member_sacco_id ?: $member->member_id) .
+        '-' .
+        $statementGeneratedAt->format('YmdHis');
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Outstanding loans
+    |--------------------------------------------------------------------------
+    |
+    | Filter here once so:
+    | - numbering is correct
+    | - empty state is correct
+    | - UI/PDF/print all use the same records
+    |
+    */
+
+    $outstandingLoans = collect($loansTakenWithGuarantors)
+        ->filter(function ($loan) use ($threshold_amount) {
+            return (
+                (float) ($loan->loan_amount ?? 0)
+                -
+                (float) ($loan->loan_loan_paid ?? 0)
+            ) > $threshold_amount;
+        })
+        ->values();
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Active guarantees provided by this member
+    |--------------------------------------------------------------------------
+    */
+
+    $activeGuaranteesProvided = collect($loansGuaranteed)
+        ->filter(function ($loan) use ($threshold_amount) {
+
+            $loanBalance =
+                (float) ($loan->loan_amount ?? 0)
+                -
+                (float) ($loan->loan_loan_paid ?? 0);
+
+            $guaranteeTied =
+                (float) ($loan->loan_guar_amount_guaranteed ?? 0)
+                -
+                (float) ($loan->loan_guar_amount_freed ?? 0);
+
+            return
+                $loanBalance > $threshold_amount
+                &&
+                $guaranteeTied > $threshold_amount;
+        })
+        ->values();
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Loan date formatter
+    |--------------------------------------------------------------------------
+    |
+    | Prefer the actual loan/disbursement date when available.
+    | Fall back to YYYYMM period for older records.
+    |
+    */
+
+    $loanDateDisplay = function ($loan) {
+
+        $rawDate = $loan->loan_on ?? null;
+
+        if (
+            !empty($rawDate)
+            &&
+            $rawDate !== '0000-00-00'
+            &&
+            $rawDate !== '0000-00-00 00:00:00'
+        ) {
+            try {
+                return [
+                    'label' => 'Loan Date',
+                    'value' => \Illuminate\Support\Carbon::parse($rawDate)
+                        ->format('d M Y'),
+                ];
+            } catch (\Throwable $e) {
+                // Fall through to period.
+            }
+        }
+
+        return [
+            'label' => 'Period Taken',
+            'value' => $loan->loan_taken_period ?? '—',
+        ];
+    };
+@endphp
+
+
 <style>
-    .member-statement {
-        --statement-border: #e3e6ea;
-        --statement-muted: #69707a;
-        --statement-bg: #f7f8fa;
-        --statement-heading: #222;
-        --statement-accent: #663399;
-        max-width: 1400px;
-        margin: 0 auto;
+    /*
+    |--------------------------------------------------------------------------
+    | PAGE
+    |--------------------------------------------------------------------------
+    */
+
+    .member-financial-status-page {
+        --mfs-border: #dfe3e8;
+        --mfs-border-strong: #c8cdd3;
+        --mfs-text: #1e2430;
+        --mfs-muted: #687282;
+        --mfs-soft: #f6f7f9;
+        --mfs-soft-2: #fafbfc;
+        --mfs-accent: #663399;
+        --mfs-positive: #166534;
+        --mfs-negative: #9f1239;
+
+        max-width: 1420px;
+        margin: 0 auto 30px;
+        color: var(--mfs-text);
     }
 
-    .member-statement .statement-sheet {
-        background: #fff;
-        border: 1px solid var(--statement-border);
-        box-shadow: 0 2px 8px rgba(0, 0, 0, .04);
-    }
 
-    .member-statement .statement-header {
-        padding: 24px 26px 20px;
-        border-bottom: 2px solid var(--statement-accent);
-    }
+    /*
+    |--------------------------------------------------------------------------
+    | SCREEN TOOLBAR
+    |--------------------------------------------------------------------------
+    */
 
-    .member-statement .statement-title {
-        margin: 0;
-        font-size: 23px;
-        line-height: 1.2;
-        font-weight: 800;
-        color: var(--statement-heading);
-    }
-
-    .member-statement .statement-subtitle {
-        margin-top: 5px;
-        color: var(--statement-muted);
-        font-size: 13px;
-        text-transform: uppercase;
-        letter-spacing: .05em;
-    }
-
-    .member-statement .member-name {
-        margin-top: 18px;
-        margin-bottom: 4px;
-        font-size: 20px;
-        font-weight: 800;
-    }
-
-    .member-statement .member-meta {
+    .mfs-toolbar {
         display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 18px;
+        margin-bottom: 12px;
+        padding: 12px 14px;
+        background: #fff;
+        border: 1px solid var(--mfs-border);
+        border-radius: 6px;
+    }
+
+    .mfs-toolbar-title {
+        margin: 0;
+        font-size: 14px;
+        font-weight: 800;
+        color: #20242b;
+    }
+
+    .mfs-toolbar-help {
+        margin-top: 2px;
+        font-size: 11px;
+        color: var(--mfs-muted);
+    }
+
+    .mfs-toolbar-actions {
+        display: flex;
+        align-items: center;
         flex-wrap: wrap;
-        gap: 8px 24px;
-        color: var(--statement-muted);
-        font-size: 13px;
+        gap: 8px;
     }
 
-    .member-statement .statement-section {
-        padding: 22px 26px;
-        border-bottom: 1px solid var(--statement-border);
+    .mfs-toolbar-actions .btn {
+        white-space: nowrap;
     }
 
-    .member-statement .statement-section:last-child {
+    .mfs-pdf-loader {
+        font-size: 11px;
+        color: var(--mfs-muted);
+        font-weight: 700;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | STATEMENT SHEET
+    |--------------------------------------------------------------------------
+    */
+
+    .mfs-sheet {
+        width: 100%;
+        background: #fff;
+        border: 1px solid var(--mfs-border);
+        box-shadow: 0 2px 8px rgba(20, 25, 35, .045);
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | INSTITUTION / DOCUMENT HEADER
+    |--------------------------------------------------------------------------
+    */
+
+    .mfs-document-header {
+        background: #fff;
+    }
+
+    .mfs-institution-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 30px;
+        padding: 24px 26px 20px;
+        border-bottom: 3px solid #24272d;
+    }
+
+    .mfs-institution-name {
+        font-size: 21px;
+        line-height: 1.1;
+        font-weight: 900;
+        letter-spacing: .03em;
+        color: #17191d;
+    }
+
+    .mfs-document-title {
+        margin-top: 9px;
+        font-size: 15px;
+        line-height: 1.25;
+        font-weight: 900;
+        letter-spacing: .055em;
+        color: #252932;
+    }
+
+    .mfs-document-subtitle {
+        margin-top: 4px;
+        font-size: 11px;
+        color: var(--mfs-muted);
+    }
+
+    .mfs-document-meta {
+        min-width: 315px;
+        font-size: 11px;
+    }
+
+    .mfs-meta-row {
+        display: grid;
+        grid-template-columns: 105px 1fr;
+        gap: 14px;
+        padding: 5px 0;
+        border-bottom: 1px solid #eceef1;
+    }
+
+    .mfs-meta-row:last-child {
         border-bottom: 0;
     }
 
-    .member-statement .section-heading {
-        margin: 0 0 15px;
-        font-size: 15px;
-        font-weight: 800;
-        text-transform: uppercase;
-        letter-spacing: .045em;
-        color: #343a40;
+    .mfs-meta-row span {
+        color: var(--mfs-muted);
     }
 
-    .member-statement .summary-grid {
+    .mfs-meta-row strong {
+        color: #252932;
+        text-align: right;
+        font-weight: 800;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | MEMBER IDENTITY
+    |--------------------------------------------------------------------------
+    */
+
+    .mfs-member-panel {
+        display: grid;
+        grid-template-columns: minmax(280px, 1.05fr) 2fr;
+        gap: 25px;
+        padding: 18px 26px;
+        background: #f5f6f8;
+        border-bottom: 1px solid var(--mfs-border-strong);
+    }
+
+    .mfs-member-label {
+        font-size: 9px;
+        font-weight: 800;
+        letter-spacing: .08em;
+        color: var(--mfs-muted);
+        text-transform: uppercase;
+    }
+
+    .mfs-member-name {
+        margin-top: 4px;
+        font-size: 19px;
+        line-height: 1.25;
+        font-weight: 900;
+        color: #16191f;
+    }
+
+    .mfs-member-number {
+        margin-top: 4px;
+        font-size: 11px;
+        color: #505968;
+    }
+
+    .mfs-member-details {
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
-        border: 1px solid var(--statement-border);
-        background: #fff;
+        gap: 16px;
+        align-items: start;
     }
 
-    .member-statement .summary-item {
+    .mfs-member-detail {
+        padding-left: 14px;
+        border-left: 1px solid #d5d9de;
+    }
+
+    .mfs-member-detail-label {
+        font-size: 9px;
+        font-weight: 800;
+        letter-spacing: .035em;
+        color: var(--mfs-muted);
+        text-transform: uppercase;
+    }
+
+    .mfs-member-detail-value {
+        margin-top: 4px;
+        font-size: 11px;
+        line-height: 1.35;
+        font-weight: 800;
+        color: #262b34;
+        overflow-wrap: anywhere;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | SECTIONS
+    |--------------------------------------------------------------------------
+    */
+
+    .mfs-section {
+        padding: 23px 26px;
+        border-bottom: 1px solid var(--mfs-border);
+    }
+
+    .mfs-section:last-of-type {
+        border-bottom: 0;
+    }
+
+    .mfs-section-head {
+        margin-bottom: 14px;
+    }
+
+    .mfs-section-number {
+        display: inline-block;
+        margin-right: 6px;
+        color: var(--mfs-muted);
+        font-size: 10px;
+        font-weight: 800;
+    }
+
+    .mfs-section-title {
+        display: inline;
+        margin: 0;
+        color: #292e37;
+        font-size: 13px;
+        font-weight: 900;
+        letter-spacing: .045em;
+        text-transform: uppercase;
+    }
+
+    .mfs-section-description {
+        margin-top: 4px;
+        color: var(--mfs-muted);
+        font-size: 11px;
+        line-height: 1.4;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | FINANCIAL POSITION GROUPS
+    |--------------------------------------------------------------------------
+    */
+
+    .mfs-position-groups {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        border: 1px solid var(--mfs-border-strong);
+    }
+
+    .mfs-position-group {
         min-width: 0;
-        padding: 16px 18px;
-        border-right: 1px solid var(--statement-border);
-        border-bottom: 1px solid var(--statement-border);
+        border-right: 1px solid var(--mfs-border-strong);
     }
 
-    .member-statement .summary-item:nth-child(3n) {
+    .mfs-position-group:last-child {
         border-right: 0;
     }
 
-    .member-statement .summary-item:nth-last-child(-n+3) {
+    .mfs-position-group-title {
+        padding: 10px 13px;
+        background: #edeff2;
+        border-bottom: 1px solid var(--mfs-border-strong);
+        color: #454b56;
+        font-size: 10px;
+        font-weight: 900;
+        letter-spacing: .04em;
+        text-transform: uppercase;
+    }
+
+    .mfs-position-item {
+        padding: 12px 14px;
+        border-bottom: 1px solid #e9ebee;
+    }
+
+    .mfs-position-item:last-child {
         border-bottom: 0;
     }
 
-    .member-statement .summary-label {
-        color: var(--statement-muted);
-        font-size: 12px;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: .03em;
-    }
-
-    .member-statement .summary-value {
-        margin-top: 5px;
-        font-size: 18px;
-        line-height: 1.25;
+    .mfs-position-label {
+        color: var(--mfs-muted);
+        font-size: 9px;
         font-weight: 800;
-        color: #212529;
+        letter-spacing: .025em;
+        text-transform: uppercase;
     }
 
-    .member-statement .loan-block {
-        margin-bottom: 22px;
-        border: 1px solid var(--statement-border);
+    .mfs-position-value {
+        margin-top: 4px;
+        color: #171a20;
+        font-size: 17px;
+        line-height: 1.2;
+        font-weight: 900;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
     }
 
-    .member-statement .loan-block:last-child {
+    .mfs-position-note {
+        margin-top: 3px;
+        color: #858d98;
+        font-size: 9px;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | LOAN BLOCK
+    |--------------------------------------------------------------------------
+    */
+
+    .mfs-loan {
+        margin-bottom: 20px;
+        border: 1px solid var(--mfs-border-strong);
+        background: #fff;
+    }
+
+    .mfs-loan:last-child {
         margin-bottom: 0;
     }
 
-    .member-statement .loan-heading {
+    .mfs-loan-overview {
+        background: #fff;
+    }
+
+    .mfs-loan-head {
         display: flex;
         justify-content: space-between;
-        gap: 20px;
         align-items: flex-start;
-        padding: 15px 18px;
-        background: var(--statement-bg);
-        border-bottom: 1px solid var(--statement-border);
+        gap: 18px;
+        padding: 13px 16px;
+        background: #f1f2f4;
+        border-bottom: 1px solid var(--mfs-border-strong);
     }
 
-    .member-statement .loan-name {
-        font-size: 16px;
-        font-weight: 800;
-        color: #252525;
+    .mfs-loan-type {
+        color: #171a1f;
+        font-size: 15px;
+        font-weight: 900;
     }
 
-    .member-statement .loan-number {
+    .mfs-loan-id {
         margin-top: 3px;
-        color: var(--statement-muted);
-        font-size: 12px;
+        color: var(--mfs-muted);
+        font-size: 10px;
     }
 
-    .member-statement .loan-actions {
+    .mfs-loan-actions {
         flex: 0 0 auto;
     }
 
-    .member-statement .loan-details {
+    .mfs-loan-grid {
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
-        border-bottom: 1px solid var(--statement-border);
+        border-bottom: 1px solid var(--mfs-border);
     }
 
-    .member-statement .loan-detail {
-        padding: 14px 18px;
-        border-right: 1px solid var(--statement-border);
-        border-bottom: 1px solid var(--statement-border);
+    .mfs-loan-stat {
+        min-width: 0;
+        padding: 12px 16px;
+        border-right: 1px solid var(--mfs-border);
+        border-bottom: 1px solid var(--mfs-border);
     }
 
-    .member-statement .loan-detail:nth-child(3n) {
+    .mfs-loan-stat:nth-child(3n) {
         border-right: 0;
     }
 
-    .member-statement .loan-detail-label {
-        color: var(--statement-muted);
-        font-size: 11px;
-        font-weight: 700;
-        text-transform: uppercase;
+    .mfs-loan-stat:nth-last-child(-n+3) {
+        border-bottom: 0;
     }
 
-    .member-statement .loan-detail-value {
-        margin-top: 4px;
-        font-size: 14px;
-        font-weight: 700;
-        color: #252525;
-    }
-
-    .member-statement .loan-description {
-        padding: 13px 18px;
-        background: #fff;
-        border-bottom: 1px solid var(--statement-border);
-        color: #444;
-        font-size: 13px;
-    }
-
-    .member-statement .loan-description strong {
-        color: #222;
-    }
-
-    .member-statement .guarantee-wrap {
-        padding: 17px 18px;
-    }
-
-    .member-statement .guarantee-heading {
-        margin-bottom: 10px;
-        font-size: 13px;
+    .mfs-loan-stat-label {
+        color: var(--mfs-muted);
+        font-size: 9px;
         font-weight: 800;
-        text-transform: uppercase;
-    }
-
-    .member-statement table {
-        margin-bottom: 0;
-        font-size: 13px;
-    }
-
-    .member-statement table thead th {
-        background: #f7f8fa;
-        border-bottom-width: 1px;
-        white-space: nowrap;
-        font-size: 11px;
-        text-transform: uppercase;
         letter-spacing: .025em;
-        color: #565d65;
+        text-transform: uppercase;
     }
 
-    .member-statement .money {
-        white-space: nowrap;
-        text-align: right;
+    .mfs-loan-stat-value {
+        margin-top: 4px;
+        color: #22262e;
+        font-size: 13px;
+        font-weight: 900;
         font-variant-numeric: tabular-nums;
     }
 
-    .member-statement .empty-state {
-        padding: 22px;
-        border: 1px dashed #ccd1d6;
-        color: var(--statement-muted);
-        text-align: center;
-        font-size: 13px;
-        background: #fafafa;
+    .mfs-loan-stat-value.is-negative {
+        color: var(--mfs-negative);
     }
 
-    .member-statement .statement-footer {
-        padding: 14px 26px;
-        color: var(--statement-muted);
-        background: #fafafa;
-        border-top: 1px solid var(--statement-border);
+    .mfs-loan-description {
+        padding: 10px 16px;
+        border-bottom: 1px solid var(--mfs-border);
+        color: #505865;
+        font-size: 11px;
+        line-height: 1.45;
+    }
+
+    .mfs-loan-description strong {
+        color: #30353d;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | GUARANTEE POSITION
+    |--------------------------------------------------------------------------
+    */
+
+    .mfs-guarantee-area {
+        padding: 14px 16px 16px;
+    }
+
+    .mfs-guarantee-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 9px;
+    }
+
+    .mfs-guarantee-title {
+        font-size: 10px;
+        font-weight: 900;
+        letter-spacing: .04em;
+        color: #333842;
+        text-transform: uppercase;
+    }
+
+    .mfs-guarantee-total {
+        color: var(--mfs-muted);
+        font-size: 10px;
+    }
+
+    .mfs-guarantee-total strong {
+        color: #242933;
+        font-weight: 900;
+        font-variant-numeric: tabular-nums;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | TABLES
+    |--------------------------------------------------------------------------
+    */
+
+    .mfs-table-wrap {
+        width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .mfs-table {
+        width: 100%;
+        margin: 0 !important;
+        border-collapse: collapse !important;
         font-size: 11px;
     }
 
+    .mfs-table th,
+    .mfs-table td {
+        padding: 8px 9px !important;
+        vertical-align: middle;
+        border: 1px solid #d7dbe0 !important;
+    }
+
+    .mfs-table thead th {
+        background: #eceef1 !important;
+        color: #4d5562;
+        font-size: 9px;
+        font-weight: 900;
+        letter-spacing: .025em;
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+
+    .mfs-table tbody td {
+        background: #fff;
+        color: #272c35;
+    }
+
+    .mfs-table tbody tr:nth-child(even) td {
+        background: #fbfbfc;
+    }
+
+    .mfs-money {
+        text-align: right;
+        white-space: nowrap;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .mfs-nowrap {
+        white-space: nowrap;
+    }
+
+    .mfs-member-link {
+        font-weight: 700;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | EMPTY STATE
+    |--------------------------------------------------------------------------
+    */
+
+    .mfs-empty {
+        padding: 18px;
+        color: var(--mfs-muted);
+        background: #fafafa;
+        border: 1px dashed #c9ced5;
+        font-size: 11px;
+        text-align: center;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | FOOTER
+    |--------------------------------------------------------------------------
+    */
+
+    .mfs-footer {
+        padding: 14px 26px;
+        background: #f7f8f9;
+        border-top: 1px solid var(--mfs-border-strong);
+        color: #666f7c;
+        font-size: 9px;
+        line-height: 1.5;
+    }
+
+    .mfs-footer-main {
+        display: flex;
+        justify-content: space-between;
+        gap: 20px;
+    }
+
+    .mfs-footer strong {
+        color: #333943;
+    }
+
+    .mfs-footer-note {
+        margin-top: 5px;
+        color: #818895;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | PDF EXPORT MODE
+    |--------------------------------------------------------------------------
+    |
+    | Fixed width means a PDF downloaded from a phone looks like the same
+    | formal document downloaded from desktop.
+    |
+    */
+
+    #memberFinancialStatusPrintable.mfs-export-mode {
+        width: 1200px !important;
+        max-width: 1200px !important;
+        min-width: 1200px !important;
+        border: 0 !important;
+        box-shadow: none !important;
+        background: #fff !important;
+    }
+
+    #memberFinancialStatusPrintable.mfs-export-mode .mfs-position-groups {
+        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    }
+
+    #memberFinancialStatusPrintable.mfs-export-mode .mfs-member-panel {
+        grid-template-columns: minmax(280px, 1.05fr) 2fr !important;
+    }
+
+    #memberFinancialStatusPrintable.mfs-export-mode .mfs-member-details {
+        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    }
+
+    #memberFinancialStatusPrintable.mfs-export-mode .mfs-loan-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    }
+
+    #memberFinancialStatusPrintable.mfs-export-mode .mfs-loan-actions,
+    #memberFinancialStatusPrintable.mfs-export-mode .mfs-admin-only {
+        display: none !important;
+    }
+
+    #memberFinancialStatusPrintable.mfs-export-mode .mfs-table-wrap,
+    #memberFinancialStatusPrintable.mfs-export-mode .table-responsive {
+        overflow: visible !important;
+    }
+
+    #memberFinancialStatusPrintable.mfs-export-mode a {
+        color: inherit !important;
+        text-decoration: none !important;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | RESPONSIVE
+    |--------------------------------------------------------------------------
+    */
+
+    @media (max-width: 991.98px) {
+
+        .mfs-institution-row {
+            gap: 18px;
+        }
+
+        .mfs-document-meta {
+            min-width: 280px;
+        }
+
+        .mfs-member-panel {
+            grid-template-columns: 1fr;
+        }
+
+        .mfs-member-details {
+            border-top: 1px solid #ddd;
+            padding-top: 14px;
+        }
+
+        .mfs-member-detail:first-child {
+            padding-left: 0;
+            border-left: 0;
+        }
+    }
+
+
     @media (max-width: 767.98px) {
-        .member-statement .statement-header,
-        .member-statement .statement-section {
+
+        .member-financial-status-page {
+            margin-left: -3px;
+            margin-right: -3px;
+        }
+
+        .mfs-toolbar {
+            display: block;
+            margin-left: 8px;
+            margin-right: 8px;
+        }
+
+        .mfs-toolbar-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            margin-top: 10px;
+        }
+
+        .mfs-toolbar-actions .btn {
+            width: 100%;
+        }
+
+        .mfs-pdf-loader {
+            grid-column: 1 / -1;
+        }
+
+        .mfs-sheet {
+            border-left: 0;
+            border-right: 0;
+        }
+
+        .mfs-institution-row {
+            display: block;
+            padding: 17px 14px;
+        }
+
+        .mfs-document-meta {
+            min-width: 0;
+            margin-top: 16px;
+        }
+
+        .mfs-member-panel {
+            padding: 15px 14px;
+        }
+
+        .mfs-member-details {
+            grid-template-columns: 1fr 1fr;
+            gap: 13px;
+        }
+
+        .mfs-member-detail {
+            padding-left: 0;
+            border-left: 0;
+        }
+
+        .mfs-section {
+            padding: 18px 14px;
+        }
+
+        .mfs-position-groups {
+            grid-template-columns: 1fr;
+        }
+
+        .mfs-position-group {
+            border-right: 0;
+            border-bottom: 1px solid var(--mfs-border-strong);
+        }
+
+        .mfs-position-group:last-child {
+            border-bottom: 0;
+        }
+
+        .mfs-loan-grid {
+            grid-template-columns: 1fr 1fr;
+        }
+
+        .mfs-loan-stat,
+        .mfs-loan-stat:nth-child(3n) {
+            border-right: 1px solid var(--mfs-border);
+            border-bottom: 1px solid var(--mfs-border);
+        }
+
+        .mfs-loan-stat:nth-child(2n) {
+            border-right: 0;
+        }
+
+        .mfs-loan-head {
+            display: block;
+        }
+
+        .mfs-loan-actions {
+            margin-top: 10px;
+        }
+
+        .mfs-loan-actions .btn {
+            width: 100%;
+        }
+
+        .mfs-footer {
             padding-left: 14px;
             padding-right: 14px;
         }
 
-        .member-statement .summary-grid,
-        .member-statement .loan-details {
-            grid-template-columns: 1fr 1fr;
-        }
-
-        .member-statement .summary-item,
-        .member-statement .summary-item:nth-child(3n),
-        .member-statement .loan-detail,
-        .member-statement .loan-detail:nth-child(3n) {
-            border-right: 1px solid var(--statement-border);
-            border-bottom: 1px solid var(--statement-border);
-        }
-
-        .member-statement .summary-item:nth-child(2n),
-        .member-statement .loan-detail:nth-child(2n) {
-            border-right: 0;
-        }
-
-        .member-statement .loan-heading {
+        .mfs-footer-main {
             display: block;
-        }
-
-        .member-statement .loan-actions {
-            margin-top: 12px;
-        }
-
-        .member-statement .loan-actions .btn {
-            width: 100%;
         }
     }
 
+
     @media (max-width: 480px) {
-        .member-statement .summary-grid,
-        .member-statement .loan-details {
+
+        .mfs-toolbar-actions {
             grid-template-columns: 1fr;
         }
 
-        .member-statement .summary-item,
-        .member-statement .summary-item:nth-child(2n),
-        .member-statement .summary-item:nth-child(3n),
-        .member-statement .loan-detail,
-        .member-statement .loan-detail:nth-child(2n),
-        .member-statement .loan-detail:nth-child(3n) {
+        .mfs-member-details {
+            grid-template-columns: 1fr;
+        }
+
+        .mfs-loan-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .mfs-loan-stat,
+        .mfs-loan-stat:nth-child(2n),
+        .mfs-loan-stat:nth-child(3n) {
             border-right: 0;
         }
 
-        .member-statement .summary-value {
-            font-size: 17px;
+        .mfs-position-value {
+            font-size: 16px;
         }
     }
 
+
+    /*
+    |--------------------------------------------------------------------------
+    | PRINT
+    |--------------------------------------------------------------------------
+    */
+
+    @page {
+        size: A4 landscape;
+        margin: 9mm 8mm 11mm;
+    }
+
     @media print {
-        .sidebar-panel,
-        .main-header,
-        footer,
-        .loan-actions,
-        .btn {
+
+        html,
+        body {
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #fff !important;
+        }
+
+        /*
+         * Hide absolutely everything in the application first.
+         */
+        body * {
+            visibility: hidden !important;
+        }
+
+        /*
+         * Reveal only this financial statement.
+         */
+        #memberFinancialStatusPrintable,
+        #memberFinancialStatusPrintable * {
+            visibility: visible !important;
+        }
+
+        #memberFinancialStatusPrintable {
+            position: absolute;
+            left: 0;
+            top: 0;
+
+            width: 100% !important;
+            max-width: none !important;
+            min-width: 0 !important;
+
+            margin: 0 !important;
+            padding: 0 !important;
+
+            border: 0 !important;
+            box-shadow: none !important;
+
+            background: #fff !important;
+        }
+
+        #memberFinancialStatusPrintable .mfs-admin-only,
+        #memberFinancialStatusPrintable .mfs-loan-actions {
             display: none !important;
         }
 
-        .main-content-wrap {
-            margin: 0 !important;
-            padding: 0 !important;
+        #memberFinancialStatusPrintable a {
+            color: #000 !important;
+            text-decoration: none !important;
         }
 
-        .member-statement {
-            max-width: none;
+        #memberFinancialStatusPrintable .mfs-institution-row {
+            display: flex !important;
+            padding: 4mm 4mm 3.5mm !important;
+            border-bottom: 2px solid #000 !important;
         }
 
-        .member-statement .statement-sheet {
-            border: 0;
-            box-shadow: none;
+        #memberFinancialStatusPrintable .mfs-document-meta {
+            min-width: 75mm !important;
+        }
+
+        #memberFinancialStatusPrintable .mfs-member-panel {
+            display: grid !important;
+            grid-template-columns: 1fr 2fr !important;
+            padding: 3mm 4mm !important;
+        }
+
+        #memberFinancialStatusPrintable .mfs-member-details {
+            display: grid !important;
+            grid-template-columns: repeat(3, 1fr) !important;
+        }
+
+        #memberFinancialStatusPrintable .mfs-position-groups {
+            display: grid !important;
+            grid-template-columns: repeat(3, 1fr) !important;
+        }
+
+        #memberFinancialStatusPrintable .mfs-loan-grid {
+            display: grid !important;
+            grid-template-columns: repeat(3, 1fr) !important;
+        }
+
+        #memberFinancialStatusPrintable .mfs-section {
+            padding: 4mm !important;
+        }
+
+        #memberFinancialStatusPrintable .mfs-position-item {
+            padding: 2.5mm 3mm !important;
+        }
+
+        #memberFinancialStatusPrintable .mfs-position-value {
+            font-size: 10.5pt !important;
+        }
+
+        #memberFinancialStatusPrintable .mfs-loan {
+            margin-bottom: 4mm !important;
+        }
+
+        #memberFinancialStatusPrintable .mfs-loan-head {
+            padding: 2.5mm 3mm !important;
+        }
+
+        #memberFinancialStatusPrintable .mfs-loan-stat {
+            padding: 2.5mm 3mm !important;
+        }
+
+        #memberFinancialStatusPrintable .mfs-guarantee-area {
+            padding: 3mm !important;
+        }
+
+        #memberFinancialStatusPrintable .mfs-table-wrap,
+        #memberFinancialStatusPrintable .table-responsive {
+            overflow: visible !important;
+        }
+
+        #memberFinancialStatusPrintable .mfs-table {
+            width: 100% !important;
+            font-size: 7.5pt !important;
+        }
+
+        #memberFinancialStatusPrintable .mfs-table th,
+        #memberFinancialStatusPrintable .mfs-table td {
+            padding: 1.6mm 1.8mm !important;
+            border: 1px solid #aaa !important;
+        }
+
+        #memberFinancialStatusPrintable .mfs-table thead {
+            display: table-header-group;
+        }
+
+        #memberFinancialStatusPrintable .mfs-table tr {
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+
+        #memberFinancialStatusPrintable .mfs-loan-overview {
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+
+        #memberFinancialStatusPrintable .mfs-loan-head,
+        #memberFinancialStatusPrintable .mfs-section-head,
+        #memberFinancialStatusPrintable .mfs-guarantee-head {
+            break-after: avoid;
+            page-break-after: avoid;
+        }
+
+        #memberFinancialStatusPrintable .mfs-loan {
+            break-inside: auto;
+            page-break-inside: auto;
+        }
+
+        #memberFinancialStatusPrintable .mfs-institution-row,
+        #memberFinancialStatusPrintable .mfs-member-panel,
+        #memberFinancialStatusPrintable .mfs-position-group-title,
+        #memberFinancialStatusPrintable .mfs-loan-head,
+        #memberFinancialStatusPrintable .mfs-table thead th {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        #memberFinancialStatusPrintable .mfs-footer {
+            padding: 3mm 4mm !important;
+            background: #fff !important;
+            border-top: 1px solid #777 !important;
         }
     }
 </style>
 
 
-<div class="member-statement">
+<div class="member-financial-status-page">
+
+    {{-- ================================================================
+         SCREEN MESSAGES
+         ================================================================ --}}
 
     @if(session('success'))
-        <div class="alert alert-success">
+        <div class="alert alert-success mfs-screen-only">
             {{ session('success') }}
         </div>
     @endif
 
     @if($errors->any())
-        <div class="alert alert-danger">
+        <div class="alert alert-danger mfs-screen-only">
             @foreach($errors->all() as $error)
                 <div>{{ $error }}</div>
             @endforeach
@@ -340,132 +1113,409 @@
     @endif
 
 
-    <div class="statement-sheet">
+    {{-- ================================================================
+         SCREEN ACTIONS
+         ================================================================ --}}
 
-        {{-- REPORT HEADER --}}
-        <div class="statement-header">
+    <div class="mfs-toolbar mfs-screen-only">
 
-            <div class="statement-title">
-                Member Financial Status Statement
+        <div>
+            <div class="mfs-toolbar-title">
+                Member Financial Status
             </div>
 
-            <div class="statement-subtitle">
-                Savings, Loans & Guarantee Exposure
-            </div>
-
-            <div class="member-name">
-                {{ $member->member_name }}
-            </div>
-
-            <div class="member-meta">
-                <span>
-                    <strong>Member No:</strong>
-                    {{ $member->member_sacco_id }}
-                </span>
-
-                <span>
-                    <strong>Company:</strong>
-                    {{ $member->company_name }}
-                </span>
-
-                <span>
-                    <strong>Department:</strong>
-                    {{ $member->department_name }}
-                </span>
-
-                <span>
-                    <strong>Generated:</strong>
-                    {{ now()->format('d/m/Y H:i') }}
-                </span>
+            <div class="mfs-toolbar-help">
+                Current member balances, loans and guarantee exposure.
             </div>
         </div>
 
 
-        {{-- FINANCIAL SUMMARY --}}
-        <section class="statement-section">
+        <div class="mfs-toolbar-actions">
 
-            <h2 class="section-heading">
-                Financial Summary
-            </h2>
+            <button
+                type="button"
+                id="printMemberFinancialStatus"
+                class="btn btn-outline-secondary btn-sm"
+            >
+                <i class="fas fa-print me-1"></i>
+                Print
+            </button>
 
-            <div class="summary-grid">
 
-                <div class="summary-item">
-                    <div class="summary-label">
-                        Savings / Deposits
+            <button
+                type="button"
+                id="downloadMemberFinancialStatusPdf"
+                class="btn btn-primary btn-sm"
+            >
+                <i class="fas fa-file-pdf me-1"></i>
+                Download PDF
+            </button>
+
+
+            <span
+                id="memberFinancialStatusPdfLoader"
+                class="mfs-pdf-loader d-none"
+            >
+                <i class="fas fa-spinner fa-spin me-1"></i>
+                Preparing statement...
+            </span>
+
+        </div>
+
+    </div>
+
+
+    {{-- ================================================================
+         OFFICIAL PRINTABLE STATEMENT
+         ================================================================ --}}
+
+    <div
+        class="mfs-sheet"
+        id="memberFinancialStatusPrintable"
+    >
+
+        {{-- ============================================================
+             DOCUMENT HEADER
+             ============================================================ --}}
+
+        <header class="mfs-document-header">
+
+            <div class="mfs-institution-row">
+
+                <div>
+
+                    <div class="mfs-institution-name">
+                        KASS SACCO
                     </div>
 
-                    <div class="summary-value">
-                        KES {{ number_format(
-                            $memberFinancials['total_share_deposit'],
-                            2
-                        ) }}
+                    <div class="mfs-document-title">
+                        MEMBER FINANCIAL STATUS STATEMENT
                     </div>
+
+                    <div class="mfs-document-subtitle">
+                        Member balances, loan obligations and guarantee exposure
+                    </div>
+
                 </div>
 
-                <div class="summary-item">
-                    <div class="summary-label">
-                        Share Capital
+
+                <div class="mfs-document-meta">
+
+                    <div class="mfs-meta-row">
+                        <span>Statement Ref.</span>
+
+                        <strong>
+                            {{ $statementReference }}
+                        </strong>
                     </div>
 
-                    <div class="summary-value">
-                        KES {{ number_format(
-                            $memberFinancials['total_capital_shares'],
-                            2
-                        ) }}
+
+                    <div class="mfs-meta-row">
+                        <span>Position Date</span>
+
+                        <strong>
+                            {{ $statementGeneratedAt->format('d M Y') }}
+                        </strong>
                     </div>
+
+
+                    <div class="mfs-meta-row">
+                        <span>Generated</span>
+
+                        <strong>
+                            {{ $statementGeneratedAt->format('d M Y H:i') }}
+                        </strong>
+                    </div>
+
+
+                    <div class="mfs-meta-row">
+                        <span>Currency</span>
+
+                        <strong>
+                            Kenya Shillings (KES)
+                        </strong>
+                    </div>
+
                 </div>
 
-                <div class="summary-item">
-                    <div class="summary-label">
-                        FOSA Deposits
+            </div>
+
+
+            {{-- MEMBER DETAILS --}}
+
+            <div class="mfs-member-panel">
+
+                <div>
+
+                    <div class="mfs-member-label">
+                        Member
                     </div>
 
-                    <div class="summary-value">
-                        KES {{ number_format(
-                            $memberFinancials['total_fosa_deposits'],
-                            2
-                        ) }}
+                    <div class="mfs-member-name">
+                        {{ $member->member_name }}
                     </div>
+
+                    <div class="mfs-member-number">
+                        Member No.
+                        <strong>
+                            {{ $member->member_sacco_id }}
+                        </strong>
+                    </div>
+
                 </div>
 
-                <div class="summary-item">
-                    <div class="summary-label">
-                        Outstanding Loan Principal
+
+                <div class="mfs-member-details">
+
+                    <div class="mfs-member-detail">
+
+                        <div class="mfs-member-detail-label">
+                            Company / Institution
+                        </div>
+
+                        <div class="mfs-member-detail-value">
+                            {{ $member->company_name ?: '—' }}
+                        </div>
+
                     </div>
 
-                    <div class="summary-value">
-                        KES {{ number_format(
-                            $memberFinancials['unpaid_loan'],
-                            2
-                        ) }}
+
+                    <div class="mfs-member-detail">
+
+                        <div class="mfs-member-detail-label">
+                            Department
+                        </div>
+
+                        <div class="mfs-member-detail-value">
+                            {{ $member->department_name ?: '—' }}
+                        </div>
+
                     </div>
+
+
+                    <div class="mfs-member-detail">
+
+                        <div class="mfs-member-detail-label">
+                            Financial Position
+                        </div>
+
+                        <div class="mfs-member-detail-value">
+                            As at {{ $statementGeneratedAt->format('d M Y') }}
+                        </div>
+
+                    </div>
+
                 </div>
 
-                <div class="summary-item">
-                    <div class="summary-label">
-                        Savings Tied — Others
-                    </div>
+            </div>
 
-                    <div class="summary-value">
-                        KES {{ number_format(
-                            $memberFinancials['tied_shares_others'],
-                            2
-                        ) }}
-                    </div>
+        </header>
+
+
+        {{-- ============================================================
+             SECTION 1 — FINANCIAL POSITION
+             ============================================================ --}}
+
+        <section class="mfs-section">
+
+            <div class="mfs-section-head">
+
+                <span class="mfs-section-number">
+                    01
+                </span>
+
+                <h2 class="mfs-section-title">
+                    Financial Position Summary
+                </h2>
+
+                <div class="mfs-section-description">
+                    Current balances and financial exposure recorded against
+                    this member.
                 </div>
 
-                <div class="summary-item">
-                    <div class="summary-label">
-                        Savings Tied — Self
+            </div>
+
+
+            <div class="mfs-position-groups">
+
+                {{-- MEMBER BALANCES --}}
+
+                <div class="mfs-position-group">
+
+                    <div class="mfs-position-group-title">
+                        Member Balances
                     </div>
 
-                    <div class="summary-value">
-                        KES {{ number_format(
-                            $memberFinancials['tied_shares_self'],
-                            2
-                        ) }}
+
+                    <div class="mfs-position-item">
+
+                        <div class="mfs-position-label">
+                            Savings / Deposits
+                        </div>
+
+                        <div class="mfs-position-value">
+                            KES
+                            {{
+                                number_format(
+                                    $memberFinancials['total_share_deposit'],
+                                    2
+                                )
+                            }}
+                        </div>
+
                     </div>
+
+
+                    <div class="mfs-position-item">
+
+                        <div class="mfs-position-label">
+                            Share Capital
+                        </div>
+
+                        <div class="mfs-position-value">
+                            KES
+                            {{
+                                number_format(
+                                    $memberFinancials['total_capital_shares'],
+                                    2
+                                )
+                            }}
+                        </div>
+
+                    </div>
+
+
+                    <div class="mfs-position-item">
+
+                        <div class="mfs-position-label">
+                            FOSA Deposits
+                        </div>
+
+                        <div class="mfs-position-value">
+                            KES
+                            {{
+                                number_format(
+                                    $memberFinancials['total_fosa_deposits'],
+                                    2
+                                )
+                            }}
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                {{-- CREDIT EXPOSURE --}}
+
+                <div class="mfs-position-group">
+
+                    <div class="mfs-position-group-title">
+                        Credit Exposure
+                    </div>
+
+
+                    <div class="mfs-position-item">
+
+                        <div class="mfs-position-label">
+                            Outstanding Loan Principal
+                        </div>
+
+                        <div class="mfs-position-value">
+                            KES
+                            {{
+                                number_format(
+                                    $memberFinancials['unpaid_loan'],
+                                    2
+                                )
+                            }}
+                        </div>
+
+                    </div>
+
+
+                    <div class="mfs-position-item">
+
+                        <div class="mfs-position-label">
+                            Outstanding Loans
+                        </div>
+
+                        <div class="mfs-position-value">
+                            {{ number_format($outstandingLoans->count()) }}
+                        </div>
+
+                        <div class="mfs-position-note">
+                            Active loan account(s)
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                {{-- GUARANTEE EXPOSURE --}}
+
+                <div class="mfs-position-group">
+
+                    <div class="mfs-position-group-title">
+                        Guarantee Exposure
+                    </div>
+
+
+                    <div class="mfs-position-item">
+
+                        <div class="mfs-position-label">
+                            Savings Tied — Other Members
+                        </div>
+
+                        <div class="mfs-position-value">
+                            KES
+                            {{
+                                number_format(
+                                    $memberFinancials['tied_shares_others'],
+                                    2
+                                )
+                            }}
+                        </div>
+
+                    </div>
+
+
+                    <div class="mfs-position-item">
+
+                        <div class="mfs-position-label">
+                            Savings Tied — Self
+                        </div>
+
+                        <div class="mfs-position-value">
+                            KES
+                            {{
+                                number_format(
+                                    $memberFinancials['tied_shares_self'],
+                                    2
+                                )
+                            }}
+                        </div>
+
+                    </div>
+
+
+                    <div class="mfs-position-item">
+
+                        <div class="mfs-position-label">
+                            Loans Currently Guaranteed
+                        </div>
+
+                        <div class="mfs-position-value">
+                            {{
+                                number_format(
+                                    $activeGuaranteesProvided->count()
+                                )
+                            }}
+                        </div>
+
+                    </div>
+
                 </div>
 
             </div>
@@ -473,208 +1523,309 @@
         </section>
 
 
-        {{-- LOANS --}}
-        <section class="statement-section">
+        {{-- ============================================================
+             SECTION 2 — LOANS TAKEN
+             ============================================================ --}}
 
-            <h2 class="section-heading">
-                Loans Taken & Guarantee Position
-            </h2>
+        <section class="mfs-section">
 
-            @forelse($loansTakenWithGuarantors as $loan)
+            <div class="mfs-section-head">
 
-                @php
-                    $loanBalance =
-                        (float) $loan->loan_amount
-                        -
-                        (float) ($loan->loan_loan_paid ?? 0);
+                <span class="mfs-section-number">
+                    02
+                </span>
 
-                    $activeGuarantee =
-                        $loan->guarantors->sum(function ($guarantor) {
-                            return max(
-                                0,
-                                (float) $guarantor->loan_guar_amount_guaranteed
-                                -
-                                (float) $guarantor->loan_guar_amount_freed
-                            );
-                        });
-                @endphp
+                <h2 class="mfs-section-title">
+                    Loans Taken & Security Position
+                </h2>
 
-                @if($loanBalance > $threshold_amount)
+                <div class="mfs-section-description">
+                    Outstanding member loans together with the guarantors
+                    currently securing each facility.
+                </div>
 
-                    <article class="loan-block">
+            </div>
 
-                        <div class="loan-heading">
 
-                            <div>
-                                <div class="loan-name">
-                                    {{ $loan->loan_type_name }}
+            @if($outstandingLoans->isNotEmpty())
+
+                @foreach($outstandingLoans as $loan)
+
+                    @php
+                        $loanBalance =
+                            (float) ($loan->loan_amount ?? 0)
+                            -
+                            (float) ($loan->loan_loan_paid ?? 0);
+
+                        $principalPaid =
+                            (float) ($loan->loan_loan_paid ?? 0);
+
+                        $activeGuarantee =
+                            collect($loan->guarantors ?? [])
+                                ->sum(function ($guarantor) {
+                                    return max(
+                                        0,
+                                        (float) ($guarantor->loan_guar_amount_guaranteed ?? 0)
+                                        -
+                                        (float) ($guarantor->loan_guar_amount_freed ?? 0)
+                                    );
+                                });
+
+                        $loanDate =
+                            $loanDateDisplay($loan);
+                    @endphp
+
+
+                    <article class="mfs-loan">
+
+                        <div class="mfs-loan-overview">
+
+                            {{-- LOAN HEADER --}}
+
+                            <div class="mfs-loan-head">
+
+                                <div>
+
+                                    <div class="mfs-loan-type">
+                                        {{ $loan->loan_type_name }}
+                                    </div>
+
+                                    <div class="mfs-loan-id">
+                                        Loan No.
+                                        <strong>
+                                            {{ $loan->loan_id }}
+                                        </strong>
+                                    </div>
+
                                 </div>
 
-                                <div class="loan-number">
-                                    Loan No. {{ $loan->loan_id }}
-                                </div>
+
+                                @if($showHyperlinks)
+
+                                    <div class="mfs-loan-actions">
+
+                                        <button
+                                            type="button"
+                                            class="btn btn-primary btn-sm js-add-guarantor"
+                                            data-loan-id="{{ $loan->loan_id }}"
+                                        >
+                                            <i class="i-Add-User me-1"></i>
+                                            Add Guarantor
+                                        </button>
+
+                                    </div>
+
+                                @endif
+
                             </div>
 
-                            @if($showHyperlinks)
-                                <div class="loan-actions">
 
-                                    <button
-                                        type="button"
-                                        class="btn btn-primary btn-sm js-add-guarantor"
-                                        data-loan-id="{{ $loan->loan_id }}"
-                                    >
-                                        <i class="i-Add-User me-1"></i>
-                                        Add Guarantor
-                                    </button>
+                            {{-- LOAN FINANCIAL POSITION --}}
+
+                            <div class="mfs-loan-grid">
+
+                                <div class="mfs-loan-stat">
+
+                                    <div class="mfs-loan-stat-label">
+                                        Original Loan
+                                    </div>
+
+                                    <div class="mfs-loan-stat-value">
+                                        KES
+                                        {{
+                                            number_format(
+                                                $loan->loan_amount,
+                                                2
+                                            )
+                                        }}
+                                    </div>
 
                                 </div>
+
+
+                                <div class="mfs-loan-stat">
+
+                                    <div class="mfs-loan-stat-label">
+                                        Principal Paid / Adjustment
+                                    </div>
+
+                                    <div
+                                        class="mfs-loan-stat-value
+                                        {{ $principalPaid < 0 ? 'is-negative' : '' }}"
+                                    >
+                                        KES
+                                        {{
+                                            number_format(
+                                                $principalPaid,
+                                                2
+                                            )
+                                        }}
+                                    </div>
+
+                                </div>
+
+
+                                <div class="mfs-loan-stat">
+
+                                    <div class="mfs-loan-stat-label">
+                                        Outstanding Principal
+                                    </div>
+
+                                    <div class="mfs-loan-stat-value">
+                                        KES
+                                        {{
+                                            number_format(
+                                                $loanBalance,
+                                                2
+                                            )
+                                        }}
+                                    </div>
+
+                                </div>
+
+
+                                <div class="mfs-loan-stat">
+
+                                    <div class="mfs-loan-stat-label">
+                                        {{ $loanDate['label'] }}
+                                    </div>
+
+                                    <div class="mfs-loan-stat-value">
+                                        {{ $loanDate['value'] }}
+                                    </div>
+
+                                </div>
+
+
+                                <div class="mfs-loan-stat">
+
+                                    <div class="mfs-loan-stat-label">
+                                        Commission
+                                    </div>
+
+                                    <div class="mfs-loan-stat-value">
+                                        KES
+                                        {{
+                                            number_format(
+                                                $loan->loan_commision ?? 0,
+                                                2
+                                            )
+                                        }}
+                                    </div>
+
+                                </div>
+
+
+                                <div class="mfs-loan-stat">
+
+                                    <div class="mfs-loan-stat-label">
+                                        Insurance
+                                    </div>
+
+                                    <div class="mfs-loan-stat-value">
+                                        KES
+                                        {{
+                                            number_format(
+                                                $loan->loan_insurance ?? 0,
+                                                2
+                                            )
+                                        }}
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+
+                            @if(!empty($loan->loan_description))
+
+                                <div class="mfs-loan-description">
+
+                                    <strong>
+                                        Description:
+                                    </strong>
+
+                                    {{ $loan->loan_description }}
+
+                                </div>
+
                             @endif
 
                         </div>
 
 
-                        <div class="loan-details">
+                        {{-- GUARANTORS --}}
 
-                            <div class="loan-detail">
-                                <div class="loan-detail-label">
-                                    Original Loan
-                                </div>
+                        <div class="mfs-guarantee-area">
 
-                                <div class="loan-detail-value">
-                                    KES {{ number_format(
-                                        $loan->loan_amount,
-                                        2
-                                    ) }}
-                                </div>
-                            </div>
+                            <div class="mfs-guarantee-head">
 
-
-                            <div class="loan-detail">
-                                <div class="loan-detail-label">
-                                    Principal Paid
-                                </div>
-
-                                <div class="loan-detail-value">
-                                    KES {{ number_format(
-                                        $loan->loan_loan_paid,
-                                        2
-                                    ) }}
-                                </div>
-                            </div>
-
-
-                            <div class="loan-detail">
-                                <div class="loan-detail-label">
-                                    Outstanding Balance
-                                </div>
-
-                                <div class="loan-detail-value">
-                                    KES {{ number_format(
-                                        $loanBalance,
-                                        2
-                                    ) }}
-                                </div>
-                            </div>
-
-
-                            <div class="loan-detail">
-                                <div class="loan-detail-label">
-                                    Period Taken
-                                </div>
-
-                                <div class="loan-detail-value">
-                                    {{ $loan->loan_taken_period }}
-                                </div>
-                            </div>
-
-
-                            <div class="loan-detail">
-                                <div class="loan-detail-label">
-                                    Commission
-                                </div>
-
-                                <div class="loan-detail-value">
-                                    KES {{ number_format(
-                                        $loan->loan_commision,
-                                        2
-                                    ) }}
-                                </div>
-                            </div>
-
-
-                            <div class="loan-detail">
-                                <div class="loan-detail-label">
-                                    Insurance
-                                </div>
-
-                                <div class="loan-detail-value">
-                                    KES {{ number_format(
-                                        $loan->loan_insurance,
-                                        2
-                                    ) }}
-                                </div>
-                            </div>
-
-                        </div>
-
-
-                        @if(!empty($loan->loan_description))
-                            <div class="loan-description">
-                                <strong>Description:</strong>
-                                {{ $loan->loan_description }}
-                            </div>
-                        @endif
-
-
-                        <div class="guarantee-wrap">
-
-                            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
-
-                                <div class="guarantee-heading mb-0">
+                                <div class="mfs-guarantee-title">
                                     Guarantors / Security
                                 </div>
 
-                                <div class="small text-muted">
-                                    Active guarantee:
+
+                                <div class="mfs-guarantee-total">
+
+                                    Active guarantee secured:
+
                                     <strong>
-                                        KES {{ number_format(
-                                            $activeGuarantee,
-                                            2
-                                        ) }}
+                                        KES
+                                        {{
+                                            number_format(
+                                                $activeGuarantee,
+                                                2
+                                            )
+                                        }}
                                     </strong>
+
                                 </div>
 
                             </div>
 
 
-                            @if($loan->guarantors->count())
+                            @if(collect($loan->guarantors ?? [])->count())
 
-                                <div class="table-responsive">
+                                <div class="mfs-table-wrap">
 
-                                    <table class="table table-bordered align-middle">
+                                    <table class="table mfs-table">
 
                                         <thead>
                                             <tr>
-                                                <th>#</th>
-                                                <th>Guarantor</th>
-                                                <th>SACCO No.</th>
-                                                <th class="text-end">
+
+                                                <th>
+                                                    #
+                                                </th>
+
+                                                <th>
+                                                    Guarantor
+                                                </th>
+
+                                                <th>
+                                                    SACCO No.
+                                                </th>
+
+                                                <th class="mfs-money">
                                                     Guaranteed
                                                 </th>
-                                                <th class="text-end">
+
+                                                <th class="mfs-money">
                                                     Freed
                                                 </th>
-                                                <th class="text-end">
+
+                                                <th class="mfs-money">
                                                     Currently Tied
                                                 </th>
 
                                                 @if($showHyperlinks)
-                                                    <th>
+                                                    <th class="mfs-admin-only">
                                                         Action
                                                     </th>
                                                 @endif
+
                                             </tr>
                                         </thead>
+
 
                                         <tbody>
 
@@ -683,85 +1834,98 @@
                                                 as $guarantor
                                             )
 
+                                                @php
+                                                    $guarantorTied =
+                                                        max(
+                                                            0,
+                                                            (float) $guarantor->loan_guar_amount_guaranteed
+                                                            -
+                                                            (float) $guarantor->loan_guar_amount_freed
+                                                        );
+                                                @endphp
+
                                                 <tr>
 
                                                     <td>
                                                         {{ $loop->iteration }}
                                                     </td>
 
+
                                                     <td>
+
                                                         @if($showHyperlinks)
 
-                                                            <a href="{{
-                                                                route(
-                                                                    'changeGuarantors',
-                                                                    [
-                                                                        'member_id' =>
-                                                                            $guarantor->member_id,
+                                                            <a
+                                                                class="mfs-member-link"
+                                                                href="{{
+                                                                    route(
+                                                                        'changeGuarantors',
+                                                                        [
+                                                                            'member_id' =>
+                                                                                $guarantor->member_id,
 
-                                                                        'guarantor_id' =>
-                                                                            $guarantor->loan_guar_id
-                                                                    ]
-                                                                )
-                                                            }}">
+                                                                            'guarantor_id' =>
+                                                                                $guarantor->loan_guar_id
+                                                                        ]
+                                                                    )
+                                                                }}"
+                                                            >
                                                                 {{
-                                                                    $guarantor
-                                                                    ->member_name
+                                                                    $guarantor->member_name
                                                                 }}
                                                             </a>
 
                                                         @else
 
                                                             {{
-                                                                $guarantor
-                                                                ->member_name
+                                                                $guarantor->member_name
                                                             }}
 
                                                         @endif
+
                                                     </td>
 
-                                                    <td>
+
+                                                    <td class="mfs-nowrap">
                                                         {{
-                                                            $guarantor
-                                                            ->member_sacco_id
+                                                            $guarantor->member_sacco_id
                                                         }}
                                                     </td>
 
-                                                    <td class="money">
+
+                                                    <td class="mfs-money">
                                                         {{
                                                             number_format(
-                                                                $guarantor
-                                                                ->loan_guar_amount_guaranteed,
+                                                                $guarantor->loan_guar_amount_guaranteed,
                                                                 2
                                                             )
                                                         }}
                                                     </td>
 
-                                                    <td class="money">
+
+                                                    <td class="mfs-money">
                                                         {{
                                                             number_format(
-                                                                $guarantor
-                                                                ->loan_guar_amount_freed,
+                                                                $guarantor->loan_guar_amount_freed,
                                                                 2
                                                             )
                                                         }}
                                                     </td>
 
-                                                    <td class="money">
+
+                                                    <td class="mfs-money">
                                                         {{
                                                             number_format(
-                                                                $guarantor
-                                                                ->loan_guar_amount_guaranteed
-                                                                -
-                                                                $guarantor
-                                                                ->loan_guar_amount_freed,
+                                                                $guarantorTied,
                                                                 2
                                                             )
                                                         }}
                                                     </td>
+
 
                                                     @if($showHyperlinks)
-                                                        <td>
+
+                                                        <td class="mfs-admin-only">
 
                                                             <form
                                                                 action="{{
@@ -798,6 +1962,7 @@
                                                             </form>
 
                                                         </td>
+
                                                     @endif
 
                                                 </tr>
@@ -812,7 +1977,7 @@
 
                             @else
 
-                                <div class="empty-state">
+                                <div class="mfs-empty">
                                     No guarantors are currently attached to this loan.
                                 </div>
 
@@ -822,136 +1987,201 @@
 
                     </article>
 
-                @endif
+                @endforeach
 
-            @empty
+            @else
 
-                <div class="empty-state">
-                    No outstanding loans were found for this member.
+                <div class="mfs-empty">
+                    This member does not currently have an outstanding loan.
                 </div>
 
-            @endforelse
+            @endif
 
         </section>
 
 
-        {{-- LOANS GUARANTEED BY MEMBER --}}
-        <section class="statement-section">
+        {{-- ============================================================
+             SECTION 3 — GUARANTEES PROVIDED
+             ============================================================ --}}
 
-            <h2 class="section-heading">
-                Loans Guaranteed by This Member
-            </h2>
+        <section class="mfs-section">
 
-            @if($loansGuaranteed->count())
+            <div class="mfs-section-head">
 
-                <div class="table-responsive">
+                <span class="mfs-section-number">
+                    03
+                </span>
 
-                    <table class="table table-bordered align-middle">
+                <h2 class="mfs-section-title">
+                    Guarantees Provided by This Member
+                </h2>
+
+                <div class="mfs-section-description">
+                    Outstanding loan obligations for which this member's
+                    savings are currently pledged as security.
+                </div>
+
+            </div>
+
+
+            @if($activeGuaranteesProvided->isNotEmpty())
+
+                <div class="mfs-table-wrap">
+
+                    <table class="table mfs-table">
 
                         <thead>
                             <tr>
-                                <th>#</th>
-                                <th>Borrower</th>
-                                <th>Loan Type</th>
-                                <th>Period</th>
-                                <th class="text-end">
+
+                                <th>
+                                    #
+                                </th>
+
+                                <th>
+                                    Borrower
+                                </th>
+
+                                <th>
+                                    Loan Type
+                                </th>
+
+                                <th>
+                                    Loan Date / Period
+                                </th>
+
+                                <th class="mfs-money">
                                     Original Loan
                                 </th>
-                                <th class="text-end">
+
+                                <th class="mfs-money">
+                                    Loan Outstanding
+                                </th>
+
+                                <th class="mfs-money">
                                     Guaranteed
                                 </th>
-                                <th class="text-end">
+
+                                <th class="mfs-money">
                                     Freed
                                 </th>
-                                <th class="text-end">
+
+                                <th class="mfs-money">
                                     Currently Tied
                                 </th>
+
                             </tr>
                         </thead>
 
+
                         <tbody>
 
-                            @foreach($loansGuaranteed as $loan)
+                            @foreach(
+                                $activeGuaranteesProvided
+                                as $loan
+                            )
 
                                 @php
                                     $guaranteeTied =
-                                        (float) $loan
-                                            ->loan_guar_amount_guaranteed
+                                        max(
+                                            0,
+                                            (float) $loan->loan_guar_amount_guaranteed
+                                            -
+                                            (float) $loan->loan_guar_amount_freed
+                                        );
+
+                                    $borrowerLoanBalance =
+                                        (float) $loan->loan_amount
                                         -
-                                        (float) $loan
-                                            ->loan_guar_amount_freed;
+                                        (float) $loan->loan_loan_paid;
+
+                                    $guaranteedLoanDate =
+                                        $loanDateDisplay($loan);
                                 @endphp
 
-                                @if(
-                                    (
-                                        $loan->loan_amount
-                                        -
-                                        $loan->loan_loan_paid
-                                    ) > $threshold_amount
-                                    &&
-                                    $guaranteeTied > $threshold_amount
-                                )
 
-                                    <tr>
+                                <tr>
 
-                                        <td>
-                                            {{ $loop->iteration }}
-                                        </td>
+                                    <td>
+                                        {{ $loop->iteration }}
+                                    </td>
 
-                                        <td>
-                                            {{ $loan->member_name }},
-                                            {{ $loan->member_sacco_id }}
-                                        </td>
 
-                                        <td>
-                                            {{ $loan->loan_type_name }}
-                                        </td>
+                                    <td>
+                                        <strong>
+                                            {{ $loan->member_name }}
+                                        </strong>
 
-                                        <td>
-                                            {{ $loan->loan_taken_period }}
-                                        </td>
+                                        @if(!empty($loan->member_sacco_id))
+                                            <div class="text-muted small">
+                                                Member No.
+                                                {{ $loan->member_sacco_id }}
+                                            </div>
+                                        @endif
+                                    </td>
 
-                                        <td class="money">
-                                            {{
-                                                number_format(
-                                                    $loan->loan_amount,
-                                                    2
-                                                )
-                                            }}
-                                        </td>
 
-                                        <td class="money">
-                                            {{
-                                                number_format(
-                                                    $loan
-                                                    ->loan_guar_amount_guaranteed,
-                                                    2
-                                                )
-                                            }}
-                                        </td>
+                                    <td>
+                                        {{ $loan->loan_type_name }}
+                                    </td>
 
-                                        <td class="money">
-                                            {{
-                                                number_format(
-                                                    $loan
-                                                    ->loan_guar_amount_freed,
-                                                    2
-                                                )
-                                            }}
-                                        </td>
 
-                                        <td class="money">
+                                    <td class="mfs-nowrap">
+                                        {{ $guaranteedLoanDate['value'] }}
+                                    </td>
+
+
+                                    <td class="mfs-money">
+                                        {{
+                                            number_format(
+                                                $loan->loan_amount,
+                                                2
+                                            )
+                                        }}
+                                    </td>
+
+
+                                    <td class="mfs-money">
+                                        {{
+                                            number_format(
+                                                $borrowerLoanBalance,
+                                                2
+                                            )
+                                        }}
+                                    </td>
+
+
+                                    <td class="mfs-money">
+                                        {{
+                                            number_format(
+                                                $loan->loan_guar_amount_guaranteed,
+                                                2
+                                            )
+                                        }}
+                                    </td>
+
+
+                                    <td class="mfs-money">
+                                        {{
+                                            number_format(
+                                                $loan->loan_guar_amount_freed,
+                                                2
+                                            )
+                                        }}
+                                    </td>
+
+
+                                    <td class="mfs-money">
+                                        <strong>
                                             {{
                                                 number_format(
                                                     $guaranteeTied,
                                                     2
                                                 )
                                             }}
-                                        </td>
+                                        </strong>
+                                    </td>
 
-                                    </tr>
-
-                                @endif
+                                </tr>
 
                             @endforeach
 
@@ -963,7 +2193,7 @@
 
             @else
 
-                <div class="empty-state">
+                <div class="mfs-empty">
                     This member is not currently guaranteeing an outstanding loan.
                 </div>
 
@@ -972,23 +2202,544 @@
         </section>
 
 
-        <div class="statement-footer">
+        {{-- ============================================================
+             DOCUMENT FOOTER
+             ============================================================ --}}
 
-            Generated by KASS SACCO on
-            {{ now()->format('d/m/Y H:i:s') }}.
+        <footer class="mfs-footer">
 
-            Financial balances shown are based on the current system records.
+            <div class="mfs-footer-main">
 
-        </div>
+                <div>
+                    <strong>
+                        KASS SACCO — Member Financial Status Statement
+                    </strong>
+                </div>
+
+
+                <div>
+                    Statement Ref:
+                    <strong>
+                        {{ $statementReference }}
+                    </strong>
+                </div>
+
+            </div>
+
+
+            <div class="mfs-footer-note">
+
+                Generated on
+                {{ $statementGeneratedAt->format('d M Y H:i:s') }}.
+
+                Financial balances shown reflect the current records in
+                the SACCO system at the time this statement was generated.
+
+                This is a system-generated financial statement.
+
+            </div>
+
+        </footer>
 
     </div>
 
 </div>
 
 
-{{-- Existing-loan guarantor modal will sit here --}}
+{{-- ====================================================================
+     EXISTING WORKING GUARANTOR MODAL
+     ==================================================================== --}}
+
 @if($showHyperlinks)
-    @include('guarantors.partials.add-existing-loan-modal')
+
+    @include(
+        'guarantors.partials.add-existing-loan-modal'
+    )
+
 @endif
+
+
+{{-- ====================================================================
+     PDF LIBRARIES
+     Same mechanism already used by Member Statement
+     ==================================================================== --}}
+
+<script
+    src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"
+></script>
+
+<script
+    src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"
+></script>
+
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    'use strict';
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Elements
+    |--------------------------------------------------------------------------
+    */
+
+    const printable =
+        document.getElementById(
+            'memberFinancialStatusPrintable'
+        );
+
+    const printButton =
+        document.getElementById(
+            'printMemberFinancialStatus'
+        );
+
+    const pdfButton =
+        document.getElementById(
+            'downloadMemberFinancialStatusPdf'
+        );
+
+    const pdfLoader =
+        document.getElementById(
+            'memberFinancialStatusPdfLoader'
+        );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Print
+    |--------------------------------------------------------------------------
+    */
+
+    if (printButton) {
+
+        printButton.addEventListener(
+            'click',
+            function () {
+                window.print();
+            }
+        );
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | PDF
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+        !pdfButton
+        ||
+        !printable
+    ) {
+        return;
+    }
+
+
+    pdfButton.addEventListener(
+        'click',
+        async function () {
+
+            if (
+                !window.jspdf
+                ||
+                typeof window.jspdf.jsPDF !== 'function'
+                ||
+                typeof window.html2canvas !== 'function'
+            ) {
+
+                alert(
+                    'PDF tools did not load. Please refresh the page and try again.'
+                );
+
+                return;
+            }
+
+
+            const {
+                jsPDF
+            } = window.jspdf;
+
+
+            pdfButton.disabled = true;
+
+            if (printButton) {
+                printButton.disabled = true;
+            }
+
+            if (pdfLoader) {
+                pdfLoader.classList.remove(
+                    'd-none'
+                );
+            }
+
+
+            /*
+             * Force formal fixed-width export even when downloaded
+             * from a phone or narrow browser.
+             */
+            printable.classList.add(
+                'mfs-export-mode'
+            );
+
+
+            try {
+
+                /*
+                 * Let the browser finish applying export CSS.
+                 */
+                await new Promise(function (resolve) {
+
+                    requestAnimationFrame(function () {
+
+                        requestAnimationFrame(
+                            resolve
+                        );
+
+                    });
+
+                });
+
+
+                const canvas =
+                    await window.html2canvas(
+                        printable,
+                        {
+                            scale: 2,
+                            useCORS: true,
+                            allowTaint: false,
+                            backgroundColor: '#ffffff',
+                            logging: false,
+
+                            width:
+                                printable.scrollWidth,
+
+                            height:
+                                printable.scrollHeight,
+
+                            windowWidth:
+                                printable.scrollWidth
+                        }
+                    );
+
+
+                /*
+                 * A4 landscape
+                 *
+                 * 297mm x 210mm
+                 */
+                const pdf =
+                    new jsPDF(
+                        'l',
+                        'mm',
+                        'a4'
+                    );
+
+
+                const pageWidth =
+                    297;
+
+                const pageHeight =
+                    210;
+
+
+                /*
+                 * Leave space around the actual statement and reserve
+                 * a small footer area for page numbering.
+                 */
+                const marginLeft =
+                    7;
+
+                const marginRight =
+                    7;
+
+                const marginTop =
+                    7;
+
+                const footerSpace =
+                    8;
+
+
+                const usableWidth =
+                    pageWidth
+                    -
+                    marginLeft
+                    -
+                    marginRight;
+
+
+                const usableHeight =
+                    pageHeight
+                    -
+                    marginTop
+                    -
+                    footerSpace;
+
+
+                /*
+                 * JPEG at high quality keeps the PDF smaller than PNG
+                 * while retaining statement readability.
+                 */
+                const imageData =
+                    canvas.toDataURL(
+                        'image/jpeg',
+                        0.92
+                    );
+
+
+                const imageHeight =
+                    (
+                        canvas.height
+                        *
+                        usableWidth
+                    )
+                    /
+                    canvas.width;
+
+
+                let heightLeft =
+                    imageHeight;
+
+
+                let position =
+                    marginTop;
+
+
+                /*
+                 * First page
+                 */
+                pdf.addImage(
+                    imageData,
+                    'JPEG',
+                    marginLeft,
+                    position,
+                    usableWidth,
+                    imageHeight,
+                    undefined,
+                    'FAST'
+                );
+
+
+                heightLeft -=
+                    usableHeight;
+
+
+                /*
+                 * Remaining pages
+                 */
+                while (
+                    heightLeft > 0.5
+                ) {
+
+                    pdf.addPage();
+
+                    position -=
+                        usableHeight;
+
+
+                    pdf.addImage(
+                        imageData,
+                        'JPEG',
+                        marginLeft,
+                        position,
+                        usableWidth,
+                        imageHeight,
+                        undefined,
+                        'FAST'
+                    );
+
+
+                    heightLeft -=
+                        usableHeight;
+                }
+
+
+                /*
+                 * ---------------------------------------------------------
+                 * Page footer / page numbering
+                 * ---------------------------------------------------------
+                 */
+
+                const totalPages =
+                    pdf.getNumberOfPages();
+
+
+                const statementReference =
+                    @json($statementReference);
+
+
+                for (
+                    let pageNumber = 1;
+                    pageNumber <= totalPages;
+                    pageNumber++
+                ) {
+
+                    pdf.setPage(
+                        pageNumber
+                    );
+
+
+                    pdf.setDrawColor(
+                        190,
+                        190,
+                        190
+                    );
+
+
+                    pdf.line(
+                        marginLeft,
+                        pageHeight - 6,
+                        pageWidth - marginRight,
+                        pageHeight - 6
+                    );
+
+
+                    pdf.setFontSize(
+                        7
+                    );
+
+
+                    pdf.setTextColor(
+                        90,
+                        90,
+                        90
+                    );
+
+
+                    pdf.text(
+                        'KASS SACCO | '
+                        +
+                        statementReference,
+                        marginLeft,
+                        pageHeight - 3
+                    );
+
+
+                    pdf.text(
+                        'Page '
+                        +
+                        pageNumber
+                        +
+                        ' of '
+                        +
+                        totalPages,
+                        pageWidth - marginRight,
+                        pageHeight - 3,
+                        {
+                            align:
+                                'right'
+                        }
+                    );
+
+                }
+
+
+                /*
+                 * ---------------------------------------------------------
+                 * Filename
+                 * ---------------------------------------------------------
+                 */
+
+                const memberName =
+                    @json($member->member_name);
+
+
+                const memberNo =
+                    @json($member->member_sacco_id);
+
+
+                const safeName =
+                    String(
+                        memberName
+                        ||
+                        'member'
+                    )
+                    .replace(
+                        /[^a-z0-9]+/gi,
+                        '_'
+                    )
+                    .replace(
+                        /^_+|_+$/g,
+                        ''
+                    )
+                    .toLowerCase();
+
+
+                const safeMemberNo =
+                    String(
+                        memberNo
+                        ||
+                        ''
+                    )
+                    .replace(
+                        /[^a-z0-9_-]+/gi,
+                        ''
+                    );
+
+
+                const fileName =
+                    safeName
+                    +
+                    (
+                        safeMemberNo
+                            ?
+                            '_'
+                            +
+                            safeMemberNo
+                            :
+                            ''
+                    )
+                    +
+                    '_financial_status_statement.pdf';
+
+
+                pdf.save(
+                    fileName
+                );
+
+            } catch (error) {
+
+                console.error(
+                    'Member financial status PDF generation failed:',
+                    error
+                );
+
+
+                alert(
+                    'The financial statement PDF could not be generated. Please refresh the page and try again.'
+                );
+
+            } finally {
+
+                printable.classList.remove(
+                    'mfs-export-mode'
+                );
+
+
+                pdfButton.disabled = false;
+
+
+                if (printButton) {
+                    printButton.disabled = false;
+                }
+
+
+                if (pdfLoader) {
+
+                    pdfLoader.classList.add(
+                        'd-none'
+                    );
+
+                }
+
+            }
+
+        }
+    );
+
+});
+</script>
 
 @endsection
