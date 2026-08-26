@@ -667,6 +667,18 @@
             color: #818895;
         }
 
+.mfs-action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.mfs-action-icon {
+    width: 14px;
+    height: 14px;
+    flex: 0 0 14px;
+}
 
         /*
         |--------------------------------------------------------------------------
@@ -1109,16 +1121,52 @@
 
             <div class="mfs-toolbar-actions">
 
-                <button type="button" id="printMemberFinancialStatus" class="btn btn-outline-secondary btn-sm">
-                    <i class="fas fa-print me-1"></i>
-                    Print
-                </button>
+           <button
+    type="button"
+    id="printMemberFinancialStatus"
+    class="btn btn-outline-secondary btn-sm mfs-action-btn"
+>
+    <svg
+        class="mfs-action-icon"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.8"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+    >
+        <path d="M6 9V3h12v6"></path>
+        <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+        <rect x="6" y="14" width="12" height="7"></rect>
+    </svg>
+
+    <span>Print</span>
+</button>
 
 
-                <button type="button" id="downloadMemberFinancialStatusPdf" class="btn btn-primary btn-sm">
-                    <i class="fas fa-file-pdf me-1"></i>
-                    Download PDF
-                </button>
+<button
+    type="button"
+    id="downloadMemberFinancialStatusPdf"
+    class="btn btn-primary btn-sm mfs-action-btn"
+>
+    <svg
+        class="mfs-action-icon"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.8"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+    >
+        <path d="M12 3v12"></path>
+        <path d="m7 10 5 5 5-5"></path>
+        <path d="M5 21h14"></path>
+    </svg>
+
+    <span>Download PDF</span>
+</button>
 
 
                 <span id="memberFinancialStatusPdfLoader" class="mfs-pdf-loader d-none">
