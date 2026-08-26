@@ -996,13 +996,46 @@
                                     @endif
                                 </h6>
 
-                                <p class="small mb-2">
-                                    <strong>Period Taken:</strong> {{ $loan->loan_taken_period }} |
-                                    <strong>Amount:</strong> Ksh {{ number_format($loan->loan_amount, 2) }} |
-                                    <strong>Paid:</strong> Ksh {{ number_format($loan->loan_loan_paid, 2) }} |
-                                    <strong>Commission:</strong> {{ number_format($loan->loan_commision, 2) }} |
-                                    <strong>Insurance:</strong> {{ number_format($loan->loan_insurance, 2) }}
-                                </p>
+                               @php
+    $loanDuration = isset($loan->loan_type_duration)
+        ? (int) $loan->loan_type_duration
+        : null;
+
+    $isShortTermLoan =
+        (
+            $loanDuration !== null
+            && $loanDuration > 0
+            && $loanDuration <= 1
+        )
+        || (int) ($loan->loan_type_instant_qualification ?? 0) === 1
+        || (int) ($loan->loan_type_instant_disbursement ?? 0) === 1;
+@endphp
+
+<p class="small mb-2">
+
+    @if ($isShortTermLoan && !empty($loan->loan_on))
+        <strong>Date Taken:</strong>
+        {{ \Carbon\Carbon::parse($loan->loan_on)->format('d-m-Y') }}
+    @else
+        <strong>Period Taken:</strong>
+        {{ $loan->loan_taken_period }}
+    @endif
+
+    |
+
+    <strong>Amount:</strong>
+    Ksh {{ number_format($loan->loan_amount, 2) }} |
+
+    <strong>Paid:</strong>
+    Ksh {{ number_format($loan->loan_loan_paid, 2) }} |
+
+    <strong>Commission:</strong>
+    {{ number_format($loan->loan_commision, 2) }} |
+
+    <strong>Insurance:</strong>
+    {{ number_format($loan->loan_insurance, 2) }}
+
+</p>
 
                                 @php
                                     $effectiveFromPeriod = $data['period_from'];

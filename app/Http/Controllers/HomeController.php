@@ -2469,39 +2469,39 @@ class HomeController extends Controller
 |
 */
 
-$requestedFosaTypes = request()->input(
-    'fosa_types',
-    []
-);
+        $requestedFosaTypes = request()->input(
+            'fosa_types',
+            []
+        );
 
-/*
+        /*
  * Also support a singular fosa_type_id parameter.
  */
-if (
-    empty($requestedFosaTypes)
-    && request()->filled('fosa_type_id')
-) {
-    $requestedFosaTypes = [
-        request()->input('fosa_type_id')
-    ];
-}
+        if (
+            empty($requestedFosaTypes)
+            && request()->filled('fosa_type_id')
+        ) {
+            $requestedFosaTypes = [
+                request()->input('fosa_type_id')
+            ];
+        }
 
-if (!is_array($requestedFosaTypes)) {
-    $requestedFosaTypes = [
-        $requestedFosaTypes
-    ];
-}
+        if (!is_array($requestedFosaTypes)) {
+            $requestedFosaTypes = [
+                $requestedFosaTypes
+            ];
+        }
 
-$fosaTypeIds = collect($requestedFosaTypes)
-    ->map(function ($fosaTypeId) {
-        return (int) $fosaTypeId;
-    })
-    ->filter(function ($fosaTypeId) {
-        return $fosaTypeId > 0;
-    })
-    ->unique()
-    ->values()
-    ->all();
+        $fosaTypeIds = collect($requestedFosaTypes)
+            ->map(function ($fosaTypeId) {
+                return (int) $fosaTypeId;
+            })
+            ->filter(function ($fosaTypeId) {
+                return $fosaTypeId > 0;
+            })
+            ->unique()
+            ->values()
+            ->all();
 
 
         /*
@@ -2665,7 +2665,7 @@ $fosaTypeIds = collect($requestedFosaTypes)
 |
 */
 
-/*
+        /*
 |--------------------------------------------------------------------------
 | FOSA types available to this member
 |--------------------------------------------------------------------------
@@ -2677,56 +2677,56 @@ $fosaTypeIds = collect($requestedFosaTypes)
 |
 */
 
-$memberFosaTypes = DB::table('sacco_fosas as f')
-    ->join(
-        'sacco_fosa_types as ft',
-        'f.fosa_type_id',
-        '=',
-        'ft.type_id'
-    )
-    ->where(
-        'f.fosa_member_id',
-        $id
-    )
-    ->where(
-        'f.fosa_period',
-        '<=',
-        $period_to
-    )
-    ->select(
-        'ft.type_id',
-        'ft.type_name',
-        'ft.type_prefix'
-    )
-    ->distinct()
-    ->orderBy(
-        'ft.type_name',
-        'asc'
-    )
-    ->get();
+        $memberFosaTypes = DB::table('sacco_fosas as f')
+            ->join(
+                'sacco_fosa_types as ft',
+                'f.fosa_type_id',
+                '=',
+                'ft.type_id'
+            )
+            ->where(
+                'f.fosa_member_id',
+                $id
+            )
+            ->where(
+                'f.fosa_period',
+                '<=',
+                $period_to
+            )
+            ->select(
+                'ft.type_id',
+                'ft.type_name',
+                'ft.type_prefix'
+            )
+            ->distinct()
+            ->orderBy(
+                'ft.type_name',
+                'asc'
+            )
+            ->get();
 
-/*
+        /*
 |--------------------------------------------------------------------------
 | Types which will actually appear on this statement
 |--------------------------------------------------------------------------
 */
 
-$statementFosaTypes = $memberFosaTypes;
+        $statementFosaTypes = $memberFosaTypes;
 
-if (!empty($fosaTypeIds)) {
-    $statementFosaTypes = $memberFosaTypes
-        ->filter(function ($type) use ($fosaTypeIds) {
+        if (!empty($fosaTypeIds)) {
+            $statementFosaTypes = $memberFosaTypes
+                ->filter(function ($type) use ($fosaTypeIds) {
 
-            return in_array(
-                (int) $type->type_id,
-                $fosaTypeIds,
-                true
-            );
-        })
-        ->values();
-}
+                    return in_array(
+                        (int) $type->type_id,
+                        $fosaTypeIds,
+                        true
+                    );
+                })
+                ->values();
+        }
 
-/*
+        /*
 |--------------------------------------------------------------------------
 | Opening balances BY FOSA TYPE
 |--------------------------------------------------------------------------
@@ -2737,134 +2737,134 @@ if (!empty($fosaTypeIds)) {
 |
 */
 
-$fosaOpeningBalancesQuery = DB::table(
-    'sacco_fosas'
-)
-    ->where(
-        'fosa_member_id',
-        $id
-    )
-    ->where(
-        'fosa_period',
-        '<',
-        $period_from
-    );
-
-if (!empty($fosaTypeIds)) {
-    $fosaOpeningBalancesQuery->whereIn(
-        'fosa_type_id',
-        $fosaTypeIds
-    );
-}
-
-$fosaOpeningBalances = $fosaOpeningBalancesQuery
-    ->select(
-        'fosa_type_id',
-        DB::raw(
-            'SUM(COALESCE(fosa_amount_paying, 0)) as opening_balance'
+        $fosaOpeningBalancesQuery = DB::table(
+            'sacco_fosas'
         )
-    )
-    ->groupBy(
-        'fosa_type_id'
-    )
-    ->pluck(
-        'opening_balance',
-        'fosa_type_id'
-    );
+            ->where(
+                'fosa_member_id',
+                $id
+            )
+            ->where(
+                'fosa_period',
+                '<',
+                $period_from
+            );
 
-/*
+        if (!empty($fosaTypeIds)) {
+            $fosaOpeningBalancesQuery->whereIn(
+                'fosa_type_id',
+                $fosaTypeIds
+            );
+        }
+
+        $fosaOpeningBalances = $fosaOpeningBalancesQuery
+            ->select(
+                'fosa_type_id',
+                DB::raw(
+                    'SUM(COALESCE(fosa_amount_paying, 0)) as opening_balance'
+                )
+            )
+            ->groupBy(
+                'fosa_type_id'
+            )
+            ->pluck(
+                'opening_balance',
+                'fosa_type_id'
+            );
+
+        /*
 |--------------------------------------------------------------------------
 | FOSA movements within selected statement period
 |--------------------------------------------------------------------------
 */
 
-$fosaContributionsQuery = DB::table(
-    'sacco_fosas'
-)
-    ->leftJoin(
-        'sacco_fosa_types',
-        'sacco_fosas.fosa_type_id',
-        '=',
-        'sacco_fosa_types.type_id'
-    )
-    ->join(
-        'sacco_members',
-        'sacco_fosas.fosa_member_id',
-        '=',
-        'sacco_members.member_id'
-    )
-    ->join(
-        'sacco_department',
-        'sacco_members.member_dept',
-        '=',
-        'sacco_department.department_id'
-    )
-    ->join(
-        'sacco_company',
-        'sacco_department.department_company_id',
-        '=',
-        'sacco_company.company_id'
-    )
-    ->where(
-        'sacco_members.member_deleted',
-        '<>',
-        'Y'
-    )
-    ->where(
-        'sacco_fosas.fosa_member_id',
-        $id
-    )
-    ->whereBetween(
-        'sacco_fosas.fosa_period',
-        [
-            $period_from,
-            $period_to
-        ]
-    );
+        $fosaContributionsQuery = DB::table(
+            'sacco_fosas'
+        )
+            ->leftJoin(
+                'sacco_fosa_types',
+                'sacco_fosas.fosa_type_id',
+                '=',
+                'sacco_fosa_types.type_id'
+            )
+            ->join(
+                'sacco_members',
+                'sacco_fosas.fosa_member_id',
+                '=',
+                'sacco_members.member_id'
+            )
+            ->join(
+                'sacco_department',
+                'sacco_members.member_dept',
+                '=',
+                'sacco_department.department_id'
+            )
+            ->join(
+                'sacco_company',
+                'sacco_department.department_company_id',
+                '=',
+                'sacco_company.company_id'
+            )
+            ->where(
+                'sacco_members.member_deleted',
+                '<>',
+                'Y'
+            )
+            ->where(
+                'sacco_fosas.fosa_member_id',
+                $id
+            )
+            ->whereBetween(
+                'sacco_fosas.fosa_period',
+                [
+                    $period_from,
+                    $period_to
+                ]
+            );
 
-if (!empty($fosaTypeIds)) {
-    $fosaContributionsQuery->whereIn(
-        'sacco_fosas.fosa_type_id',
-        $fosaTypeIds
-    );
-}
+        if (!empty($fosaTypeIds)) {
+            $fosaContributionsQuery->whereIn(
+                'sacco_fosas.fosa_type_id',
+                $fosaTypeIds
+            );
+        }
 
-$fosaContributions = $fosaContributionsQuery
-    ->orderBy(
-        'sacco_fosas.fosa_type_id',
-        'asc'
-    )
-    ->orderBy(
-        'sacco_fosas.fosa_period',
-        'asc'
-    )
-    ->orderBy(
-        'sacco_fosas.fosa_date_paid',
-        'asc'
-    )
-    ->orderBy(
-        'sacco_fosas.fosa_id',
-        'asc'
-    )
-    ->select(
-        'sacco_fosas.*',
-        'sacco_members.member_name',
-        'sacco_department.department_name',
-        'sacco_company.company_name',
-        'sacco_fosa_types.type_name',
-        'sacco_fosa_types.type_prefix'
-    )
-    ->get();
+        $fosaContributions = $fosaContributionsQuery
+            ->orderBy(
+                'sacco_fosas.fosa_type_id',
+                'asc'
+            )
+            ->orderBy(
+                'sacco_fosas.fosa_period',
+                'asc'
+            )
+            ->orderBy(
+                'sacco_fosas.fosa_date_paid',
+                'asc'
+            )
+            ->orderBy(
+                'sacco_fosas.fosa_id',
+                'asc'
+            )
+            ->select(
+                'sacco_fosas.*',
+                'sacco_members.member_name',
+                'sacco_department.department_name',
+                'sacco_company.company_name',
+                'sacco_fosa_types.type_name',
+                'sacco_fosa_types.type_prefix'
+            )
+            ->get();
 
-/*
+        /*
  * Retain this collection for backward compatibility with any code
  * which may still reference fosaGrouped.
  */
-$fosaGrouped = $fosaContributions
-    ->groupBy(function ($row) {
-        return $row->type_name
-            ?: 'UNSPECIFIED';
-    });
+        $fosaGrouped = $fosaContributions
+            ->groupBy(function ($row) {
+                return $row->type_name
+                    ?: 'UNSPECIFIED';
+            });
 
         /*
     |--------------------------------------------------------------------------
@@ -3010,10 +3010,13 @@ $fosaGrouped = $fosaContributions
                 '<=',
                 $period_to
             )
-            ->select(
-                'sacco_loans.*',
-                'sacco_loan_types.loan_type_name',
-                'sacco_loan_category.loan_category_name',
+           ->select(
+    'sacco_loans.*',
+    'sacco_loan_types.loan_type_name',
+    'sacco_loan_types.loan_type_duration',
+    'sacco_loan_types.loan_type_instant_qualification',
+    'sacco_loan_types.loan_type_instant_disbursement',
+    'sacco_loan_category.loan_category_name',
                 DB::raw(
                     'COALESCE(paid_period.paid_to_period, 0) as paid_as_at_period_to'
                 ),
@@ -3062,20 +3065,20 @@ $fosaGrouped = $fosaContributions
 
         if ($selectedLoanId === null) {
 
-    if ($cleared_loans === 'uncleared') {
-        $loansQuery->whereRaw(
-            '(COALESCE(sacco_loans.loan_amount, 0) - COALESCE(paid_period.paid_to_period, 0)) > ?',
-            [$statementLoanBalanceThreshold]
-        );
-    }
+            if ($cleared_loans === 'uncleared') {
+                $loansQuery->whereRaw(
+                    '(COALESCE(sacco_loans.loan_amount, 0) - COALESCE(paid_period.paid_to_period, 0)) > ?',
+                    [$statementLoanBalanceThreshold]
+                );
+            }
 
-    if ($cleared_loans === 'cleared') {
-        $loansQuery->whereRaw(
-            '(COALESCE(sacco_loans.loan_amount, 0) - COALESCE(paid_period.paid_to_period, 0)) <= ?',
-            [$statementLoanBalanceThreshold]
-        );
-    }
-}
+            if ($cleared_loans === 'cleared') {
+                $loansQuery->whereRaw(
+                    '(COALESCE(sacco_loans.loan_amount, 0) - COALESCE(paid_period.paid_to_period, 0)) <= ?',
+                    [$statementLoanBalanceThreshold]
+                );
+            }
+        }
 
         $loans = $loansQuery
             ->orderBy(
@@ -3329,13 +3332,13 @@ $fosaGrouped = $fosaContributions
             'member' => $member,
 
             'fosaContributions' => $fosaContributions,
-'fosaGrouped' => $fosaGrouped,
+            'fosaGrouped' => $fosaGrouped,
 
-'fosaOpeningBalances' => $fosaOpeningBalances,
+            'fosaOpeningBalances' => $fosaOpeningBalances,
 
-'fosaTypeIds' => $fosaTypeIds,
-'memberFosaTypes' => $memberFosaTypes,
-'statementFosaTypes' => $statementFosaTypes,
+            'fosaTypeIds' => $fosaTypeIds,
+            'memberFosaTypes' => $memberFosaTypes,
+            'statementFosaTypes' => $statementFosaTypes,
 
             'shareContributions' => $shareContributions,
             'capitalContributions' => $capitalContributions,
