@@ -384,10 +384,46 @@ Route::middleware(['auth'])->group(function () {
     // Member statement route for non-officials
     Route::get('/members/statement/self', [HomeController::class, 'viewStatement']);
 
-    Route::get('/members/status/{self}', [HomeController::class, 'memberStatus']);
-    Route::get('/members/status/{id}', [HomeController::class, 'memberStatus'])->name('members.status')->middleware('check_user_rights:rpt_loans_issued');
+    // Route::get('/members/status/{self}', [HomeController::class, 'memberStatus']);
+    // Route::get('/members/status/{id}', [HomeController::class, 'memberStatus'])->name('members.status')->middleware('check_user_rights:rpt_loans_issued');
+
+/*
+|--------------------------------------------------------------------------
+| Member's own financial status
+|--------------------------------------------------------------------------
+|
+| Literal /self route.
+| Accessible to authenticated members, including officials using
+| ?view_as_member=y.
+|
+*/
+
+Route::get(
+    '/members/status/self',
+    [HomeController::class, 'memberStatus']
+)
+    ->name('members.status.self');
 
 
+/*
+|--------------------------------------------------------------------------
+| Administrative member financial status
+|--------------------------------------------------------------------------
+|
+| Numeric member ID only.
+|
+*/
+
+Route::get(
+    '/members/status/{id}',
+    [HomeController::class, 'memberStatus']
+)
+    ->whereNumber('id')
+    ->name('members.status')
+    ->middleware(
+        'check_user_rights:rpt_loans_issued'
+    );
+    
     /*
 |--------------------------------------------------------------------------
 | Existing Loan Guarantor Management
