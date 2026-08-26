@@ -2272,17 +2272,9 @@
     src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"
 ></script>
 
-
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     'use strict';
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Elements
-    |--------------------------------------------------------------------------
-    */
 
     const printable =
         document.getElementById(
@@ -2307,7 +2299,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     /*
     |--------------------------------------------------------------------------
-    | Print
+    | PRINT
     |--------------------------------------------------------------------------
     */
 
@@ -2329,14 +2321,397 @@ document.addEventListener('DOMContentLoaded', function () {
     |--------------------------------------------------------------------------
     */
 
-    if (
-        !pdfButton
-        ||
-        !printable
-    ) {
+    if (!pdfButton || !printable) {
         return;
     }
 
+
+    /*
+    |--------------------------------------------------------------------------
+    | Find elements that should preferably remain together
+    |--------------------------------------------------------------------------
+    |
+    | The PDF generator uses these DOM positions to avoid cutting through:
+    |
+    | - section headings
+    | - financial summary
+    | - member details
+    | - loan summary/details
+    | - guarantee headings
+    | - individual table rows
+    |
+    | A very large element which is taller than a whole PDF page is still
+    | allowed to split, otherwise PDF generation could become impossible.
+    |
+    */
+
+    function getKeepTogetherRanges(canvas, maxPageHeightPx) {
+
+        const rootRect =
+            printable.getBoundingClientRect();
+
+        const renderedHeight =
+            printable.scrollHeight;
+
+        const canvasScaleY =
+            canvas.height / renderedHeight;
+
+
+        const selectors = [
+            '.mfs-institution-row',
+            '.mfs-member-panel',
+            '.mfs-section-head',
+            '.mfs-position-groups',
+            '.mfs-loan-overview',
+            '.mfs-guarantee-head',
+            '.mfs-table thead',
+            '.mfs-table tbody tr'
+        ];
+
+
+        const ranges = [];
+
+
+        selectors.forEach(function (selector) {
+
+            printable
+                .querySelectorAll(selector)
+                .forEach(function (element) {
+
+                    const rect =
+                        element.getBoundingClientRect();
+
+
+                    const top =
+                        (
+                            rect.top
+                            -
+                            rootRect.top
+                        )
+                        *
+                        canvasScaleY;
+
+
+                    const bottom =
+                        (
+                            rect.bottom
+                            -
+                            rootRect.top
+                        )
+                        *
+                        canvasScaleY;
+
+
+                    const height =
+                        bottom - top;
+
+
+                    /*
+                     * Only protect blocks which can reasonably fit on
+                     * one PDF page.
+                     */
+                    if (
+                        height > 0
+                        &&
+                        height <
+                        (
+                            maxPageHeightPx
+                            *
+                            0.92
+                        )
+                    ) {
+
+                        ranges.push({
+                            top: Math.max(
+                                0,
+                                top
+                            ),
+
+                            bottom: Math.min(
+                                canvas.height,
+                                bottom
+                            )
+                        });
+
+                    }
+
+                });
+
+        });
+
+
+        /*
+         * Sort from the top of the document downward.
+         */
+        ranges.sort(function (a, b) {
+            return a.top - b.top;
+        });
+
+
+        return ranges;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Calculate safest page ending
+    |--------------------------------------------------------------------------
+    */
+
+    function findSafePageEnd(
+        startY,
+        proposedEndY,
+        keepRanges,
+        canvasHeight,
+        targetPageHeight
+    ) {
+
+        if (
+            proposedEndY >= canvasHeight
+        ) {
+            return canvasHeight;
+        }
+
+
+        let safeEnd =
+            proposedEndY;
+
+
+        /*
+         * Is our proposed page break cutting directly through a protected
+         * element?
+         */
+        for (
+            let i = 0;
+            i < keepRanges.length;
+            i++
+        ) {
+
+            const range =
+                keepRanges[i];
+
+
+            if (
+                range.top
+                <
+                proposedEndY
+                &&
+                range.bottom
+                >
+                proposedEndY
+            ) {
+
+                /*
+                 * If enough content has already been placed on this page,
+                 * move the whole protected element to the next page.
+                 */
+                const contentAlreadyUsed =
+                    range.top
+                    -
+                    startY;
+
+
+                if (
+                    contentAlreadyUsed
+                    >
+                    targetPageHeight
+                    *
+                    0.20
+                ) {
+
+                    safeEnd =
+                        range.top;
+
+                }
+
+                break;
+            }
+
+        }
+
+
+        /*
+         * Prevent an accidental zero-height/tiny page.
+         */
+        const minimumUsefulPage =
+            targetPageHeight
+            *
+            0.15;
+
+
+        if (
+            safeEnd
+            -
+            startY
+            <
+            minimumUsefulPage
+        ) {
+
+            safeEnd =
+                proposedEndY;
+
+        }
+
+
+        return Math.min(
+            safeEnd,
+            canvasHeight
+        );
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Create cropped canvas for ONE PDF page
+    |--------------------------------------------------------------------------
+    */
+
+    function createPageCanvas(
+        sourceCanvas,
+        startY,
+        endY
+    ) {
+
+        const sliceHeight =
+            Math.max(
+                1,
+                Math.round(
+                    endY - startY
+                )
+            );
+
+
+        const pageCanvas =
+            document.createElement(
+                'canvas'
+            );
+
+
+        pageCanvas.width =
+            sourceCanvas.width;
+
+        pageCanvas.height =
+            sliceHeight;
+
+
+        const context =
+            pageCanvas.getContext(
+                '2d'
+            );
+
+
+        /*
+         * White page background.
+         */
+        context.fillStyle =
+            '#ffffff';
+
+        context.fillRect(
+            0,
+            0,
+            pageCanvas.width,
+            pageCanvas.height
+        );
+
+
+        context.drawImage(
+            sourceCanvas,
+
+            0,
+            Math.round(startY),
+
+            sourceCanvas.width,
+            sliceHeight,
+
+            0,
+            0,
+
+            sourceCanvas.width,
+            sliceHeight
+        );
+
+
+        return pageCanvas;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Add page footer
+    |--------------------------------------------------------------------------
+    */
+
+    function addPageFooter(
+        pdf,
+        pageNumber,
+        totalPages,
+        statementReference,
+        pageWidth,
+        pageHeight,
+        marginLeft,
+        marginRight
+    ) {
+
+        pdf.setDrawColor(
+            185,
+            185,
+            185
+        );
+
+
+        pdf.line(
+            marginLeft,
+            pageHeight - 7,
+            pageWidth - marginRight,
+            pageHeight - 7
+        );
+
+
+        pdf.setFontSize(
+            7
+        );
+
+
+        pdf.setTextColor(
+            90,
+            90,
+            90
+        );
+
+
+        pdf.text(
+            'KASS SACCO  |  '
+            +
+            statementReference,
+            marginLeft,
+            pageHeight - 3.5
+        );
+
+
+        pdf.text(
+            'Page '
+            +
+            pageNumber
+            +
+            ' of '
+            +
+            totalPages,
+            pageWidth - marginRight,
+            pageHeight - 3.5,
+            {
+                align:
+                    'right'
+            }
+        );
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | DOWNLOAD PDF
+    |--------------------------------------------------------------------------
+    */
 
     pdfButton.addEventListener(
         'click',
@@ -2345,9 +2720,13 @@ document.addEventListener('DOMContentLoaded', function () {
             if (
                 !window.jspdf
                 ||
-                typeof window.jspdf.jsPDF !== 'function'
+                typeof window.jspdf.jsPDF
+                    !==
+                    'function'
                 ||
-                typeof window.html2canvas !== 'function'
+                typeof window.html2canvas
+                    !==
+                    'function'
             ) {
 
                 alert(
@@ -2360,25 +2739,31 @@ document.addEventListener('DOMContentLoaded', function () {
 
             const {
                 jsPDF
-            } = window.jspdf;
+            } =
+                window.jspdf;
 
 
-            pdfButton.disabled = true;
+            pdfButton.disabled =
+                true;
+
 
             if (printButton) {
-                printButton.disabled = true;
+                printButton.disabled =
+                    true;
             }
 
+
             if (pdfLoader) {
+
                 pdfLoader.classList.remove(
                     'd-none'
                 );
+
             }
 
 
             /*
-             * Force formal fixed-width export even when downloaded
-             * from a phone or narrow browser.
+             * Apply desktop/document layout before capture.
              */
             printable.classList.add(
                 'mfs-export-mode'
@@ -2388,30 +2773,49 @@ document.addEventListener('DOMContentLoaded', function () {
             try {
 
                 /*
-                 * Let the browser finish applying export CSS.
+                 * Give browser two layout frames to settle.
                  */
-                await new Promise(function (resolve) {
-
-                    requestAnimationFrame(function () {
+                await new Promise(
+                    function (resolve) {
 
                         requestAnimationFrame(
-                            resolve
+                            function () {
+
+                                requestAnimationFrame(
+                                    resolve
+                                );
+
+                            }
                         );
 
-                    });
+                    }
+                );
 
-                });
 
+                /*
+                 * ---------------------------------------------------------
+                 * CAPTURE FULL STATEMENT
+                 * ---------------------------------------------------------
+                 */
 
                 const canvas =
                     await window.html2canvas(
                         printable,
                         {
-                            scale: 2,
-                            useCORS: true,
-                            allowTaint: false,
-                            backgroundColor: '#ffffff',
-                            logging: false,
+                            scale:
+                                2,
+
+                            useCORS:
+                                true,
+
+                            allowTaint:
+                                false,
+
+                            backgroundColor:
+                                '#ffffff',
+
+                            logging:
+                                false,
 
                             width:
                                 printable.scrollWidth,
@@ -2420,16 +2824,23 @@ document.addEventListener('DOMContentLoaded', function () {
                                 printable.scrollHeight,
 
                             windowWidth:
-                                printable.scrollWidth
+                                printable.scrollWidth,
+
+                            scrollX:
+                                0,
+
+                            scrollY:
+                                -window.scrollY
                         }
                     );
 
 
                 /*
-                 * A4 landscape
-                 *
-                 * 297mm x 210mm
+                 * ---------------------------------------------------------
+                 * A4 LANDSCAPE
+                 * ---------------------------------------------------------
                  */
+
                 const pdf =
                     new jsPDF(
                         'l',
@@ -2446,8 +2857,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
                 /*
-                 * Leave space around the actual statement and reserve
-                 * a small footer area for page numbering.
+                 * Clean banking-document margins.
                  */
                 const marginLeft =
                     7;
@@ -2458,8 +2868,18 @@ document.addEventListener('DOMContentLoaded', function () {
                 const marginTop =
                     7;
 
-                const footerSpace =
-                    8;
+
+                /*
+                 * Reserve this area exclusively for:
+                 *
+                 * separator
+                 * reference
+                 * page number
+                 *
+                 * Statement content can NEVER enter this zone.
+                 */
+                const footerReserve =
+                    12;
 
 
                 const usableWidth =
@@ -2475,99 +2895,202 @@ document.addEventListener('DOMContentLoaded', function () {
                     -
                     marginTop
                     -
-                    footerSpace;
+                    footerReserve;
 
 
                 /*
-                 * JPEG at high quality keeps the PDF smaller than PNG
-                 * while retaining statement readability.
+                 * ---------------------------------------------------------
+                 * Convert PDF dimensions into canvas pixels
+                 * ---------------------------------------------------------
+                 *
+                 * The entire canvas width is scaled to usableWidth mm.
                  */
-                const imageData =
-                    canvas.toDataURL(
-                        'image/jpeg',
-                        0.92
+
+                const pixelsPerMm =
+                    canvas.width
+                    /
+                    usableWidth;
+
+
+                const targetPageHeightPx =
+                    usableHeight
+                    *
+                    pixelsPerMm;
+
+
+                /*
+                 * Find DOM elements which should not be broken.
+                 */
+                const keepRanges =
+                    getKeepTogetherRanges(
+                        canvas,
+                        targetPageHeightPx
                     );
 
 
-                const imageHeight =
-                    (
-                        canvas.height
-                        *
-                        usableWidth
-                    )
-                    /
-                    canvas.width;
-
-
-                let heightLeft =
-                    imageHeight;
-
-
-                let position =
-                    marginTop;
-
-
                 /*
-                 * First page
+                 * ---------------------------------------------------------
+                 * BUILD LOGICAL PAGES
+                 * ---------------------------------------------------------
                  */
-                pdf.addImage(
-                    imageData,
-                    'JPEG',
-                    marginLeft,
-                    position,
-                    usableWidth,
-                    imageHeight,
-                    undefined,
-                    'FAST'
-                );
+
+                const pages = [];
+
+                let startY =
+                    0;
 
 
-                heightLeft -=
-                    usableHeight;
-
-
-                /*
-                 * Remaining pages
-                 */
                 while (
-                    heightLeft > 0.5
+                    startY
+                    <
+                    canvas.height - 1
                 ) {
 
-                    pdf.addPage();
+                    let proposedEndY =
+                        Math.min(
+                            startY
+                            +
+                            targetPageHeightPx,
 
-                    position -=
-                        usableHeight;
-
-
-                    pdf.addImage(
-                        imageData,
-                        'JPEG',
-                        marginLeft,
-                        position,
-                        usableWidth,
-                        imageHeight,
-                        undefined,
-                        'FAST'
-                    );
+                            canvas.height
+                        );
 
 
-                    heightLeft -=
-                        usableHeight;
+                    const endY =
+                        findSafePageEnd(
+                            startY,
+                            proposedEndY,
+                            keepRanges,
+                            canvas.height,
+                            targetPageHeightPx
+                        );
+
+
+                    /*
+                     * Ultimate safety check.
+                     */
+                    if (
+                        endY
+                        <=
+                        startY
+                    ) {
+
+                        proposedEndY =
+                            Math.min(
+                                startY
+                                +
+                                targetPageHeightPx,
+
+                                canvas.height
+                            );
+
+
+                        pages.push({
+                            start:
+                                startY,
+
+                            end:
+                                proposedEndY
+                        });
+
+
+                        startY =
+                            proposedEndY;
+
+                        continue;
+                    }
+
+
+                    pages.push({
+                        start:
+                            startY,
+
+                        end:
+                            endY
+                    });
+
+
+                    startY =
+                        endY;
+
                 }
 
 
                 /*
                  * ---------------------------------------------------------
-                 * Page footer / page numbering
+                 * RENDER EACH PAGE AS ITS OWN IMAGE
+                 * ---------------------------------------------------------
+                 *
+                 * This is the critical improvement.
+                 *
+                 * We are NOT inserting the original huge image repeatedly
+                 * with increasingly negative positions.
+                 *
+                 * Every PDF page gets an independent cropped image.
+                 */
+
+                pages.forEach(
+                    function (
+                        page,
+                        index
+                    ) {
+
+                        if (index > 0) {
+                            pdf.addPage();
+                        }
+
+
+                        const pageCanvas =
+                            createPageCanvas(
+                                canvas,
+                                page.start,
+                                page.end
+                            );
+
+
+                        const pageImage =
+                            pageCanvas.toDataURL(
+                                'image/jpeg',
+                                0.92
+                            );
+
+
+                        const pageImageHeightMm =
+                            pageCanvas.height
+                            /
+                            pixelsPerMm;
+
+
+                        pdf.addImage(
+                            pageImage,
+                            'JPEG',
+
+                            marginLeft,
+                            marginTop,
+
+                            usableWidth,
+                            pageImageHeightMm,
+
+                            undefined,
+                            'FAST'
+                        );
+
+                    }
+                );
+
+
+                /*
+                 * ---------------------------------------------------------
+                 * FOOTERS
                  * ---------------------------------------------------------
                  */
 
-                const totalPages =
-                    pdf.getNumberOfPages();
-
-
                 const statementReference =
                     @json($statementReference);
+
+
+                const totalPages =
+                    pdf.getNumberOfPages();
 
 
                 for (
@@ -2581,56 +3104,15 @@ document.addEventListener('DOMContentLoaded', function () {
                     );
 
 
-                    pdf.setDrawColor(
-                        190,
-                        190,
-                        190
-                    );
-
-
-                    pdf.line(
-                        marginLeft,
-                        pageHeight - 6,
-                        pageWidth - marginRight,
-                        pageHeight - 6
-                    );
-
-
-                    pdf.setFontSize(
-                        7
-                    );
-
-
-                    pdf.setTextColor(
-                        90,
-                        90,
-                        90
-                    );
-
-
-                    pdf.text(
-                        'KASS SACCO | '
-                        +
-                        statementReference,
-                        marginLeft,
-                        pageHeight - 3
-                    );
-
-
-                    pdf.text(
-                        'Page '
-                        +
-                        pageNumber
-                        +
-                        ' of '
-                        +
+                    addPageFooter(
+                        pdf,
+                        pageNumber,
                         totalPages,
-                        pageWidth - marginRight,
-                        pageHeight - 3,
-                        {
-                            align:
-                                'right'
-                        }
+                        statementReference,
+                        pageWidth,
+                        pageHeight,
+                        marginLeft,
+                        marginRight
                     );
 
                 }
@@ -2638,7 +3120,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 /*
                  * ---------------------------------------------------------
-                 * Filename
+                 * FILE NAME
                  * ---------------------------------------------------------
                  */
 
@@ -2699,6 +3181,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     fileName
                 );
 
+
             } catch (error) {
 
                 console.error(
@@ -2718,11 +3201,13 @@ document.addEventListener('DOMContentLoaded', function () {
                 );
 
 
-                pdfButton.disabled = false;
+                pdfButton.disabled =
+                    false;
 
 
                 if (printButton) {
-                    printButton.disabled = false;
+                    printButton.disabled =
+                        false;
                 }
 
 
