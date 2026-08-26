@@ -59,52 +59,52 @@ class ExistingLoanGuarantorController extends Controller
                 'loan_id' => (int) $loanRow->loan_id,
 
                 'loan_type_id' =>
-                    (int) $loanRow->loan_loan_type,
+                (int) $loanRow->loan_loan_type,
 
                 'loan_type_name' =>
-                    (string) $loanRow->loan_type_name,
+                (string) $loanRow->loan_type_name,
 
                 'borrower_id' =>
-                    (int) $loanRow->loan_member,
+                (int) $loanRow->loan_member,
 
                 'borrower_name' =>
-                    (string) $loanRow->borrower_name,
+                (string) $loanRow->borrower_name,
 
                 'borrower_sacco_id' =>
-                    (string) $loanRow->borrower_sacco_id,
+                (string) $loanRow->borrower_sacco_id,
 
                 'loan_amount' =>
-                    round((float) $loanRow->loan_amount, 2),
+                round((float) $loanRow->loan_amount, 2),
 
                 'loan_paid' =>
-                    round((float) $loanRow->loan_loan_paid, 2),
+                round((float) $loanRow->loan_loan_paid, 2),
 
                 'loan_balance' =>
-                    $summary['loan_balance'],
+                $summary['loan_balance'],
 
                 'guarantee_percent' =>
-                    $summary['guarantee_percent'],
+                $summary['guarantee_percent'],
 
                 'guarantee_required' =>
-                    $summary['guarantee_required'],
+                $summary['guarantee_required'],
 
                 'currently_guaranteed' =>
-                    $summary['currently_guaranteed'],
+                $summary['currently_guaranteed'],
 
                 'guarantee_remaining' =>
-                    $summary['guarantee_remaining'],
+                $summary['guarantee_remaining'],
 
                 'current_guarantor_count' =>
-                    $summary['current_guarantor_count'],
+                $summary['current_guarantor_count'],
 
                 'maximum_guarantors' =>
-                    $summary['maximum_guarantors'],
+                $summary['maximum_guarantors'],
 
                 'can_add_guarantor' =>
-                    $summary['can_add_guarantor'],
+                $summary['can_add_guarantor'],
 
                 'blocking_message' =>
-                    $summary['blocking_message'],
+                $summary['blocking_message'],
             ],
         ]);
     }
@@ -125,93 +125,118 @@ class ExistingLoanGuarantorController extends Controller
     */
 
     public function search(Request $request, int $loan)
-    {
-        $validator = Validator::make(
-            $request->all(),
-            [
-                'q' => [
-                    'required',
-                    'string',
-                    'min:2',
-                    'max:100',
-                ],
-            ]
-        );
+{
+    $validator = Validator::make(
+        $request->all(),
+        [
+            'q' => [
+                'required',
+                'string',
+                'min:2',
+                'max:100',
+            ],
+        ]
+    );
 
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Enter at least 2 characters.',
-                'results' => [],
-            ], 422);
-        }
+    if ($validator->fails()) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Enter at least 2 characters.',
+            'results' => [],
+        ], 422);
+    }
 
-        $loanRow = $this->getLoan($loan);
 
-        if (!$loanRow) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Loan not found.',
-                'results' => [],
-            ], 404);
-        }
+    /*
+    |--------------------------------------------------------------------------
+    | Load loan
+    |--------------------------------------------------------------------------
+    */
 
-        $summary = $this->buildLoanGuaranteeSummary(
-            $loanRow
-        );
+    $loanRow = $this->getLoan($loan);
 
-        if (!$summary['can_add_guarantor']) {
-            return response()->json([
-                'success' => false,
-                'message' => $summary['blocking_message'],
-                'results' => [],
-            ], 422);
-        }
+    if (!$loanRow) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Loan not found.',
+            'results' => [],
+        ], 404);
+    }
 
-        $query = trim(
-            (string) $request->input('q')
-        );
 
-        /*
-         * Existing guarantors on THIS loan.
-         *
-         * A member already attached to the loan must not be offered again.
-         *
-         * This includes a partially/fully freed guarantor while the
-         * guarantor row remains a valid non-deleted record.
-         */
-        $existingGuarantorIds = DB::table(
-            'sacco_loan_guarantors'
+    /*
+    |--------------------------------------------------------------------------
+    | Loan guarantee position
+    |--------------------------------------------------------------------------
+    */
+
+    $summary = $this->buildLoanGuaranteeSummary(
+        $loanRow
+    );
+
+    if (!$summary['can_add_guarantor']) {
+        return response()->json([
+            'success' => false,
+            'message' => $summary['blocking_message'],
+            'results' => [],
+        ], 422);
+    }
+
+
+    $query = trim(
+        (string) $request->input('q')
+    );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Existing guarantors on this loan
+    |--------------------------------------------------------------------------
+    |
+    | Do not offer somebody who is already attached to this exact loan.
+    |
+    */
+
+    $existingGuarantorIds = DB::table(
+        'sacco_loan_guarantors'
+    )
+        ->where(
+            'loan_guar_loan_id',
+            $loan
         )
-            ->where(
-                'loan_guar_loan_id',
-                $loan
-            )
-            ->whereRaw(
-                "COALESCE(loan_guar_deleted, 'N') <> 'Y'"
-            )
-            ->pluck(
-                'loan_guar_guarantor_id'
-            )
-            ->map(fn ($id) => (int) $id)
-            ->all();
-
-        /*
-         * Search a bounded candidate set.
-         */
-        $membersQuery = DB::table(
-            'sacco_members'
+        ->whereRaw(
+            "COALESCE(loan_guar_deleted, 'N') <> 'Y'"
         )
-            ->where(
-                'member_active',
-                'Y'
-            )
-            ->whereRaw(
-                "COALESCE(member_deleted, 'N') <> 'Y'"
-            )
-            ->where(function ($q) use ($query) {
+        ->pluck(
+            'loan_guar_guarantor_id'
+        )
+        ->map(
+            fn ($id) => (int) $id
+        )
+        ->all();
 
-                $search = '%' . $query . '%';
+
+    /*
+    |--------------------------------------------------------------------------
+    | Search active members
+    |--------------------------------------------------------------------------
+    */
+
+    $membersQuery = DB::table(
+        'sacco_members'
+    )
+        ->where(
+            'member_active',
+            'Y'
+        )
+        ->whereRaw(
+            "COALESCE(member_deleted, 'N') <> 'Y'"
+        )
+        ->where(
+            function ($q) use ($query) {
+
+                $search =
+                    '%' . $query . '%';
 
                 $q->where(
                     'member_name',
@@ -238,270 +263,518 @@ class ExistingLoanGuarantorController extends Controller
                         'LIKE',
                         $search
                     );
-            });
+            }
+        );
 
-        if (!empty($existingGuarantorIds)) {
-            $membersQuery->whereNotIn(
-                'member_id',
-                $existingGuarantorIds
+
+    if (!empty($existingGuarantorIds)) {
+
+        $membersQuery->whereNotIn(
+            'member_id',
+            $existingGuarantorIds
+        );
+    }
+
+
+    $members = $membersQuery
+        ->select(
+            'member_id',
+            'member_name',
+            'member_sacco_id',
+            'member_national_id',
+            'member_phone_no',
+            'member_total_share',
+            'member_tied_shares',
+            'member_tied_shares_self'
+        )
+        ->orderBy(
+            'member_name'
+        )
+        ->limit(20)
+        ->get();
+
+
+    if ($members->isEmpty()) {
+
+        return response()->json([
+            'success' => true,
+            'results' => [],
+        ]);
+    }
+
+
+    $memberIds = $members
+        ->pluck('member_id')
+        ->map(
+            fn ($id) => (int) $id
+        )
+        ->all();
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Pending guarantee exposure
+    |--------------------------------------------------------------------------
+    |
+    | Pending applications must also reserve guarantee capacity.
+    |
+    */
+
+    $pendingRows = DB::table(
+        'sacco_loan_batch_guarantors_members as g'
+    )
+        ->join(
+            'sacco_loan_batch_trans_members as t',
+            'g.guarantors_loan_batch_trans_id',
+            '=',
+            't.batch_trans_id'
+        )
+        ->whereIn(
+            'g.guarantors_guarantor_id',
+            $memberIds
+        )
+        ->whereRaw(
+            "COALESCE(g.guarantors_deleted, 'N') <> 'Y'"
+        )
+        ->whereRaw(
+            "COALESCE(t.batch_trans_deleted, 'N') <> 'Y'"
+        )
+        ->whereRaw(
+            "COALESCE(t.batch_trans_updated, 'N') = 'N'"
+        )
+        ->select(
+            'g.guarantors_guarantor_id',
+            'g.guarantors_amount_guaranteed',
+            't.batch_trans_member_id'
+        )
+        ->get();
+
+
+    $pendingByMember = [];
+
+
+    foreach ($pendingRows as $pending) {
+
+        $pendingGuarantorId =
+            (int) $pending->guarantors_guarantor_id;
+
+        $pendingAmount =
+            max(
+                0,
+                (float) (
+                    $pending->guarantors_amount_guaranteed
+                    ?? 0
+                )
             );
-        }
 
-        $members = $membersQuery
-            ->select(
-                'member_id',
-                'member_name',
-                'member_sacco_id',
-                'member_national_id',
-                'member_phone_no',
-                'member_total_share',
-                'member_tied_shares',
-                'member_tied_shares_self'
+
+        if (
+            !isset(
+                $pendingByMember[$pendingGuarantorId]
             )
-            ->orderBy('member_name')
-            ->limit(20)
-            ->get();
+        ) {
 
-        if ($members->isEmpty()) {
-            return response()->json([
-                'success' => true,
-                'results' => [],
-            ]);
+            $pendingByMember[$pendingGuarantorId] = [
+                'other' => 0.00,
+                'self' => 0.00,
+            ];
         }
 
-        $memberIds = $members
-            ->pluck('member_id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
+
+        if (
+            (int) $pending->batch_trans_member_id
+            ===
+            $pendingGuarantorId
+        ) {
+
+            $pendingByMember[
+                $pendingGuarantorId
+            ]['self'] +=
+                $pendingAmount;
+
+        } else {
+
+            $pendingByMember[
+                $pendingGuarantorId
+            ]['other'] +=
+                $pendingAmount;
+        }
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Configured guarantee factors
+    |--------------------------------------------------------------------------
+    |
+    | Read ONCE per request.
+    |
+    | Other-member guarantees:
+    | member_total_share × max_guarantor_factor
+    |
+    | Self guarantees:
+    | member_total_share × max_guarantor_factor_self
+    |
+    */
+
+    $maxGuarantorFactor =
+        (float) (
+            DB::table(
+                'sacco_defaults'
+            )
+                ->where(
+                    'default_name',
+                    'max_guarantor_factor'
+                )
+                ->value(
+                    'default_value'
+                )
+            ?? 1
+        );
+
+
+    $maxGuarantorFactorSelf =
+        (float) (
+            DB::table(
+                'sacco_defaults'
+            )
+                ->where(
+                    'default_name',
+                    'max_guarantor_factor_self'
+                )
+                ->value(
+                    'default_value'
+                )
+            ?? 1
+        );
+
+
+    $maxGuarantorFactor =
+        max(
+            0,
+            $maxGuarantorFactor
+        );
+
+
+    $maxGuarantorFactorSelf =
+        max(
+            0,
+            $maxGuarantorFactorSelf
+        );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Build eligible search results
+    |--------------------------------------------------------------------------
+    */
+
+    $results = [];
+
+
+    foreach ($members as $member) {
+
+        $memberId =
+            (int) $member->member_id;
+
+
+        $pending =
+            $pendingByMember[$memberId]
+            ?? [
+                'other' => 0.00,
+                'self' => 0.00,
+            ];
+
+
+        $totalSavings =
+            max(
+                0,
+                (float) (
+                    $member->member_total_share
+                    ?? 0
+                )
+            );
+
 
         /*
         |--------------------------------------------------------------------------
-        | Pending guarantee exposure
+        | Determine whether this is self-guarantee
         |--------------------------------------------------------------------------
-        |
-        | Do not permit pending loan applications to reserve the same savings
-        | while this existing-loan operation is also trying to tie them.
-        |
         */
 
-        $pendingRows = DB::table(
-            'sacco_loan_batch_guarantors_members as g'
-        )
-            ->join(
-                'sacco_loan_batch_trans_members as t',
-                'g.guarantors_loan_batch_trans_id',
-                '=',
-                't.batch_trans_id'
-            )
-            ->whereIn(
-                'g.guarantors_guarantor_id',
-                $memberIds
-            )
-            ->whereRaw(
-                "COALESCE(g.guarantors_deleted, 'N') <> 'Y'"
-            )
-            ->whereRaw(
-                "COALESCE(t.batch_trans_deleted, 'N') <> 'Y'"
-            )
-            ->whereRaw(
-                "COALESCE(t.batch_trans_updated, 'N') = 'N'"
-            )
-            ->select(
-                'g.guarantors_guarantor_id',
-                'g.guarantors_amount_guaranteed',
-                't.batch_trans_member_id'
-            )
-            ->get();
+        $isSelfGuarantee =
+            $memberId
+            ===
+            (int) $loanRow->loan_member;
 
-        $pendingByMember = [];
 
-        foreach ($pendingRows as $pending) {
+        /*
+        |--------------------------------------------------------------------------
+        | Apply correct factor and exposure bucket
+        |--------------------------------------------------------------------------
+        */
 
-            $guarantorId =
-                (int) $pending->guarantors_guarantor_id;
-
-            $amount =
-                max(
-                    0,
-                    (float) $pending->guarantors_amount_guaranteed
-                );
-
-            if (!isset($pendingByMember[$guarantorId])) {
-                $pendingByMember[$guarantorId] = [
-                    'other' => 0.00,
-                    'self' => 0.00,
-                    'total' => 0.00,
-                ];
-            }
-
-            if (
-                (int) $pending->batch_trans_member_id
-                ===
-                $guarantorId
-            ) {
-                $pendingByMember[$guarantorId]['self']
-                    += $amount;
-            } else {
-                $pendingByMember[$guarantorId]['other']
-                    += $amount;
-            }
-
-            $pendingByMember[$guarantorId]['total']
-                += $amount;
-        }
-
-        $results = [];
-
-        foreach ($members as $member) {
-
-            $memberId =
-                (int) $member->member_id;
-
-            $pending =
-                $pendingByMember[$memberId]
-                ?? [
-                    'other' => 0,
-                    'self' => 0,
-                    'total' => 0,
-                ];
+        if ($isSelfGuarantee) {
 
             /*
-            |--------------------------------------------------------------------------
-            | HARD SAVINGS CEILING
-            |--------------------------------------------------------------------------
-            |
-            | User rule:
-            |
-            | A member cannot guarantee more than the savings they actually
-            | hold.
-            |
-            | Therefore ALL guarantee exposure counts:
-            |
-            | member_tied_shares
-            | +
-            | member_tied_shares_self
-            | +
-            | pending other guarantees
-            | +
-            | pending self guarantees
-            |
-            */
+             * Self:
+             *
+             * savings × max_guarantor_factor_self
+             * - tied self
+             * - pending self
+             */
 
-            $totalSavings =
+            $guaranteeFactor =
+                $maxGuarantorFactorSelf;
+
+
+            $existingExposure =
                 max(
                     0,
-                    (float) $member->member_total_share
+                    (float) (
+                        $member->member_tied_shares_self
+                        ?? 0
+                    )
                 );
 
-            $alreadyTied =
-                max(
-                    0,
-                    (float) $member->member_tied_shares
-                )
-                +
-                max(
-                    0,
-                    (float) $member->member_tied_shares_self
-                );
 
             $pendingExposure =
                 max(
                     0,
-                    (float) $pending['total']
+                    (float) (
+                        $pending['self']
+                        ?? 0
+                    )
                 );
 
-            $availableCapacity =
+        } else {
+
+            /*
+             * Other member:
+             *
+             * savings × max_guarantor_factor
+             * - tied others
+             * - pending others
+             */
+
+            $guaranteeFactor =
+                $maxGuarantorFactor;
+
+
+            $existingExposure =
                 max(
                     0,
-                    $totalSavings
-                    - $alreadyTied
-                    - $pendingExposure
+                    (float) (
+                        $member->member_tied_shares
+                        ?? 0
+                    )
                 );
 
-            /*
-             * No need to show members with no capacity.
-             */
-            if (
-                $availableCapacity
-                <= $this->moneyTolerance
-            ) {
-                continue;
-            }
 
-            /*
-             * A guarantor can never be offered more than the loan itself
-             * still needs.
-             */
-            $maximumForThisLoan = min(
-                $availableCapacity,
-                $summary['guarantee_remaining']
-            );
-
-            if (
-                $maximumForThisLoan
-                <= $this->moneyTolerance
-            ) {
-                continue;
-            }
-
-            $results[] = [
-                'member_id' =>
-                    $memberId,
-
-                'member_name' =>
-                    (string) $member->member_name,
-
-                'member_sacco_id' =>
-                    (string) $member->member_sacco_id,
-
-                'member_national_id' =>
-                    (string) ($member->member_national_id ?? ''),
-
-                'member_phone_no' =>
-                    (string) ($member->member_phone_no ?? ''),
-
-                'is_self_guarantee' =>
-                    $memberId === (int) $loanRow->loan_member,
-
-                'total_savings' =>
-                    round($totalSavings, 2),
-
-                'tied_to_others' =>
-                    round(
-                        (float) $member->member_tied_shares,
-                        2
-                    ),
-
-                'tied_to_self' =>
-                    round(
-                        (float) $member->member_tied_shares_self,
-                        2
-                    ),
-
-                'pending_guarantees' =>
-                    round($pendingExposure, 2),
-
-                'available_capacity' =>
-                    round($availableCapacity, 2),
-
-                'maximum_for_this_loan' =>
-                    round($maximumForThisLoan, 2),
-            ];
+            $pendingExposure =
+                max(
+                    0,
+                    (float) (
+                        $pending['other']
+                        ?? 0
+                    )
+                );
         }
 
-        return response()->json([
-            'success' => true,
 
-            'loan_id' =>
-                (int) $loanRow->loan_id,
+        /*
+        |--------------------------------------------------------------------------
+        | Maximum permitted exposure
+        |--------------------------------------------------------------------------
+        */
 
-            'guarantee_remaining' =>
-                $summary['guarantee_remaining'],
+        $maximumExposure =
+            round(
+                $totalSavings
+                *
+                $guaranteeFactor,
+                2
+            );
 
-            'results' =>
-                array_values($results),
-        ]);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Remaining member capacity
+        |--------------------------------------------------------------------------
+        */
+
+        $availableCapacity =
+            round(
+                max(
+                    0,
+                    $maximumExposure
+                    -
+                    $existingExposure
+                    -
+                    $pendingExposure
+                ),
+                2
+            );
+
+
+        /*
+         * Do not display members with no capacity.
+         */
+        if (
+            $availableCapacity
+            <=
+            $this->moneyTolerance
+        ) {
+            continue;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Maximum usable for THIS loan
+        |--------------------------------------------------------------------------
+        |
+        | A member may have substantial guarantee capacity, but this
+        | particular loan may need much less.
+        |
+        */
+
+        $maximumForThisLoan =
+            round(
+                min(
+                    $availableCapacity,
+                    $summary['guarantee_remaining']
+                ),
+                2
+            );
+
+
+        if (
+            $maximumForThisLoan
+            <=
+            $this->moneyTolerance
+        ) {
+            continue;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Result
+        |--------------------------------------------------------------------------
+        */
+
+        $results[] = [
+
+            'member_id' =>
+                $memberId,
+
+            'member_name' =>
+                (string) $member->member_name,
+
+            'member_sacco_id' =>
+                (string) $member->member_sacco_id,
+
+            'member_national_id' =>
+                (string) (
+                    $member->member_national_id
+                    ?? ''
+                ),
+
+            'member_phone_no' =>
+                (string) (
+                    $member->member_phone_no
+                    ?? ''
+                ),
+
+            'is_self_guarantee' =>
+                $isSelfGuarantee,
+
+            'guarantee_factor' =>
+                round(
+                    $guaranteeFactor,
+                    2
+                ),
+
+            'maximum_exposure' =>
+                round(
+                    $maximumExposure,
+                    2
+                ),
+
+            'total_savings' =>
+                round(
+                    $totalSavings,
+                    2
+                ),
+
+            'tied_to_others' =>
+                round(
+                    (float) (
+                        $member->member_tied_shares
+                        ?? 0
+                    ),
+                    2
+                ),
+
+            'tied_to_self' =>
+                round(
+                    (float) (
+                        $member->member_tied_shares_self
+                        ?? 0
+                    ),
+                    2
+                ),
+
+            /*
+             * Applicable pending pool for this guarantee.
+             */
+            'pending_guarantees' =>
+                round(
+                    $pendingExposure,
+                    2
+                ),
+
+            'available_capacity' =>
+                round(
+                    $availableCapacity,
+                    2
+                ),
+
+            /*
+             * Actual amount that may be assigned to THIS loan.
+             */
+            'maximum_for_this_loan' =>
+                round(
+                    $maximumForThisLoan,
+                    2
+                ),
+        ];
     }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Search response
+    |--------------------------------------------------------------------------
+    |
+    | THIS is the return response()->json() I was referring to earlier.
+    |
+    */
+
+    return response()->json([
+        'success' => true,
+
+        'loan_id' =>
+            (int) $loanRow->loan_id,
+
+        'guarantee_remaining' =>
+            $summary['guarantee_remaining'],
+
+        'results' =>
+            array_values($results),
+    ]);
+}
 
 
     /*
@@ -639,8 +912,8 @@ class ExistingLoanGuarantorController extends Controller
                         max(
                             0,
                             (float) $loanRow->loan_amount
-                            -
-                            (float) ($loanRow->loan_loan_paid ?? 0)
+                                -
+                                (float) ($loanRow->loan_loan_paid ?? 0)
                         ),
                         2
                     );
@@ -695,7 +968,7 @@ class ExistingLoanGuarantorController extends Controller
                     $configuredGuarantee =
                         round(
                             $loanBalance
-                            * ($guaranteePercent / 100),
+                                * ($guaranteePercent / 100),
                             2
                         );
 
@@ -718,15 +991,15 @@ class ExistingLoanGuarantorController extends Controller
                         DB::table(
                             'sacco_loan_guarantors'
                         )
-                            ->where(
-                                'loan_guar_loan_id',
-                                $loan
-                            )
-                            ->whereRaw(
-                                "COALESCE(loan_guar_deleted, 'N') <> 'Y'"
-                            )
-                            ->lockForUpdate()
-                            ->get();
+                        ->where(
+                            'loan_guar_loan_id',
+                            $loan
+                        )
+                        ->whereRaw(
+                            "COALESCE(loan_guar_deleted, 'N') <> 'Y'"
+                        )
+                        ->lockForUpdate()
+                        ->get();
 
                     /*
                     |--------------------------------------------------------------------------
@@ -736,14 +1009,14 @@ class ExistingLoanGuarantorController extends Controller
 
                     $alreadyGuarantor =
                         $existingGuarantors
-                            ->contains(
-                                function ($row) use ($guarantorId) {
-                                    return
-                                        (int) $row->loan_guar_guarantor_id
-                                        ===
-                                        $guarantorId;
-                                }
-                            );
+                        ->contains(
+                            function ($row) use ($guarantorId) {
+                                return
+                                    (int) $row->loan_guar_guarantor_id
+                                    ===
+                                    $guarantorId;
+                            }
+                        );
 
                     if ($alreadyGuarantor) {
                         throw new DomainException(
@@ -772,12 +1045,12 @@ class ExistingLoanGuarantorController extends Controller
                                                 ->loan_guar_amount_guaranteed
                                                 ?? 0
                                             )
-                                            -
-                                            (float) (
-                                                $row
-                                                ->loan_guar_amount_freed
-                                                ?? 0
-                                            )
+                                                -
+                                                (float) (
+                                                    $row
+                                                    ->loan_guar_amount_freed
+                                                    ?? 0
+                                                )
                                         );
                                     }
                                 ),
@@ -789,8 +1062,8 @@ class ExistingLoanGuarantorController extends Controller
                             max(
                                 0,
                                 $maximumLoanGuarantee
-                                -
-                                $currentlyGuaranteed
+                                    -
+                                    $currentlyGuaranteed
                             ),
                             2
                         );
@@ -817,12 +1090,12 @@ class ExistingLoanGuarantorController extends Controller
                     ) {
                         throw new DomainException(
                             'This amount would over-guarantee the loan. '
-                            . 'The maximum additional guarantee allowed is KES '
-                            . number_format(
-                                $remainingGuarantee,
-                                2
-                            )
-                            . '.'
+                                . 'The maximum additional guarantee allowed is KES '
+                                . number_format(
+                                    $remainingGuarantee,
+                                    2
+                                )
+                                . '.'
                         );
                     }
 
@@ -837,13 +1110,13 @@ class ExistingLoanGuarantorController extends Controller
                             DB::table(
                                 'sacco_defaults'
                             )
-                                ->where(
-                                    'default_name',
-                                    'maximum_no_of_guarantors'
-                                )
-                                ->value(
-                                    'default_value'
-                                )
+                            ->where(
+                                'default_name',
+                                'maximum_no_of_guarantors'
+                            )
+                            ->value(
+                                'default_value'
+                            )
                             ?? 3
                         );
 
@@ -858,26 +1131,26 @@ class ExistingLoanGuarantorController extends Controller
                      */
                     $activeGuarantorCount =
                         $existingGuarantors
-                            ->filter(
-                                function ($row) {
-                                    return (
-                                        (float) (
-                                            $row
-                                            ->loan_guar_amount_guaranteed
-                                            ?? 0
-                                        )
-                                        -
-                                        (float) (
-                                            $row
-                                            ->loan_guar_amount_freed
-                                            ?? 0
-                                        )
+                        ->filter(
+                            function ($row) {
+                                return (
+                                    (float) (
+                                        $row
+                                        ->loan_guar_amount_guaranteed
+                                        ?? 0
                                     )
+                                    -
+                                    (float) (
+                                        $row
+                                        ->loan_guar_amount_freed
+                                        ?? 0
+                                    )
+                                )
                                     >
                                     $this->moneyTolerance;
-                                }
-                            )
-                            ->count();
+                            }
+                        )
+                        ->count();
 
                     if (
                         $activeGuarantorCount
@@ -898,12 +1171,12 @@ class ExistingLoanGuarantorController extends Controller
                         DB::table(
                             'sacco_members'
                         )
-                            ->where(
-                                'member_id',
-                                $guarantorId
-                            )
-                            ->lockForUpdate()
-                            ->first();
+                        ->where(
+                            'member_id',
+                            $guarantorId
+                        )
+                        ->lockForUpdate()
+                        ->first();
 
                     if (!$guarantor) {
                         throw new DomainException(
@@ -955,31 +1228,31 @@ class ExistingLoanGuarantorController extends Controller
                         DB::table(
                             'sacco_loan_batch_guarantors_members as g'
                         )
-                            ->join(
-                                'sacco_loan_batch_trans_members as t',
-                                'g.guarantors_loan_batch_trans_id',
-                                '=',
-                                't.batch_trans_id'
-                            )
-                            ->where(
-                                'g.guarantors_guarantor_id',
-                                $guarantorId
-                            )
-                            ->whereRaw(
-                                "COALESCE(g.guarantors_deleted, 'N') <> 'Y'"
-                            )
-                            ->whereRaw(
-                                "COALESCE(t.batch_trans_deleted, 'N') <> 'Y'"
-                            )
-                            ->whereRaw(
-                                "COALESCE(t.batch_trans_updated, 'N') = 'N'"
-                            )
-                            ->select(
-                                'g.guarantors_amount_guaranteed',
-                                't.batch_trans_member_id'
-                            )
-                            ->lockForUpdate()
-                            ->get();
+                        ->join(
+                            'sacco_loan_batch_trans_members as t',
+                            'g.guarantors_loan_batch_trans_id',
+                            '=',
+                            't.batch_trans_id'
+                        )
+                        ->where(
+                            'g.guarantors_guarantor_id',
+                            $guarantorId
+                        )
+                        ->whereRaw(
+                            "COALESCE(g.guarantors_deleted, 'N') <> 'Y'"
+                        )
+                        ->whereRaw(
+                            "COALESCE(t.batch_trans_deleted, 'N') <> 'Y'"
+                        )
+                        ->whereRaw(
+                            "COALESCE(t.batch_trans_updated, 'N') = 'N'"
+                        )
+                        ->select(
+                            'g.guarantors_amount_guaranteed',
+                            't.batch_trans_member_id'
+                        )
+                        ->lockForUpdate()
+                        ->get();
 
                     $pendingOther = 0.00;
                     $pendingSelf = 0.00;
@@ -1011,82 +1284,188 @@ class ExistingLoanGuarantorController extends Controller
                     }
 
                     /*
-                    |--------------------------------------------------------------------------
-                    | HARD MEMBER SAVINGS LIMIT
-                    |--------------------------------------------------------------------------
-                    |
-                    | A member cannot have guarantee exposure greater than
-                    | actual savings.
-                    |
-                    | We deliberately DO NOT multiply savings by
-                    | max_guarantor_factor here.
-                    |
-                    | Existing tied exposure in BOTH pools counts.
-                    |
-                    */
+|--------------------------------------------------------------------------
+| GUARANTOR CAPACITY
+|--------------------------------------------------------------------------
+|
+| Guaranteeing another member:
+|
+|   savings × max_guarantor_factor
+|   - existing guarantees to others
+|   - pending guarantees to others
+|
+| Self guarantee:
+|
+|   savings × max_guarantor_factor_self
+|   - existing self guarantee exposure
+|   - pending self guarantee exposure
+|
+*/
 
                     $totalSavings =
                         max(
                             0,
                             (float) (
-                                $guarantor
-                                ->member_total_share
+                                $guarantor->member_total_share
                                 ?? 0
                             )
                         );
+
 
                     $tiedOthers =
                         max(
                             0,
                             (float) (
-                                $guarantor
-                                ->member_tied_shares
+                                $guarantor->member_tied_shares
                                 ?? 0
                             )
                         );
+
 
                     $tiedSelf =
                         max(
                             0,
                             (float) (
-                                $guarantor
-                                ->member_tied_shares_self
+                                $guarantor->member_tied_shares_self
                                 ?? 0
                             )
                         );
 
+
+                    $isSelfGuarantee =
+                        $guarantorId
+                        ===
+                        (int) $loanRow->loan_member;
+
+
+                    /*
+ * Load configured factors.
+ */
+                    $maxGuarantorFactor =
+                        (float) (
+                            DB::table('sacco_defaults')
+                            ->where(
+                                'default_name',
+                                'max_guarantor_factor'
+                            )
+                            ->value('default_value')
+                            ?? 1
+                        );
+
+
+                    $maxGuarantorFactorSelf =
+                        (float) (
+                            DB::table('sacco_defaults')
+                            ->where(
+                                'default_name',
+                                'max_guarantor_factor_self'
+                            )
+                            ->value('default_value')
+                            ?? 1
+                        );
+
+
+                    $maxGuarantorFactor =
+                        max(
+                            0,
+                            $maxGuarantorFactor
+                        );
+
+
+                    $maxGuarantorFactorSelf =
+                        max(
+                            0,
+                            $maxGuarantorFactorSelf
+                        );
+
+
+                    /*
+ * Select the correct exposure pool.
+ */
+                    if ($isSelfGuarantee) {
+
+                        $guaranteeFactor =
+                            $maxGuarantorFactorSelf;
+
+                        $existingExposure =
+                            $tiedSelf;
+
+                        $pendingExposure =
+                            $pendingSelf;
+                    } else {
+
+                        $guaranteeFactor =
+                            $maxGuarantorFactor;
+
+                        $existingExposure =
+                            $tiedOthers;
+
+                        $pendingExposure =
+                            $pendingOther;
+                    }
+
+
+                    /*
+ * Maximum permitted guarantee exposure.
+ */
+                    $maximumExposure =
+                        round(
+                            $totalSavings
+                                *
+                                $guaranteeFactor,
+                            2
+                        );
+
+
+                    /*
+ * Remaining capacity.
+ */
                     $availableCapacity =
                         round(
                             max(
                                 0,
-                                $totalSavings
-                                -
-                                $tiedOthers
-                                -
-                                $tiedSelf
-                                -
-                                $pendingOther
-                                -
-                                $pendingSelf
+                                $maximumExposure
+                                    -
+                                    $existingExposure
+                                    -
+                                    $pendingExposure
                             ),
                             2
                         );
 
+
                     if (
                         $amount
                         >
-                        ($availableCapacity + $this->moneyTolerance)
+                        (
+                            $availableCapacity
+                            +
+                            $this->moneyTolerance
+                        )
                     ) {
+
                         throw new DomainException(
-                            'The selected member does not have enough free savings to guarantee this amount. '
-                            . 'Available capacity is KES '
-                            . number_format(
-                                $availableCapacity,
-                                2
-                            )
-                            . '.'
+                            'The selected member does not have enough guarantee capacity. '
+                                . 'Savings: KES '
+                                . number_format(
+                                    $totalSavings,
+                                    2
+                                )
+                                . ', factor: '
+                                . number_format(
+                                    $guaranteeFactor,
+                                    2
+                                )
+                                . 'x, available capacity: KES '
+                                . number_format(
+                                    $availableCapacity,
+                                    2
+                                )
+                                . '.'
                         );
                     }
+
+                    
 
                     /*
                     |--------------------------------------------------------------------------
@@ -1099,35 +1478,35 @@ class ExistingLoanGuarantorController extends Controller
                     )
                         ->insert([
                             'loan_guar_loan_id' =>
-                                $loan,
+                            $loan,
 
                             'loan_guar_guarantor_id' =>
-                                $guarantorId,
+                            $guarantorId,
 
                             'loan_guar_amount_guaranteed' =>
-                                $amount,
+                            $amount,
 
                             'loan_guar_amount_freed' =>
-                                0,
+                            0,
 
                             'loan_guar_description' =>
-                                'Added to existing loan: '
+                            'Added to existing loan: '
                                 . $reason,
 
                             'loan_guar_transfered' =>
-                                null,
+                            null,
 
                             'loan_guar_by' =>
-                                Auth::id(),
+                            Auth::id(),
 
                             'loan_guar_on' =>
-                                now(),
+                            now(),
 
                             'loan_guar_ip' =>
-                                $request->ip(),
+                            $request->ip(),
 
                             'loan_guar_deleted' =>
-                                'N',
+                            'N',
                         ]);
 
                     /*
@@ -1154,7 +1533,6 @@ class ExistingLoanGuarantorController extends Controller
                                 'member_tied_shares_self',
                                 $amount
                             );
-
                     } else {
 
                         DB::table(
@@ -1184,8 +1562,8 @@ class ExistingLoanGuarantorController extends Controller
                     $newActiveGuarantee =
                         round(
                             $currentlyGuaranteed
-                            +
-                            $amount,
+                                +
+                                $amount,
                             2
                         );
 
@@ -1198,40 +1576,39 @@ class ExistingLoanGuarantorController extends Controller
                         )
                         ->update([
                             'loan_amount_guaranteed' =>
-                                $newActiveGuarantee,
+                            $newActiveGuarantee,
                         ]);
 
                     return [
                         'loan_id' =>
-                            $loan,
+                        $loan,
 
                         'borrower_id' =>
-                            (int) $loanRow->loan_member,
+                        (int) $loanRow->loan_member,
 
                         'guarantor_id' =>
-                            $guarantorId,
+                        $guarantorId,
 
                         'guarantor_name' =>
-                            (string) $guarantor->member_name,
+                        (string) $guarantor->member_name,
 
                         'amount' =>
-                            $amount,
+                        $amount,
 
                         'currently_guaranteed' =>
-                            $newActiveGuarantee,
+                        $newActiveGuarantee,
 
                         'guarantee_remaining' =>
-                            round(
-                                max(
-                                    0,
-                                    $maximumLoanGuarantee
+                        round(
+                            max(
+                                0,
+                                $maximumLoanGuarantee
                                     -
                                     $newActiveGuarantee
-                                ),
-                                2
                             ),
+                            2
+                        ),
                     ];
-
                 },
 
                 /*
@@ -1244,45 +1621,43 @@ class ExistingLoanGuarantorController extends Controller
                 'success' => true,
 
                 'message' =>
-                    'Guarantor added successfully.',
+                'Guarantor added successfully.',
 
                 'data' =>
-                    $result,
+                $result,
             ]);
-
         } catch (DomainException $e) {
 
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),
             ], 422);
-
         } catch (Throwable $e) {
 
             Log::error(
                 'Failed to add guarantor to existing loan',
                 [
                     'loan_id' =>
-                        $loan,
+                    $loan,
 
                     'guarantor_id' =>
-                        $guarantorId,
+                    $guarantorId,
 
                     'amount' =>
-                        $amount,
+                    $amount,
 
                     'user_id' =>
-                        Auth::id(),
+                    Auth::id(),
 
                     'message' =>
-                        $e->getMessage(),
+                    $e->getMessage(),
                 ]
             );
 
             return response()->json([
                 'success' => false,
                 'message' =>
-                    'The guarantor could not be added. Please try again or contact support.',
+                'The guarantor could not be added. Please try again or contact support.',
             ], 500);
         }
     }
@@ -1349,11 +1724,11 @@ class ExistingLoanGuarantorController extends Controller
                 max(
                     0,
                     (float) $loan->loan_amount
-                    -
-                    (float) (
-                        $loan->loan_loan_paid
-                        ?? 0
-                    )
+                        -
+                        (float) (
+                            $loan->loan_loan_paid
+                            ?? 0
+                        )
                 ),
                 2
             );
@@ -1376,8 +1751,8 @@ class ExistingLoanGuarantorController extends Controller
         $configuredRequirement =
             round(
                 $loanBalance
-                *
-                ($guaranteePercent / 100),
+                    *
+                    ($guaranteePercent / 100),
                 2
             );
 
@@ -1394,14 +1769,14 @@ class ExistingLoanGuarantorController extends Controller
             DB::table(
                 'sacco_loan_guarantors'
             )
-                ->where(
-                    'loan_guar_loan_id',
-                    $loan->loan_id
-                )
-                ->whereRaw(
-                    "COALESCE(loan_guar_deleted, 'N') <> 'Y'"
-                )
-                ->get();
+            ->where(
+                'loan_guar_loan_id',
+                $loan->loan_id
+            )
+            ->whereRaw(
+                "COALESCE(loan_guar_deleted, 'N') <> 'Y'"
+            )
+            ->get();
 
         $currentlyGuaranteed =
             round(
@@ -1416,12 +1791,12 @@ class ExistingLoanGuarantorController extends Controller
                                     ->loan_guar_amount_guaranteed
                                     ?? 0
                                 )
-                                -
-                                (float) (
-                                    $row
-                                    ->loan_guar_amount_freed
-                                    ?? 0
-                                )
+                                    -
+                                    (float) (
+                                        $row
+                                        ->loan_guar_amount_freed
+                                        ?? 0
+                                    )
                             );
                         }
                     ),
@@ -1433,8 +1808,8 @@ class ExistingLoanGuarantorController extends Controller
                 max(
                     0,
                     $guaranteeRequired
-                    -
-                    $currentlyGuaranteed
+                        -
+                        $currentlyGuaranteed
                 ),
                 2
             );
@@ -1444,13 +1819,13 @@ class ExistingLoanGuarantorController extends Controller
                 DB::table(
                     'sacco_defaults'
                 )
-                    ->where(
-                        'default_name',
-                        'maximum_no_of_guarantors'
-                    )
-                    ->value(
-                        'default_value'
-                    )
+                ->where(
+                    'default_name',
+                    'maximum_no_of_guarantors'
+                )
+                ->value(
+                    'default_value'
+                )
                 ?? 3
             );
 
@@ -1462,27 +1837,27 @@ class ExistingLoanGuarantorController extends Controller
 
         $activeGuarantorCount =
             $guarantors
-                ->filter(
-                    function ($row) {
+            ->filter(
+                function ($row) {
 
-                        return (
-                            (float) (
-                                $row
-                                ->loan_guar_amount_guaranteed
-                                ?? 0
-                            )
-                            -
-                            (float) (
-                                $row
-                                ->loan_guar_amount_freed
-                                ?? 0
-                            )
+                    return (
+                        (float) (
+                            $row
+                            ->loan_guar_amount_guaranteed
+                            ?? 0
                         )
+                        -
+                        (float) (
+                            $row
+                            ->loan_guar_amount_freed
+                            ?? 0
+                        )
+                    )
                         >
                         $this->moneyTolerance;
-                    }
-                )
-                ->count();
+                }
+            )
+            ->count();
 
         $canAdd =
             true;
@@ -1498,9 +1873,7 @@ class ExistingLoanGuarantorController extends Controller
 
             $blockingMessage =
                 'This loan is fully paid.';
-        }
-
-        elseif (
+        } elseif (
             $guaranteePercent
             <= 0
         ) {
@@ -1508,9 +1881,7 @@ class ExistingLoanGuarantorController extends Controller
 
             $blockingMessage =
                 'This loan product is configured not to require guarantors.';
-        }
-
-        elseif (
+        } elseif (
             $guaranteeRemaining
             <= $this->moneyTolerance
         ) {
@@ -1518,9 +1889,7 @@ class ExistingLoanGuarantorController extends Controller
 
             $blockingMessage =
                 'This loan is already fully guaranteed.';
-        }
-
-        elseif (
+        } elseif (
             $activeGuarantorCount
             >= $maximumGuarantors
         ) {
@@ -1532,34 +1901,34 @@ class ExistingLoanGuarantorController extends Controller
 
         return [
             'loan_balance' =>
-                $loanBalance,
+            $loanBalance,
 
             'guarantee_percent' =>
-                round(
-                    $guaranteePercent,
-                    2
-                ),
+            round(
+                $guaranteePercent,
+                2
+            ),
 
             'guarantee_required' =>
-                $guaranteeRequired,
+            $guaranteeRequired,
 
             'currently_guaranteed' =>
-                $currentlyGuaranteed,
+            $currentlyGuaranteed,
 
             'guarantee_remaining' =>
-                $guaranteeRemaining,
+            $guaranteeRemaining,
 
             'current_guarantor_count' =>
-                $activeGuarantorCount,
+            $activeGuarantorCount,
 
             'maximum_guarantors' =>
-                $maximumGuarantors,
+            $maximumGuarantors,
 
             'can_add_guarantor' =>
-                $canAdd,
+            $canAdd,
 
             'blocking_message' =>
-                $blockingMessage,
+            $blockingMessage,
         ];
     }
 }
