@@ -4,13 +4,7 @@
     @php
         $migrationMode = ($data['migrationMode'] ?? 'N') === 'Y';
 
-        $selectedSections = $data['sections'] ?? [
-            'capital',
-            'savings',
-            'fosa',
-            'special_savings',
-            'loans',
-        ];
+        $selectedSections = $data['sections'] ?? ['capital', 'savings', 'fosa', 'special_savings', 'loans'];
 
         $selectedFosaTypes = $data['fosaTypeIds'] ?? [];
         $selectedLoanTypes = $data['loanTypeIds'] ?? [];
@@ -21,17 +15,15 @@
          * Ordinary members stay on the self-statement URL so applying filters
          * cannot accidentally send them through staff-only middleware.
          */
-        $statementFilterAction = ((int) (auth()->user()->member_position ?? 0) === 2)
-            ? route('members.statement', ['id' => $data['member']->member_id])
-            : url('/members/statement/self');
+        $statementFilterAction =
+            (int) (auth()->user()->member_position ?? 0) === 2
+                ? route('members.statement', ['id' => $data['member']->member_id])
+                : url('/members/statement/self');
 
-        $periodFromLabel = ($data['period_from'] ?? '000000') === '000000'
-            ? 'Beginning'
-            : ($data['period_from'] ?? '000000');
+        $periodFromLabel =
+            ($data['period_from'] ?? '000000') === '000000' ? 'Beginning' : $data['period_from'] ?? '000000';
 
-        $periodToLabel = ($data['period_to'] ?? '999999') === '999999'
-            ? 'Latest'
-            : ($data['period_to'] ?? '999999');
+        $periodToLabel = ($data['period_to'] ?? '999999') === '999999' ? 'Latest' : $data['period_to'] ?? '999999';
     @endphp
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
@@ -114,17 +106,10 @@
                                     Period From
                                 </label>
 
-                                <input
-                                    type="text"
-                                    inputmode="numeric"
-                                    maxlength="6"
-                                    name="period_from"
-                                    id="periodFrom"
+                                <input type="text" inputmode="numeric" maxlength="6" name="period_from" id="periodFrom"
                                     class="form-control"
                                     value="{{ request('period_from', $data['period_from'] ?? '000000') }}"
-                                    placeholder="YYYYMM"
-                                    autocomplete="off"
-                                >
+                                    placeholder="YYYYMM" autocomplete="off">
 
                                 <div class="form-text">Use YYYYMM. Example: 202601.</div>
                             </div>
@@ -134,17 +119,9 @@
                                     Period To
                                 </label>
 
-                                <input
-                                    type="text"
-                                    inputmode="numeric"
-                                    maxlength="6"
-                                    name="period_to"
-                                    id="periodTo"
-                                    class="form-control"
-                                    value="{{ request('period_to', $data['period_to'] ?? '999999') }}"
-                                    placeholder="YYYYMM"
-                                    autocomplete="off"
-                                >
+                                <input type="text" inputmode="numeric" maxlength="6" name="period_to" id="periodTo"
+                                    class="form-control" value="{{ request('period_to', $data['period_to'] ?? '999999') }}"
+                                    placeholder="YYYYMM" autocomplete="off">
 
                                 <div class="form-text">Use YYYYMM. Example: 202608.</div>
                             </div>
@@ -155,24 +132,18 @@
                                 </label>
 
                                 <select name="cleared_loans" id="clearedLoans" class="form-select">
-                                    <option
-                                        value="uncleared"
-                                        {{ request('cleared_loans', $data['cleared_loans'] ?? 'uncleared') === 'uncleared' ? 'selected' : '' }}
-                                    >
+                                    <option value="uncleared"
+                                        {{ request('cleared_loans', $data['cleared_loans'] ?? 'uncleared') === 'uncleared' ? 'selected' : '' }}>
                                         Outstanding Only
                                     </option>
 
-                                    <option
-                                        value="all"
-                                        {{ request('cleared_loans', $data['cleared_loans'] ?? 'uncleared') === 'all' ? 'selected' : '' }}
-                                    >
+                                    <option value="all"
+                                        {{ request('cleared_loans', $data['cleared_loans'] ?? 'uncleared') === 'all' ? 'selected' : '' }}>
                                         All Loans
                                     </option>
 
-                                    <option
-                                        value="cleared"
-                                        {{ request('cleared_loans', $data['cleared_loans'] ?? 'uncleared') === 'cleared' ? 'selected' : '' }}
-                                    >
+                                    <option value="cleared"
+                                        {{ request('cleared_loans', $data['cleared_loans'] ?? 'uncleared') === 'cleared' ? 'selected' : '' }}>
                                         Cleared Only
                                     </option>
                                 </select>
@@ -195,14 +166,9 @@
 
                         <div class="section-choice-grid">
                             <label class="section-choice" for="sectionCapital">
-                                <input
-                                    class="form-check-input"
-                                    type="checkbox"
-                                    name="sections[]"
-                                    value="capital"
+                                <input class="form-check-input" type="checkbox" name="sections[]" value="capital"
                                     id="sectionCapital"
-                                    {{ in_array('capital', $selectedSections, true) ? 'checked' : '' }}
-                                >
+                                    {{ in_array('capital', $selectedSections, true) ? 'checked' : '' }}>
                                 <span>
                                     <strong>Share Capital</strong>
                                     <small>Capital contribution ledger</small>
@@ -210,14 +176,9 @@
                             </label>
 
                             <label class="section-choice" for="sectionSavings">
-                                <input
-                                    class="form-check-input"
-                                    type="checkbox"
-                                    name="sections[]"
-                                    value="savings"
+                                <input class="form-check-input" type="checkbox" name="sections[]" value="savings"
                                     id="sectionSavings"
-                                    {{ in_array('savings', $selectedSections, true) ? 'checked' : '' }}
-                                >
+                                    {{ in_array('savings', $selectedSections, true) ? 'checked' : '' }}>
                                 <span>
                                     <strong>Savings / Deposits</strong>
                                     <small>Member deposits and running balance</small>
@@ -225,14 +186,8 @@
                             </label>
 
                             <label class="section-choice" for="sectionFosa">
-                                <input
-                                    class="form-check-input"
-                                    type="checkbox"
-                                    name="sections[]"
-                                    value="fosa"
-                                    id="sectionFosa"
-                                    {{ in_array('fosa', $selectedSections, true) ? 'checked' : '' }}
-                                >
+                                <input class="form-check-input" type="checkbox" name="sections[]" value="fosa"
+                                    id="sectionFosa" {{ in_array('fosa', $selectedSections, true) ? 'checked' : '' }}>
                                 <span>
                                     <strong>FOSA</strong>
                                     <small>FOSA ledgers grouped by FOSA type</small>
@@ -240,14 +195,9 @@
                             </label>
 
                             <label class="section-choice" for="sectionSpecialSavings">
-                                <input
-                                    class="form-check-input"
-                                    type="checkbox"
-                                    name="sections[]"
-                                    value="special_savings"
-                                    id="sectionSpecialSavings"
-                                    {{ in_array('special_savings', $selectedSections, true) ? 'checked' : '' }}
-                                >
+                                <input class="form-check-input" type="checkbox" name="sections[]"
+                                    value="special_savings" id="sectionSpecialSavings"
+                                    {{ in_array('special_savings', $selectedSections, true) ? 'checked' : '' }}>
                                 <span>
                                     <strong>Special Savings</strong>
                                     <small>Special savings product accounts</small>
@@ -255,14 +205,8 @@
                             </label>
 
                             <label class="section-choice" for="sectionLoans">
-                                <input
-                                    class="form-check-input"
-                                    type="checkbox"
-                                    name="sections[]"
-                                    value="loans"
-                                    id="sectionLoans"
-                                    {{ in_array('loans', $selectedSections, true) ? 'checked' : '' }}
-                                >
+                                <input class="form-check-input" type="checkbox" name="sections[]" value="loans"
+                                    id="sectionLoans" {{ in_array('loans', $selectedSections, true) ? 'checked' : '' }}>
                                 <span>
                                     <strong>Loans</strong>
                                     <small>Loan principal, interest and balances</small>
@@ -286,14 +230,9 @@
                             <div class="filter-checkbox-panel">
                                 @foreach ($data['memberFosaTypes'] ?? collect() as $fosaType)
                                     <label class="filter-checkbox-item" for="fosaType{{ $fosaType->type_id }}">
-                                        <input
-                                            class="form-check-input"
-                                            type="checkbox"
-                                            name="fosa_types[]"
-                                            value="{{ $fosaType->type_id }}"
-                                            id="fosaType{{ $fosaType->type_id }}"
-                                            {{ in_array((int) $fosaType->type_id, $selectedFosaTypes, true) ? 'checked' : '' }}
-                                        >
+                                        <input class="form-check-input" type="checkbox" name="fosa_types[]"
+                                            value="{{ $fosaType->type_id }}" id="fosaType{{ $fosaType->type_id }}"
+                                            {{ in_array((int) $fosaType->type_id, $selectedFosaTypes, true) ? 'checked' : '' }}>
 
                                         <span>
                                             <strong>{{ $fosaType->type_name }}</strong>
@@ -332,15 +271,12 @@
                                 @if (($data['memberLoanTypes'] ?? collect())->count() > 0)
                                     <div class="filter-checkbox-panel loan-type-panel">
                                         @foreach ($data['memberLoanTypes'] ?? collect() as $loanType)
-                                            <label class="filter-checkbox-item" for="loanType{{ $loanType->loan_type_id }}">
-                                                <input
-                                                    class="form-check-input"
-                                                    type="checkbox"
-                                                    name="loan_types[]"
+                                            <label class="filter-checkbox-item"
+                                                for="loanType{{ $loanType->loan_type_id }}">
+                                                <input class="form-check-input" type="checkbox" name="loan_types[]"
                                                     value="{{ $loanType->loan_type_id }}"
                                                     id="loanType{{ $loanType->loan_type_id }}"
-                                                    {{ in_array((int) $loanType->loan_type_id, $selectedLoanTypes, true) ? 'checked' : '' }}
-                                                >
+                                                    {{ in_array((int) $loanType->loan_type_id, $selectedLoanTypes, true) ? 'checked' : '' }}>
 
                                                 <span>
                                                     <strong>{{ $loanType->loan_type_name }}</strong>
@@ -368,11 +304,9 @@
                                     <option value="">All Matching Loans</option>
 
                                     @foreach ($data['memberLoanChoices'] ?? collect() as $loanChoice)
-                                        <option
-                                            value="{{ $loanChoice->loan_id }}"
+                                        <option value="{{ $loanChoice->loan_id }}"
                                             data-loan-type="{{ $loanChoice->loan_loan_type }}"
-                                            {{ (int) $selectedLoanId === (int) $loanChoice->loan_id ? 'selected' : '' }}
-                                        >
+                                            {{ (int) $selectedLoanId === (int) $loanChoice->loan_id ? 'selected' : '' }}>
                                             {{ $loanChoice->loan_type_name }}
                                             — Loan #{{ $loanChoice->loan_id }}
                                             — Ksh {{ number_format($loanChoice->loan_amount, 2) }}
@@ -468,53 +402,54 @@
                     <div class="card-body p-0">
                         <div class="statement-table-wrap">
                             <table class="table table-striped table-sm mb-0 statement-ledger-table">
-                            <thead class="bg-light">
-                                <tr>
-                                    <th>#</th>
-                                    <th>Period</th>
-                                    <th>Date</th>
-                                    <th>Description</th>
-                                    <th>Doc No</th>
-                                    <th class="text-end">Debit</th>
-                                    <th class="text-end">Credit</th>
-                                    <th class="text-end">Balance</th>
-                                </tr>
-
-                                <tr class="table-secondary">
-                                    <td colspan="7" class="text-end fw-bold">Opening Balance</td>
-                                    <td class="text-end fw-bold">
-                                        {{ number_format($data['openingBalanceCapital'], 2) }}
-                                    </td>
-                                </tr>
-                            </thead>
-
-                            <tbody>
-                                @php $total_capital = $data['openingBalanceCapital']; @endphp
-
-                                @foreach ($data['capitalContributions'] as $i => $r)
-                                    @php $total_capital += $r->share_capitalamount_paying; @endphp
-
+                                <thead class="bg-light">
                                     <tr>
-                                        <td>{{ $i + 1 }}</td>
-                                        <td>{{ $r->share_capitalperiod }}</td>
-                                        <td>{{ \Carbon\Carbon::parse($r->share_capitaldate_paid)->format('d-m-Y') }}</td>
-                                        <td>{{ $r->share_capitaldescription }}</td>
-                                        <td>{{ $r->share_capitaldoc_no }}</td>
+                                        <th>#</th>
+                                        <th>Period</th>
+                                        <th>Date</th>
+                                        <th>Description</th>
+                                        <th>Doc No</th>
+                                        <th class="text-end">Debit</th>
+                                        <th class="text-end">Credit</th>
+                                        <th class="text-end">Balance</th>
+                                    </tr>
 
-                                        <td class="text-end">
-                                            {{ $r->share_capitalamount_paying < 0 ? number_format(-$r->share_capitalamount_paying, 2) : '' }}
-                                        </td>
-
-                                        <td class="text-end">
-                                            {{ $r->share_capitalamount_paying > 0 ? number_format($r->share_capitalamount_paying, 2) : '' }}
-                                        </td>
-
+                                    <tr class="table-secondary">
+                                        <td colspan="7" class="text-end fw-bold">Opening Balance</td>
                                         <td class="text-end fw-bold">
-                                            {{ number_format($total_capital, 2) }}
+                                            {{ number_format($data['openingBalanceCapital'], 2) }}
                                         </td>
                                     </tr>
-                                @endforeach
-                            </tbody>
+                                </thead>
+
+                                <tbody>
+                                    @php $total_capital = $data['openingBalanceCapital']; @endphp
+
+                                    @foreach ($data['capitalContributions'] as $i => $r)
+                                        @php $total_capital += $r->share_capitalamount_paying; @endphp
+
+                                        <tr>
+                                            <td>{{ $i + 1 }}</td>
+                                            <td>{{ $r->share_capitalperiod }}</td>
+                                            <td>{{ \Carbon\Carbon::parse($r->share_capitaldate_paid)->format('d-m-Y') }}
+                                            </td>
+                                            <td>{{ $r->share_capitaldescription }}</td>
+                                            <td>{{ $r->share_capitaldoc_no }}</td>
+
+                                            <td class="text-end">
+                                                {{ $r->share_capitalamount_paying < 0 ? number_format(-$r->share_capitalamount_paying, 2) : '' }}
+                                            </td>
+
+                                            <td class="text-end">
+                                                {{ $r->share_capitalamount_paying > 0 ? number_format($r->share_capitalamount_paying, 2) : '' }}
+                                            </td>
+
+                                            <td class="text-end fw-bold">
+                                                {{ number_format($total_capital, 2) }}
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
                             </table>
                         </div>
                     </div>
@@ -529,53 +464,53 @@
                     <div class="card-body p-0">
                         <div class="statement-table-wrap">
                             <table class="table table-striped table-sm mb-0 statement-ledger-table">
-                            <thead class="bg-light">
-                                <tr>
-                                    <th>#</th>
-                                    <th>Period</th>
-                                    <th>Date</th>
-                                    <th>Description</th>
-                                    <th>Doc No</th>
-                                    <th class="text-end">Debit</th>
-                                    <th class="text-end">Credit</th>
-                                    <th class="text-end">Balance</th>
-                                </tr>
-
-                                <tr class="table-secondary">
-                                    <td colspan="7" class="text-end fw-bold">Opening Balance</td>
-                                    <td class="text-end fw-bold">
-                                        {{ number_format($data['openingBalanceShares'], 2) }}
-                                    </td>
-                                </tr>
-                            </thead>
-
-                            <tbody>
-                                @php $total_shares = $data['openingBalanceShares']; @endphp
-
-                                @foreach ($data['shareContributions'] as $i => $r)
-                                    @php $total_shares += $r->share_amount_paying; @endphp
-
+                                <thead class="bg-light">
                                     <tr>
-                                        <td>{{ $i + 1 }}</td>
-                                        <td>{{ $r->share_period }}</td>
-                                        <td>{{ \Carbon\Carbon::parse($r->share_date_paid)->format('d-m-Y') }}</td>
-                                        <td>{{ $r->share_description }}</td>
-                                        <td>{{ $r->share_doc_no }}</td>
+                                        <th>#</th>
+                                        <th>Period</th>
+                                        <th>Date</th>
+                                        <th>Description</th>
+                                        <th>Doc No</th>
+                                        <th class="text-end">Debit</th>
+                                        <th class="text-end">Credit</th>
+                                        <th class="text-end">Balance</th>
+                                    </tr>
 
-                                        <td class="text-end">
-                                            {{ $r->share_amount_paying < 0 ? number_format(-$r->share_amount_paying, 2) : '' }}
-                                        </td>
-
-                                        <td class="text-end">
-                                            {{ $r->share_amount_paying > 0 ? number_format($r->share_amount_paying, 2) : '' }}
-                                        </td>
-
+                                    <tr class="table-secondary">
+                                        <td colspan="7" class="text-end fw-bold">Opening Balance</td>
                                         <td class="text-end fw-bold">
-                                            {{ number_format($total_shares, 2) }}
+                                            {{ number_format($data['openingBalanceShares'], 2) }}
                                         </td>
                                     </tr>
-                                @endforeach
-                            </tbody>
+                                </thead>
+
+                                <tbody>
+                                    @php $total_shares = $data['openingBalanceShares']; @endphp
+
+                                    @foreach ($data['shareContributions'] as $i => $r)
+                                        @php $total_shares += $r->share_amount_paying; @endphp
+
+                                        <tr>
+                                            <td>{{ $i + 1 }}</td>
+                                            <td>{{ $r->share_period }}</td>
+                                            <td>{{ \Carbon\Carbon::parse($r->share_date_paid)->format('d-m-Y') }}</td>
+                                            <td>{{ $r->share_description }}</td>
+                                            <td>{{ $r->share_doc_no }}</td>
+
+                                            <td class="text-end">
+                                                {{ $r->share_amount_paying < 0 ? number_format(-$r->share_amount_paying, 2) : '' }}
+                                            </td>
+
+                                            <td class="text-end">
+                                                {{ $r->share_amount_paying > 0 ? number_format($r->share_amount_paying, 2) : '' }}
+                                            </td>
+
+                                            <td class="text-end fw-bold">
+                                                {{ number_format($total_shares, 2) }}
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
                             </table>
                         </div>
                     </div>
@@ -600,14 +535,26 @@
                                  */
                                 $rows = ($data['fosaContributions'] ?? collect())
                                     ->filter(function ($row) use ($fosaType) {
-                                        return (int) $row->fosa_type_id === (int) $fosaType->type_id;
+                                        /*
+                                         * Virtual FOSA type 0 = Other Deposits.
+                                         *
+                                         * matched_fosa_type_id is NULL when:
+                                         * - fosa_type_id is NULL
+                                         * - fosa_type_id is 0 with no configured type
+                                         * - fosa_type_id references a deleted/missing FOSA type
+                                         */
+                                        if ((int) $fosaType->type_id === 0) {
+                                            return $row->matched_fosa_type_id === null;
+                                        }
+
+                                        /*
+                                         * Normal configured FOSA types.
+                                         */
+                                        return (int) $row->matched_fosa_type_id === (int) $fosaType->type_id;
                                     })
                                     ->values();
 
-                                $running = (float) (
-                                    $data['fosaOpeningBalances'][$fosaType->type_id]
-                                    ?? 0
-                                );
+                                $running = (float) ($data['fosaOpeningBalances'][$fosaType->type_id] ?? 0);
                             @endphp
 
                             <div class="fosa-type-block">
@@ -658,23 +605,17 @@
                                                     <td>{{ $i + 1 }}</td>
                                                     <td>{{ $r->fosa_period }}</td>
                                                     <td>
-                                                        {{ !empty($r->fosa_date_paid)
-                                                            ? \Carbon\Carbon::parse($r->fosa_date_paid)->format('d-m-Y')
-                                                            : '' }}
+                                                        {{ !empty($r->fosa_date_paid) ? \Carbon\Carbon::parse($r->fosa_date_paid)->format('d-m-Y') : '' }}
                                                     </td>
                                                     <td>{{ $r->fosa_description }}</td>
                                                     <td>{{ $r->fosa_doc_no }}</td>
 
                                                     <td class="text-end">
-                                                        {{ $r->fosa_amount_paying < 0
-                                                            ? number_format(-$r->fosa_amount_paying, 2)
-                                                            : '' }}
+                                                        {{ $r->fosa_amount_paying < 0 ? number_format(-$r->fosa_amount_paying, 2) : '' }}
                                                     </td>
 
                                                     <td class="text-end">
-                                                        {{ $r->fosa_amount_paying > 0
-                                                            ? number_format($r->fosa_amount_paying, 2)
-                                                            : '' }}
+                                                        {{ $r->fosa_amount_paying > 0 ? number_format($r->fosa_amount_paying, 2) : '' }}
                                                     </td>
 
                                                     <td class="text-end fw-bold">
@@ -724,237 +665,237 @@
 
                     <div class="card-body financial-section-body">
                         @if (isset($data['specialSavings']) && $data['specialSavings']->count() > 0)
-                        @foreach ($data['specialSavings'] as $specialSaving)
-                            @php
-                                $account = $specialSaving->account;
-                                $transactions = $specialSaving->transactions ?? collect();
+                            @foreach ($data['specialSavings'] as $specialSaving)
+                                @php
+                                    $account = $specialSaving->account;
+                                    $transactions = $specialSaving->transactions ?? collect();
 
-                                $openingPrincipal = (float) $specialSaving->opening_principal;
-                                $openingInterest =
-                                    (float) $specialSaving->opening_accrued_interest +
-                                    (float) $specialSaving->opening_available_interest;
-                                $openingTotal = (float) $specialSaving->opening_total;
+                                    $openingPrincipal = (float) $specialSaving->opening_principal;
+                                    $openingInterest =
+                                        (float) $specialSaving->opening_accrued_interest +
+                                        (float) $specialSaving->opening_available_interest;
+                                    $openingTotal = (float) $specialSaving->opening_total;
 
-                                $totalDebit = 0;
-                                $totalCredit = 0;
+                                    $totalDebit = 0;
+                                    $totalCredit = 0;
 
-                                $principalCredit = 0;
-                                $principalDebit = 0;
+                                    $principalCredit = 0;
+                                    $principalDebit = 0;
 
-                                $interestCredit = 0;
-                                $interestDebit = 0;
+                                    $interestCredit = 0;
+                                    $interestDebit = 0;
 
-                                foreach ($transactions as $summaryTxn) {
-                                    $summaryDirection = strtoupper(
-                                        (string) $summaryTxn->special_saving_transaction_direction,
-                                    );
-                                    $summaryAmount = (float) $summaryTxn->special_saving_transaction_amount;
+                                    foreach ($transactions as $summaryTxn) {
+                                        $summaryDirection = strtoupper(
+                                            (string) $summaryTxn->special_saving_transaction_direction,
+                                        );
+                                        $summaryAmount = (float) $summaryTxn->special_saving_transaction_amount;
 
-                                    $summaryPrincipalAmount = abs(
-                                        (float) ($summaryTxn->special_saving_transaction_principal_amount ?? 0),
-                                    );
-                                    $summaryInterestAmount = abs(
-                                        (float) ($summaryTxn->special_saving_transaction_interest_amount ?? 0),
-                                    );
+                                        $summaryPrincipalAmount = abs(
+                                            (float) ($summaryTxn->special_saving_transaction_principal_amount ?? 0),
+                                        );
+                                        $summaryInterestAmount = abs(
+                                            (float) ($summaryTxn->special_saving_transaction_interest_amount ?? 0),
+                                        );
 
-                                    if ($summaryDirection === 'DEBIT') {
-                                        $totalDebit += $summaryAmount;
-                                        $principalDebit += $summaryPrincipalAmount;
-                                        $interestDebit += $summaryInterestAmount;
-                                    } else {
-                                        $totalCredit += $summaryAmount;
-                                        $principalCredit += $summaryPrincipalAmount;
-                                        $interestCredit += $summaryInterestAmount;
+                                        if ($summaryDirection === 'DEBIT') {
+                                            $totalDebit += $summaryAmount;
+                                            $principalDebit += $summaryPrincipalAmount;
+                                            $interestDebit += $summaryInterestAmount;
+                                        } else {
+                                            $totalCredit += $summaryAmount;
+                                            $principalCredit += $summaryPrincipalAmount;
+                                            $interestCredit += $summaryInterestAmount;
+                                        }
                                     }
-                                }
 
-                                $closingTxn = $transactions->last();
+                                    $closingTxn = $transactions->last();
 
-                                $closingPrincipal = $closingTxn
-                                    ? (float) $closingTxn->special_saving_transaction_principal_balance_after
-                                    : $openingPrincipal;
+                                    $closingPrincipal = $closingTxn
+                                        ? (float) $closingTxn->special_saving_transaction_principal_balance_after
+                                        : $openingPrincipal;
 
-                                $closingInterest = $closingTxn
-                                    ? (float) $closingTxn->special_saving_transaction_accrued_interest_after +
-                                        (float) $closingTxn->special_saving_transaction_available_interest_after
-                                    : $openingInterest;
+                                    $closingInterest = $closingTxn
+                                        ? (float) $closingTxn->special_saving_transaction_accrued_interest_after +
+                                            (float) $closingTxn->special_saving_transaction_available_interest_after
+                                        : $openingInterest;
 
-                                $closingTotal = $closingTxn
-                                    ? (float) $closingTxn->special_saving_transaction_total_balance_after
-                                    : $openingTotal;
+                                    $closingTotal = $closingTxn
+                                        ? (float) $closingTxn->special_saving_transaction_total_balance_after
+                                        : $openingTotal;
 
-                                $expectedClosingTotal = $openingTotal + $totalCredit - $totalDebit;
-                                $difference = round($expectedClosingTotal - $closingTotal, 2);
+                                    $expectedClosingTotal = $openingTotal + $totalCredit - $totalDebit;
+                                    $difference = round($expectedClosingTotal - $closingTotal, 2);
 
-                                $productName = $account->special_saving_product_name ?? 'Special Savings';
-                                $accountNumber = $account->special_saving_account_number ?? '';
-                            @endphp
+                                    $productName = $account->special_saving_product_name ?? 'Special Savings';
+                                    $accountNumber = $account->special_saving_account_number ?? '';
+                                @endphp
 
-                            <div class="financial-product-panel">
-                                <div class="financial-product-header">
-                                    <div>
-                                        <div class="financial-product-title">
-                                            {{ $productName }}
-                                            @if (!empty($accountNumber))
-                                                <span class="financial-account-number">{{ $accountNumber }}</span>
-                                            @endif
+                                <div class="financial-product-panel">
+                                    <div class="financial-product-header">
+                                        <div>
+                                            <div class="financial-product-title">
+                                                {{ $productName }}
+                                                @if (!empty($accountNumber))
+                                                    <span class="financial-account-number">{{ $accountNumber }}</span>
+                                                @endif
+                                            </div>
+
+                                            <div class="financial-product-meta">
+                                                Status:
+                                                <span class="financial-status-badge">
+                                                    {{ $account->special_saving_account_status }}
+                                                </span>
+                                            </div>
                                         </div>
 
-                                        <div class="financial-product-meta">
-                                            Status:
-                                            <span class="financial-status-badge">
-                                                {{ $account->special_saving_account_status }}
-                                            </span>
+                                        <div class="financial-closing-box">
+                                            <span>Current Account Total</span>
+                                            <strong>{{ number_format((float) $account->special_saving_account_total_balance, 2) }}</strong>
                                         </div>
                                     </div>
 
-                                    <div class="financial-closing-box">
-                                        <span>Current Account Total</span>
-                                        <strong>{{ number_format((float) $account->special_saving_account_total_balance, 2) }}</strong>
+                                    <div class="financial-summary-grid">
+                                        <div class="financial-summary-item">
+                                            <span>Opening Total</span>
+                                            <strong>{{ number_format($openingTotal, 2) }}</strong>
+                                        </div>
+
+                                        <div class="financial-summary-item">
+                                            <span>Principal Credits Posted</span>
+                                            <strong>{{ number_format($principalCredit, 2) }}</strong>
+                                        </div>
+
+                                        <div class="financial-summary-item">
+                                            <span>Interest Credits Posted</span>
+                                            <strong>{{ number_format($interestCredit, 2) }}</strong>
+                                        </div>
+
+                                        <div class="financial-summary-item">
+                                            <span>Total Credits Posted</span>
+                                            <strong>{{ number_format($totalCredit, 2) }}</strong>
+                                        </div>
+
+                                        <div class="financial-summary-item">
+                                            <span>Total Debits / Resets</span>
+                                            <strong>{{ number_format($totalDebit, 2) }}</strong>
+                                        </div>
+
+                                        <div class="financial-summary-item">
+                                            <span>Closing Principal</span>
+                                            <strong>{{ number_format($closingPrincipal, 2) }}</strong>
+                                        </div>
+
+                                        <div class="financial-summary-item">
+                                            <span>Closing Interest</span>
+                                            <strong>{{ number_format($closingInterest, 2) }}</strong>
+                                        </div>
+
+                                        <div class="financial-summary-item financial-summary-total">
+                                            <span>Closing Total</span>
+                                            <strong>{{ number_format($closingTotal, 2) }}</strong>
+                                        </div>
+
+                                        <div
+                                            class="financial-summary-item {{ abs($difference) > 0.01 ? 'financial-check-bad' : 'financial-check-good' }}">
+                                            <span>Reconciliation Check</span>
+                                            <strong>{{ number_format($difference, 2) }}</strong>
+                                        </div>
                                     </div>
-                                </div>
 
-                                <div class="financial-summary-grid">
-                                    <div class="financial-summary-item">
-                                        <span>Opening Total</span>
-                                        <strong>{{ number_format($openingTotal, 2) }}</strong>
+                                    <div class="financial-formula-line">
+                                        Opening Total + Total Credits Posted - Total Debits / Resets = Closing Total
                                     </div>
 
-                                    <div class="financial-summary-item">
-                                        <span>Principal Credits Posted</span>
-                                        <strong>{{ number_format($principalCredit, 2) }}</strong>
-                                    </div>
-
-                                    <div class="financial-summary-item">
-                                        <span>Interest Credits Posted</span>
-                                        <strong>{{ number_format($interestCredit, 2) }}</strong>
-                                    </div>
-
-                                    <div class="financial-summary-item">
-                                        <span>Total Credits Posted</span>
-                                        <strong>{{ number_format($totalCredit, 2) }}</strong>
-                                    </div>
-
-                                    <div class="financial-summary-item">
-                                        <span>Total Debits / Resets</span>
-                                        <strong>{{ number_format($totalDebit, 2) }}</strong>
-                                    </div>
-
-                                    <div class="financial-summary-item">
-                                        <span>Closing Principal</span>
-                                        <strong>{{ number_format($closingPrincipal, 2) }}</strong>
-                                    </div>
-
-                                    <div class="financial-summary-item">
-                                        <span>Closing Interest</span>
-                                        <strong>{{ number_format($closingInterest, 2) }}</strong>
-                                    </div>
-
-                                    <div class="financial-summary-item financial-summary-total">
-                                        <span>Closing Total</span>
-                                        <strong>{{ number_format($closingTotal, 2) }}</strong>
-                                    </div>
-
-                                    <div
-                                        class="financial-summary-item {{ abs($difference) > 0.01 ? 'financial-check-bad' : 'financial-check-good' }}">
-                                        <span>Reconciliation Check</span>
-                                        <strong>{{ number_format($difference, 2) }}</strong>
-                                    </div>
-                                </div>
-
-                                <div class="financial-formula-line">
-                                    Opening Total + Total Credits Posted - Total Debits / Resets = Closing Total
-                                </div>
-
-                                <div class="financial-table-wrap">
-                                    <table class="table table-sm mb-0 financial-ledger-table">
-                                        <thead>
-                                            <tr>
-                                                <th>#</th>
-                                                <th class="nowrap-cell">Period</th>
-                                                <th class="nowrap-cell">Date</th>
-                                                <th>Description</th>
-                                                <th class="nowrap-cell">Doc No</th>
-                                                <th class="nowrap-cell">Type</th>
-                                                <th class="text-end money-cell">Debit</th>
-                                                <th class="text-end money-cell">Credit</th>
-                                                <th class="text-end money-cell">Principal Bal</th>
-                                                <th class="text-end money-cell">Interest Bal</th>
-                                                <th class="text-end money-cell">Total Bal</th>
-                                            </tr>
-
-                                            <tr class="financial-opening-row">
-                                                <td colspan="8" class="text-end fw-bold">
-                                                    Opening Balance before selected period
-                                                </td>
-                                                <td class="text-end fw-bold money-cell">
-                                                    {{ number_format($openingPrincipal, 2) }}</td>
-                                                <td class="text-end fw-bold money-cell">
-                                                    {{ number_format($openingInterest, 2) }}</td>
-                                                <td class="text-end fw-bold money-cell">
-                                                    {{ number_format($openingTotal, 2) }}</td>
-                                            </tr>
-                                        </thead>
-
-                                        <tbody>
-                                            @foreach ($transactions as $txn)
-                                                @php
-                                                    $direction = strtoupper(
-                                                        (string) $txn->special_saving_transaction_direction,
-                                                    );
-                                                    $amount = (float) $txn->special_saving_transaction_amount;
-
-                                                    $debit = $direction === 'DEBIT' ? $amount : 0;
-                                                    $credit = $direction === 'CREDIT' ? $amount : 0;
-
-                                                    $interestBalance =
-                                                        (float) $txn->special_saving_transaction_accrued_interest_after +
-                                                        (float) $txn->special_saving_transaction_available_interest_after;
-                                                @endphp
-
+                                    <div class="financial-table-wrap">
+                                        <table class="table table-sm mb-0 financial-ledger-table">
+                                            <thead>
                                                 <tr>
-                                                    <td class="row-number-cell">{{ $loop->iteration }}</td>
-                                                    <td class="nowrap-cell">
-                                                        {{ $txn->special_saving_transaction_period }}
-                                                    </td>
-                                                    <td class="nowrap-cell">
-                                                        {{ \Carbon\Carbon::parse($txn->special_saving_transaction_date)->format('d-m-Y') }}
-                                                    </td>
-                                                    <td class="description-cell">
-                                                        {{ $txn->special_saving_transaction_description }}</td>
-                                                    <td class="nowrap-cell">
-                                                        {{ $txn->special_saving_transaction_doc_no }}
-                                                    </td>
-                                                    <td class="nowrap-cell">
-                                                        {{ $txn->special_saving_transaction_type }}
-                                                    </td>
-
-                                                    <td class="text-end money-cell">
-                                                        {{ $debit != 0 ? number_format($debit, 2) : '' }}
-                                                    </td>
-
-                                                    <td class="text-end money-cell">
-                                                        {{ $credit != 0 ? number_format($credit, 2) : '' }}
-                                                    </td>
-
-                                                    <td class="text-end fw-bold money-cell">
-                                                        {{ number_format((float) $txn->special_saving_transaction_principal_balance_after, 2) }}
-                                                    </td>
-
-                                                    <td class="text-end fw-bold money-cell">
-                                                        {{ number_format($interestBalance, 2) }}
-                                                    </td>
-
-                                                    <td class="text-end fw-bold money-cell total-balance-cell">
-                                                        {{ number_format((float) $txn->special_saving_transaction_total_balance_after, 2) }}
-                                                    </td>
+                                                    <th>#</th>
+                                                    <th class="nowrap-cell">Period</th>
+                                                    <th class="nowrap-cell">Date</th>
+                                                    <th>Description</th>
+                                                    <th class="nowrap-cell">Doc No</th>
+                                                    <th class="nowrap-cell">Type</th>
+                                                    <th class="text-end money-cell">Debit</th>
+                                                    <th class="text-end money-cell">Credit</th>
+                                                    <th class="text-end money-cell">Principal Bal</th>
+                                                    <th class="text-end money-cell">Interest Bal</th>
+                                                    <th class="text-end money-cell">Total Bal</th>
                                                 </tr>
-                                            @endforeach
-                                        </tbody>
-                                    </table>
+
+                                                <tr class="financial-opening-row">
+                                                    <td colspan="8" class="text-end fw-bold">
+                                                        Opening Balance before selected period
+                                                    </td>
+                                                    <td class="text-end fw-bold money-cell">
+                                                        {{ number_format($openingPrincipal, 2) }}</td>
+                                                    <td class="text-end fw-bold money-cell">
+                                                        {{ number_format($openingInterest, 2) }}</td>
+                                                    <td class="text-end fw-bold money-cell">
+                                                        {{ number_format($openingTotal, 2) }}</td>
+                                                </tr>
+                                            </thead>
+
+                                            <tbody>
+                                                @foreach ($transactions as $txn)
+                                                    @php
+                                                        $direction = strtoupper(
+                                                            (string) $txn->special_saving_transaction_direction,
+                                                        );
+                                                        $amount = (float) $txn->special_saving_transaction_amount;
+
+                                                        $debit = $direction === 'DEBIT' ? $amount : 0;
+                                                        $credit = $direction === 'CREDIT' ? $amount : 0;
+
+                                                        $interestBalance =
+                                                            (float) $txn->special_saving_transaction_accrued_interest_after +
+                                                            (float) $txn->special_saving_transaction_available_interest_after;
+                                                    @endphp
+
+                                                    <tr>
+                                                        <td class="row-number-cell">{{ $loop->iteration }}</td>
+                                                        <td class="nowrap-cell">
+                                                            {{ $txn->special_saving_transaction_period }}
+                                                        </td>
+                                                        <td class="nowrap-cell">
+                                                            {{ \Carbon\Carbon::parse($txn->special_saving_transaction_date)->format('d-m-Y') }}
+                                                        </td>
+                                                        <td class="description-cell">
+                                                            {{ $txn->special_saving_transaction_description }}</td>
+                                                        <td class="nowrap-cell">
+                                                            {{ $txn->special_saving_transaction_doc_no }}
+                                                        </td>
+                                                        <td class="nowrap-cell">
+                                                            {{ $txn->special_saving_transaction_type }}
+                                                        </td>
+
+                                                        <td class="text-end money-cell">
+                                                            {{ $debit != 0 ? number_format($debit, 2) : '' }}
+                                                        </td>
+
+                                                        <td class="text-end money-cell">
+                                                            {{ $credit != 0 ? number_format($credit, 2) : '' }}
+                                                        </td>
+
+                                                        <td class="text-end fw-bold money-cell">
+                                                            {{ number_format((float) $txn->special_saving_transaction_principal_balance_after, 2) }}
+                                                        </td>
+
+                                                        <td class="text-end fw-bold money-cell">
+                                                            {{ number_format($interestBalance, 2) }}
+                                                        </td>
+
+                                                        <td class="text-end fw-bold money-cell total-balance-cell">
+                                                            {{ number_format((float) $txn->special_saving_transaction_total_balance_after, 2) }}
+                                                        </td>
+                                                    </tr>
+                                                @endforeach
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
-                            </div>
-                        @endforeach
+                            @endforeach
                         @else
                             <div class="statement-empty-state">
                                 No Special Savings records were found for the selected period.
@@ -996,46 +937,42 @@
                                     @endif
                                 </h6>
 
-                               @php
-    $loanDuration = isset($loan->loan_type_duration)
-        ? (int) $loan->loan_type_duration
-        : null;
+                                @php
+                                    $loanDuration = isset($loan->loan_type_duration)
+                                        ? (int) $loan->loan_type_duration
+                                        : null;
 
-    $isShortTermLoan =
-        (
-            $loanDuration !== null
-            && $loanDuration > 0
-            && $loanDuration <= 1
-        )
-        || (int) ($loan->loan_type_instant_qualification ?? 0) === 1
-        || (int) ($loan->loan_type_instant_disbursement ?? 0) === 1;
-@endphp
+                                    $isShortTermLoan =
+                                        ($loanDuration !== null && $loanDuration > 0 && $loanDuration <= 1) ||
+                                        (int) ($loan->loan_type_instant_qualification ?? 0) === 1 ||
+                                        (int) ($loan->loan_type_instant_disbursement ?? 0) === 1;
+                                @endphp
 
-<p class="small mb-2">
+                                <p class="small mb-2">
 
-    @if ($isShortTermLoan && !empty($loan->loan_on))
-        <strong>Date Taken:</strong>
-        {{ \Carbon\Carbon::parse($loan->loan_on)->format('d-m-Y') }}
-    @else
-        <strong>Period Taken:</strong>
-        {{ $loan->loan_taken_period }}
-    @endif
+                                    @if ($isShortTermLoan && !empty($loan->loan_on))
+                                        <strong>Date Taken:</strong>
+                                        {{ \Carbon\Carbon::parse($loan->loan_on)->format('d-m-Y') }}
+                                    @else
+                                        <strong>Period Taken:</strong>
+                                        {{ $loan->loan_taken_period }}
+                                    @endif
 
-    |
+                                    |
 
-    <strong>Amount:</strong>
-    Ksh {{ number_format($loan->loan_amount, 2) }} |
+                                    <strong>Amount:</strong>
+                                    Ksh {{ number_format($loan->loan_amount, 2) }} |
 
-    <strong>Paid:</strong>
-    Ksh {{ number_format($loan->loan_loan_paid, 2) }} |
+                                    <strong>Paid:</strong>
+                                    Ksh {{ number_format($loan->loan_loan_paid, 2) }} |
 
-    <strong>Commission:</strong>
-    {{ number_format($loan->loan_commision, 2) }} |
+                                    <strong>Commission:</strong>
+                                    {{ number_format($loan->loan_commision, 2) }} |
 
-    <strong>Insurance:</strong>
-    {{ number_format($loan->loan_insurance, 2) }}
+                                    <strong>Insurance:</strong>
+                                    {{ number_format($loan->loan_insurance, 2) }}
 
-</p>
+                                </p>
 
                                 @php
                                     $effectiveFromPeriod = $data['period_from'];
@@ -1738,7 +1675,7 @@
             min-width: 850px;
         }
 
-        .fosa-type-block + .fosa-type-block {
+        .fosa-type-block+.fosa-type-block {
             border-top: 10px solid #f4f6f9;
         }
 
@@ -1875,7 +1812,7 @@
                 padding: 0 0 20px 0;
             }
 
-            .statement-sections > .text-center {
+            .statement-sections>.text-center {
                 padding-left: 12px;
                 padding-right: 12px;
             }

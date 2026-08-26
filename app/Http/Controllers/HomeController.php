@@ -410,51 +410,51 @@ class HomeController extends Controller
 
 
     public function membersList(Request $request)
-{
-    DB::table('sacco_loans')
-        ->whereNull('loan_loan_paid')
-        ->update(['loan_loan_paid' => 0]);
+    {
+        DB::table('sacco_loans')
+            ->whereNull('loan_loan_paid')
+            ->update(['loan_loan_paid' => 0]);
 
-    DB::table('sacco_loans')
-        ->whereNull('loan_start_deduction_period')
-        ->update(['loan_start_deduction_period' => '00000']);
+        DB::table('sacco_loans')
+            ->whereNull('loan_start_deduction_period')
+            ->update(['loan_start_deduction_period' => '00000']);
 
-    $orderby    = $request->input('orderby', 'member_name');
-    $sort_order = 'asc';
-    $search     = $request->input('pms_srch', '');
+        $orderby    = $request->input('orderby', 'member_name');
+        $sort_order = 'asc';
+        $search     = $request->input('pms_srch', '');
 
-    // Optional member filters
-    $memberActive  = $request->input('member_active', '');
-    $isJunior      = $request->input('member_is_junior', '');
-    $memberDeleted = $request->input('member_deleted', '');
+        // Optional member filters
+        $memberActive  = $request->input('member_active', '');
+        $isJunior      = $request->input('member_is_junior', '');
+        $memberDeleted = $request->input('member_deleted', '');
 
-    // Empty means "do not filter"
-    $memberActiveFilter  = $memberActive === '' ? null : $memberActive;
-    $isJuniorFilter      = $isJunior === '' ? null : $isJunior;
-    $memberDeletedFilter = $memberDeleted === '' ? null : $memberDeleted;
+        // Empty means "do not filter"
+        $memberActiveFilter  = $memberActive === '' ? null : $memberActive;
+        $isJuniorFilter      = $isJunior === '' ? null : $isJunior;
+        $memberDeletedFilter = $memberDeleted === '' ? null : $memberDeleted;
 
-    $members = $this->getMembersListFiltered(
-        $orderby,
-        $sort_order,
-        $search,
-        null,
-        $memberActiveFilter,
-        $isJuniorFilter,
-        $memberDeletedFilter
-    );
+        $members = $this->getMembersListFiltered(
+            $orderby,
+            $sort_order,
+            $search,
+            null,
+            $memberActiveFilter,
+            $isJuniorFilter,
+            $memberDeletedFilter
+        );
 
-    return view('members.list', [
-        'members'          => $members,
-        'orderby'          => $orderby,
-        'sort_order'       => $sort_order,
-        'pms_srch'         => $search,
+        return view('members.list', [
+            'members'          => $members,
+            'orderby'          => $orderby,
+            'sort_order'       => $sort_order,
+            'pms_srch'         => $search,
 
-        // Keep selected dropdown values
-        'member_active'    => $memberActive,
-        'member_is_junior' => $isJunior,
-        'member_deleted'   => $memberDeleted,
-    ]);
-}
+            // Keep selected dropdown values
+            'member_active'    => $memberActive,
+            'member_is_junior' => $isJunior,
+            'member_deleted'   => $memberDeleted,
+        ]);
+    }
     private function getMembersListFiltered(
         $orderby = 'member_name',
         $sort_order = 'asc',
@@ -2493,15 +2493,19 @@ class HomeController extends Controller
         }
 
         $fosaTypeIds = collect($requestedFosaTypes)
+            ->filter(function ($fosaTypeId) {
+                return is_numeric($fosaTypeId);
+            })
             ->map(function ($fosaTypeId) {
                 return (int) $fosaTypeId;
             })
             ->filter(function ($fosaTypeId) {
-                return $fosaTypeId > 0;
+                return $fosaTypeId >= 0;
             })
             ->unique()
             ->values()
             ->all();
+
 
 
         /*
@@ -2678,7 +2682,7 @@ class HomeController extends Controller
 */
 
         $memberFosaTypes = DB::table('sacco_fosas as f')
-            ->join(
+            ->leftJoin(
                 'sacco_fosa_types as ft',
                 'f.fosa_type_id',
                 '=',
@@ -2699,11 +2703,58 @@ class HomeController extends Controller
                 'ft.type_prefix'
             )
             ->distinct()
-            ->orderBy(
-                'ft.type_name',
-                'asc'
-            )
+            ->orderByRaw('ft.type_name IS NULL ASC')
+            ->orderBy('ft.type_name', 'asc')
             ->get();
+
+        /*
+|--------------------------------------------------------------------------
+| Add virtual "Other Deposits" FOSA type
+|--------------------------------------------------------------------------
+|
+| Any FOSA transaction whose type:
+| - is NULL
+| - is 0
+| - or references a FOSA type that no longer exists
+|
+| is retained on the statement under Other Deposits.
+|
+*/
+
+        $hasUncategorisedFosa = DB::table('sacco_fosas as f')
+            ->leftJoin(
+                'sacco_fosa_types as ft',
+                'f.fosa_type_id',
+                '=',
+                'ft.type_id'
+            )
+            ->where('f.fosa_member_id', $id)
+            ->where('f.fosa_period', '<=', $period_to)
+            ->where(function ($q) {
+                $q->whereNull('f.fosa_type_id')
+                    ->orWhere('f.fosa_type_id', 0)
+                    ->orWhereNull('ft.type_id');
+            })
+            ->exists();
+
+        /*
+ * Remove the NULL row produced by the LEFT JOIN.
+ * We replace it with one deliberate virtual ledger.
+ */
+        $memberFosaTypes = $memberFosaTypes
+            ->filter(function ($type) {
+                return $type->type_id !== null;
+            })
+            ->values();
+
+        if ($hasUncategorisedFosa) {
+            $memberFosaTypes->push((object) [
+                'type_id'     => 0,
+                'type_name'   => 'Other Deposits',
+                'type_prefix' => null,
+                'is_other'    => true,
+            ]);
+        }
 
         /*
 |--------------------------------------------------------------------------
@@ -2737,40 +2788,133 @@ class HomeController extends Controller
 |
 */
 
-        $fosaOpeningBalancesQuery = DB::table(
-            'sacco_fosas'
-        )
+        /*
+|--------------------------------------------------------------------------
+| Opening balances BY FOSA TYPE
+|--------------------------------------------------------------------------
+|
+| Valid configured FOSA types retain their own opening balances.
+|
+| Any FOSA transaction which:
+| - has NULL fosa_type_id
+| - has fosa_type_id = 0
+| - references a type which does not exist
+|
+| is consolidated into virtual FOSA type 0 = Other Deposits.
+|
+*/
+
+        $fosaOpeningBalancesQuery = DB::table('sacco_fosas as f')
+            ->leftJoin(
+                'sacco_fosa_types as ft',
+                'f.fosa_type_id',
+                '=',
+                'ft.type_id'
+            )
             ->where(
-                'fosa_member_id',
+                'f.fosa_member_id',
                 $id
             )
             ->where(
-                'fosa_period',
+                'f.fosa_period',
                 '<',
                 $period_from
             );
 
+        /*
+ * Apply FOSA type filtering.
+ *
+ * Type 0 is the virtual Other Deposits type.
+ */
         if (!empty($fosaTypeIds)) {
-            $fosaOpeningBalancesQuery->whereIn(
-                'fosa_type_id',
-                $fosaTypeIds
+
+            $includeOtherDeposits = in_array(
+                0,
+                $fosaTypeIds,
+                true
+            );
+
+            $normalFosaTypeIds = array_values(
+                array_filter(
+                    $fosaTypeIds,
+                    function ($typeId) {
+                        return (int) $typeId > 0;
+                    }
+                )
+            );
+
+            $fosaOpeningBalancesQuery->where(
+                function ($q) use (
+                    $normalFosaTypeIds,
+                    $includeOtherDeposits
+                ) {
+
+                    if (!empty($normalFosaTypeIds)) {
+                        $q->whereIn(
+                            'f.fosa_type_id',
+                            $normalFosaTypeIds
+                        );
+                    }
+
+                    if ($includeOtherDeposits) {
+
+                        $method = !empty($normalFosaTypeIds)
+                            ? 'orWhere'
+                            : 'where';
+
+                        $q->{$method}(function ($other) {
+                            $other
+                                ->whereNull('f.fosa_type_id')
+                                ->orWhere(
+                                    'f.fosa_type_id',
+                                    0
+                                )
+                                ->orWhereNull(
+                                    'ft.type_id'
+                                );
+                        });
+                    }
+                }
             );
         }
 
+        /*
+ * CASE converts every uncategorised/orphaned FOSA record
+ * to the virtual type ID 0.
+ */
         $fosaOpeningBalances = $fosaOpeningBalancesQuery
-            ->select(
-                'fosa_type_id',
-                DB::raw(
-                    'SUM(COALESCE(fosa_amount_paying, 0)) as opening_balance'
-                )
+            ->selectRaw(
+                "
+        CASE
+            WHEN f.fosa_type_id IS NULL
+              OR f.fosa_type_id = 0
+              OR ft.type_id IS NULL
+            THEN 0
+            ELSE f.fosa_type_id
+        END AS statement_fosa_type_id,
+
+        SUM(
+            COALESCE(f.fosa_amount_paying, 0)
+        ) AS opening_balance
+        "
             )
-            ->groupBy(
-                'fosa_type_id'
+            ->groupByRaw(
+                "
+        CASE
+            WHEN f.fosa_type_id IS NULL
+              OR f.fosa_type_id = 0
+              OR ft.type_id IS NULL
+            THEN 0
+            ELSE f.fosa_type_id
+        END
+        "
             )
             ->pluck(
                 'opening_balance',
-                'fosa_type_id'
+                'statement_fosa_type_id'
             );
+
+        
 
         /*
 |--------------------------------------------------------------------------
@@ -2823,10 +2967,41 @@ class HomeController extends Controller
             );
 
         if (!empty($fosaTypeIds)) {
-            $fosaContributionsQuery->whereIn(
-                'sacco_fosas.fosa_type_id',
-                $fosaTypeIds
+
+            $includeOtherDeposits = in_array(0, $fosaTypeIds, true);
+
+            $normalFosaTypeIds = array_values(
+                array_filter($fosaTypeIds, function ($typeId) {
+                    return (int) $typeId > 0;
+                })
             );
+
+            $fosaContributionsQuery->where(function ($q) use (
+                $normalFosaTypeIds,
+                $includeOtherDeposits
+            ) {
+
+                if (!empty($normalFosaTypeIds)) {
+                    $q->whereIn(
+                        'sacco_fosas.fosa_type_id',
+                        $normalFosaTypeIds
+                    );
+                }
+
+                if ($includeOtherDeposits) {
+
+                    $method = !empty($normalFosaTypeIds)
+                        ? 'orWhere'
+                        : 'where';
+
+                    $q->{$method}(function ($other) {
+                        $other
+                            ->whereNull('sacco_fosas.fosa_type_id')
+                            ->orWhere('sacco_fosas.fosa_type_id', 0)
+                            ->orWhereNull('sacco_fosa_types.type_id');
+                    });
+                }
+            });
         }
 
         $fosaContributions = $fosaContributionsQuery
@@ -2846,14 +3021,15 @@ class HomeController extends Controller
                 'sacco_fosas.fosa_id',
                 'asc'
             )
-            ->select(
-                'sacco_fosas.*',
-                'sacco_members.member_name',
-                'sacco_department.department_name',
-                'sacco_company.company_name',
-                'sacco_fosa_types.type_name',
-                'sacco_fosa_types.type_prefix'
-            )
+           ->select(
+    'sacco_fosas.*',
+    'sacco_members.member_name',
+    'sacco_department.department_name',
+    'sacco_company.company_name',
+    'sacco_fosa_types.type_id as matched_fosa_type_id',
+    'sacco_fosa_types.type_name',
+    'sacco_fosa_types.type_prefix'
+)
             ->get();
 
         /*
@@ -3010,13 +3186,13 @@ class HomeController extends Controller
                 '<=',
                 $period_to
             )
-           ->select(
-    'sacco_loans.*',
-    'sacco_loan_types.loan_type_name',
-    'sacco_loan_types.loan_type_duration',
-    'sacco_loan_types.loan_type_instant_qualification',
-    'sacco_loan_types.loan_type_instant_disbursement',
-    'sacco_loan_category.loan_category_name',
+            ->select(
+                'sacco_loans.*',
+                'sacco_loan_types.loan_type_name',
+                'sacco_loan_types.loan_type_duration',
+                'sacco_loan_types.loan_type_instant_qualification',
+                'sacco_loan_types.loan_type_instant_disbursement',
+                'sacco_loan_category.loan_category_name',
                 DB::raw(
                     'COALESCE(paid_period.paid_to_period, 0) as paid_as_at_period_to'
                 ),
@@ -6252,26 +6428,26 @@ class HomeController extends Controller
 
         // Handle approval of guarantee
         if ($request->has('yid') && is_numeric($request->input('yid'))) {
-    DB::table('sacco_loan_batch_guarantors_members')
-        ->where(
-            'guarantors_loan_batch_trans_id',
-            $request->input('yid')
-        )
-        ->where(
-            'guarantors_guarantor_id',
-            $logged_in_user
-        )
-        ->whereRaw(
-            "COALESCE(guarantors_deleted, 'N') <> 'Y'"
-        )
-        ->whereRaw(
-            "COALESCE(guarantors_approved, 'N') <> 'Y'"
-        )
-        ->update([
-            'guarantors_approved' => 'Y',
-            'guarantors_approved_on' => $transdate,
-        ]);
-}
+            DB::table('sacco_loan_batch_guarantors_members')
+                ->where(
+                    'guarantors_loan_batch_trans_id',
+                    $request->input('yid')
+                )
+                ->where(
+                    'guarantors_guarantor_id',
+                    $logged_in_user
+                )
+                ->whereRaw(
+                    "COALESCE(guarantors_deleted, 'N') <> 'Y'"
+                )
+                ->whereRaw(
+                    "COALESCE(guarantors_approved, 'N') <> 'Y'"
+                )
+                ->update([
+                    'guarantors_approved' => 'Y',
+                    'guarantors_approved_on' => $transdate,
+                ]);
+        }
 
         // Fetch loans pending guarantee approval
         $loans = DB::table('sacco_loan_category')
@@ -9983,10 +10159,10 @@ class HomeController extends Controller
 
         // IMPORTANT: build query WITHOUT ->get() or paginate()
         $query = DB::table('sacco_loans as l')
-    ->join('sacco_members as m', 'l.loan_member', '=', 'm.member_id')
-    ->leftJoin('sacco_department as d', 'm.member_dept', '=', 'd.department_id')
-    ->leftJoin('sacco_company as c', 'd.department_company_id', '=', 'c.company_id')
-    ->leftJoin('sacco_loan_types as lt', 'l.loan_loan_type', '=', 'lt.loan_type_id')
+            ->join('sacco_members as m', 'l.loan_member', '=', 'm.member_id')
+            ->leftJoin('sacco_department as d', 'm.member_dept', '=', 'd.department_id')
+            ->leftJoin('sacco_company as c', 'd.department_company_id', '=', 'c.company_id')
+            ->leftJoin('sacco_loan_types as lt', 'l.loan_loan_type', '=', 'lt.loan_type_id')
             ->select(
                 // Loan
                 'l.loan_id',
@@ -10167,26 +10343,26 @@ class HomeController extends Controller
         return response()->json(['data' => $loanRepayments]);
     }
     public function membersListCsv(Request $request)
-{
-    /*
+    {
+        /*
     |--------------------------------------------------------------------------
     | Use the SAME filtering logic as the member listing
     |--------------------------------------------------------------------------
     */
 
-    $orderby    = $request->input('orderby', 'member_name');
-    $sort_order = 'asc';
-    $search     = $request->input('pms_srch', '');
+        $orderby    = $request->input('orderby', 'member_name');
+        $sort_order = 'asc';
+        $search     = $request->input('pms_srch', '');
 
-    $memberActive  = $request->input('member_active', '');
-    $isJunior      = $request->input('member_is_junior', '');
-    $memberDeleted = $request->input('member_deleted', '');
+        $memberActive  = $request->input('member_active', '');
+        $isJunior      = $request->input('member_is_junior', '');
+        $memberDeleted = $request->input('member_deleted', '');
 
-    $memberActive  = $memberActive === '' ? null : $memberActive;
-    $isJunior      = $isJunior === '' ? null : $isJunior;
-    $memberDeleted = $memberDeleted === '' ? null : $memberDeleted;
+        $memberActive  = $memberActive === '' ? null : $memberActive;
+        $isJunior      = $isJunior === '' ? null : $isJunior;
+        $memberDeleted = $memberDeleted === '' ? null : $memberDeleted;
 
-    /*
+        /*
     |--------------------------------------------------------------------------
     | Get export population
     |--------------------------------------------------------------------------
@@ -10195,17 +10371,17 @@ class HomeController extends Controller
     |--------------------------------------------------------------------------
     */
 
-    $members = $this->getMembersListFiltered(
-        $orderby,
-        $sort_order,
-        $search,
-        50000,
-        $memberActive,
-        $isJunior,
-        $memberDeleted
-    );
+        $members = $this->getMembersListFiltered(
+            $orderby,
+            $sort_order,
+            $search,
+            50000,
+            $memberActive,
+            $isJunior,
+            $memberDeleted
+        );
 
-    /*
+        /*
     |--------------------------------------------------------------------------
     | Resolve Junior Account Guardians
     |--------------------------------------------------------------------------
@@ -10213,123 +10389,123 @@ class HomeController extends Controller
     |--------------------------------------------------------------------------
     */
 
-    $guardianIds = $members
-        ->pluck('member_guardian_id')
-        ->filter()
-        ->unique()
-        ->values();
+        $guardianIds = $members
+            ->pluck('member_guardian_id')
+            ->filter()
+            ->unique()
+            ->values();
 
-    $guardians = collect();
+        $guardians = collect();
 
-    if ($guardianIds->isNotEmpty()) {
-        $guardians = DB::table('sacco_members')
-            ->whereIn('member_id', $guardianIds)
-            ->select(
-                'member_id',
-                'member_name',
-                'member_sacco_id',
-                'member_national_id'
-            )
-            ->get()
-            ->keyBy('member_id');
-    }
+        if ($guardianIds->isNotEmpty()) {
+            $guardians = DB::table('sacco_members')
+                ->whereIn('member_id', $guardianIds)
+                ->select(
+                    'member_id',
+                    'member_name',
+                    'member_sacco_id',
+                    'member_national_id'
+                )
+                ->get()
+                ->keyBy('member_id');
+        }
 
-    /*
+        /*
     |--------------------------------------------------------------------------
     | CSV filename
     |--------------------------------------------------------------------------
     */
 
-    $filename = 'members_' . date('Ymd_His') . '.csv';
+        $filename = 'members_' . date('Ymd_His') . '.csv';
 
-    $headers = [
-        'Content-Type'        => 'text/csv; charset=UTF-8',
-        'Content-Disposition' => 'attachment; filename="' . $filename . '"',
-        'Pragma'              => 'no-cache',
-        'Cache-Control'       => 'must-revalidate, post-check=0, pre-check=0',
-        'Expires'             => '0',
-    ];
+        $headers = [
+            'Content-Type'        => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            'Pragma'              => 'no-cache',
+            'Cache-Control'       => 'must-revalidate, post-check=0, pre-check=0',
+            'Expires'             => '0',
+        ];
 
-    /*
+        /*
     |--------------------------------------------------------------------------
     | Rich Member Master columns
     |--------------------------------------------------------------------------
     */
 
-    $columns = [
-        'System Member ID',
+        $columns = [
+            'System Member ID',
 
-        // Identity
-        'Name',
-        'Sacco ID',
-        'National ID',
-        'KRA PIN',
-        'Date of Birth',
-        'Gender',
+            // Identity
+            'Name',
+            'Sacco ID',
+            'National ID',
+            'KRA PIN',
+            'Date of Birth',
+            'Gender',
 
-        // Contact
-        'Phone',
-        'Email',
-        'Postal Address',
+            // Contact
+            'Phone',
+            'Email',
+            'Postal Address',
 
-        // Membership
-        'Date Joined',
-        'Company',
-        'Department',
-        'Position',
-        'Status',
-        'Date Deactivated',
-        'Deleted',
-        'Deleted On',
-        'Account Type',
+            // Membership
+            'Date Joined',
+            'Company',
+            'Department',
+            'Position',
+            'Status',
+            'Date Deactivated',
+            'Deleted',
+            'Deleted On',
+            'Account Type',
 
-        // Junior account
-        'Guardian Name',
-        'Guardian Sacco ID',
-        'Guardian National ID',
+            // Junior account
+            'Guardian Name',
+            'Guardian Sacco ID',
+            'Guardian National ID',
 
-        // Digital access
-        'Mobile Banking',
-        'Last Mobile Login',
+            // Digital access
+            'Mobile Banking',
+            'Last Mobile Login',
 
-        // Monthly contribution settings
-        'Monthly Savings Contribution',
-        'Monthly Other Savings Contribution',
+            // Monthly contribution settings
+            'Monthly Savings Contribution',
+            'Monthly Other Savings Contribution',
 
-        // Current stored member totals
-        'Current Savings Total',
-        'Current Other Savings Total',
-        'Current Share Capital Total',
-        'Current Loan Total',
-        'Tied Shares - Others',
-        'Tied Shares - Self',
+            // Current stored member totals
+            'Current Savings Total',
+            'Current Other Savings Total',
+            'Current Share Capital Total',
+            'Current Loan Total',
+            'Tied Shares - Others',
+            'Tied Shares - Self',
 
-        // Banking
-        'Bank Name',
-        'Bank Branch',
-        'Bank Account Number',
+            // Banking
+            'Bank Name',
+            'Bank Branch',
+            'Bank Account Number',
 
-        // Record information
-        'Record Created',
-    ];
+            // Record information
+            'Record Created',
+        ];
 
-    /*
+        /*
     |--------------------------------------------------------------------------
     | Stream CSV
     |--------------------------------------------------------------------------
     */
 
-    $callback = function () use ($members, $columns, $guardians) {
-        $file = fopen('php://output', 'w');
+        $callback = function () use ($members, $columns, $guardians) {
+            $file = fopen('php://output', 'w');
 
-        /*
+            /*
          * UTF-8 BOM makes Excel handle names/special characters better.
          */
-        fwrite($file, "\xEF\xBB\xBF");
+            fwrite($file, "\xEF\xBB\xBF");
 
-        fputcsv($file, $columns);
+            fputcsv($file, $columns);
 
-        /*
+            /*
          * Preserve identifiers exactly as text in Excel.
          *
          * This prevents:
@@ -10337,200 +10513,200 @@ class HomeController extends Controller
          * long account numbers becoming scientific notation
          * phone numbers losing + or leading zeroes
          */
-        $excelText = function ($value) {
-            if ($value === null || $value === '') {
-                return '';
-            }
+            $excelText = function ($value) {
+                if ($value === null || $value === '') {
+                    return '';
+                }
 
-            $value = (string) $value;
-            $value = str_replace('"', '""', $value);
+                $value = (string) $value;
+                $value = str_replace('"', '""', $value);
 
-            return '="' . $value . '"';
-        };
-
-        /*
-         * Protect normal textual CSV values against Excel formula execution.
-         */
-        $safeText = function ($value) {
-            if ($value === null) {
-                return '';
-            }
-
-            $value = (string) $value;
-
-            if (
-                $value !== ''
-                && in_array(substr($value, 0, 1), ['=', '+', '-', '@'], true)
-            ) {
-                return "'" . $value;
-            }
-
-            return $value;
-        };
-
-        /*
-         * Consistent date formatting.
-         */
-        $formatDate = function ($value, $includeTime = false) {
-            if (empty($value)) {
-                return '';
-            }
-
-            try {
-                return \Carbon\Carbon::parse($value)->format(
-                    $includeTime ? 'Y-m-d H:i:s' : 'Y-m-d'
-                );
-            } catch (\Throwable $e) {
-                return (string) $value;
-            }
-        };
-
-        foreach ($members as $m) {
-
-            /*
-             * Junior guardian information
-             */
-            $guardian = null;
-
-            if (!empty($m->member_guardian_id)) {
-                $guardian = $guardians->get(
-                    $m->member_guardian_id
-                );
-            }
-
-            /*
-             * Human-readable gender
-             */
-            $gender = match (strtoupper((string) ($m->member_gender ?? ''))) {
-                'M' => 'Male',
-                'F' => 'Female',
-                default => (string) ($m->member_gender ?? ''),
+                return '="' . $value . '"';
             };
 
             /*
+         * Protect normal textual CSV values against Excel formula execution.
+         */
+            $safeText = function ($value) {
+                if ($value === null) {
+                    return '';
+                }
+
+                $value = (string) $value;
+
+                if (
+                    $value !== ''
+                    && in_array(substr($value, 0, 1), ['=', '+', '-', '@'], true)
+                ) {
+                    return "'" . $value;
+                }
+
+                return $value;
+            };
+
+            /*
+         * Consistent date formatting.
+         */
+            $formatDate = function ($value, $includeTime = false) {
+                if (empty($value)) {
+                    return '';
+                }
+
+                try {
+                    return \Carbon\Carbon::parse($value)->format(
+                        $includeTime ? 'Y-m-d H:i:s' : 'Y-m-d'
+                    );
+                } catch (\Throwable $e) {
+                    return (string) $value;
+                }
+            };
+
+            foreach ($members as $m) {
+
+                /*
+             * Junior guardian information
+             */
+                $guardian = null;
+
+                if (!empty($m->member_guardian_id)) {
+                    $guardian = $guardians->get(
+                        $m->member_guardian_id
+                    );
+                }
+
+                /*
+             * Human-readable gender
+             */
+                $gender = match (strtoupper((string) ($m->member_gender ?? ''))) {
+                    'M' => 'Male',
+                    'F' => 'Female',
+                    default => (string) ($m->member_gender ?? ''),
+                };
+
+                /*
              * Human-readable member status
              */
-            $status = strtoupper((string) ($m->member_active ?? 'N')) === 'Y'
-                ? 'Active'
-                : 'Inactive';
+                $status = strtoupper((string) ($m->member_active ?? 'N')) === 'Y'
+                    ? 'Active'
+                    : 'Inactive';
 
-            /*
+                /*
              * Junior / Standard account
              */
-            $accountType = (int) ($m->member_is_junior ?? 0) === 1
-                ? 'Junior'
-                : 'Standard';
+                $accountType = (int) ($m->member_is_junior ?? 0) === 1
+                    ? 'Junior'
+                    : 'Standard';
 
-            /*
+                /*
              * Deleted status
              */
-            $deleted = strtoupper((string) ($m->member_deleted ?? 'N')) === 'Y'
-                ? 'Yes'
-                : 'No';
+                $deleted = strtoupper((string) ($m->member_deleted ?? 'N')) === 'Y'
+                    ? 'Yes'
+                    : 'No';
 
-            /*
+                /*
              * Mobile banking status
              */
-            $mobileBanking = strtoupper(
-                (string) ($m->member_mobile_banking_active ?? 'N')
-            ) === 'Y'
-                ? 'Active'
-                : 'Inactive';
+                $mobileBanking = strtoupper(
+                    (string) ($m->member_mobile_banking_active ?? 'N')
+                ) === 'Y'
+                    ? 'Active'
+                    : 'Inactive';
 
-            fputcsv($file, [
-                /*
+                fputcsv($file, [
+                    /*
                  * System
                  */
-                $m->member_id,
+                    $m->member_id,
 
-                /*
+                    /*
                  * Identity
                  */
-                $safeText($m->member_name),
-                $excelText($m->member_sacco_id),
-                $excelText($m->member_national_id),
-                $excelText($m->member_kra_pin),
-                $formatDate($m->member_dob),
-                $gender,
+                    $safeText($m->member_name),
+                    $excelText($m->member_sacco_id),
+                    $excelText($m->member_national_id),
+                    $excelText($m->member_kra_pin),
+                    $formatDate($m->member_dob),
+                    $gender,
 
-                /*
+                    /*
                  * Contact
                  */
-                $excelText($m->member_phone_no),
-                $safeText($m->member_email),
-                $safeText($m->member_postal_address),
+                    $excelText($m->member_phone_no),
+                    $safeText($m->member_email),
+                    $safeText($m->member_postal_address),
 
-                /*
+                    /*
                  * Membership
                  */
-                $formatDate($m->member_date_joined),
-                $safeText($m->company_name),
-                $safeText($m->department_name),
-                $safeText($m->position_name),
-                $status,
-                $formatDate($m->member_date_dactivated),
-                $deleted,
-                $formatDate($m->member_deleted_on, true),
-                $accountType,
+                    $formatDate($m->member_date_joined),
+                    $safeText($m->company_name),
+                    $safeText($m->department_name),
+                    $safeText($m->position_name),
+                    $status,
+                    $formatDate($m->member_date_dactivated),
+                    $deleted,
+                    $formatDate($m->member_deleted_on, true),
+                    $accountType,
 
-                /*
+                    /*
                  * Junior guardian
                  */
-                $guardian
-                    ? $safeText($guardian->member_name)
-                    : '',
+                    $guardian
+                        ? $safeText($guardian->member_name)
+                        : '',
 
-                $guardian
-                    ? $excelText($guardian->member_sacco_id)
-                    : '',
+                    $guardian
+                        ? $excelText($guardian->member_sacco_id)
+                        : '',
 
-                $guardian
-                    ? $excelText($guardian->member_national_id)
-                    : '',
+                    $guardian
+                        ? $excelText($guardian->member_national_id)
+                        : '',
 
-                /*
+                    /*
                  * Digital access
                  */
-                $mobileBanking,
-                $formatDate($m->member_last_mobile_login, true),
+                    $mobileBanking,
+                    $formatDate($m->member_last_mobile_login, true),
 
-                /*
+                    /*
                  * Monthly contribution settings
                  */
-                (float) ($m->member_share_contr_monthly ?? 0),
-                (float) ($m->member_fosa_contr_monthly ?? 0),
+                    (float) ($m->member_share_contr_monthly ?? 0),
+                    (float) ($m->member_fosa_contr_monthly ?? 0),
 
-                /*
+                    /*
                  * Current stored member totals
                  */
-                (float) ($m->member_total_share ?? 0),
-                (float) ($m->member_total_fosa ?? 0),
-                (float) ($m->member_total_share_capital ?? 0),
-                (float) ($m->member_total_loan ?? 0),
-                (float) ($m->member_tied_shares ?? 0),
-                (float) ($m->member_tied_shares_self ?? 0),
+                    (float) ($m->member_total_share ?? 0),
+                    (float) ($m->member_total_fosa ?? 0),
+                    (float) ($m->member_total_share_capital ?? 0),
+                    (float) ($m->member_total_loan ?? 0),
+                    (float) ($m->member_tied_shares ?? 0),
+                    (float) ($m->member_tied_shares_self ?? 0),
 
-                /*
+                    /*
                  * Bank information
                  */
-                $safeText($m->bank_name),
-                $safeText($m->bank_branch),
-                $excelText($m->bank_account_number),
+                    $safeText($m->bank_name),
+                    $safeText($m->bank_branch),
+                    $excelText($m->bank_account_number),
 
-                /*
+                    /*
                  * Record information
                  */
-                $formatDate($m->member_transdate, true),
-            ]);
-        }
+                    $formatDate($m->member_transdate, true),
+                ]);
+            }
 
-        fclose($file);
-    };
+            fclose($file);
+        };
 
-    return response()->stream(
-        $callback,
-        200,
-        $headers
-    );
-}
+        return response()->stream(
+            $callback,
+            200,
+            $headers
+        );
+    }
 }
