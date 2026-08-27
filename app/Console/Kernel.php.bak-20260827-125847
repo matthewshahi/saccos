@@ -182,32 +182,6 @@ class Kernel extends ConsoleKernel
 
         /*
         |--------------------------------------------------------------------------
-        | Automatic Loan Default Interest
-        |--------------------------------------------------------------------------
-        | Processes a maximum of 20 eligible defaulted loans per minute.
-        |
-        | Runs nightly from 22:00 through 05:59 Africa/Nairobi.
-        | The command itself performs loan-level eligibility, duplicate,
-        | balance, accounting and idempotency checks before posting.
-        |--------------------------------------------------------------------------
-        */
-
-        $schedule->command(
-            'loans:process-default-interest --limit=20'
-        )
-            ->everyMinute()
-            ->when(function () {
-                $hour = (int) now('Africa/Nairobi')->format('H');
-
-                return $hour >= 22 || $hour < 6;
-            })
-            ->withoutOverlapping(10)
-            ->onOneServer()
-            ->timezone('Africa/Nairobi')
-            ->runInBackground();
-
-        /*
-        |--------------------------------------------------------------------------
         | Nightly Loan Recompute
         |--------------------------------------------------------------------------
         */

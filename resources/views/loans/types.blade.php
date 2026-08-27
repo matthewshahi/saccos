@@ -15,7 +15,7 @@
 
     .loan-types-table {
         width: 100%;
-        min-width: 1450px;
+        min-width: 1550px;
         margin-bottom: 0;
     }
 
@@ -59,6 +59,10 @@
         min-width: 250px;
     }
 
+    .loan-types-table .pricing-cell {
+        min-width: 310px;
+    }
+
     .loan-types-table .sticky-left {
         position: sticky;
         left: 0;
@@ -86,7 +90,7 @@
         min-width: 90px;
         text-align: center;
         vertical-align: middle;
-        box-shadow: -4px 0 6px rgba(0,0,0,0.05);
+        box-shadow: -4px 0 6px rgba(0, 0, 0, 0.05);
     }
 
     .loan-types-table tbody tr:nth-child(even) .sticky-action {
@@ -109,21 +113,55 @@
     .loan-types-table small {
         font-size: 11px;
     }
+
+    .dfi-block {
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 1px dashed #d1d5db;
+    }
+
+    .dfi-heading {
+        display: block;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: #6b7280;
+        margin-bottom: 7px;
+    }
+
+    .rate-fallback {
+        color: #6b7280;
+        font-size: 12px;
+    }
 </style>
 @endsection
 
 @section('content')
+
 <div class="breadcrumb d-flex justify-content-between align-items-center">
     <h1>Loan Types</h1>
+
     <div class="header-part-right">
         <ul>
             @if(Auth::check())
                 <li>{{ Auth::user()->member_name }}</li>
             @endif
+
             @if(isset($currentPeriod) && $currentPeriod)
-                <li><a href="{{ route('admin.periods') }}">{{ $currentPeriod->period_name }}</a></li>
+                <li>
+                    <a href="{{ route('admin.periods') }}">
+                        {{ $currentPeriod->period_name }}
+                    </a>
+                </li>
             @endif
-            <li><i class="i-Full-Screen header-icon d-none d-sm-inline-block" data-fullscreen=""></i></li>
+
+            <li>
+                <i
+                    class="i-Full-Screen header-icon d-none d-sm-inline-block"
+                    data-fullscreen=""
+                ></i>
+            </li>
         </ul>
     </div>
 </div>
@@ -131,11 +169,15 @@
 <div class="separator-breadcrumb border-top"></div>
 
 @if(session('success'))
-    <div class="alert alert-success">{{ session('success') }}</div>
+    <div class="alert alert-success">
+        {{ session('success') }}
+    </div>
 @endif
 
 @if(session('error'))
-    <div class="alert alert-danger">{{ session('error') }}</div>
+    <div class="alert alert-danger">
+        {{ session('error') }}
+    </div>
 @endif
 
 @if($errors->any())
@@ -150,249 +192,719 @@
 
 <div class="row">
     <div class="col-md-12">
+
         <div class="card o-hidden mb-4">
+
             <div class="card-header">
-                <h3 class="w-50 float-start card-title m-0">All Loan Types</h3>
+
+                <h3 class="w-50 float-start card-title m-0">
+                    All Loan Types
+                </h3>
 
                 <div class="dropdown dropleft text-end w-50 float-end">
-                    <button class="btn bg-gray-100" type="button" id="dropdownMenuButton_table2" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+
+                    <button
+                        class="btn bg-gray-100"
+                        type="button"
+                        id="dropdownMenuButton_table2"
+                        data-toggle="dropdown"
+                        aria-haspopup="true"
+                        aria-expanded="false"
+                    >
                         <i class="nav-icon i-Gear-2"></i>
                     </button>
-                    <div class="dropdown-menu" aria-labelledby="dropdownMenuButton_table2">
-                        <a class="dropdown-item" href="{{ route('loans.types.add') }}">Add New Loan Type</a>
-                        <a class="dropdown-item" href="{{ route('loans.types') }}">Refresh List</a>
+
+                    <div
+                        class="dropdown-menu"
+                        aria-labelledby="dropdownMenuButton_table2"
+                    >
+                        <a
+                            class="dropdown-item"
+                            href="{{ route('loans.types.add') }}"
+                        >
+                            Add New Loan Type
+                        </a>
+
+                        <a
+                            class="dropdown-item"
+                            href="{{ route('loans.types') }}"
+                        >
+                            Refresh List
+                        </a>
                     </div>
+
                 </div>
             </div>
 
             <div class="card-body">
+
                 <div class="mb-3">
-                    <a href="{{ route('loans.types.add') }}" class="btn btn-primary">Add New Loan Type</a>
+                    <a
+                        href="{{ route('loans.types.add') }}"
+                        class="btn btn-primary"
+                    >
+                        Add New Loan Type
+                    </a>
                 </div>
 
                 <div class="loan-types-table-wrap">
+
                     <table class="table table-striped table-bordered loan-types-table">
+
                         <thead>
                             <tr>
                                 <th class="sticky-left">#</th>
-                                <th>Loan Type</th>
-                                <th>Pricing &amp; Repayment</th>
-                                <th>Eligibility Rules</th>
-                                <th>Compliance &amp; Charges</th>
-                                <th>Accounts</th>
-                                <th class="sticky-action">Action</th>
+
+                                <th>
+                                    Loan Type
+                                </th>
+
+                                <th>
+                                    Pricing &amp; Repayment
+                                </th>
+
+                                <th>
+                                    Eligibility Rules
+                                </th>
+
+                                <th>
+                                    Compliance &amp; Charges
+                                </th>
+
+                                <th>
+                                    Accounts
+                                </th>
+
+                                <th class="sticky-action">
+                                    Action
+                                </th>
                             </tr>
                         </thead>
+
                         <tbody>
+
                             @forelse($loanTypes as $index => $loanType)
+
                                 @php
-                                    $loanAcc = $subAccountDetails[$loanType->loan_type_acount] ?? null;
-                                    $intAcc = $subAccountDetails[$loanType->loan_type_int_account] ?? null;
-                                    $commAcc = $subAccountDetails[$loanType->loan_type_comm_account] ?? null;
+                                    $loanAcc =
+                                        $subAccountDetails[$loanType->loan_type_acount]
+                                        ?? null;
+
+                                    $intAcc =
+                                        $subAccountDetails[$loanType->loan_type_int_account]
+                                        ?? null;
+
+                                    $commAcc =
+                                        $subAccountDetails[$loanType->loan_type_comm_account]
+                                        ?? null;
+
+                                    /*
+                                    |--------------------------------------------------------------------------
+                                    | Default Interest Configuration
+                                    |--------------------------------------------------------------------------
+                                    */
+
+                                    $autoDefaultInterest =
+                                        (int) (
+                                            $loanType->loan_type_auto_interest_on_period_change
+                                            ?? 0
+                                        ) === 1;
+
+                                    /*
+                                     * Service fallback is 45 days where the field
+                                     * is unexpectedly NULL.
+                                     */
+                                    $defaultGraceDays =
+                                        (int) (
+                                            $loanType->loan_type_grace_days_after_due
+                                            ?? 45
+                                        );
+
+                                    /*
+                                     * NULL means use normal loan interest.
+                                     */
+                                    $configuredDefaultRate =
+                                        $loanType->loan_type_default_interest;
+
+                                    $normalInterestRate =
+                                        (float) (
+                                            $loanType->loan_type_interest
+                                            ?? 0
+                                        );
                                 @endphp
 
                                 <tr>
-                                    <td class="sticky-left">{{ $index + 1 }}</td>
 
+                                    {{-- Row Number --}}
+                                    <td class="sticky-left">
+                                        {{ $index + 1 }}
+                                    </td>
+
+                                    {{-- Loan Type --}}
                                     <td class="group-cell">
-                                        <div class="cell-title">{{ $loanType->loan_type_name }}</div>
+
+                                        <div class="cell-title">
+                                            {{ $loanType->loan_type_name }}
+                                        </div>
 
                                         <span class="cell-line">
-                                            <strong>Code:</strong> {{ $loanType->loan_type_code }}
+                                            <strong>Code:</strong>
+                                            {{ $loanType->loan_type_code }}
                                         </span>
 
                                         <span class="cell-line">
+
                                             <strong>Status:</strong>
-                                            @if((int)($loanType->loan_type_active ?? 1) === 1)
-                                                <span class="badge text-bg-success">Active</span>
+
+                                            @if(
+                                                (int) (
+                                                    $loanType->loan_type_active
+                                                    ?? 1
+                                                ) === 1
+                                            )
+
+                                                <span class="badge text-bg-success">
+                                                    Active
+                                                </span>
+
                                             @else
-                                                <span class="badge text-bg-warning">Inactive</span>
+
+                                                <span class="badge text-bg-warning">
+                                                    Inactive
+                                                </span>
+
                                             @endif
+
                                         </span>
+
                                     </td>
 
-                                    <td class="group-cell">
+                                    {{-- Pricing / Repayment / Default Interest --}}
+                                    <td class="group-cell pricing-cell">
+
                                         <span class="cell-line">
-                                            <strong>Interest:</strong> {{ number_format((float)$loanType->loan_type_interest, 2) }}%
+                                            <strong>Interest:</strong>
+
+                                            {{ number_format(
+                                                (float) (
+                                                    $loanType->loan_type_interest
+                                                    ?? 0
+                                                ),
+                                                2
+                                            ) }}%
                                         </span>
 
                                         <span class="cell-line">
-                                            <strong>Type:</strong> {{ $loanType->loan_type_interest_type }}
+                                            <strong>Type:</strong>
+
+                                            {{ $loanType->loan_type_interest_type }}
                                         </span>
 
                                         <span class="cell-line">
-                                            <strong>Duration:</strong> {{ (int)$loanType->loan_type_duration }} months
+                                            <strong>Duration:</strong>
+
+                                            {{ (int) (
+                                                $loanType->loan_type_duration
+                                                ?? 0
+                                            ) }} months
                                         </span>
 
                                         <span class="cell-line">
-                                            <strong>Max Amount:</strong> {{ number_format((float)$loanType->loan_type_max_amount, 2) }}
+                                            <strong>Max Amount:</strong>
+
+                                            {{ number_format(
+                                                (float) (
+                                                    $loanType->loan_type_max_amount
+                                                    ?? 0
+                                                ),
+                                                2
+                                            ) }}
                                         </span>
+
+
+                                        {{-- Default Interest Configuration --}}
+                                        <div class="dfi-block">
+
+                                            <span class="dfi-heading">
+                                                Default Interest
+                                            </span>
+
+                                            <span class="cell-line">
+
+                                                <strong>Automatic:</strong>
+
+                                                @if($autoDefaultInterest)
+
+                                                    <span class="badge text-bg-success">
+                                                        Enabled
+                                                    </span>
+
+                                                @else
+
+                                                    <span class="badge text-bg-secondary">
+                                                        Disabled
+                                                    </span>
+
+                                                @endif
+
+                                            </span>
+
+                                            <span class="cell-line">
+
+                                                <strong>Grace After Due:</strong>
+
+                                                {{ $defaultGraceDays }}
+                                                {{ $defaultGraceDays === 1 ? 'day' : 'days' }}
+
+                                            </span>
+
+                                            <span class="cell-line">
+
+                                                <strong>Default Rate:</strong>
+
+                                                @if(!is_null($configuredDefaultRate))
+
+                                                    {{ number_format(
+                                                        (float) $configuredDefaultRate,
+                                                        2
+                                                    ) }}%
+
+                                                @else
+
+                                                    <span class="rate-fallback">
+                                                        Uses normal rate
+                                                        ({{ number_format(
+                                                            $normalInterestRate,
+                                                            2
+                                                        ) }}%)
+                                                    </span>
+
+                                                @endif
+
+                                            </span>
+
+                                        </div>
+
                                     </td>
 
+                                    {{-- Eligibility --}}
                                     <td class="group-cell">
+
                                         <span class="cell-line">
-                                            <strong>Share Factor:</strong> {{ $loanType->loan_type_share_factor ?? 0 }}
+
+                                            <strong>Share Factor:</strong>
+
+                                            {{ $loanType->loan_type_share_factor ?? 0 }}
+
                                         </span>
 
                                         <span class="cell-line">
-                                            <strong>Guarantee:</strong> {{ (int)$loanType->loan_type_guaranteable_percent }}%
+
+                                            <strong>Guarantee:</strong>
+
+                                            {{ (int) (
+                                                $loanType->loan_type_guaranteable_percent
+                                                ?? 0
+                                            ) }}%
+
                                         </span>
 
                                         <span class="cell-line">
-                                            <strong>Min Months:</strong> {{ (int)$loanType->loan_type_qualification_period }}
+
+                                            <strong>Min Months:</strong>
+
+                                            {{ (int) (
+                                                $loanType->loan_type_qualification_period
+                                                ?? 0
+                                            ) }}
+
                                         </span>
 
                                         <span class="cell-line">
+
                                             <strong>Max Months:</strong>
-                                            @if(!is_null($loanType->loan_type_max_qualification_period))
-                                                {{ (int)$loanType->loan_type_max_qualification_period }}
+
+                                            @if(
+                                                !is_null(
+                                                    $loanType->loan_type_max_qualification_period
+                                                )
+                                            )
+
+                                                {{ (int) $loanType->loan_type_max_qualification_period }}
+
                                             @else
+
                                                 No limit
+
                                             @endif
+
                                         </span>
 
                                         <span class="cell-line">
+
                                             <strong>Instant:</strong>
-                                            @if((int)($loanType->loan_type_instant_qualification ?? 0) === 1)
-                                                <span class="badge text-bg-primary">Yes</span>
+
+                                            @if(
+                                                (int) (
+                                                    $loanType->loan_type_instant_qualification
+                                                    ?? 0
+                                                ) === 1
+                                            )
+
+                                                <span class="badge text-bg-primary">
+                                                    Yes
+                                                </span>
+
                                             @else
-                                                <span class="badge text-bg-secondary">No</span>
+
+                                                <span class="badge text-bg-secondary">
+                                                    No
+                                                </span>
+
                                             @endif
+
                                         </span>
+
                                     </td>
 
+                                    {{-- Compliance / Charges --}}
                                     <td class="group-cell">
+
                                         <span class="cell-line">
+
                                             <strong>Insurable:</strong>
-                                            @if(($loanType->loan_type_insurable ?? 'N') === 'Y')
-                                                <span class="badge text-bg-success">Yes</span>
+
+                                            @if(
+                                                ($loanType->loan_type_insurable ?? 'N')
+                                                === 'Y'
+                                            )
+
+                                                <span class="badge text-bg-success">
+                                                    Yes
+                                                </span>
+
                                             @else
-                                                <span class="badge text-bg-danger">No</span>
+
+                                                <span class="badge text-bg-danger">
+                                                    No
+                                                </span>
+
                                             @endif
+
                                         </span>
 
                                         <span class="cell-line">
+
                                             <strong>Insurance Effect:</strong>
-                                            @if(($loanType->loan_type_insurance_effect ?? '') === 'ADD_TO_LOAN')
+
+                                            @if(
+                                                ($loanType->loan_type_insurance_effect ?? '')
+                                                === 'ADD_TO_LOAN'
+                                            )
+
                                                 Add to Loan
-                                            @elseif(($loanType->loan_type_insurance_effect ?? '') === 'DEDUCT_FROM_DISBURSEMENT')
+
+                                            @elseif(
+                                                ($loanType->loan_type_insurance_effect ?? '')
+                                                === 'DEDUCT_FROM_DISBURSEMENT'
+                                            )
+
                                                 Deduct from Payout
+
                                             @else
+
                                                 N/A
+
                                             @endif
+
                                         </span>
 
                                         <span class="cell-line">
+
                                             <strong>CRB Required:</strong>
-                                            @if(($loanType->loan_type_crb_required ?? 'N') === 'Y')
-                                                <span class="badge text-bg-info">Yes</span>
+
+                                            @if(
+                                                ($loanType->loan_type_crb_required ?? 'N')
+                                                === 'Y'
+                                            )
+
+                                                <span class="badge text-bg-info">
+                                                    Yes
+                                                </span>
+
                                             @else
-                                                <span class="badge text-bg-secondary">No</span>
+
+                                                <span class="badge text-bg-secondary">
+                                                    No
+                                                </span>
+
                                             @endif
+
                                         </span>
 
                                         <span class="cell-line">
-                                            <strong>CRB Charge:</strong> {{ number_format((float)($loanType->loan_type_crb_charge ?? 0), 2) }}
+
+                                            <strong>CRB Charge:</strong>
+
+                                            {{ number_format(
+                                                (float) (
+                                                    $loanType->loan_type_crb_charge
+                                                    ?? 0
+                                                ),
+                                                2
+                                            ) }}
+
                                         </span>
 
                                         <span class="cell-line">
+
                                             <strong>CRB Effect:</strong>
-                                            @if(($loanType->loan_type_crb_effect ?? '') === 'ADD_TO_LOAN')
+
+                                            @if(
+                                                ($loanType->loan_type_crb_effect ?? '')
+                                                === 'ADD_TO_LOAN'
+                                            )
+
                                                 Add to Loan
-                                            @elseif(($loanType->loan_type_crb_effect ?? '') === 'DEDUCT_FROM_DISBURSEMENT')
+
+                                            @elseif(
+                                                ($loanType->loan_type_crb_effect ?? '')
+                                                === 'DEDUCT_FROM_DISBURSEMENT'
+                                            )
+
                                                 Deduct from Payout
+
                                             @else
+
                                                 N/A
+
                                             @endif
+
                                         </span>
 
                                         <span class="cell-line">
+
                                             <strong>Commission Required:</strong>
-                                            @if(($loanType->loan_type_commission_required ?? 'N') === 'Y')
-                                                <span class="badge text-bg-info">Yes</span>
+
+                                            @if(
+                                                ($loanType->loan_type_commission_required ?? 'N')
+                                                === 'Y'
+                                            )
+
+                                                <span class="badge text-bg-info">
+                                                    Yes
+                                                </span>
+
                                             @else
-                                                <span class="badge text-bg-secondary">No</span>
+
+                                                <span class="badge text-bg-secondary">
+                                                    No
+                                                </span>
+
                                             @endif
+
                                         </span>
 
                                         <span class="cell-line">
-                                            <strong>Commission Type:</strong> {{ $loanType->loan_type_commission_type ?? 'N/A' }}
+
+                                            <strong>Commission Type:</strong>
+
+                                            {{ $loanType->loan_type_commission_type ?? 'N/A' }}
+
                                         </span>
 
                                         <span class="cell-line">
-                                            <strong>Commission Value:</strong> {{ number_format((float)($loanType->loan_type_commission_value ?? 0), 2) }}
+
+                                            <strong>Commission Value:</strong>
+
+                                            {{ number_format(
+                                                (float) (
+                                                    $loanType->loan_type_commission_value
+                                                    ?? 0
+                                                ),
+                                                2
+                                            ) }}
+
                                         </span>
 
                                         <span class="cell-line">
+
                                             <strong>Commission Effect:</strong>
-                                            @if(($loanType->loan_type_commission_effect ?? '') === 'ADD_TO_LOAN')
+
+                                            @if(
+                                                ($loanType->loan_type_commission_effect ?? '')
+                                                === 'ADD_TO_LOAN'
+                                            )
+
                                                 Add to Loan
-                                            @elseif(($loanType->loan_type_commission_effect ?? '') === 'DEDUCT_FROM_DISBURSEMENT')
+
+                                            @elseif(
+                                                ($loanType->loan_type_commission_effect ?? '')
+                                                === 'DEDUCT_FROM_DISBURSEMENT'
+                                            )
+
                                                 Deduct from Payout
+
                                             @else
+
                                                 N/A
+
                                             @endif
+
                                         </span>
+
                                     </td>
 
+                                    {{-- Accounts --}}
                                     <td class="group-cell">
+
                                         <span class="cell-line">
-                                            <strong>Loan Account:</strong><br>
+
+                                            <strong>Loan Account:</strong>
+                                            <br>
+
                                             @if($loanAcc)
-                                                {{ $loanAcc->sub_account_name }}<br>
-                                                <small class="text-muted">{{ $loanAcc->main_account_code }}/{{ $loanAcc->sub_account_code }}</small>
+
+                                                {{ $loanAcc->sub_account_name }}
+                                                <br>
+
+                                                <small class="text-muted">
+                                                    {{ $loanAcc->main_account_code }}/{{ $loanAcc->sub_account_code }}
+                                                </small>
+
                                             @else
-                                                <span class="text-muted">None</span>
+
+                                                <span class="text-muted">
+                                                    None
+                                                </span>
+
                                             @endif
+
                                         </span>
 
                                         <span class="cell-line">
-                                            <strong>Interest Account:</strong><br>
+
+                                            <strong>Interest Account:</strong>
+                                            <br>
+
                                             @if($intAcc)
-                                                {{ $intAcc->sub_account_name }}<br>
-                                                <small class="text-muted">{{ $intAcc->main_account_code }}/{{ $intAcc->sub_account_code }}</small>
+
+                                                {{ $intAcc->sub_account_name }}
+                                                <br>
+
+                                                <small class="text-muted">
+                                                    {{ $intAcc->main_account_code }}/{{ $intAcc->sub_account_code }}
+                                                </small>
+
                                             @else
-                                                <span class="text-muted">None</span>
+
+                                                <span class="text-muted">
+                                                    None
+                                                </span>
+
                                             @endif
+
                                         </span>
 
                                         <span class="cell-line">
-                                            <strong>Commission Account:</strong><br>
+
+                                            <strong>Commission Account:</strong>
+                                            <br>
+
                                             @if($commAcc)
-                                                {{ $commAcc->sub_account_name }}<br>
-                                                <small class="text-muted">{{ $commAcc->main_account_code }}/{{ $commAcc->sub_account_code }}</small>
+
+                                                {{ $commAcc->sub_account_name }}
+                                                <br>
+
+                                                <small class="text-muted">
+                                                    {{ $commAcc->main_account_code }}/{{ $commAcc->sub_account_code }}
+                                                </small>
+
                                             @else
-                                                <span class="text-muted">None</span>
+
+                                                <span class="text-muted">
+                                                    None
+                                                </span>
+
                                             @endif
+
                                         </span>
+
                                     </td>
 
+                                    {{-- Actions --}}
                                     <td class="sticky-action">
+
                                         <div class="action-icons">
-                                            <a href="{{ route('loans.types.edit', $loanType->loan_type_id) }}" class="text-success" title="Edit">
-                                                <i class="nav-icon i-Pen-2 font-weight-bold"></i>
+
+                                            <a
+                                                href="{{ route(
+                                                    'loans.types.edit',
+                                                    $loanType->loan_type_id
+                                                ) }}"
+                                                class="text-success"
+                                                title="Edit"
+                                            >
+                                                <i
+                                                    class="nav-icon i-Pen-2 font-weight-bold"
+                                                ></i>
                                             </a>
 
-                                            <form action="{{ route('loans.types.delete', $loanType->loan_type_id) }}" method="POST" style="display:inline;">
+                                            <form
+                                                action="{{ route(
+                                                    'loans.types.delete',
+                                                    $loanType->loan_type_id
+                                                ) }}"
+                                                method="POST"
+                                                style="display:inline;"
+                                            >
+
                                                 @csrf
                                                 @method('DELETE')
-                                                <button type="submit" class="text-danger border-0 bg-transparent p-0" title="Delete" onclick="return confirm('Delete this loan type?');">
-                                                    <i class="nav-icon i-Close-Window font-weight-bold"></i>
+
+                                                <button
+                                                    type="submit"
+                                                    class="text-danger border-0 bg-transparent p-0"
+                                                    title="Delete"
+                                                    onclick="return confirm('Delete this loan type?');"
+                                                >
+                                                    <i
+                                                        class="nav-icon i-Close-Window font-weight-bold"
+                                                    ></i>
                                                 </button>
+
                                             </form>
+
                                         </div>
+
+                                    </td>
+
+                                </tr>
+
+                            @empty
+
+                                <tr>
+                                    <td
+                                        colspan="7"
+                                        class="text-center text-muted"
+                                    >
+                                        No loan types found.
                                     </td>
                                 </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="7" class="text-center text-muted">No loan types found.</td>
-                                </tr>
+
                             @endforelse
+
                         </tbody>
+
                     </table>
+
                 </div>
+
             </div>
+
         </div>
+
     </div>
 </div>
+
 @endsection

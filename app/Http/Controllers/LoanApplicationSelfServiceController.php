@@ -490,17 +490,69 @@ class LoanApplicationSelfServiceController extends Controller
             }
 
             if ((float) ($loan->loan_type_guaranteable_percent ?? 0) > 0) {
-                $guaranteeCheck = $this->isSufficientlyGuaranteed($loan, $loan->batch_trans_loan_amount);
+
+                /*
+    |--------------------------------------------------------------------------
+    | Final guarantor capacity recheck
+    |--------------------------------------------------------------------------
+    |
+    | Reconfirm the current share capacity of every guarantor immediately
+    | before approval.
+    |
+    | Guaranteeing another member:
+    |   member_total_share × max_guarantor_factor
+    |   - member_tied_shares
+    |   - other pending guarantees
+    |
+    | Self-guaranteeing:
+    |   member_total_share × max_guarantor_factor_self
+    |   - member_tied_shares_self
+    |   - other pending self-guarantees
+    |--------------------------------------------------------------------------
+    */
+                $finalCapacityCheck =
+                    $this->validateGuarantorCapacityForFinalApproval(
+                        $loan
+                    );
+
+                if (!$finalCapacityCheck['success']) {
+                    throw new \Exception(
+                        $finalCapacityCheck['message']
+                    );
+                }
+
+                /*
+    |--------------------------------------------------------------------------
+    | Final total guarantee check
+    |--------------------------------------------------------------------------
+    */
+                $guaranteeCheck = $this->isSufficientlyGuaranteed(
+                    $loan,
+                    $loan->batch_trans_loan_amount
+                );
 
                 if (!$guaranteeCheck['is_fully_guaranteed']) {
-                    $errorMessage = "Error: This loan application by <strong>{$loan->member_name}</strong> "
-                        . "is under-guaranteed.<br>"
-                        . "Total Guaranteed: <strong>" . number_format($guaranteeCheck['total_guaranteed'], 2) . "</strong><br>"
-                        . "Required Guarantee: <strong>" . number_format($guaranteeCheck['required_guarantee'], 2) . "</strong><br>"
-                        . "Deficit: <strong>" . number_format($guaranteeCheck['difference'], 2) . "</strong>";
-
-                    DB::rollBack();
-                    return redirect()->back()->withErrors(['error' => $errorMessage]);
+                    throw new \Exception(
+                        'This loan application by '
+                            . $loan->member_name
+                            . ' is under-guaranteed. '
+                            . 'Total Guaranteed: '
+                            . number_format(
+                                $guaranteeCheck['total_guaranteed'],
+                                2
+                            )
+                            . '. Required Guarantee: '
+                            . number_format(
+                                $guaranteeCheck['required_guarantee'],
+                                2
+                            )
+                            . '. Deficit: '
+                            . number_format(
+                                $guaranteeCheck['difference'],
+                                2
+                            )
+                            . '.'
+                    );
                 }
             }
 
@@ -4758,5 +4810,307 @@ class LoanApplicationSelfServiceController extends Controller
                 'Failed to save the Credit Committee decision.',
             ], 500);
         }
+    }
+
+    private function validateGuarantorCapacityForFinalApproval($loan): array
+    {
+        $batchTransId = (int) $loan->batch_trans_id;
+        $borrowerMemberId = (int) $loan->batch_trans_member_id;
+
+        /*
+    |--------------------------------------------------------------------------
+    | Read current guarantor factors
+    |--------------------------------------------------------------------------
+    */
+        $maxGuarantorFactor = (float) (
+            DB::table('sacco_defaults')
+            ->where(
+                'default_name',
+                'max_guarantor_factor'
+            )
+            ->value('default_value')
+            ?? 1
+        );
+
+        $maxGuarantorFactorSelf = (float) (
+            DB::table('sacco_defaults')
+            ->where(
+                'default_name',
+                'max_guarantor_factor_self'
+            )
+            ->value('default_value')
+            ?? 1
+        );
+
+        /*
+    |--------------------------------------------------------------------------
+    | Fail safely on invalid configuration
+    |--------------------------------------------------------------------------
+    */
+        if ($maxGuarantorFactor < 0) {
+            return [
+                'success' => false,
+                'message' =>
+                'Invalid max_guarantor_factor configuration.',
+            ];
+        }
+
+        if ($maxGuarantorFactorSelf < 0) {
+            return [
+                'success' => false,
+                'message' =>
+                'Invalid max_guarantor_factor_self configuration.',
+            ];
+        }
+
+        /*
+    |--------------------------------------------------------------------------
+    | Load active guarantors on this application
+    |--------------------------------------------------------------------------
+    */
+        $guarantors = DB::table(
+            'sacco_loan_batch_guarantors_members as g'
+        )
+            ->where(
+                'g.guarantors_loan_batch_trans_id',
+                $batchTransId
+            )
+            ->whereRaw(
+                "COALESCE(g.guarantors_deleted, 'N') <> 'Y'"
+            )
+            ->get();
+
+        if ($guarantors->isEmpty()) {
+            return [
+                'success' => false,
+                'message' =>
+                'This loan requires guarantors, but no active '
+                    . 'guarantors were found.',
+            ];
+        }
+
+        foreach ($guarantors as $guarantorRow) {
+
+            /*
+        |--------------------------------------------------------------------------
+        | Every guarantor must have approved
+        |--------------------------------------------------------------------------
+        */
+            if (
+                strtoupper(
+                    trim(
+                        (string) (
+                            $guarantorRow->guarantors_approved
+                            ?? ''
+                        )
+                    )
+                ) !== 'Y'
+            ) {
+                return [
+                    'success' => false,
+                    'message' =>
+                    'All guarantors must approve before '
+                        . 'the loan can be finally approved.',
+                ];
+            }
+
+            $guarantorId =
+                (int) $guarantorRow->guarantors_guarantor_id;
+
+            $guaranteedAmount =
+                round(
+                    (float) (
+                        $guarantorRow
+                        ->guarantors_amount_guaranteed
+                        ?? 0
+                    ),
+                    2
+                );
+
+            /*
+        |--------------------------------------------------------------------------
+        | Lock member capacity while final approval is being processed
+        |--------------------------------------------------------------------------
+        */
+            $member = DB::table('sacco_members')
+                ->where(
+                    'member_id',
+                    $guarantorId
+                )
+                ->where(
+                    'member_active',
+                    'Y'
+                )
+                ->whereRaw(
+                    "COALESCE(member_deleted, 'N') <> 'Y'"
+                )
+                ->lockForUpdate()
+                ->first();
+
+            if (!$member) {
+                return [
+                    'success' => false,
+                    'message' =>
+                    'A guarantor is no longer an active member.',
+                ];
+            }
+
+            /*
+        |--------------------------------------------------------------------------
+        | Guaranteeing another member
+        |--------------------------------------------------------------------------
+        */
+            if ($guarantorId !== $borrowerMemberId) {
+
+                $pendingOtherGuaranteeAmount =
+                    DB::table(
+                        'sacco_loan_batch_guarantors_members as g'
+                    )
+                    ->join(
+                        'sacco_loan_batch_trans_members as t',
+                        'g.guarantors_loan_batch_trans_id',
+                        '=',
+                        't.batch_trans_id'
+                    )
+                    ->where(
+                        'g.guarantors_guarantor_id',
+                        $guarantorId
+                    )
+                    ->where(
+                        't.batch_trans_member_id',
+                        '<>',
+                        $guarantorId
+                    )
+                    ->whereRaw(
+                        "COALESCE(g.guarantors_deleted, 'N') <> 'Y'"
+                    )
+                    ->whereRaw(
+                        "COALESCE(t.batch_trans_deleted, 'N') <> 'Y'"
+                    )
+                    ->whereRaw(
+                        "COALESCE(t.batch_trans_updated, 'N') = 'N'"
+                    )
+                    ->where(
+                        't.batch_trans_id',
+                        '<>',
+                        $batchTransId
+                    )
+                    ->sum(
+                        'g.guarantors_amount_guaranteed'
+                    );
+
+                $availableCapacity = (
+                    (
+                        (float) $member->member_total_share
+                        * $maxGuarantorFactor
+                    )
+                    - (float) $member->member_tied_shares
+                    - (float) $pendingOtherGuaranteeAmount
+                );
+
+                if ($availableCapacity < $guaranteedAmount) {
+                    return [
+                        'success' => false,
+                        'message' =>
+                        'Guarantor '
+                            . $member->member_name
+                            . ' no longer has sufficient capacity '
+                            . 'to guarantee this loan. '
+                            . 'Current available capacity is KES '
+                            . number_format(
+                                max(0, $availableCapacity),
+                                2
+                            )
+                            . ', while this loan requires KES '
+                            . number_format(
+                                $guaranteedAmount,
+                                2
+                            )
+                            . ' from this guarantor.',
+                    ];
+                }
+            }
+
+            /*
+        |--------------------------------------------------------------------------
+        | Self-guaranteeing
+        |--------------------------------------------------------------------------
+        */ else {
+
+                $pendingSelfGuaranteeAmount =
+                    DB::table(
+                        'sacco_loan_batch_guarantors_members as g'
+                    )
+                    ->join(
+                        'sacco_loan_batch_trans_members as t',
+                        'g.guarantors_loan_batch_trans_id',
+                        '=',
+                        't.batch_trans_id'
+                    )
+                    ->where(
+                        'g.guarantors_guarantor_id',
+                        $guarantorId
+                    )
+                    ->where(
+                        't.batch_trans_member_id',
+                        $guarantorId
+                    )
+                    ->whereRaw(
+                        "COALESCE(g.guarantors_deleted, 'N') <> 'Y'"
+                    )
+                    ->whereRaw(
+                        "COALESCE(t.batch_trans_deleted, 'N') <> 'Y'"
+                    )
+                    ->whereRaw(
+                        "COALESCE(t.batch_trans_updated, 'N') = 'N'"
+                    )
+                    ->where(
+                        't.batch_trans_id',
+                        '<>',
+                        $batchTransId
+                    )
+                    ->sum(
+                        'g.guarantors_amount_guaranteed'
+                    );
+
+                $availableCapacity = (
+                    (
+                        (float) $member->member_total_share
+                        * $maxGuarantorFactorSelf
+                    )
+                    - (float) $member->member_tied_shares_self
+                    - (float) $pendingSelfGuaranteeAmount
+                );
+
+                if ($availableCapacity < $guaranteedAmount) {
+                    return [
+                        'success' => false,
+                        'message' =>
+                        'Member '
+                            . $member->member_name
+                            . ' no longer has sufficient '
+                            . 'self-guarantee capacity. '
+                            . 'Current available self-guarantee '
+                            . 'capacity is KES '
+                            . number_format(
+                                max(0, $availableCapacity),
+                                2
+                            )
+                            . ', while this loan requires KES '
+                            . number_format(
+                                $guaranteedAmount,
+                                2
+                            )
+                            . ' from the member.',
+                    ];
+                }
+            }
+        }
+
+        return [
+            'success' => true,
+            'message' =>
+            'Guarantor capacity confirmed.',
+        ];
     }
 }
