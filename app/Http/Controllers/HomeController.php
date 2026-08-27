@@ -2914,7 +2914,7 @@ class HomeController extends Controller
                 'statement_fosa_type_id'
             );
 
-        
+
 
         /*
 |--------------------------------------------------------------------------
@@ -3021,15 +3021,15 @@ class HomeController extends Controller
                 'sacco_fosas.fosa_id',
                 'asc'
             )
-           ->select(
-    'sacco_fosas.*',
-    'sacco_members.member_name',
-    'sacco_department.department_name',
-    'sacco_company.company_name',
-    'sacco_fosa_types.type_id as matched_fosa_type_id',
-    'sacco_fosa_types.type_name',
-    'sacco_fosa_types.type_prefix'
-)
+            ->select(
+                'sacco_fosas.*',
+                'sacco_members.member_name',
+                'sacco_department.department_name',
+                'sacco_company.company_name',
+                'sacco_fosa_types.type_id as matched_fosa_type_id',
+                'sacco_fosa_types.type_name',
+                'sacco_fosa_types.type_prefix'
+            )
             ->get();
 
         /*
@@ -7658,17 +7658,16 @@ class HomeController extends Controller
             'incomeLiabilityAccounts'
         ));
     }
-
     public function updateLoanType(Request $request, $id)
     {
         /*
     |--------------------------------------------------------------------------
-    | Retrieve loan type
+    | Retrieve Loan Type
     |--------------------------------------------------------------------------
     */
         $loanType = DB::table('sacco_loan_types')
             ->where('loan_type_id', $id)
-            ->where('loan_type_deleted', '<>', 'Y')
+            ->whereRaw("COALESCE(loan_type_deleted, 'N') <> 'Y'")
             ->first();
 
         if (!$loanType) {
@@ -7679,10 +7678,16 @@ class HomeController extends Controller
 
         /*
     |--------------------------------------------------------------------------
-    | Validate submitted data
+    | Validate Submitted Data
     |--------------------------------------------------------------------------
     */
         $validated = $request->validate([
+
+            /*
+        |--------------------------------------------------------------------------
+        | 1. Product Identity
+        |--------------------------------------------------------------------------
+        */
             'loan_type_name' => [
                 'required',
                 'string',
@@ -7703,11 +7708,6 @@ class HomeController extends Controller
                 )->ignore($id, 'loan_type_id'),
             ],
 
-            // 'loan_type_auto_approval' => [
-            //     'required',
-            //     'boolean',
-            // ],
-
             'loan_type_active' => [
                 'required',
                 'boolean',
@@ -7715,7 +7715,7 @@ class HomeController extends Controller
 
             /*
         |--------------------------------------------------------------------------
-        | Interest configuration
+        | 2. Pricing & Repayment
         |--------------------------------------------------------------------------
         */
             'loan_type_interest' => [
@@ -7726,13 +7726,10 @@ class HomeController extends Controller
 
             'loan_type_interest_type' => [
                 'required',
-                'string',
-                'max:100',
-            ],
-
-            'loan_type_auto_interest_on_period_change' => [
-                'required',
-                'boolean',
+                Rule::in([
+                    'REDUCING BALANCE',
+                    'FIXED INTEREST',
+                ]),
             ],
 
             'loan_type_duration' => [
@@ -7749,7 +7746,34 @@ class HomeController extends Controller
 
             /*
         |--------------------------------------------------------------------------
-        | Qualification and security
+        | 3. Default & Delinquency
+        |--------------------------------------------------------------------------
+        */
+            'loan_type_auto_interest_on_period_change' => [
+                'required',
+                'boolean',
+            ],
+
+            'loan_type_grace_days_after_due' => [
+                'required',
+                'integer',
+                'min:0',
+                'max:3650',
+            ],
+
+            /*
+         * NULL / blank means:
+         * use loan_type_interest as the default-interest rate.
+         */
+            'loan_type_default_interest' => [
+                'nullable',
+                'numeric',
+                'min:0',
+            ],
+
+            /*
+        |--------------------------------------------------------------------------
+        | 4. Eligibility & Security
         |--------------------------------------------------------------------------
         */
             'loan_type_share_factor' => [
@@ -7763,16 +7787,6 @@ class HomeController extends Controller
                 'integer',
                 'min:0',
                 'max:100',
-            ],
-
-            'loan_type_insurable' => [
-                'required',
-                'in:Y,N',
-            ],
-
-            'loan_type_insurance_effect' => [
-                'nullable',
-                'in:ADD_TO_LOAN,DEDUCT_FROM_DISBURSEMENT',
             ],
 
             'loan_type_qualification_period' => [
@@ -7789,32 +7803,9 @@ class HomeController extends Controller
 
             /*
         |--------------------------------------------------------------------------
-        | CRB configuration
+        | Application Automation
         |--------------------------------------------------------------------------
         */
-            'loan_type_crb_required' => [
-                'required',
-                'in:Y,N',
-            ],
-
-            'loan_type_crb_charge' => [
-                'nullable',
-                'numeric',
-                'min:0',
-            ],
-
-            'loan_type_crb_effect' => [
-                'nullable',
-                'in:ADD_TO_LOAN,DEDUCT_FROM_DISBURSEMENT',
-            ],
-
-            /*
-|--------------------------------------------------------------------------
-| Automated loan processing settings
-|--------------------------------------------------------------------------
-| These settings operate independently.
-|--------------------------------------------------------------------------
-*/
             'loan_type_instant_qualification' => [
                 'required',
                 'boolean',
@@ -7832,7 +7823,49 @@ class HomeController extends Controller
 
             /*
         |--------------------------------------------------------------------------
-        | Commission configuration
+        | 5A. CRB Configuration
+        |--------------------------------------------------------------------------
+        */
+            'loan_type_crb_required' => [
+                'required',
+                'in:Y,N',
+            ],
+
+            'loan_type_crb_charge' => [
+                'nullable',
+                'numeric',
+                'min:0',
+            ],
+
+            'loan_type_crb_effect' => [
+                'nullable',
+                Rule::in([
+                    'ADD_TO_LOAN',
+                    'DEDUCT_FROM_DISBURSEMENT',
+                ]),
+            ],
+
+            /*
+        |--------------------------------------------------------------------------
+        | 5B. Insurance Configuration
+        |--------------------------------------------------------------------------
+        */
+            'loan_type_insurable' => [
+                'required',
+                'in:Y,N',
+            ],
+
+            'loan_type_insurance_effect' => [
+                'nullable',
+                Rule::in([
+                    'ADD_TO_LOAN',
+                    'DEDUCT_FROM_DISBURSEMENT',
+                ]),
+            ],
+
+            /*
+        |--------------------------------------------------------------------------
+        | 5C. Commission Configuration
         |--------------------------------------------------------------------------
         */
             'loan_type_commission_required' => [
@@ -7842,7 +7875,10 @@ class HomeController extends Controller
 
             'loan_type_commission_type' => [
                 'nullable',
-                'in:FIXED,PERCENT',
+                Rule::in([
+                    'FIXED',
+                    'PERCENT',
+                ]),
             ],
 
             'loan_type_commission_value' => [
@@ -7853,12 +7889,15 @@ class HomeController extends Controller
 
             'loan_type_commission_effect' => [
                 'nullable',
-                'in:ADD_TO_LOAN,DEDUCT_FROM_DISBURSEMENT',
+                Rule::in([
+                    'ADD_TO_LOAN',
+                    'DEDUCT_FROM_DISBURSEMENT',
+                ]),
             ],
 
             /*
         |--------------------------------------------------------------------------
-        | Accounting configuration
+        | 6. Accounting
         |--------------------------------------------------------------------------
         */
             'loan_type_acount' => [
@@ -7882,30 +7921,103 @@ class HomeController extends Controller
 
         /*
     |--------------------------------------------------------------------------
-    | Normalise Boolean Settings
+    | Normalise Product Settings
     |--------------------------------------------------------------------------
     */
-        $instantQualification = (int) $validated['loan_type_instant_qualification'];
+        $loanTypeName = strtoupper(
+            trim((string) $validated['loan_type_name'])
+        );
 
-        $autoApproval = (int) $validated['loan_type_auto_approval'];
+        $loanTypeCode = strtoupper(
+            trim((string) $validated['loan_type_code'])
+        );
 
-        $instantDisbursement = (int) $validated['loan_type_instant_disbursement'];
+        $loanTypeActive =
+            (int) $validated['loan_type_active'];
 
-        $autoInterestOnPeriodChange = (int) $validated['loan_type_auto_interest_on_period_change'];
+        /*
+    |--------------------------------------------------------------------------
+    | Normalise Pricing Settings
+    |--------------------------------------------------------------------------
+    */
+        $normalInterestRate =
+            (float) $validated['loan_type_interest'];
+
+        $interestType = strtoupper(
+            trim((string) $validated['loan_type_interest_type'])
+        );
+
+        $duration =
+            (int) $validated['loan_type_duration'];
+
+        $maximumAmount =
+            (float) $validated['loan_type_max_amount'];
+
+        /*
+    |--------------------------------------------------------------------------
+    | Normalise Default-Interest Settings
+    |--------------------------------------------------------------------------
+    */
+        $autoDefaultInterest =
+            (int) $validated['loan_type_auto_interest_on_period_change'];
+
+        $graceDaysAfterDue =
+            (int) $validated['loan_type_grace_days_after_due'];
+
+        /*
+     * IMPORTANT:
+     *
+     * NULL means LoanDefaultInterestService falls back to:
+     *
+     *     loan_type_interest
+     *
+     * Do not convert blank to zero.
+     */
+        $defaultInterestRate = null;
+
+        if (
+            array_key_exists(
+                'loan_type_default_interest',
+                $validated
+            )
+            && $validated['loan_type_default_interest'] !== null
+            && $validated['loan_type_default_interest'] !== ''
+        ) {
+            $defaultInterestRate =
+                (float) $validated['loan_type_default_interest'];
+        }
+
+        /*
+    |--------------------------------------------------------------------------
+    | Normalise Qualification Settings
+    |--------------------------------------------------------------------------
+    */
+        $shareFactor =
+            (float) $validated['loan_type_share_factor'];
+
+        $guaranteablePercent =
+            (int) $validated['loan_type_guaranteable_percent'];
+
+        $minimumQualificationPeriod =
+            (int) $validated['loan_type_qualification_period'];
+
+        $maximumQualificationPeriod =
+            $validated['loan_type_max_qualification_period']
+            ?? null;
+
+        if ($maximumQualificationPeriod !== null) {
+            $maximumQualificationPeriod =
+                (int) $maximumQualificationPeriod;
+        }
 
         /*
     |--------------------------------------------------------------------------
     | Validate Qualification Period Range
     |--------------------------------------------------------------------------
     */
-        $minimumQualificationPeriod = (int) $validated['loan_type_qualification_period'];
-
-        $maximumQualificationPeriod =
-            $validated['loan_type_max_qualification_period'] ?? null;
-
         if (
             $maximumQualificationPeriod !== null
-            && (int) $maximumQualificationPeriod
+            && $maximumQualificationPeriod
             < $minimumQualificationPeriod
         ) {
             return back()
@@ -7918,38 +8030,68 @@ class HomeController extends Controller
 
         /*
     |--------------------------------------------------------------------------
+    | Normalise Application Automation
+    |--------------------------------------------------------------------------
+    */
+        $instantQualification =
+            (int) $validated['loan_type_instant_qualification'];
+
+        $autoApproval =
+            (int) $validated['loan_type_auto_approval'];
+
+        $instantDisbursement =
+            (int) $validated['loan_type_instant_disbursement'];
+
+        /*
+    |--------------------------------------------------------------------------
     | Validate Insurance Configuration
     |--------------------------------------------------------------------------
     */
-        $insurable = $validated['loan_type_insurable'];
+        $insurable =
+            $validated['loan_type_insurable'];
 
         if (
             $insurable === 'Y'
-            && empty($validated['loan_type_insurance_effect'])
+            && empty($validated['loan_type_insurance_effect']
+                ?? null)
         ) {
             return back()
                 ->withErrors([
                     'loan_type_insurance_effect' =>
-                    'Please select insurance treatment when this loan type is insurable.',
+                    'Please select insurance treatment when insurance is required.',
                 ])
                 ->withInput();
         }
+
+        /*
+     * When insurance is disabled, no operational treatment is required.
+     */
+        $insuranceEffect =
+            $insurable === 'Y'
+            ? $validated['loan_type_insurance_effect']
+            : null;
 
         /*
     |--------------------------------------------------------------------------
     | Validate CRB Configuration
     |--------------------------------------------------------------------------
     */
-        $crbRequired = $validated['loan_type_crb_required'];
+        $crbRequired =
+            $validated['loan_type_crb_required'];
 
-        $crbCharge = $crbRequired === 'Y'
-            ? (float) ($validated['loan_type_crb_charge'] ?? 0)
-            : 0;
+        $crbCharge =
+            $crbRequired === 'Y'
+            ? (float) (
+                $validated['loan_type_crb_charge']
+                ?? 0
+            )
+            : 0.00;
 
         if (
             $crbRequired === 'Y'
             && $crbCharge > 0
-            && empty($validated['loan_type_crb_effect'])
+            && empty($validated['loan_type_crb_effect']
+                ?? null)
         ) {
             return back()
                 ->withErrors([
@@ -7959,15 +8101,28 @@ class HomeController extends Controller
                 ->withInput();
         }
 
+        $crbEffect =
+            (
+                $crbRequired === 'Y'
+                && $crbCharge > 0
+            )
+            ? $validated['loan_type_crb_effect']
+            : null;
+
         /*
     |--------------------------------------------------------------------------
     | Validate Commission Configuration
     |--------------------------------------------------------------------------
     */
-        $commissionRequired = $validated['loan_type_commission_required'];
+        $commissionRequired =
+            $validated['loan_type_commission_required'];
 
         if ($commissionRequired === 'Y') {
-            if (empty($validated['loan_type_commission_type'])) {
+
+            if (
+                empty($validated['loan_type_commission_type']
+                    ?? null)
+            ) {
                 return back()
                     ->withErrors([
                         'loan_type_commission_type' =>
@@ -7986,12 +8141,15 @@ class HomeController extends Controller
                 return back()
                     ->withErrors([
                         'loan_type_commission_value' =>
-                        'Please provide a valid commission value when commission is required.',
+                        'Please provide a commission value when commission is required.',
                     ])
                     ->withInput();
             }
 
-            if (empty($validated['loan_type_commission_effect'])) {
+            if (
+                empty($validated['loan_type_commission_effect']
+                    ?? null)
+            ) {
                 return back()
                     ->withErrors([
                         'loan_type_commission_effect' =>
@@ -8001,108 +8159,252 @@ class HomeController extends Controller
             }
         }
 
-        /*
-    |--------------------------------------------------------------------------
-    | Prepare Conditional Values
-    |--------------------------------------------------------------------------
-    */
-        $insuranceEffect = $insurable === 'Y'
-            ? $validated['loan_type_insurance_effect']
-            : 'ADD_TO_LOAN';
-
-        $crbEffect = (
-            $crbRequired === 'Y'
-            && $crbCharge > 0
-        )
-            ? $validated['loan_type_crb_effect']
-            : null;
-
-        $commissionType = $commissionRequired === 'Y'
+        $commissionType =
+            $commissionRequired === 'Y'
             ? $validated['loan_type_commission_type']
             : null;
 
-        $commissionValue = $commissionRequired === 'Y'
+        $commissionValue =
+            $commissionRequired === 'Y'
             ? (float) $validated['loan_type_commission_value']
-            : 0;
+            : 0.00;
 
-        $commissionEffect = $commissionRequired === 'Y'
+        $commissionEffect =
+            $commissionRequired === 'Y'
             ? $validated['loan_type_commission_effect']
-            : 'ADD_TO_LOAN';
+            : null;
+
+        /*
+    |--------------------------------------------------------------------------
+    | Validate Accounting Account Types
+    |--------------------------------------------------------------------------
+    |
+    | Do not rely only on the dropdown options.
+    | A manipulated request must not be able to assign an inappropriate
+    | ledger account.
+    |--------------------------------------------------------------------------
+    */
+
+        $loanAccountId =
+            (int) $validated['loan_type_acount'];
+
+        $interestAccountId =
+            (int) $validated['loan_type_int_account'];
+
+        $commissionAccountId =
+            (int) $validated['loan_type_comm_account'];
+
+        $loanAccount = DB::table('sacco_sub_account as s')
+            ->join(
+                'sacco_main_account as m',
+                's.sub_account_main_account',
+                '=',
+                'm.main_account_id'
+            )
+            ->where(
+                's.sub_account_id',
+                $loanAccountId
+            )
+            ->whereRaw(
+                "COALESCE(s.sub_account_deleted, 'N') <> 'Y'"
+            )
+            ->select(
+                's.sub_account_id',
+                'm.main_account_type'
+            )
+            ->first();
+
+        if (
+            !$loanAccount
+            || strtolower(
+                trim(
+                    (string) $loanAccount->main_account_type
+                )
+            ) !== 'asset'
+        ) {
+            return back()
+                ->withErrors([
+                    'loan_type_acount' =>
+                    'The loan receivable account must be an active asset account.',
+                ])
+                ->withInput();
+        }
+
+        $interestAccount = DB::table('sacco_sub_account as s')
+            ->join(
+                'sacco_main_account as m',
+                's.sub_account_main_account',
+                '=',
+                'm.main_account_id'
+            )
+            ->where(
+                's.sub_account_id',
+                $interestAccountId
+            )
+            ->whereRaw(
+                "COALESCE(s.sub_account_deleted, 'N') <> 'Y'"
+            )
+            ->select(
+                's.sub_account_id',
+                'm.main_account_type'
+            )
+            ->first();
+
+        if (
+            !$interestAccount
+            || strtolower(
+                trim(
+                    (string) $interestAccount->main_account_type
+                )
+            ) !== 'income'
+        ) {
+            return back()
+                ->withErrors([
+                    'loan_type_int_account' =>
+                    'The interest account must be an active income account.',
+                ])
+                ->withInput();
+        }
+
+        $commissionAccount = DB::table('sacco_sub_account as s')
+            ->join(
+                'sacco_main_account as m',
+                's.sub_account_main_account',
+                '=',
+                'm.main_account_id'
+            )
+            ->where(
+                's.sub_account_id',
+                $commissionAccountId
+            )
+            ->whereRaw(
+                "COALESCE(s.sub_account_deleted, 'N') <> 'Y'"
+            )
+            ->select(
+                's.sub_account_id',
+                'm.main_account_type'
+            )
+            ->first();
+
+        if (!$commissionAccount) {
+            return back()
+                ->withErrors([
+                    'loan_type_comm_account' =>
+                    'The selected commission account is invalid or inactive.',
+                ])
+                ->withInput();
+        }
+
+        $commissionMainType = strtolower(
+            trim(
+                (string) $commissionAccount->main_account_type
+            )
+        );
+
+        if (
+            !in_array(
+                $commissionMainType,
+                ['income', 'liability'],
+                true
+            )
+        ) {
+            return back()
+                ->withErrors([
+                    'loan_type_comm_account' =>
+                    'The commission account must be an income or liability account.',
+                ])
+                ->withInput();
+        }
 
         /*
     |--------------------------------------------------------------------------
     | Update Loan Type
     |--------------------------------------------------------------------------
-    | The automatic-interest field is configuration only at this stage.
-    | This method does not calculate or post any interest.
+    |
+    | This is configuration only.
+    |
+    | No loan balances, repayments, default interest or ledger transactions
+    | are posted from this method.
     |--------------------------------------------------------------------------
     */
         DB::table('sacco_loan_types')
             ->where('loan_type_id', $id)
-            ->where('loan_type_deleted', '<>', 'Y')
+            ->whereRaw(
+                "COALESCE(loan_type_deleted, 'N') <> 'Y'"
+            )
             ->update([
-                'loan_type_name' =>
-                strtoupper(trim($validated['loan_type_name'])),
-
-                'loan_type_code' =>
-                strtoupper(trim($validated['loan_type_code'])),
-
-                'loan_type_active' =>
-                (int) $validated['loan_type_active'],
 
                 /*
             |--------------------------------------------------------------------------
-            | Interest configuration
+            | Product Identity
+            |--------------------------------------------------------------------------
+            */
+                'loan_type_name' =>
+                $loanTypeName,
+
+                'loan_type_code' =>
+                $loanTypeCode,
+
+                'loan_type_active' =>
+                $loanTypeActive,
+
+                /*
+            |--------------------------------------------------------------------------
+            | Pricing & Repayment
             |--------------------------------------------------------------------------
             */
                 'loan_type_interest' =>
-                (float) $validated['loan_type_interest'],
+                $normalInterestRate,
 
                 'loan_type_interest_type' =>
-                strtoupper(trim(
-                    $validated['loan_type_interest_type']
-                )),
-
-                'loan_type_auto_interest_on_period_change' =>
-                $autoInterestOnPeriodChange,
+                $interestType,
 
                 'loan_type_duration' =>
-                (int) $validated['loan_type_duration'],
+                $duration,
 
                 'loan_type_max_amount' =>
-                (float) $validated['loan_type_max_amount'],
+                $maximumAmount,
 
                 /*
             |--------------------------------------------------------------------------
-            | Qualification and security
+            | Default & Delinquency
+            |--------------------------------------------------------------------------
+            */
+                'loan_type_auto_interest_on_period_change' =>
+                $autoDefaultInterest,
+
+                'loan_type_grace_days_after_due' =>
+                $graceDaysAfterDue,
+
+                /*
+             * NULL deliberately means:
+             * use loan_type_interest.
+             */
+                'loan_type_default_interest' =>
+                $defaultInterestRate,
+
+                /*
+            |--------------------------------------------------------------------------
+            | Eligibility & Security
             |--------------------------------------------------------------------------
             */
                 'loan_type_share_factor' =>
-                (float) $validated['loan_type_share_factor'],
+                $shareFactor,
 
                 'loan_type_guaranteable_percent' =>
-                (int) $validated['loan_type_guaranteable_percent'],
-
-                'loan_type_insurable' =>
-                $insurable,
-
-                'loan_type_insurance_effect' =>
-                $insuranceEffect,
+                $guaranteablePercent,
 
                 'loan_type_qualification_period' =>
                 $minimumQualificationPeriod,
 
                 'loan_type_max_qualification_period' =>
-                $maximumQualificationPeriod !== null
-                    ? (int) $maximumQualificationPeriod
-                    : null,
-
+                $maximumQualificationPeriod,
 
                 /*
-|--------------------------------------------------------------------------
-| Automated loan processing
-|--------------------------------------------------------------------------
-*/
+            |--------------------------------------------------------------------------
+            | Application Automation
+            |--------------------------------------------------------------------------
+            */
                 'loan_type_instant_qualification' =>
                 $instantQualification,
 
@@ -8128,6 +8430,17 @@ class HomeController extends Controller
 
                 /*
             |--------------------------------------------------------------------------
+            | Insurance
+            |--------------------------------------------------------------------------
+            */
+                'loan_type_insurable' =>
+                $insurable,
+
+                'loan_type_insurance_effect' =>
+                $insuranceEffect,
+
+                /*
+            |--------------------------------------------------------------------------
             | Commission
             |--------------------------------------------------------------------------
             */
@@ -8145,17 +8458,17 @@ class HomeController extends Controller
 
                 /*
             |--------------------------------------------------------------------------
-            | Accounts
+            | Accounting
             |--------------------------------------------------------------------------
             */
                 'loan_type_acount' =>
-                (int) $validated['loan_type_acount'],
+                $loanAccountId,
 
                 'loan_type_int_account' =>
-                (int) $validated['loan_type_int_account'],
+                $interestAccountId,
 
                 'loan_type_comm_account' =>
-                (int) $validated['loan_type_comm_account'],
+                $commissionAccountId,
 
                 /*
             |--------------------------------------------------------------------------
@@ -8179,6 +8492,7 @@ class HomeController extends Controller
                 'Loan type updated successfully.'
             );
     }
+
     public function createLoanType()
     {
         $currentPeriod = DB::table('sacco_period')
