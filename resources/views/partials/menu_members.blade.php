@@ -103,6 +103,14 @@
                     </li>
 
                     <li class="Ul_li--hover">
+    <a href="{{ $specialSavingsUrl }}">
+        <i class="i-Coins text-20 me-2 text-muted"></i>
+        <span class="item-name text-15 text-muted">Special Savings</span>
+    </a>
+</li>
+
+
+                    <li class="Ul_li--hover">
                         <a href="{{ url('/loans/taken') }}{{ $vam }}">
                             <i class="i-Money-2 text-20 me-2 text-muted"></i>
                             <span class="item-name text-15 text-muted">Outstanding Loans</span>

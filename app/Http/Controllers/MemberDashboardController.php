@@ -369,4 +369,351 @@ class MemberDashboardController extends Controller
 
         return view('members.loans_taken', compact('data'));
     }
+
+    public function specialSavingsListings()
+{
+    /*
+    |--------------------------------------------------------------------------
+    | Resolve effective member
+    |--------------------------------------------------------------------------
+    | This automatically respects:
+    |
+    | - normal logged-in member
+    | - official using ?view_as_member=y
+    | - valid junior account using ?jaccount=ID
+    |
+    | The existing resolveEffectiveMemberId() performs the ownership check.
+    |--------------------------------------------------------------------------
+    */
+    $memberId = $this->resolveEffectiveMemberId();
+
+    /*
+    |--------------------------------------------------------------------------
+    | Statement period
+    |--------------------------------------------------------------------------
+    */
+    $periodFrom = trim((string) request()->query(
+        'period_from',
+        '000000'
+    ));
+
+    $periodTo = trim((string) request()->query(
+        'period_to',
+        '999999'
+    ));
+
+    /*
+     * Only allow YYYYMM-style numeric periods.
+     */
+    if (!preg_match('/^\d{6}$/', $periodFrom)) {
+        $periodFrom = '000000';
+    }
+
+    if (!preg_match('/^\d{6}$/', $periodTo)) {
+        $periodTo = '999999';
+    }
+
+    /*
+     * Do not allow an inverted period range.
+     */
+    if ((int) $periodFrom > (int) $periodTo) {
+        [$periodFrom, $periodTo] = [
+            $periodTo,
+            $periodFrom,
+        ];
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Member
+    |--------------------------------------------------------------------------
+    */
+    $member = DB::table('sacco_members')
+        ->where('member_id', $memberId)
+        ->where('member_deleted', 'N')
+        ->first();
+
+    if (!$member) {
+        abort(404, 'Member not found');
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Member Special Savings Accounts
+    |--------------------------------------------------------------------------
+    |
+    | IMPORTANT:
+    |
+    | We do NOT require the product to still be Active.
+    |
+    | Historical/inactive products must continue to appear where the member
+    | owns a valid, non-deleted account.
+    |--------------------------------------------------------------------------
+    */
+    $accounts = DB::table(
+        'sacco_special_saving_accounts as a'
+    )
+        ->leftJoin(
+            'sacco_special_saving_products as p',
+            'p.special_saving_product_id',
+            '=',
+            'a.special_saving_account_product_id'
+        )
+        ->where(
+            'a.special_saving_account_member_id',
+            $memberId
+        )
+        ->where(
+            'a.special_saving_account_deleted',
+            'N'
+        )
+        ->select(
+            'a.*',
+
+            'p.special_saving_product_name',
+            'p.special_saving_product_code',
+            'p.special_saving_product_description'
+        )
+        ->orderByRaw(
+            'p.special_saving_product_name IS NULL ASC'
+        )
+        ->orderBy(
+            'p.special_saving_product_name'
+        )
+        ->orderBy(
+            'a.special_saving_account_number'
+        )
+        ->get();
+
+    /*
+    |--------------------------------------------------------------------------
+    | Build Member Special Savings Statements
+    |--------------------------------------------------------------------------
+    |
+    | We retain the Special Savings accounting rules:
+    |
+    | 1. Deleted transactions are excluded.
+    | 2. Reversed transactions are excluded.
+    | 3. Opening balance comes from the LAST valid transaction before
+    |    period_from.
+    | 4. Transactions within the selected period use their stored
+    |    *_balance_after snapshots.
+    | 5. Historical closing balance comes from the final valid transaction
+    |    within the selected period — NOT today's account balance.
+    |--------------------------------------------------------------------------
+    */
+    $specialSavings = $accounts->map(
+        function ($account) use (
+            $periodFrom,
+            $periodTo
+        ) {
+
+            /*
+            |--------------------------------------------------------------------------
+            | Opening transaction
+            |--------------------------------------------------------------------------
+            */
+            $openingTxn = DB::table(
+                'sacco_special_saving_transactions'
+            )
+                ->where(
+                    'special_saving_transaction_account_id',
+                    $account->special_saving_account_id
+                )
+                ->where(
+                    'special_saving_transaction_deleted',
+                    'N'
+                )
+                ->where(function ($query) {
+                    $query
+                        ->where(
+                            'special_saving_transaction_reversed',
+                            'N'
+                        )
+                        ->orWhereNull(
+                            'special_saving_transaction_reversed'
+                        );
+                })
+                ->where(
+                    'special_saving_transaction_period',
+                    '<',
+                    $periodFrom
+                )
+                ->orderByDesc(
+                    'special_saving_transaction_period'
+                )
+                ->orderByDesc(
+                    'special_saving_transaction_date'
+                )
+                ->orderByDesc(
+                    'special_saving_transaction_id'
+                )
+                ->first();
+
+            /*
+            |--------------------------------------------------------------------------
+            | Transactions in selected period
+            |--------------------------------------------------------------------------
+            */
+            $transactions = DB::table(
+                'sacco_special_saving_transactions'
+            )
+                ->where(
+                    'special_saving_transaction_account_id',
+                    $account->special_saving_account_id
+                )
+                ->where(
+                    'special_saving_transaction_deleted',
+                    'N'
+                )
+                ->where(function ($query) {
+                    $query
+                        ->where(
+                            'special_saving_transaction_reversed',
+                            'N'
+                        )
+                        ->orWhereNull(
+                            'special_saving_transaction_reversed'
+                        );
+                })
+                ->whereBetween(
+                    'special_saving_transaction_period',
+                    [
+                        $periodFrom,
+                        $periodTo,
+                    ]
+                )
+                ->orderBy(
+                    'special_saving_transaction_period'
+                )
+                ->orderBy(
+                    'special_saving_transaction_date'
+                )
+                ->orderBy(
+                    'special_saving_transaction_id'
+                )
+                ->get();
+
+            /*
+            |--------------------------------------------------------------------------
+            | Opening balances
+            |--------------------------------------------------------------------------
+            */
+            $openingPrincipal = $openingTxn
+                ? (float) $openingTxn
+                    ->special_saving_transaction_principal_balance_after
+                : 0.0;
+
+            $openingAccruedInterest = $openingTxn
+                ? (float) $openingTxn
+                    ->special_saving_transaction_accrued_interest_after
+                : 0.0;
+
+            $openingAvailableInterest = $openingTxn
+                ? (float) $openingTxn
+                    ->special_saving_transaction_available_interest_after
+                : 0.0;
+
+            $openingTotal = $openingTxn
+                ? (float) $openingTxn
+                    ->special_saving_transaction_total_balance_after
+                : 0.0;
+
+            /*
+            |--------------------------------------------------------------------------
+            | Historical closing balances
+            |--------------------------------------------------------------------------
+            |
+            | Do NOT use special_saving_account_total_balance for a historical
+            | report. That is today's/current account position.
+            |
+            | Instead use the balance-after snapshot from the last transaction
+            | inside the requested period.
+            |--------------------------------------------------------------------------
+            */
+            $closingTxn = $transactions->last();
+
+            if ($closingTxn) {
+                $closingPrincipal = (float) $closingTxn
+                    ->special_saving_transaction_principal_balance_after;
+
+                $closingAccruedInterest = (float) $closingTxn
+                    ->special_saving_transaction_accrued_interest_after;
+
+                $closingAvailableInterest = (float) $closingTxn
+                    ->special_saving_transaction_available_interest_after;
+
+                $closingTotal = (float) $closingTxn
+                    ->special_saving_transaction_total_balance_after;
+            } else {
+                /*
+                 * No movement during the requested period.
+                 * Closing position therefore equals opening position.
+                 */
+                $closingPrincipal = $openingPrincipal;
+                $closingAccruedInterest = $openingAccruedInterest;
+                $closingAvailableInterest = $openingAvailableInterest;
+                $closingTotal = $openingTotal;
+            }
+
+            return (object) [
+                'account' => $account,
+
+                'opening_principal' =>
+                    $openingPrincipal,
+
+                'opening_accrued_interest' =>
+                    $openingAccruedInterest,
+
+                'opening_available_interest' =>
+                    $openingAvailableInterest,
+
+                'opening_total' =>
+                    $openingTotal,
+
+                'closing_principal' =>
+                    $closingPrincipal,
+
+                'closing_accrued_interest' =>
+                    $closingAccruedInterest,
+
+                'closing_available_interest' =>
+                    $closingAvailableInterest,
+
+                'closing_total' =>
+                    $closingTotal,
+
+                'transactions' =>
+                    $transactions,
+            ];
+        }
+    )->values();
+
+    /*
+    |--------------------------------------------------------------------------
+    | Blade payload
+    |--------------------------------------------------------------------------
+    */
+    $data = [
+        'member' => $member,
+
+        'specialSavings' => $specialSavings,
+
+        'period_from' => $periodFrom,
+        'period_to' => $periodTo,
+    ];
+
+    /*
+     * Preserve the existing secure junior-account context.
+     */
+    $data = array_merge(
+        $data,
+        $this->buildJuniorViewContext($memberId)
+    );
+
+    return view(
+        'members.special_savings_listings',
+        compact('data')
+    );
+}
 }

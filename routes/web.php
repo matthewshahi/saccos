@@ -381,6 +381,12 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/contributions/fosa', [MemberDashboardController::class, 'fosaListings'])->name('fosa.listings');
     Route::get('/loans/taken', [MemberDashboardController::class, 'loansTaken'])->name('loans.taken');
 
+    Route::get(
+    '/contributions/special-savings',
+    [MemberDashboardController::class, 'specialSavingsListings']
+)->name('special_savings.listings');
+
+
     // Member statement route for non-officials
     Route::get('/members/statement/self', [HomeController::class, 'viewStatement']);
 
