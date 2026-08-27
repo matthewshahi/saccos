@@ -102,10 +102,12 @@
                         </a>
                     </li>
 
-                    <li class="Ul_li--hover">
-    <a href="{{ $specialSavingsUrl }}">
+                  <li class="Ul_li--hover">
+    <a href="{{ url('/contributions/special-savings') }}{{ $vam }}">
         <i class="i-Coins text-20 me-2 text-muted"></i>
-        <span class="item-name text-15 text-muted">Special Savings</span>
+        <span class="item-name text-15 text-muted">
+            Special Savings
+        </span>
     </a>
 </li>
 
