@@ -192,19 +192,19 @@ class Kernel extends ConsoleKernel
         |--------------------------------------------------------------------------
         */
 
-        $schedule->command(
-            'loans:process-default-interest --limit=20'
-        )
-            ->everyMinute()
-            ->when(function () {
-                $hour = (int) now('Africa/Nairobi')->format('H');
+        // $schedule->command(
+        //     'loans:process-default-interest --limit=20'
+        // )
+        //     ->everyMinute()
+        //     ->when(function () {
+        //         $hour = (int) now('Africa/Nairobi')->format('H');
 
-                return $hour >= 22 || $hour < 6;
-            })
-            ->withoutOverlapping(10)
-            ->onOneServer()
-            ->timezone('Africa/Nairobi')
-            ->runInBackground();
+        //         return $hour >= 22 || $hour < 6;
+        //     })
+        //     ->withoutOverlapping(10)
+        //     ->onOneServer()
+        //     ->timezone('Africa/Nairobi')
+        //     ->runInBackground();
 
         /*
         |--------------------------------------------------------------------------
