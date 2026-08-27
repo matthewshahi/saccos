@@ -8176,18 +8176,19 @@ class HomeController extends Controller
 
         /*
 |--------------------------------------------------------------------------
-| Validate Accounting Account Types
+| Validate Accounting Account Classes
 |--------------------------------------------------------------------------
 |
-| Do not rely only on the dropdown options.
-| A manipulated request must not be able to assign an inappropriate
-| ledger account.
+| SACCO chart-of-account prefixes:
 |
-| Historical SACCO databases may use singular or plural account classes:
+| A = Assets
+| L = Liabilities
+| C = Capital
+| I = Income
+| E = Expense
 |
-| ASSET / ASSETS
-| INCOME / INCOMES
-| LIABILITY / LIABILITIES
+| Validate using the accounting code rather than descriptive account-type
+| text, which may vary between ASSET, ASSETS - CURRENT, ASSET - FIXED, etc.
 |--------------------------------------------------------------------------
 */
 
@@ -8220,9 +8221,12 @@ class HomeController extends Controller
             ->whereRaw(
                 "COALESCE(s.sub_account_deleted, 'N') <> 'Y'"
             )
+            ->whereRaw(
+                "COALESCE(m.main_account_deleted, 'N') <> 'Y'"
+            )
             ->select(
                 's.sub_account_id',
-                'm.main_account_type'
+                'm.main_account_code'
             )
             ->first();
 
@@ -8235,26 +8239,17 @@ class HomeController extends Controller
                 ->withInput();
         }
 
-        $loanMainType = strtoupper(
+        $loanMainCode = strtoupper(
             trim(
-                (string) ($loanAccount->main_account_type ?? '')
+                (string) ($loanAccount->main_account_code ?? '')
             )
         );
 
-        if (
-            !in_array(
-                $loanMainType,
-                [
-                    'ASSET',
-                    'ASSETS',
-                ],
-                true
-            )
-        ) {
+        if (!str_starts_with($loanMainCode, 'A')) {
             return back()
                 ->withErrors([
                     'loan_type_acount' =>
-                    'The loan receivable account must belong to the ASSET/ASSETS account class.',
+                    'The loan receivable account must belong to the Asset account class (A).',
                 ])
                 ->withInput();
         }
@@ -8279,9 +8274,12 @@ class HomeController extends Controller
             ->whereRaw(
                 "COALESCE(s.sub_account_deleted, 'N') <> 'Y'"
             )
+            ->whereRaw(
+                "COALESCE(m.main_account_deleted, 'N') <> 'Y'"
+            )
             ->select(
                 's.sub_account_id',
-                'm.main_account_type'
+                'm.main_account_code'
             )
             ->first();
 
@@ -8294,26 +8292,17 @@ class HomeController extends Controller
                 ->withInput();
         }
 
-        $interestMainType = strtoupper(
+        $interestMainCode = strtoupper(
             trim(
-                (string) ($interestAccount->main_account_type ?? '')
+                (string) ($interestAccount->main_account_code ?? '')
             )
         );
 
-        if (
-            !in_array(
-                $interestMainType,
-                [
-                    'INCOME',
-                    'INCOMES',
-                ],
-                true
-            )
-        ) {
+        if (!str_starts_with($interestMainCode, 'I')) {
             return back()
                 ->withErrors([
                     'loan_type_int_account' =>
-                    'The interest account must belong to the INCOME/INCOMES account class.',
+                    'The interest account must belong to the Income account class (I).',
                 ])
                 ->withInput();
         }
@@ -8338,9 +8327,12 @@ class HomeController extends Controller
             ->whereRaw(
                 "COALESCE(s.sub_account_deleted, 'N') <> 'Y'"
             )
+            ->whereRaw(
+                "COALESCE(m.main_account_deleted, 'N') <> 'Y'"
+            )
             ->select(
                 's.sub_account_id',
-                'm.main_account_type'
+                'm.main_account_code'
             )
             ->first();
 
@@ -8353,28 +8345,20 @@ class HomeController extends Controller
                 ->withInput();
         }
 
-        $commissionMainType = strtoupper(
+        $commissionMainCode = strtoupper(
             trim(
-                (string) ($commissionAccount->main_account_type ?? '')
+                (string) ($commissionAccount->main_account_code ?? '')
             )
         );
 
         if (
-            !in_array(
-                $commissionMainType,
-                [
-                    'INCOME',
-                    'INCOMES',
-                    'LIABILITY',
-                    'LIABILITIES',
-                ],
-                true
-            )
+            !str_starts_with($commissionMainCode, 'I')
+            && !str_starts_with($commissionMainCode, 'L')
         ) {
             return back()
                 ->withErrors([
                     'loan_type_comm_account' =>
-                    'The commission account must belong to the INCOME or LIABILITY account class.',
+                    'The commission account must belong to the Income (I) or Liability (L) account class.',
                 ])
                 ->withInput();
         }
