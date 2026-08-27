@@ -8068,8 +8068,8 @@ class HomeController extends Controller
      */
         $insuranceEffect =
             $insurable === 'Y'
-            ? $validated['loan_type_insurance_effect']
-            : null;
+            ? ($validated['loan_type_insurance_effect'] ?? 'ADD_TO_LOAN')
+            : 'ADD_TO_LOAN';
 
         /*
     |--------------------------------------------------------------------------
@@ -8171,8 +8171,8 @@ class HomeController extends Controller
 
         $commissionEffect =
             $commissionRequired === 'Y'
-            ? $validated['loan_type_commission_effect']
-            : null;
+            ? ($validated['loan_type_commission_effect'] ?? 'ADD_TO_LOAN')
+            : 'ADD_TO_LOAN';
 
         /*
 |--------------------------------------------------------------------------
