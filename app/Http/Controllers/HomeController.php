@@ -8175,15 +8175,21 @@ class HomeController extends Controller
             : null;
 
         /*
-    |--------------------------------------------------------------------------
-    | Validate Accounting Account Types
-    |--------------------------------------------------------------------------
-    |
-    | Do not rely only on the dropdown options.
-    | A manipulated request must not be able to assign an inappropriate
-    | ledger account.
-    |--------------------------------------------------------------------------
-    */
+|--------------------------------------------------------------------------
+| Validate Accounting Account Types
+|--------------------------------------------------------------------------
+|
+| Do not rely only on the dropdown options.
+| A manipulated request must not be able to assign an inappropriate
+| ledger account.
+|
+| Historical SACCO databases may use singular or plural account classes:
+|
+| ASSET / ASSETS
+| INCOME / INCOMES
+| LIABILITY / LIABILITIES
+|--------------------------------------------------------------------------
+*/
 
         $loanAccountId =
             (int) $validated['loan_type_acount'];
@@ -8194,6 +8200,12 @@ class HomeController extends Controller
         $commissionAccountId =
             (int) $validated['loan_type_comm_account'];
 
+
+        /*
+|--------------------------------------------------------------------------
+| Loan Receivable Account
+|--------------------------------------------------------------------------
+*/
         $loanAccount = DB::table('sacco_sub_account as s')
             ->join(
                 'sacco_main_account as m',
@@ -8214,22 +8226,45 @@ class HomeController extends Controller
             )
             ->first();
 
-        if (
-            !$loanAccount
-            || strtolower(
-                trim(
-                    (string) $loanAccount->main_account_type
-                )
-            ) !== 'asset'
-        ) {
+        if (!$loanAccount) {
             return back()
                 ->withErrors([
                     'loan_type_acount' =>
-                    'The loan receivable account must be an active asset account.',
+                    'The selected loan receivable account is invalid or inactive.',
                 ])
                 ->withInput();
         }
 
+        $loanMainType = strtoupper(
+            trim(
+                (string) ($loanAccount->main_account_type ?? '')
+            )
+        );
+
+        if (
+            !in_array(
+                $loanMainType,
+                [
+                    'ASSET',
+                    'ASSETS',
+                ],
+                true
+            )
+        ) {
+            return back()
+                ->withErrors([
+                    'loan_type_acount' =>
+                    'The loan receivable account must belong to the ASSET/ASSETS account class.',
+                ])
+                ->withInput();
+        }
+
+
+        /*
+|--------------------------------------------------------------------------
+| Interest Income Account
+|--------------------------------------------------------------------------
+*/
         $interestAccount = DB::table('sacco_sub_account as s')
             ->join(
                 'sacco_main_account as m',
@@ -8250,22 +8285,45 @@ class HomeController extends Controller
             )
             ->first();
 
-        if (
-            !$interestAccount
-            || strtolower(
-                trim(
-                    (string) $interestAccount->main_account_type
-                )
-            ) !== 'income'
-        ) {
+        if (!$interestAccount) {
             return back()
                 ->withErrors([
                     'loan_type_int_account' =>
-                    'The interest account must be an active income account.',
+                    'The selected interest account is invalid or inactive.',
                 ])
                 ->withInput();
         }
 
+        $interestMainType = strtoupper(
+            trim(
+                (string) ($interestAccount->main_account_type ?? '')
+            )
+        );
+
+        if (
+            !in_array(
+                $interestMainType,
+                [
+                    'INCOME',
+                    'INCOMES',
+                ],
+                true
+            )
+        ) {
+            return back()
+                ->withErrors([
+                    'loan_type_int_account' =>
+                    'The interest account must belong to the INCOME/INCOMES account class.',
+                ])
+                ->withInput();
+        }
+
+
+        /*
+|--------------------------------------------------------------------------
+| Commission Account
+|--------------------------------------------------------------------------
+*/
         $commissionAccount = DB::table('sacco_sub_account as s')
             ->join(
                 'sacco_main_account as m',
@@ -8295,23 +8353,28 @@ class HomeController extends Controller
                 ->withInput();
         }
 
-        $commissionMainType = strtolower(
+        $commissionMainType = strtoupper(
             trim(
-                (string) $commissionAccount->main_account_type
+                (string) ($commissionAccount->main_account_type ?? '')
             )
         );
 
         if (
             !in_array(
                 $commissionMainType,
-                ['income', 'liability'],
+                [
+                    'INCOME',
+                    'INCOMES',
+                    'LIABILITY',
+                    'LIABILITIES',
+                ],
                 true
             )
         ) {
             return back()
                 ->withErrors([
                     'loan_type_comm_account' =>
-                    'The commission account must be an income or liability account.',
+                    'The commission account must belong to the INCOME or LIABILITY account class.',
                 ])
                 ->withInput();
         }
