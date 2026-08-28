@@ -4,11 +4,11 @@
 
 <div class="container">
 
-    {{-- ============================================================
-         SEARCH
-         ============================================================ --}}
     <div class="row">
 
+        {{-- =========================================================
+             SEARCH
+             ========================================================= --}}
         <div class="col-md-12 mb-3">
 
             <div class="card text-start">
@@ -19,8 +19,8 @@
                         Loan Performance Report
                     </h4>
 
-                    <p>
-                        Search loans by member name, SACCO ID, national ID,
+                    <p class="mb-3">
+                        Search by member name, SACCO ID, national ID,
                         phone number or company.
                     </p>
 
@@ -44,18 +44,30 @@
                                     name="search"
                                     placeholder="Name, SACCO ID, national ID, phone or company"
                                     value="{{ request('search') }}"
+                                    autocomplete="off"
                                 >
 
                             </div>
 
-                            <div class="col-md-6">
+                            <div class="col-md-6 d-flex align-items-end mb-3">
 
                                 <button
                                     type="submit"
-                                    class="btn btn-primary mt-4"
+                                    class="btn btn-primary me-2"
                                 >
                                     Search
                                 </button>
+
+                                @if(request()->filled('search'))
+
+                                    <a
+                                        href="{{ route('reports.sasra.loanperformance', ['version' => $version]) }}"
+                                        class="btn btn-outline-secondary"
+                                    >
+                                        Clear
+                                    </a>
+
+                                @endif
 
                             </div>
 
@@ -70,24 +82,44 @@
         </div>
 
 
-        {{-- ========================================================
+        {{-- =========================================================
              REPORT
-             ======================================================== --}}
+             ========================================================= --}}
         <div class="col-md-12 mb-3">
 
             <div class="card text-start">
 
                 <div class="card-body">
 
-                    <h4 class="card-title mb-3">
-                        Loans Issued
-                    </h4>
+                    <div
+                        class="d-flex flex-wrap justify-content-between align-items-center mb-3"
+                    >
+
+                        <div>
+
+                            <h4 class="card-title mb-1">
+                                Loans Issued
+                            </h4>
+
+                            <small class="text-muted">
+                                Reporting Period:
+                                {{ substr($reportPeriod, 0, 4) }}/{{ substr($reportPeriod, 4, 2) }}
+                            </small>
+
+                        </div>
+
+                        <div class="text-muted small">
+                            {{ number_format($loans->count()) }}
+                            loan{{ $loans->count() === 1 ? '' : 's' }}
+                        </div>
+
+                    </div>
 
 
-                    {{-- ==================================================
+                    {{-- =================================================
                          CLASSIFICATION LEGEND
-                         ================================================== --}}
-                    <div class="mb-3 loan-performance-legend">
+                         ================================================= --}}
+                    <div class="loan-performance-legend mb-3">
 
                         <strong>
                             Loan Classification Legend:
@@ -96,54 +128,80 @@
                         <span class="badge bg-success ms-2">
                             Current
                         </span>
+
                         <small class="me-3">
                             ≤ 2 months
                         </small>
 
+
                         <span class="badge bg-info">
                             Watch
                         </span>
+
                         <small class="me-3">
                             3–4 months
                         </small>
 
+
                         <span class="badge bg-warning">
                             Substandard
                         </span>
+
                         <small class="me-3">
                             5–6 months
                         </small>
 
+
                         <span class="badge bg-danger">
                             Doubtful
                         </span>
+
                         <small class="me-3">
                             7–9 months
                         </small>
 
+
                         <span class="badge bg-dark">
                             Loss
                         </span>
+
                         <small>
-                            &gt; 9 months / No valid payment
+                            &gt; 9 months / No valid period
                         </small>
 
                     </div>
 
 
-                    <p>
-                        Below is a table of outstanding loans categorized
-                        by their status.
+                    <p class="mb-3">
+                        Outstanding loans categorized according to
+                        their current performance classification.
                     </p>
 
 
-                    {{-- ==================================================
-                         LOAN TABLE
-                         ================================================== --}}
+                    {{-- =================================================
+                         TABLE
+
+                         COLUMN INDEXES
+
+                         0  #
+                         1  Member
+                         2  SACCO ID
+                         3  National ID
+                         4  Phone
+                         5  Company
+                         6  Position
+                         7  Loan Type
+                         8  Loan Amount
+                         9  Loan Paid
+                         10 Outstanding
+                         11 Loan Taken Period
+                         12 Last Payment Period
+                         13 Loan Category
+                         ================================================= --}}
                     <div class="table-responsive">
 
                         <table
-                            class="table table-striped table-bordered nowrap"
+                            class="table table-striped table-bordered"
                             id="loanPerformanceTable"
                             style="width:100%"
                         >
@@ -228,64 +286,126 @@
 
                                     <tr>
 
+                                        {{-- 0 --}}
                                         <td>
                                             {{ $index + 1 }}
                                         </td>
 
-                                        <td>
-                                            {{ $loan->member_name }}
+
+                                        {{-- 1 --}}
+                                        <td class="member-name-cell">
+
+                                            {{ $loan->member_name ?: '—' }}
+
                                         </td>
 
+
+                                        {{-- 2 --}}
                                         <td>
-                                            {{ $loan->member_sacco_id }}
+
+                                            {{ $loan->member_sacco_id ?: '—' }}
+
                                         </td>
 
+
+                                        {{-- 3 --}}
                                         <td>
-                                            {{ $loan->member_national_id }}
+
+                                            {{ $loan->member_national_id ?: '—' }}
+
                                         </td>
 
+
+                                        {{-- 4 --}}
                                         <td>
-                                            {{ $loan->member_phone_no }}
+
+                                            {{ $loan->member_phone_no ?: '—' }}
+
                                         </td>
 
-                                        <td>
+
+                                        {{-- 5 --}}
+                                        <td class="company-cell">
+
                                             {{ $loan->company_name ?: '—' }}
+
                                         </td>
 
+
+                                        {{-- 6 --}}
                                         <td>
+
                                             {{ $loan->position }}
+
                                         </td>
 
-                                        <td>
-                                            {{ $loan->loan_type_name }}
+
+                                        {{-- 7 --}}
+                                        <td class="loan-type-cell">
+
+                                            {{ $loan->loan_type_name ?: '—' }}
+
                                         </td>
 
-                                        <td class="text-end">
-                                            {{ number_format((float) ($loan->loan_amount ?? 0), 2) }}
+
+                                        {{-- 8 --}}
+                                        <td class="text-end text-nowrap">
+
+                                            {{ number_format(
+                                                (float) ($loan->loan_amount ?? 0),
+                                                2
+                                            ) }}
+
                                         </td>
 
-                                        <td class="text-end">
-                                            {{ number_format((float) ($loan->loan_loan_paid ?? 0), 2) }}
+
+                                        {{-- 9 --}}
+                                        <td class="text-end text-nowrap">
+
+                                            {{ number_format(
+                                                (float) ($loan->loan_loan_paid ?? 0),
+                                                2
+                                            ) }}
+
                                         </td>
 
-                                        <td class="text-end">
-                                            {{ number_format((float) ($loan->outstanding_balance ?? 0), 2) }}
+
+                                        {{-- 10 --}}
+                                        <td class="text-end text-nowrap">
+
+                                            {{ number_format(
+                                                (float) ($loan->outstanding_balance ?? 0),
+                                                2
+                                            ) }}
+
                                         </td>
 
-                                        <td>
-                                            {{ $loan->loan_taken_period }}
+
+                                        {{-- 11 --}}
+                                        <td class="text-nowrap">
+
+                                            {{ $loan->loan_taken_period ?: '—' }}
+
                                         </td>
 
-                                        <td>
+
+                                        {{-- 12 --}}
+                                        <td class="text-nowrap">
+
                                             {{ $loan->last_payment_period ?: '—' }}
+
                                         </td>
 
-                                        <td>
+
+                                        {{-- 13 --}}
+                                        <td class="text-nowrap">
+
                                             <span
                                                 class="badge {{ $loan->loan_category['class'] }}"
                                             >
                                                 {{ $loan->loan_category['category'] }}
                                             </span>
+
                                         </td>
 
                                     </tr>
@@ -322,52 +442,93 @@
 </div>
 
 
-{{-- ================================================================
-     PAGE-SCOPED STYLES
-     ================================================================ --}}
+{{-- ===============================================================
+     REPORT-SCOPED STYLING
+     =============================================================== --}}
 <style>
 
     /*
-     * Keep this report compact because it has many columns.
-     * This only targets the Loan Performance table.
+     * Scope all report table styling to this table only.
      */
     #loanPerformanceTable {
+        width: 100% !important;
         font-size: 12px;
     }
 
-    #loanPerformanceTable th,
-    #loanPerformanceTable td {
-        vertical-align: middle;
-    }
 
-    #loanPerformanceTable th {
+    #loanPerformanceTable thead th {
+        vertical-align: middle;
         white-space: nowrap;
     }
 
+
+    #loanPerformanceTable tbody td {
+        vertical-align: middle;
+    }
+
+
     /*
-     * Names and companies may wrap on screen rather than forcing the
-     * complete report to become excessively wide.
+     * These fields are naturally long.
+     *
+     * Allow wrapping instead of forcing the whole browser table
+     * unnecessarily wide.
      */
-    #loanPerformanceTable th:nth-child(2),
-    #loanPerformanceTable td:nth-child(2),
-    #loanPerformanceTable th:nth-child(6),
-    #loanPerformanceTable td:nth-child(6),
-    #loanPerformanceTable th:nth-child(8),
-    #loanPerformanceTable td:nth-child(8) {
+    #loanPerformanceTable .member-name-cell,
+    #loanPerformanceTable .company-cell,
+    #loanPerformanceTable .loan-type-cell {
         white-space: normal;
         min-width: 120px;
     }
+
+
+    #loanPerformanceTable .company-cell {
+        min-width: 140px;
+    }
+
 
     .loan-performance-legend {
         line-height: 2;
     }
 
+
+    /*
+     * DataTables horizontal scrolling remains available on smaller
+     * displays.
+     */
+    #loanPerformanceTable_wrapper .dataTables_scroll {
+        width: 100%;
+    }
+
+
+    #loanPerformanceTable_wrapper .dt-buttons {
+        margin-bottom: 10px;
+    }
+
+
+    #loanPerformanceTable_wrapper .dt-button {
+        margin-right: 4px;
+        margin-bottom: 4px;
+    }
+
+
+    @media (max-width: 767.98px) {
+
+        #loanPerformanceTable {
+            font-size: 11px;
+        }
+
+        .loan-performance-legend {
+            line-height: 2.3;
+        }
+
+    }
+
 </style>
 
 
-{{-- ================================================================
-     EXISTING DATATABLE DEPENDENCIES
-     ================================================================ --}}
+{{-- ===============================================================
+     DATATABLE / EXPORT DEPENDENCIES
+     =============================================================== --}}
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 
@@ -375,8 +536,18 @@
 
 <script src="https://cdn.datatables.net/buttons/2.0.1/js/dataTables.buttons.min.js"></script>
 
+
+{{-- Excel --}}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js"></script>
 
+
+{{-- PDF --}}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.70/pdfmake.min.js"></script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.70/vfs_fonts.js"></script>
+
+
+{{-- DataTables exports --}}
 <script src="https://cdn.datatables.net/buttons/2.0.1/js/buttons.html5.min.js"></script>
 
 <script src="https://cdn.datatables.net/buttons/2.0.1/js/buttons.print.min.js"></script>
@@ -386,23 +557,54 @@
 
 $(document).ready(function () {
 
+    'use strict';
+
+
+    const tableSelector = '#loanPerformanceTable';
+
+    /*
+     * Prevent accidental second initialization if this page or one of
+     * its layout assets initializes DataTables more than once.
+     */
+    if (
+        $.fn.DataTable
+        && $.fn.DataTable.isDataTable(tableSelector)
+    ) {
+        return;
+    }
+
+
     const reportTitle = 'Loan Performance Report';
-    const reportFilename = 'loan_performance_{{ $currentPeriod }}';
 
-    $('#loanPerformanceTable').DataTable({
+    const reportFilename =
+        'loan_performance_{{ $reportPeriod }}';
 
-        /*
-         * Preserve existing behaviour.
-         */
+    const reportPeriod =
+        '{{ substr($reportPeriod, 0, 4) }}/{{ substr($reportPeriod, 4, 2) }}';
+
+
+    $(tableSelector).DataTable({
+
         paging: false,
+
         ordering: true,
+
         info: true,
+
         searching: true,
+
         scrollX: true,
+
         autoWidth: false,
 
         dom: 'Bfrtip',
 
+
+        /*
+         * ===========================================================
+         * EXPORT BUTTONS
+         * ===========================================================
+         */
         buttons: [
 
             /*
@@ -410,7 +612,11 @@ $(document).ready(function () {
              */
             {
                 extend: 'copyHtml5',
+
+                text: 'Copy',
+
                 title: reportTitle,
+
                 exportOptions: {
                     columns: ':visible'
                 }
@@ -419,14 +625,16 @@ $(document).ready(function () {
 
             /*
              * CSV
-             *
-             * Company is automatically included because it is now a
-             * normal table column.
              */
             {
                 extend: 'csvHtml5',
+
+                text: 'CSV',
+
                 title: reportTitle,
+
                 filename: reportFilename,
+
                 exportOptions: {
                     columns: ':visible'
                 }
@@ -438,8 +646,13 @@ $(document).ready(function () {
              */
             {
                 extend: 'excelHtml5',
+
+                text: 'Excel',
+
                 title: reportTitle,
+
                 filename: reportFilename,
+
                 exportOptions: {
                     columns: ':visible'
                 }
@@ -447,70 +660,121 @@ $(document).ready(function () {
 
 
             /*
+             * =======================================================
              * PDF
              *
-             * IMPORTANT:
-             * This is intentionally A3 LANDSCAPE.
+             * A3 LANDSCAPE is deliberate.
              *
-             * The report now contains 14 columns. A4 portrait or A3
-             * portrait gives less usable horizontal space and is therefore
-             * more likely to cut the table.
+             * There are now 14 columns. Landscape provides the
+             * horizontal space required to keep the report inside
+             * one printable page width.
+             * =======================================================
              */
             {
                 extend: 'pdfHtml5',
+
                 text: 'PDF',
+
                 title: reportTitle,
+
                 filename: reportFilename,
 
                 orientation: 'landscape',
+
                 pageSize: 'A3',
 
                 exportOptions: {
                     columns: ':visible'
                 },
 
+
                 customize: function (doc) {
 
                     /*
-                     * Compact margins leave more horizontal room while still
-                     * maintaining a proper printable border area.
+                     * A3 landscape has substantially more horizontal
+                     * room than A4 landscape or any portrait layout.
+                     */
+                    doc.pageOrientation = 'landscape';
+
+                    doc.pageSize = 'A3';
+
+
+                    /*
+                     * Keep margins small but printable.
                      */
                     doc.pageMargins = [
                         18,
-                        20,
+                        25,
                         18,
-                        20
+                        25
                     ];
 
+
                     /*
-                     * Wide regulatory report: use compact readable type.
+                     * Compact typography for a 14-column regulatory
+                     * style report.
                      */
                     doc.defaultStyle.fontSize = 7;
 
+
                     if (doc.styles.tableHeader) {
+
                         doc.styles.tableHeader.fontSize = 7;
+
                         doc.styles.tableHeader.bold = true;
+
+                        doc.styles.tableHeader.alignment = 'center';
+
                     }
 
+
                     if (doc.styles.title) {
-                        doc.styles.title.fontSize = 13;
+
+                        doc.styles.title.fontSize = 14;
+
                         doc.styles.title.bold = true;
+
                         doc.styles.title.alignment = 'center';
+
                         doc.styles.title.margin = [
                             0,
                             0,
                             0,
-                            10
+                            5
                         ];
+
                     }
 
+
                     /*
-                     * Find the exported table safely.
+                     * Add reporting-period information underneath the
+                     * main PDF title.
+                     */
+                    doc.content.splice(
+                        1,
+                        0,
+                        {
+                            text: 'Reporting Period: ' + reportPeriod,
+                            alignment: 'center',
+                            fontSize: 8,
+                            margin: [
+                                0,
+                                0,
+                                0,
+                                10
+                            ]
+                        }
+                    );
+
+
+                    /*
+                     * Find the actual DataTables-exported table.
                      *
-                     * We do not assume it is always doc.content[1],
-                     * because DataTables can add title/message nodes.
+                     * Do not rely on a fixed doc.content index because
+                     * title/message nodes can change the position.
                      */
                     let exportedTable = null;
+
 
                     for (
                         let i = 0;
@@ -518,9 +782,16 @@ $(document).ready(function () {
                         i++
                     ) {
 
-                        if (doc.content[i].table) {
+                        if (
+                            doc.content[i]
+                            && doc.content[i].table
+                            && doc.content[i].table.body
+                        ) {
+
                             exportedTable = doc.content[i];
+
                             break;
+
                         }
 
                     }
@@ -529,45 +800,43 @@ $(document).ready(function () {
                     if (exportedTable) {
 
                         /*
-                         * 14 widths matching the 14 report columns:
+                         * Exact 14-column width allocation.
                          *
-                         *  0  #
-                         *  1  Member Name
-                         *  2  Sacco ID
-                         *  3  National ID
-                         *  4  Phone
-                         *  5  Company
-                         *  6  Position
-                         *  7  Loan Type
-                         *  8  Loan Amount
-                         *  9  Loan Paid
-                         * 10  Outstanding
-                         * 11  Taken Period
-                         * 12  Payment Period
-                         * 13  Category
-                         *
-                         * These widths fit comfortably on A3 landscape.
+                         * 0  #
+                         * 1  Member Name
+                         * 2  Sacco ID
+                         * 3  National ID
+                         * 4  Phone
+                         * 5  Company
+                         * 6  Position
+                         * 7  Loan Type
+                         * 8  Loan Amount
+                         * 9  Loan Paid
+                         * 10 Outstanding
+                         * 11 Taken Period
+                         * 12 Payment Period
+                         * 13 Category
                          */
                         exportedTable.table.widths = [
                             18,
                             100,
                             45,
                             60,
-                            65,
+                            68,
                             105,
                             45,
                             85,
-                            65,
-                            65,
-                            75,
+                            70,
+                            70,
+                            80,
                             55,
                             55,
                             65
                         ];
 
+
                         /*
-                         * Reduce internal cell padding slightly so content
-                         * stays inside the page rather than being clipped.
+                         * Tight but readable cell padding.
                          */
                         exportedTable.layout = {
 
@@ -589,31 +858,133 @@ $(document).ready(function () {
 
                         };
 
+
+                        /*
+                         * Right-align the three financial columns in
+                         * the generated PDF.
+                         */
+                        const body = exportedTable.table.body;
+
+
+                        for (
+                            let rowIndex = 1;
+                            rowIndex < body.length;
+                            rowIndex++
+                        ) {
+
+                            [
+                                8,
+                                9,
+                                10
+                            ].forEach(function (columnIndex) {
+
+                                if (
+                                    !body[rowIndex]
+                                    || typeof body[rowIndex][columnIndex] === 'undefined'
+                                ) {
+                                    return;
+                                }
+
+
+                                const cell =
+                                    body[rowIndex][columnIndex];
+
+
+                                if (
+                                    cell
+                                    && typeof cell === 'object'
+                                ) {
+
+                                    cell.alignment = 'right';
+
+                                } else {
+
+                                    body[rowIndex][columnIndex] = {
+                                        text: cell,
+                                        alignment: 'right'
+                                    };
+
+                                }
+
+                            });
+
+                        }
+
                     }
+
+
+                    /*
+                     * Page numbering.
+                     */
+                    doc.footer = function (
+                        currentPage,
+                        pageCount
+                    ) {
+
+                        return {
+
+                            text:
+                                'Page '
+                                + currentPage
+                                + ' of '
+                                + pageCount,
+
+                            alignment: 'right',
+
+                            fontSize: 7,
+
+                            margin: [
+                                0,
+                                5,
+                                18,
+                                0
+                            ]
+
+                        };
+
+                    };
 
                 }
             },
 
 
             /*
+             * =======================================================
              * PRINT
              *
-             * Use the same A3 landscape paper model when users print the
-             * report directly from the browser.
+             * Browser print is also forced to A3 landscape.
+             * =======================================================
              */
             {
                 extend: 'print',
+
+                text: 'Print',
+
                 title: reportTitle,
 
                 exportOptions: {
                     columns: ':visible'
                 },
 
+
                 customize: function (win) {
 
                     /*
-                     * Inject print-specific styling directly into the
-                     * DataTables print window.
+                     * Add reporting period below the print title.
+                     */
+                    $(win.document.body)
+                        .find('h1')
+                        .after(
+                            '<div class="loan-report-print-period">'
+                            + 'Reporting Period: '
+                            + reportPeriod
+                            + '</div>'
+                        );
+
+
+                    /*
+                     * All styling is confined to the DataTables print
+                     * window.
                      */
                     $('<style>')
                         .prop(
@@ -621,30 +992,71 @@ $(document).ready(function () {
                             'text/css'
                         )
                         .html(`
+
                             @page {
                                 size: A3 landscape;
                                 margin: 8mm;
                             }
 
+
+                            html,
+                            body {
+                                width: 100%;
+                                margin: 0;
+                                padding: 0;
+                            }
+
+
                             body {
                                 font-size: 8pt !important;
                             }
 
+
+                            h1 {
+                                margin: 0 0 3px 0 !important;
+                                font-size: 14pt !important;
+                                text-align: center !important;
+                            }
+
+
+                            .loan-report-print-period {
+                                margin-bottom: 10px;
+                                font-size: 8pt;
+                                text-align: center;
+                            }
+
+
                             table {
                                 width: 100% !important;
+                                table-layout: auto !important;
                                 border-collapse: collapse !important;
                                 font-size: 7pt !important;
                             }
 
+
+                            thead {
+                                display: table-header-group;
+                            }
+
+
+                            tr {
+                                page-break-inside: avoid;
+                            }
+
+
                             th,
                             td {
-                                padding: 3px 4px !important;
+                                padding: 3px 3px !important;
+                                border: 1px solid #777 !important;
                                 vertical-align: middle !important;
                             }
 
+
                             th {
+                                font-weight: bold !important;
                                 white-space: nowrap !important;
                             }
+
 
                             td:nth-child(2),
                             td:nth-child(6),
@@ -652,11 +1064,14 @@ $(document).ready(function () {
                                 white-space: normal !important;
                             }
 
-                            h1 {
-                                font-size: 14pt !important;
-                                text-align: center !important;
-                                margin-bottom: 10px !important;
+
+                            td:nth-child(9),
+                            td:nth-child(10),
+                            td:nth-child(11) {
+                                text-align: right !important;
+                                white-space: nowrap !important;
                             }
+
                         `)
                         .appendTo(
                             $(win.document.head)
@@ -669,27 +1084,27 @@ $(document).ready(function () {
 
 
         /*
-         * Column indexes AFTER Company has been added:
-         *
-         * 0  #
-         * 1  Member
-         * 2  Sacco ID
-         * 3  National ID
-         * 4  Phone
-         * 5  Company
-         * 6  Position
-         * 7  Loan Type
-         * 8  Loan Amount
-         * 9  Loan Paid
-         * 10 Outstanding
+         * ===========================================================
+         * COLUMN BEHAVIOUR
+         * ===========================================================
          */
         columnDefs: [
 
+            /*
+             * Sequential row number should not be sortable.
+             */
             {
                 orderable: false,
                 targets: 0
             },
 
+
+            /*
+             * Financial columns.
+             *
+             * Company shifted the old numeric column indexes by one,
+             * so these are now 8, 9 and 10.
+             */
             {
                 className: 'text-end',
                 targets: [
