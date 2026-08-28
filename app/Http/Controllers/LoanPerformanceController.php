@@ -19,17 +19,27 @@ class LoanPerformanceController extends Controller
     }
 
     /**
-     * Loan Performance / Risk Classification report.
+     * Loan Performance / Risk Classification Report
      */
     public function reportLoanPerformance(Request $request, $version = null)
     {
-        $currentPeriod = date('Ym');
+        /*
+         * Use a report-specific variable name.
+         *
+         * This avoids collisions with any $currentPeriod variable
+         * that may already be shared by layouts, middleware or
+         * other application components.
+         */
+        $reportPeriod = date('Ym');
 
         $query = $this->getOutstandingLoansQuery(
             $this->ignoreLoanBalanceBelow,
             $version
         );
 
+        /*
+         * Server-side report search.
+         */
         if ($request->filled('search')) {
             $query = $this->applySearchFilter(
                 $query,
@@ -38,18 +48,19 @@ class LoanPerformanceController extends Controller
         }
 
         /*
-         * Keep all matching loans in the report because DataTables handles
-         * the on-screen ordering/searching/export from this result set.
+         * Load all matching loans.
          *
-         * Important:
-         * getOutstandingLoansQuery() still guarantees one row per loan.
+         * One row per loan is preserved by the aggregated repayment
+         * subquery inside getOutstandingLoansQuery().
          */
         $loans = $query->get();
 
         foreach ($loans as $loan) {
+
             /*
-             * Loan start-period fallback:
+             * Determine the loan starting accounting period.
              *
+             * Priority:
              * 1. loan_taken_start_period
              * 2. loan_taken_period
              */
@@ -57,52 +68,55 @@ class LoanPerformanceController extends Controller
                 ?: $loan->loan_taken_period;
 
             /*
-             * Classification:
-             *
-             * 1. latest repayment period
-             * 2. loan start period
+             * Determine risk classification.
              */
             $loan->loan_category = $this->getLoanCategory(
                 $loan->last_payment_period,
                 $loanStartPeriod,
-                $currentPeriod
+                $reportPeriod
             );
 
+            /*
+             * Human-readable member position.
+             */
             $loan->position = ((int) $loan->member_position === 2)
                 ? 'Official'
                 : 'Member';
         }
 
+        /*
+         * Preserve AJAX response support.
+         */
         if ($request->ajax()) {
             return response()->json($loans);
         }
 
         return view('reports.loans.loan_performance', [
-            'loans'         => $loans,
-            'currentPeriod' => $currentPeriod,
-            'version'       => $version,
+            'loans'        => $loans,
+            'reportPeriod' => $reportPeriod,
+            'version'      => $version,
         ]);
     }
 
     /**
-     * Build the base outstanding-loans query.
+     * Build the base query for outstanding loans.
      *
-     * Important guarantees:
+     * Guarantees:
      * - One row per loan.
-     * - Latest repayment is obtained from an aggregated subquery.
-     * - Company/department are LEFT JOINed so historical loans are not
-     *   removed merely because member institution data is incomplete.
-     * - Outstanding balance calculation remains NULL-safe.
+     * - No duplicate loan rows from repayments.
+     * - Company is optional and cannot cause loans to disappear.
+     * - Outstanding balance calculation is NULL-safe.
      */
     protected function getOutstandingLoansQuery(
         $ignoreLoanBalanceBelow,
         $version = null
     ) {
         /*
-         * One row per loan containing only its latest repayment period.
+         * One repayment-summary row per loan.
          *
-         * This avoids the duplicate-loan problem that can occur when a loan
-         * has multiple repayment records within the same accounting period.
+         * We deliberately aggregate here rather than joining directly
+         * to sacco_loan_payments, because a loan may have multiple
+         * repayment transactions in the same or different periods.
          */
         $latestPaymentSub = DB::table('sacco_loan_payments as p')
             ->selectRaw('
@@ -114,7 +128,7 @@ class LoanPerformanceController extends Controller
         $query = DB::table('sacco_loans as l')
 
             /*
-             * Member owning the loan.
+             * Loan member.
              */
             ->join(
                 'sacco_members as m',
@@ -124,11 +138,13 @@ class LoanPerformanceController extends Controller
             )
 
             /*
-             * Member department.
+             * Department.
              *
-             * LEFT JOIN is deliberate:
-             * older members with incomplete department records must still
-             * appear in this loan report.
+             * LEFT JOIN is intentional.
+             *
+             * Historical members may have missing or incomplete
+             * organisation relationships. Their loans must still
+             * remain visible in this report.
              */
             ->leftJoin(
                 'sacco_department as d',
@@ -138,14 +154,14 @@ class LoanPerformanceController extends Controller
             )
 
             /*
-             * Company / institution.
+             * Company / Institution.
              *
-             * This follows:
+             * Relationship:
              *
-             * member_dept
-             *      -> department_id
-             *      -> department_company_id
-             *      -> company_id
+             * sacco_members.member_dept
+             *      -> sacco_department.department_id
+             *      -> sacco_department.department_company_id
+             *      -> sacco_company.company_id
              */
             ->leftJoin(
                 'sacco_company as c',
@@ -165,7 +181,9 @@ class LoanPerformanceController extends Controller
             )
 
             /*
-             * Exactly one aggregated repayment row per loan.
+             * Latest repayment period.
+             *
+             * One joined row only per loan.
              */
             ->leftJoinSub(
                 $latestPaymentSub,
@@ -180,8 +198,14 @@ class LoanPerformanceController extends Controller
             )
 
             ->select(
+                /*
+                 * All loan fields.
+                 */
                 'l.*',
 
+                /*
+                 * Member fields required by report.
+                 */
                 'm.member_name',
                 'm.member_sacco_id',
                 'm.member_national_id',
@@ -189,7 +213,7 @@ class LoanPerformanceController extends Controller
                 'm.member_position',
 
                 /*
-                 * Company / institution.
+                 * Company / Institution.
                  */
                 'c.company_name',
 
@@ -199,13 +223,15 @@ class LoanPerformanceController extends Controller
                 'lt.loan_type_name',
 
                 /*
-                 * Latest authoritative repayment accounting period.
+                 * Latest authoritative repayment period.
                  */
                 'lp.last_payment_period',
 
                 /*
-                 * Calculate the balance once and use exactly the same
-                 * expression throughout the report.
+                 * Consistent outstanding balance.
+                 *
+                 * This is also the same expression used by the
+                 * outstanding-balance filter below.
                  */
                 DB::raw(
                     '(l.loan_amount - IFNULL(l.loan_loan_paid, 0))
@@ -214,8 +240,8 @@ class LoanPerformanceController extends Controller
             )
 
             /*
-             * Existing report behaviour:
-             * only non-stopped loans.
+             * Preserve the existing report rule:
+             * stopped loans are not included.
              */
             ->where(
                 'l.loan_stoped',
@@ -223,7 +249,8 @@ class LoanPerformanceController extends Controller
             )
 
             /*
-             * Existing minimum outstanding balance threshold.
+             * Only loans above the configured minimum outstanding
+             * balance should appear.
              */
             ->whereRaw(
                 '(l.loan_amount - IFNULL(l.loan_loan_paid, 0)) > ?',
@@ -231,7 +258,9 @@ class LoanPerformanceController extends Controller
             );
 
         /*
-         * Preserve the existing version behaviour exactly as it currently is.
+         * Preserve the existing version behavior.
+         *
+         * Version 2 = officials only.
          */
         if ((int) $version === 2) {
             $query->where(
@@ -240,42 +269,50 @@ class LoanPerformanceController extends Controller
             );
         }
 
+        /*
+         * Stable ordering.
+         *
+         * loan_id provides deterministic ordering where one member
+         * has multiple loans.
+         */
         return $query
             ->orderBy('m.member_name')
             ->orderBy('l.loan_id');
     }
 
     /**
-     * Apply free-text search.
-     *
-     * Company has now been added to the search without changing the existing
-     * member search behaviour.
+     * Apply report search.
      */
     protected function applySearchFilter($query, $search)
     {
         $search = trim((string) $search);
 
         return $query->where(function ($q) use ($search) {
+
             $q->where(
                 'm.member_name',
                 'like',
                 "%{$search}%"
             )
+
             ->orWhere(
                 'm.member_sacco_id',
                 'like',
                 "%{$search}%"
             )
+
             ->orWhere(
                 'm.member_phone_no',
                 'like',
                 "%{$search}%"
             )
+
             ->orWhere(
                 'm.member_national_id',
                 'like',
                 "%{$search}%"
             )
+
             ->orWhere(
                 'c.company_name',
                 'like',
@@ -287,24 +324,27 @@ class LoanPerformanceController extends Controller
     /**
      * Loan aging classifier.
      *
-     * Period based (YYYYMM), preserving the existing classification rules.
+     * This deliberately preserves the current classification
+     * methodology already used by the report.
+     *
+     * Priority:
+     * latest repayment period -> loan start period.
      */
     protected function getLoanCategory(
         $lastPaymentPeriod,
         $loanStartPeriod,
-        $currentPeriod
+        $reportPeriod
     ) {
         /*
-         * Priority:
+         * Use the most recent repayment period where available.
          *
-         * latest repayment period
-         *          ↓
-         * loan start period
+         * If no repayment exists, use the loan start period.
          */
-        $period = $lastPaymentPeriod ?: $loanStartPeriod;
+        $period = $lastPaymentPeriod
+            ?: $loanStartPeriod;
 
         /*
-         * Must be exactly YYYYMM.
+         * YYYYMM validation.
          */
         if (
             !$period
@@ -316,29 +356,53 @@ class LoanPerformanceController extends Controller
             ];
         }
 
-        $lastDate = \DateTime::createFromFormat(
-            'Ym',
-            (string) $period
-        );
+        /*
+         * Additional month validation.
+         *
+         * preg_match alone would accept values such as 202613.
+         */
+        $year = (int) substr((string) $period, 0, 4);
+        $month = (int) substr((string) $period, 4, 2);
 
-        $currentDate = \DateTime::createFromFormat(
-            'Ym',
-            (string) $currentPeriod
-        );
+        $reportYear = (int) substr((string) $reportPeriod, 0, 4);
+        $reportMonth = (int) substr((string) $reportPeriod, 4, 2);
 
-        if (!$lastDate || !$currentDate) {
+        if (
+            $year < 1900
+            || $month < 1
+            || $month > 12
+            || $reportYear < 1900
+            || $reportMonth < 1
+            || $reportMonth > 12
+        ) {
             return [
                 'category' => 'Loss',
                 'class'    => 'bg-dark',
             ];
         }
 
-        $interval = $lastDate->diff($currentDate);
+        /*
+         * Work directly with YYYYMM values.
+         *
+         * This is simpler and safer than relying on DateTime::diff()
+         * for a month-only accounting period.
+         */
+        $periodIndex = ($year * 12) + $month;
+        $reportIndex = ($reportYear * 12) + $reportMonth;
 
-        $months = ($interval->y * 12)
-            + $interval->m;
+        /*
+         * Do not allow future periods to create a misleading positive
+         * aging interval.
+         *
+         * A future period is treated as 0 months old.
+         */
+        $months = max(
+            0,
+            $reportIndex - $periodIndex
+        );
 
         return match (true) {
+
             $months <= 2 => [
                 'category' => 'Current',
                 'class'    => 'bg-success',
