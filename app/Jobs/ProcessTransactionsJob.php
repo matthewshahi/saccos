@@ -2317,7 +2317,8 @@ class ProcessTransactionsJob implements ShouldQueue
             return 0.0;
         }
 
-        $amountToPost = min($remainingAmount, $due);
+        // $amountToPost = min($remainingAmount, $due);
+        $amountToPost = $remainingAmount;
 
         $shareTransaction = clone $transaction;
         $shareTransaction->transaction_amount = $amountToPost;
@@ -2532,7 +2533,8 @@ class ProcessTransactionsJob implements ShouldQueue
             return 0.0;
         }
 
-        $amountToPost = min($remainingAmount, $due);
+        // $amountToPost = min($remainingAmount, $due);
+        $amountToPost = $remainingAmount;
 
         $mpesaAccount = DB::table('sacco_defaults')
             ->where('default_name', 'default_mpesa_in_account')
