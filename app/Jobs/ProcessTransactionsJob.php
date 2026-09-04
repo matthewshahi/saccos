@@ -2214,7 +2214,10 @@ class ProcessTransactionsJob implements ShouldQueue
                 break;
             }
 
-            $monthlyRemainingDue = $this->getLoanMonthlyRemainingDue($loan, $period);
+            $monthlyRemainingDue = max(
+                0,
+                (float) ($loan->loan_amount ?? 0) - (float) ($loan->loan_loan_paid ?? 0)
+            );
 
             if ($monthlyRemainingDue <= 0) {
                 continue;
