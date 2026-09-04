@@ -2223,6 +2223,11 @@ class ProcessTransactionsJob implements ShouldQueue
                 continue;
             }
 
+
+            if ($monthlyRemainingDue <= 0) {
+                continue;
+            }
+
             $loanOutstanding = max(
                 0,
                 (float) ($loan->loan_amount ?? 0) - (float) ($loan->loan_loan_paid ?? 0)
