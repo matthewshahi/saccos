@@ -79,6 +79,7 @@ use App\Http\Controllers\MemberLoanLimitController;
 use App\Http\Controllers\MemberClassificationController;
 use App\Http\Controllers\ReportCrbController;
 use App\Http\Controllers\ExistingLoanGuarantorController;
+use App\Http\Controllers\MpesaAllocationPriorityController;
 
 /* good imports
 Route::prefix('kass')->group(function () {
@@ -570,6 +571,71 @@ Route::prefix('mobile')->group(function () {
 
 
 Route::middleware(['auth', 'check_member_position'])->group(function () {
+
+
+/*
+|--------------------------------------------------------------------------
+| M-PESA Smart Allocation Priority
+|--------------------------------------------------------------------------
+|
+| Stage 1:
+| - Configure product priority only.
+| - No automatic M-PESA allocation occurs here.
+|
+| User Right:
+| mpesa_allocation_priorities
+|--------------------------------------------------------------------------
+*/
+
+Route::prefix('admin/mpesa-allocation-priorities')
+    ->name('mpesa.allocation.priorities.')
+    ->middleware('check_user_rights:mpesa_allocation_priorities')
+    ->group(function () {
+
+        /*
+        |--------------------------------------------------------------------------
+        | Priority Listing
+        |--------------------------------------------------------------------------
+        */
+        Route::get(
+            '/',
+            [MpesaAllocationPriorityController::class, 'index']
+        )->name('index');
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Discover / Refresh Products
+        |--------------------------------------------------------------------------
+        |
+        | Finds newly-created:
+        |
+        | - Loan Types
+        | - FOSA Types
+        | - Special Savings Products
+        |
+        | New products are appended to the bottom.
+        | Existing ordering is preserved.
+        |
+        */
+        Route::post(
+            '/sync',
+            [MpesaAllocationPriorityController::class, 'sync']
+        )->name('sync');
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Move Product
+        |--------------------------------------------------------------------------
+        */
+        Route::post(
+            '/{priority}/move',
+            [MpesaAllocationPriorityController::class, 'move']
+        )
+            ->whereNumber('priority')
+            ->name('move');
+    });
 
     Route::post(
         'admin/loans/pending/approval/{id}/credit-committee-decision',
