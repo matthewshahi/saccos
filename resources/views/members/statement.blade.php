@@ -966,7 +966,7 @@
                                     <strong>Paid:</strong>
                                     Ksh {{ number_format($loan->loan_loan_paid, 2) }} |
 
-                                    <strong>Commission:</strong>
+                                    <strong>Charges:</strong>
                                     {{ number_format($loan->loan_commision, 2) }} |
 
                                     <strong>Insurance:</strong>
