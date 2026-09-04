@@ -2018,7 +2018,7 @@ class ProcessTransactionsJob implements ShouldQueue
                 $allocated = 0.0;
 
                 if (Str::contains($key, ['LOAN', 'LOANS'])) {
-                    $allocated = $this->allocateSmartLoans($member, $remainingAmount, $transaction);
+                    $allocated = $this->allocateSmartLoans($member, $remainingAmount, $transaction, $priority);
                 } elseif (Str::contains($key, ['SHARE', 'SHARES', 'DEPOSIT', 'DEPOSITS'])) {
                     $allocated = $this->allocateSmartShares($member, $remainingAmount, $transaction, $priority);
                 } elseif (Str::contains($key, ['CAPITAL'])) {
@@ -2175,15 +2175,95 @@ class ProcessTransactionsJob implements ShouldQueue
     }
     private function getMpesaAllocationPriorities()
     {
+        $priorities = DB::table('sacco_mpesa_allocation_priorities')
+            ->where(function ($query) {
+                $query->where('priority_active', 'Y')
+                    ->orWhere('priority_active', 1);
+            })
+            ->orderBy('priority_order', 'asc')
+            ->orderBy('priority_id', 'asc')
+            ->get();
+
+        if ($priorities->isNotEmpty()) {
+            return $priorities;
+        }
+
+        DB::transaction(function () {
+            $order = 1;
+
+            $loanTypes = DB::table('sacco_loan_types')
+                ->where(function ($query) {
+                    $query->whereNull('loan_type_deleted')
+                        ->orWhere('loan_type_deleted', '!=', 'Y');
+                })
+                ->where(function ($query) {
+                    $query->where('loan_type_active', 1)
+                        ->orWhere('loan_type_active', 'Y');
+                })
+                ->whereRaw("LOWER(COALESCE(loan_type_name, '')) NOT LIKE ?", ['%test%'])
+                ->orderByRaw('COALESCE(loan_type_duration, 999999) ASC')
+                ->orderBy('loan_type_id', 'asc')
+                ->get();
+
+            foreach ($loanTypes as $loanType) {
+                DB::table('sacco_mpesa_allocation_priorities')->updateOrInsert(
+                    ['priority_key' => 'LOAN_TYPE_' . $loanType->loan_type_id],
+                    [
+                        'priority_type' => 'LOAN_TYPE',
+                        'priority_source_table' => 'sacco_loan_types',
+                        'priority_source_id' => $loanType->loan_type_id,
+                        'priority_label' => $loanType->loan_type_name,
+                        'priority_order' => $order++,
+                        'priority_active' => 'Y',
+                        'priority_notes' => 'Auto-created smart allocation priority: loan types ordered shortest to longest repayment duration.',
+                        'updated_at' => now(),
+                        'created_at' => now(),
+                    ]
+                );
+            }
+
+            DB::table('sacco_mpesa_allocation_priorities')->updateOrInsert(
+                ['priority_key' => 'SHARES'],
+                [
+                    'priority_type' => 'SYSTEM',
+                    'priority_source_table' => 'sacco_shares',
+                    'priority_source_id' => 0,
+                    'priority_label' => 'Shares',
+                    'priority_order' => $order++,
+                    'priority_active' => 'Y',
+                    'priority_notes' => 'Auto-created smart allocation priority. Shares absorbs remaining balance.',
+                    'updated_at' => now(),
+                    'created_at' => now(),
+                ]
+            );
+
+            DB::table('sacco_mpesa_allocation_priorities')->updateOrInsert(
+                ['priority_key' => 'FOSA'],
+                [
+                    'priority_type' => 'SYSTEM',
+                    'priority_source_table' => 'sacco_fosas',
+                    'priority_source_id' => 0,
+                    'priority_label' => 'FOSA Savings',
+                    'priority_order' => $order++,
+                    'priority_active' => 'Y',
+                    'priority_notes' => 'Auto-created smart allocation priority. Used only if reached.',
+                    'updated_at' => now(),
+                    'created_at' => now(),
+                ]
+            );
+        });
+
         return DB::table('sacco_mpesa_allocation_priorities')
             ->where(function ($query) {
                 $query->where('priority_active', 'Y')
                     ->orWhere('priority_active', 1);
             })
             ->orderBy('priority_order', 'asc')
+            ->orderBy('priority_id', 'asc')
             ->get();
     }
-    private function allocateSmartLoans($member, float $remainingAmount, $transaction): float
+
+    private function allocateSmartLoans($member, float $remainingAmount, $transaction, $priority = null): float
     {
         $memberId = $member->member_id ?? null;
         $period   = $this->getCurrentPeriod();
@@ -2192,18 +2272,27 @@ class ProcessTransactionsJob implements ShouldQueue
             return 0.0;
         }
 
-        $loans = DB::table('sacco_loans')
-            ->where('loan_member', $memberId)
-            ->whereRaw('(COALESCE(loan_amount, 0) - COALESCE(loan_loan_paid, 0)) > 0')
-            ->orderBy('loan_id', 'asc')
+        $loanQuery = DB::table('sacco_loans')
+            ->join('sacco_loan_types', 'sacco_loans.loan_loan_type', '=', 'sacco_loan_types.loan_type_id')
+            ->where('sacco_loans.loan_member', $memberId)
+            ->whereRaw('(COALESCE(sacco_loans.loan_amount, 0) - COALESCE(sacco_loans.loan_loan_paid, 0)) > 0')
+            ->select('sacco_loans.*', 'sacco_loan_types.loan_type_duration');
+
+        if (
+            $priority
+            && isset($priority->priority_source_table, $priority->priority_source_id)
+            && $priority->priority_source_table === 'sacco_loan_types'
+            && (int) $priority->priority_source_id > 0
+        ) {
+            $loanQuery->where('sacco_loans.loan_loan_type', (int) $priority->priority_source_id);
+        }
+
+        $loans = $loanQuery
+            ->orderByRaw('COALESCE(sacco_loan_types.loan_type_duration, 999999) ASC')
+            ->orderBy('sacco_loans.loan_id', 'asc')
             ->get();
 
         if ($loans->isEmpty()) {
-            Log::info("Smart loan allocation skipped: no outstanding loans.", [
-                'member_id' => $memberId,
-                'transaction_id' => $transaction->id ?? null,
-            ]);
-
             return 0.0;
         }
 
@@ -2214,33 +2303,17 @@ class ProcessTransactionsJob implements ShouldQueue
                 break;
             }
 
-            $monthlyRemainingDue = max(
-                0,
-                (float) ($loan->loan_amount ?? 0) - (float) ($loan->loan_loan_paid ?? 0)
-            );
-
-            if ($monthlyRemainingDue <= 0) {
-                continue;
-            }
-
-            if ($monthlyRemainingDue <= 0) {
-                continue;
-            }
-
-
             $monthlyRemainingDue = $this->getSmartLoanMonthlyRemainingDue($loan, $period);
 
             if ($monthlyRemainingDue <= 0) {
-                Log::info("Smart loan allocation skipped: expected monthly due already satisfied.", [
-                    'member_id' => $memberId,
-                    'loan_id' => $loan->loan_id ?? null,
-                    'period' => $period,
-                    'transaction_id' => $transaction->id ?? null,
-                ]);
-
                 continue;
             }
 
+            $amountToLoan = min($remainingAmount, $monthlyRemainingDue);
+
+            if ($amountToLoan <= 0) {
+                continue;
+            }
 
             $loanTransaction = clone $transaction;
             $loanTransaction->transaction_amount = $amountToLoan;
@@ -2249,26 +2322,21 @@ class ProcessTransactionsJob implements ShouldQueue
             $posted = $this->processLoans('LN' . $loan->loan_id, $loanTransaction);
 
             if (!$posted) {
-                Log::warning("Smart loan allocation failed while posting.", [
-                    'member_id' => $memberId,
-                    'loan_id' => $loan->loan_id,
-                    'amount' => $amountToLoan,
-                    'transaction_id' => $transaction->id ?? null,
-                ]);
-
                 continue;
             }
 
-            $allocatedTotal += $amountToLoan;
-            $remainingAmount -= $amountToLoan;
+            $allocatedTotal = round($allocatedTotal + $amountToLoan, 2);
+            $remainingAmount = round($remainingAmount - $amountToLoan, 2);
 
             Log::info("Smart loan allocation posted.", [
                 'member_id' => $memberId,
                 'loan_id' => $loan->loan_id,
+                'loan_type' => $loan->loan_loan_type ?? null,
                 'amount' => $amountToLoan,
                 'allocated_total' => $allocatedTotal,
                 'remaining_after_loan' => $remainingAmount,
                 'period' => $period,
+                'priority_key' => $priority->priority_key ?? null,
                 'transaction_id' => $transaction->id ?? null,
             ]);
         }
@@ -2279,45 +2347,11 @@ class ProcessTransactionsJob implements ShouldQueue
     private function allocateSmartShares($member, float $remainingAmount, $transaction, $priority): float
     {
         $memberId = $member->member_id ?? null;
-        $period   = $this->getCurrentPeriod();
 
         if (!$memberId || $remainingAmount <= 0) {
             return 0.0;
         }
 
-        /*
-     * Monthly share cap:
-     * priority amount first, otherwise min_share_contribution default.
-     * This prevents shares from swallowing all excess unless configured.
-     */
-        $targetAmount = $this->getPriorityConfiguredAmount($priority, [
-            'min_share_contribution',
-            'default_share_contribution',
-            'default_monthly_share_contribution',
-        ]);
-
-        if ($targetAmount <= 0) {
-            Log::info("Smart shares skipped: no monthly share target configured.", [
-                'member_id' => $memberId,
-                'priority_key' => $priority->priority_key ?? null,
-                'transaction_id' => $transaction->id ?? null,
-            ]);
-
-            return 0.0;
-        }
-
-        $alreadyPaid = (float) DB::table('sacco_shares')
-            ->where('share_member_id', $memberId)
-            ->where('share_period', $period)
-            ->sum('share_amount_paying');
-
-        $due = max(0, $targetAmount - $alreadyPaid);
-
-        if ($due <= 0) {
-            return 0.0;
-        }
-
-        // $amountToPost = min($remainingAmount, $due);
         $amountToPost = $remainingAmount;
 
         $shareTransaction = clone $transaction;
@@ -2333,9 +2367,6 @@ class ProcessTransactionsJob implements ShouldQueue
         Log::info("Smart shares allocation posted.", [
             'member_id' => $memberId,
             'amount' => $amountToPost,
-            'target_amount' => $targetAmount,
-            'already_paid' => $alreadyPaid,
-            'period' => $period,
             'transaction_id' => $transaction->id ?? null,
         ]);
 
@@ -2501,39 +2532,6 @@ class ProcessTransactionsJob implements ShouldQueue
             return 0.0;
         }
 
-        /*
-     * FOSA cap:
-     * priority amount first, otherwise min_fosa_contribution default.
-     * This prevents FOSA from swallowing all excess unless configured.
-     */
-        $targetAmount = $this->getPriorityConfiguredAmount($priority, [
-            'min_fosa_contribution',
-            'default_fosa_contribution',
-            'default_monthly_fosa_contribution',
-        ]);
-
-        if ($targetAmount <= 0) {
-            Log::info("Smart FOSA skipped: no FOSA target configured.", [
-                'member_id' => $memberId,
-                'priority_key' => $priority->priority_key ?? null,
-                'transaction_id' => $transaction->id ?? null,
-            ]);
-
-            return 0.0;
-        }
-
-        $alreadyPaid = (float) DB::table('sacco_fosas')
-            ->where('fosa_member_id', $memberId)
-            ->where('fosa_period', $period)
-            ->sum('fosa_amount_paying');
-
-        $due = max(0, $targetAmount - $alreadyPaid);
-
-        if ($due <= 0) {
-            return 0.0;
-        }
-
-        // $amountToPost = min($remainingAmount, $due);
         $amountToPost = $remainingAmount;
 
         $mpesaAccount = DB::table('sacco_defaults')
@@ -2603,14 +2601,13 @@ class ProcessTransactionsJob implements ShouldQueue
         Log::info("Smart FOSA allocation posted.", [
             'member_id' => $memberId,
             'amount' => $amountToPost,
-            'target_amount' => $targetAmount,
-            'already_paid' => $alreadyPaid,
             'period' => $period,
             'transaction_id' => $transaction->id ?? null,
         ]);
 
         return $amountToPost;
     }
+
     private function getPriorityConfiguredAmount($priority, array $defaultNames = []): float
     {
         $candidateColumns = [
