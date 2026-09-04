@@ -137,7 +137,6 @@ class ProcessTransactionsJob implements ShouldQueue
     |--------------------------------------------------------------------------
     | Claim Transaction
     |--------------------------------------------------------------------------
-    | Prevent another queue worker from processing the same C2B transaction.
     */
 
         $updated = DB::table('c2b_payments')
@@ -161,7 +160,11 @@ class ProcessTransactionsJob implements ShouldQueue
     |--------------------------------------------------------------------------
     */
 
-        $reference = strtoupper(trim(str_replace(' ', '', (string) $transaction->bill_ref_number)));
+        $reference = strtoupper(
+            trim(
+                str_replace(' ', '', (string) $transaction->bill_ref_number)
+            )
+        );
 
         Log::info("Normalized transaction reference: {$reference}", [
             'transaction_id' => $transaction->id,
@@ -173,17 +176,24 @@ class ProcessTransactionsJob implements ShouldQueue
     |--------------------------------------------------------------------------
     | Operator Payment
     |--------------------------------------------------------------------------
-    | Operator references are only rewritten here.
-    | Actual SACCO posting continues in the normal routing below.
+    |
+    | Preserve existing operator behaviour.
+    | processOperatorTransaction() rewrites the reference, after which
+    | normal SACCO routing continues below.
+    |
     */
 
         if (preg_match('/^OP[A-Z]{2}-\d+(-\d+)?$/', $reference)) {
+
             Log::info("Operator payment reference detected.", [
                 'original_reference' => $reference,
                 'transaction_id' => $transaction->id,
             ]);
 
-            $operatorOk = $this->processOperatorTransaction($reference, $transaction);
+            $operatorOk = $this->processOperatorTransaction(
+                $reference,
+                $transaction
+            );
 
             if (!$operatorOk) {
                 Log::warning("Operator transaction failed before SACCO routing.", [
@@ -203,102 +213,115 @@ class ProcessTransactionsJob implements ShouldQueue
 
         /*
     |--------------------------------------------------------------------------
-    | Route Transaction
+    | Detect Existing FOSA Prefix
     |--------------------------------------------------------------------------
-    | IMPORTANT:
-    | Direct references remain authoritative.
     |
-    | LN{id} means the member specifically chose that loan.
-    | Therefore the full amount goes to that loan through processLoans().
+    | IMPORTANT:
+    |
+    | This restores the OLD WORKING behaviour.
+    |
+    | Any active prefix configured in sacco_fosa_types is an EXPLICIT
+    | FOSA payment reference and must NOT enter smart allocation.
+    |
+    | Example:
+    |
+    | DT123
+    | FO123
+    | SA123
+    |
+    | If DT / FO / SA exists as an active sacco_fosa_types.type_prefix,
+    | the entire payment goes through the existing FOSA/fallback processor.
+    |
     */
 
-        // $posted = false;
+        $referencePrefix = strtoupper(substr($reference, 0, 2));
 
-        // if (str_starts_with($reference, 'SH')) {
-        //     Log::info("Identified as a Share transaction for reference: {$reference}");
+        $isFosaReference = DB::table('sacco_fosa_types')
+            ->whereRaw('UPPER(type_prefix) = ?', [$referencePrefix])
+            ->where('type_active', 'Y')
+            ->exists();
 
-        //     $result = $this->processShares($reference, $transaction);
+        /*
+    |--------------------------------------------------------------------------
+    | Route Transaction
+    |--------------------------------------------------------------------------
+    |
+    | Explicit references ALWAYS remain authoritative.
+    |
+    | SH{id} = Shares
+    | LN{id} = Selected Loan
+    | CA{id} = Capital
+    | RF{id} = Registration Fee
+    | configured FOSA prefix + member ID = Existing FOSA processor
+    |
+    | Smart allocation runs ONLY when none of the above applies.
+    |
+    */
 
-        //     // Legacy-safe: old processShares() may still return void/null.
-        //     $posted = ($result !== false);
-        // } elseif (str_starts_with($reference, 'LN')) {
-        //     Log::info("Identified as a Loan transaction for reference: {$reference}");
-
-        //     // Full amount goes to the specified loan.
-        //     // Do not cap direct LN payments here.
-        //     $posted = $this->processLoans($reference, $transaction);
-        // } elseif (str_starts_with($reference, 'CA')) {
-        //     Log::info("Identified as a Capital Shares transaction for reference: {$reference}");
-
-        //     $result = $this->processCapital($reference, $transaction);
-
-        //     // Legacy-safe: old processCapital() may still return void/null.
-        //     $posted = ($result !== false);
-        // } elseif (str_starts_with($reference, 'RF')) {
-        //     Log::info("Identified as a Registration Fee transaction for reference: {$reference}");
-
-        //     $memberId = ltrim($reference, 'RF');
-        //     $period   = $this->getCurrentPeriod();
-        //     $now      = Carbon::now();
-        //     $docNo    = "Paybill {$transaction->business_shortcode} - {$transaction->transaction_id}";
-        //     $ip       = request()->ip() ?? '127.0.0.1';
-        //     $userId   = auth()->id() ?? 999;
-        //     $desc     = "Mpesa By {$transaction->first_name} - {$transaction->bill_ref_number}";
-
-        //     $mpesaAccount = DB::table('sacco_defaults')
-        //         ->where('default_name', 'default_mpesa_in_account')
-        //         ->value('default_value');
-
-        //     $result = $this->processRegistrationFee(
-        //         $memberId,
-        //         $transaction,
-        //         $desc,
-        //         $docNo,
-        //         $period,
-        //         $now,
-        //         $userId,
-        //         $ip,
-        //         $mpesaAccount
-        //     );
-
-        //     // Legacy-safe: old processRegistrationFee() may still return void/null.
-        //     $posted = ($result !== false);
-        // } else {
-        //     Log::info("Trying FOSA/fallback for reference: {$reference}");
-
-        //     $result = $this->processFallbackTransaction($reference, $transaction);
-
-        //     // Temporary legacy-safe handling.
-        //     // Next step: make processFallbackTransaction() return true/false properly.
-        //     $posted = ($result !== false);
-        // }
         $posted = false;
 
         if (str_starts_with($reference, 'SH')) {
-            Log::info("Identified as a Share transaction for reference: {$reference}");
-            $posted = $this->processShares($reference, $transaction);
-        } elseif (str_starts_with($reference, 'LN')) {
-            Log::info("Identified as a Loan transaction for reference: {$reference}");
 
-            // Direct LN{id}: full amount goes to selected loan.
-            // No smart-allocation cap here.
-            $posted = $this->processLoans($reference, $transaction);
+            Log::info(
+                "Identified as a Share transaction for reference: {$reference}"
+            );
+
+            $posted = $this->processShares(
+                $reference,
+                $transaction
+            );
+        } elseif (str_starts_with($reference, 'LN')) {
+
+            Log::info(
+                "Identified as a Loan transaction for reference: {$reference}"
+            );
+
+            /*
+         * Direct LN{id}:
+         * Member deliberately selected this loan.
+         * Entire payment continues to the selected loan.
+         */
+            $posted = $this->processLoans(
+                $reference,
+                $transaction
+            );
         } elseif (str_starts_with($reference, 'CA')) {
-            Log::info("Identified as a Capital Shares transaction for reference: {$reference}");
-            $posted = $this->processCapital($reference, $transaction);
+
+            Log::info(
+                "Identified as a Capital Shares transaction for reference: {$reference}"
+            );
+
+            $posted = $this->processCapital(
+                $reference,
+                $transaction
+            );
         } elseif (str_starts_with($reference, 'RF')) {
-            Log::info("Identified as a Registration Fee transaction for reference: {$reference}");
+
+            Log::info(
+                "Identified as a Registration Fee transaction for reference: {$reference}"
+            );
 
             $memberId = ltrim($reference, 'RF');
-            $period   = $this->getCurrentPeriod();
-            $now      = Carbon::now();
-            $docNo    = "Paybill {$transaction->business_shortcode} - {$transaction->transaction_id}";
-            $ip       = request()->ip() ?? '127.0.0.1';
-            $userId   = auth()->id() ?? 999;
-            $desc     = "Mpesa By {$transaction->first_name} - {$transaction->bill_ref_number}";
+
+            $period = $this->getCurrentPeriod();
+
+            $now = Carbon::now();
+
+            $docNo =
+                "Paybill {$transaction->business_shortcode} - {$transaction->transaction_id}";
+
+            $ip = request()->ip() ?? '127.0.0.1';
+
+            $userId = auth()->id() ?? 999;
+
+            $desc =
+                "Mpesa By {$transaction->first_name} - {$transaction->bill_ref_number}";
 
             $mpesaAccount = DB::table('sacco_defaults')
-                ->where('default_name', 'default_mpesa_in_account')
+                ->where(
+                    'default_name',
+                    'default_mpesa_in_account'
+                )
                 ->value('default_value');
 
             $posted = $this->processRegistrationFee(
@@ -312,25 +335,68 @@ class ProcessTransactionsJob implements ShouldQueue
                 $ip,
                 $mpesaAccount
             );
+        } elseif ($isFosaReference) {
+
+            /*
+         * CRITICAL:
+         * Existing configured FOSA prefixes bypass smart allocation.
+         *
+         * This restores the old working behaviour.
+         */
+
+            Log::info(
+                "Identified as explicit FOSA transaction for reference: {$reference}",
+                [
+                    'prefix' => $referencePrefix,
+                    'transaction_id' => $transaction->id ?? null,
+                    'mpesa_transaction_id' => $transaction->transaction_id ?? null,
+                ]
+            );
+
+            $posted = $this->processFallbackTransaction(
+                $reference,
+                $transaction
+            );
         } else {
-            Log::info("Trying smart allocation for unspecified payment reference: {$reference}");
-            $posted = $this->processSmartAllocation($reference, $transaction);
+
+            /*
+         * No recognised explicit destination.
+         *
+         * ONLY NOW do we invoke smart allocation.
+         */
+
+            Log::info(
+                "No explicit SACCO/FOSA prefix found. Trying smart allocation for reference: {$reference}",
+                [
+                    'prefix' => $referencePrefix,
+                    'transaction_id' => $transaction->id ?? null,
+                    'mpesa_transaction_id' => $transaction->transaction_id ?? null,
+                ]
+            );
+
+            $posted = $this->processSmartAllocation(
+                $reference,
+                $transaction
+            );
         }
 
         /*
     |--------------------------------------------------------------------------
     | Final Processed Mark
     |--------------------------------------------------------------------------
-    | Only mark processed if a processor accepted the transaction.
     */
 
         if (!$posted) {
-            Log::warning("C2B transaction was picked but not posted.", [
-                'transaction_id' => $transaction->id,
-                'reference' => $reference,
-                'mpesa_transaction_id' => $transaction->transaction_id ?? null,
-                'amount' => $transaction->transaction_amount ?? null,
-            ]);
+
+            Log::warning(
+                "C2B transaction was picked but not posted.",
+                [
+                    'transaction_id' => $transaction->id,
+                    'reference' => $reference,
+                    'mpesa_transaction_id' => $transaction->transaction_id ?? null,
+                    'amount' => $transaction->transaction_amount ?? null,
+                ]
+            );
 
             return;
         }
@@ -342,11 +408,15 @@ class ProcessTransactionsJob implements ShouldQueue
                 'processed_date' => Carbon::now(),
             ]);
 
-        Log::info("Transaction ID {$transaction->id} marked as processed.", [
-            'reference' => $reference,
-            'mpesa_transaction_id' => $transaction->transaction_id ?? null,
-        ]);
+        Log::info(
+            "Transaction ID {$transaction->id} marked as processed.",
+            [
+                'reference' => $reference,
+                'mpesa_transaction_id' => $transaction->transaction_id ?? null,
+            ]
+        );
     }
+
 
     private function processShares($reference, $transaction): bool
     {
@@ -654,7 +724,8 @@ class ProcessTransactionsJob implements ShouldQueue
                 'sacco_loan_types.loan_type_acount',
                 'sacco_loan_types.loan_type_int_account',
                 'sacco_loan_types.loan_type_interest_type',
-                'sacco_loan_types.loan_type_interest'
+                'sacco_loan_types.loan_type_interest',
+                'sacco_loan_types.loan_type_duration'
             )
             ->where('sacco_loans.loan_id', $loanId)
             ->first();
@@ -669,12 +740,34 @@ class ProcessTransactionsJob implements ShouldQueue
         $interest = 0;
         $currentPeriod = $this->getCurrentPeriod();
 
-        // Check if interest has already been paid for this loan in this period
-        $existingPayment = DB::table('sacco_loan_payments')
-            ->where('loan_payments_loan_id', $loanId)
-            ->where('loan_payments_period', $currentPeriod)
-            ->where('loan_payments_interest', '>', 0)
-            ->exists();
+        /*
+         * Interest repeat rule:
+         * - Fixed-interest loans keep existing behaviour.
+         * - Non-fixed one-month loans must not use YYYYMM as the interest window.
+         *   They use a rolling one-month window from the current payment date.
+         * - Longer non-fixed loans keep the existing YYYYMM period check.
+         */
+        $loanDuration = (int) ($loanDetails->loan_type_duration ?? 0);
+        $isOneMonthNonFixedLoan = (
+            $loanDetails->loan_type_interest_type !== "FIXED INTEREST"
+            && $loanDuration <= 1
+        );
+
+        if ($isOneMonthNonFixedLoan) {
+            $interestWindowStart = Carbon::parse($transaction->transaction_time ?? now())->subMonth();
+
+            $existingPayment = DB::table('sacco_loan_payments')
+                ->where('loan_payments_loan_id', $loanId)
+                ->where('loan_payments_interest', '>', 0)
+                ->where('loan_payments_paid_on', '>=', $interestWindowStart->toDateString())
+                ->exists();
+        } else {
+            $existingPayment = DB::table('sacco_loan_payments')
+                ->where('loan_payments_loan_id', $loanId)
+                ->where('loan_payments_period', $currentPeriod)
+                ->where('loan_payments_interest', '>', 0)
+                ->exists();
+        }
 
         if ($loanDetails->loan_type_interest_type === "FIXED INTEREST") {
             // Preserve existing behaviour: fixed interest is backed out of the full payment amount
@@ -2689,11 +2782,33 @@ class ProcessTransactionsJob implements ShouldQueue
             return 0.0;
         }
 
-        $alreadyPaidThisPeriod = (float) DB::table('sacco_loan_payments')
-            ->where('loan_payments_loan_id', $loanId)
-            ->where('loan_payments_period', $period)
-            ->selectRaw('COALESCE(SUM(COALESCE(loan_payments_amount, 0) + COALESCE(loan_payments_interest, 0)), 0) as paid_total')
-            ->value('paid_total');
+        $loanDuration = (int) ($loan->loan_type_duration ?? 0);
+
+        if ($loanDuration <= 1) {
+            /*
+             * One-month smart allocation:
+             * Use rolling one-month window, not YYYYMM.
+             * Count positive principal only, plus positive interest.
+             * Negative principal is a balance-increasing accounting entry,
+             * not a repayment already consumed.
+             */
+            $windowStart = Carbon::now()->subMonth()->toDateString();
+
+            $alreadyPaidThisPeriod = (float) DB::table('sacco_loan_payments')
+                ->where('loan_payments_loan_id', $loanId)
+                ->where('loan_payments_paid_on', '>=', $windowStart)
+                ->selectRaw('COALESCE(SUM(
+                    CASE WHEN COALESCE(loan_payments_amount, 0) > 0 THEN loan_payments_amount ELSE 0 END
+                    + CASE WHEN COALESCE(loan_payments_interest, 0) > 0 THEN loan_payments_interest ELSE 0 END
+                ), 0) as paid_total')
+                ->value('paid_total');
+        } else {
+            $alreadyPaidThisPeriod = (float) DB::table('sacco_loan_payments')
+                ->where('loan_payments_loan_id', $loanId)
+                ->where('loan_payments_period', $period)
+                ->selectRaw('COALESCE(SUM(COALESCE(loan_payments_amount, 0) + COALESCE(loan_payments_interest, 0)), 0) as paid_total')
+                ->value('paid_total');
+        }
 
         return max(0.0, $expectedMonthlyDue - $alreadyPaidThisPeriod);
     }
