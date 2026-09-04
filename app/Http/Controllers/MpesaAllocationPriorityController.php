@@ -419,7 +419,7 @@ class MpesaAllocationPriorityController extends Controller
                     );
                 }
 
-                if (!$mpesaAllowed) {
+                if (! $mpesaAllowed) {
                     $details[] = 'M-PESA collection disabled';
                 }
 
@@ -434,7 +434,7 @@ class MpesaAllocationPriorityController extends Controller
                     'source_active' => $active,
                     'source_status' => $active
                         ? 'Active'
-                        : (!$productActive ? 'Inactive' : 'M-PESA disabled'),
+                        : (! $productActive ? 'Inactive' : 'M-PESA disabled'),
                     'details' => count($details) > 0
                         ? implode(' · ', $details)
                         : 'Special Savings product.',
@@ -644,59 +644,49 @@ class MpesaAllocationPriorityController extends Controller
 
     private function getSubAccountName($accountId): ?string
     {
-        if (
-            empty($accountId)
-            ||
-            ! Schema::hasTable('sacco_sub_accounts')
-        ) {
+        if (empty($accountId)) {
             return null;
         }
 
-        $idColumns = [
-            'sub_account_id',
-            'account_id',
-            'id',
-        ];
-
-        $availableIdColumns = [];
-
-        foreach ($idColumns as $column) {
-            if (Schema::hasColumn('sacco_sub_accounts', $column)) {
-                $availableIdColumns[] = $column;
-            }
-        }
-
-        if (count($availableIdColumns) === 0) {
+        /*
+        |--------------------------------------------------------------------------
+        | SACCO Sub Account Lookup
+        |--------------------------------------------------------------------------
+        |
+        | Existing SACCO databases use sacco_sub_account.
+        | This is a read-only lookup for display only.
+        |
+        */
+        if (! Schema::hasTable('sacco_sub_account')) {
             return null;
         }
 
-        $account = DB::table('sacco_sub_accounts')
-            ->where(function ($query) use ($availableIdColumns, $accountId) {
-                foreach ($availableIdColumns as $column) {
-                    $query->orWhere($column, $accountId);
-                }
-            })
-            ->first();
+        if (! Schema::hasColumn('sacco_sub_account', 'sub_account_id')) {
+            return null;
+        }
+
+        $query = DB::table('sacco_sub_account')
+            ->where('sub_account_id', (int) $accountId);
+
+        if (Schema::hasColumn('sacco_sub_account', 'sub_account_deleted')) {
+            $query->where(function ($q) {
+                $q->whereNull('sub_account_deleted')
+                    ->orWhere('sub_account_deleted', '!=', 'Y');
+            });
+        }
+
+        $account = $query->first();
 
         if (! $account) {
             return null;
         }
 
-        $nameColumns = [
-            'sub_account_name',
-            'account_name',
-            'sub_account',
-            'name',
-        ];
-
-        foreach ($nameColumns as $column) {
-            if (
-                property_exists($account, $column)
-                &&
-                trim((string) $account->{$column}) !== ''
-            ) {
-                return trim((string) $account->{$column});
-            }
+        if (
+            property_exists($account, 'sub_account_name')
+            &&
+            trim((string) $account->sub_account_name) !== ''
+        ) {
+            return trim((string) $account->sub_account_name);
         }
 
         return null;
