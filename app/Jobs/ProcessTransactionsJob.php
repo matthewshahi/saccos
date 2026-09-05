@@ -3086,77 +3086,70 @@ class ProcessTransactionsJob implements ShouldQueue
     }
 
     private function getSmartLoanMonthlyRemainingDue($loan, string $period): float
-    {
-        $loanId = $loan->loan_id ?? null;
+{
+    $loanId = $loan->loan_id ?? null;
 
-        if (!$loanId) {
-            return 0.0;
-        }
+    if (!$loanId) {
+        return 0.0;
+    }
 
-        /*
+    /*
      * Smart allocation rule:
      * Do not allocate using full outstanding loan balance.
-     * Allocate only the expected monthly repayment for this loan,
-     * less what has already been paid in the current period.
+     *
+     * The expected amount is ONLY:
+     * sacco_loans.loan_monthly_repayment_amount
+     *
+     * If missing, NULL, non-numeric or zero, skip this loan.
      */
 
-        $expectedMonthlyDue = 0.0;
+    if (
+        !isset($loan->loan_monthly_repayment_amount)
+        || !is_numeric($loan->loan_monthly_repayment_amount)
+        || (float) $loan->loan_monthly_repayment_amount <= 0
+    ) {
+        Log::info("Smart loan allocation skipped: loan_monthly_repayment_amount is missing or zero.", [
+            'loan_id' => $loanId,
+            'loan_monthly_repayment_amount' => $loan->loan_monthly_repayment_amount ?? null,
+            'period' => $period,
+        ]);
 
-        foreach (
-            [
-                'loan_monthly_repayment_amount',
-                'loan_expected_monthly_payment',
-                'loan_monthly_repayment',
-                'loan_repayment_amount',
-                'loan_installment_amount',
-                'loan_instalment_amount',
-                'loan_emi',
-                'loan_expected_amount',
-            ] as $field
-        ) {
-            if (isset($loan->{$field}) && (float) $loan->{$field} > 0) {
-                $expectedMonthlyDue = (float) $loan->{$field};
-                break;
-            }
-        }
-
-        if ($expectedMonthlyDue <= 0) {
-            Log::warning("Smart loan allocation skipped: loan has no expected monthly repayment field/value.", [
-                'loan_id' => $loanId,
-                'period' => $period,
-            ]);
-
-            return 0.0;
-        }
-
-        $loanDuration = (int) ($loan->loan_type_duration ?? 0);
-
-        if ($loanDuration <= 1) {
-            /*
-             * One-month smart allocation:
-             * Use rolling one-month window, not YYYYMM.
-             * Count positive principal only, plus positive interest.
-             * Negative principal is a balance-increasing accounting entry,
-             * not a repayment already consumed.
-             */
-            $windowStart = Carbon::now()->subMonth()->toDateString();
-
-            $alreadyPaidThisPeriod = (float) DB::table('sacco_loan_payments')
-                ->where('loan_payments_loan_id', $loanId)
-                ->where('loan_payments_paid_on', '>=', $windowStart)
-                ->selectRaw('COALESCE(SUM(
-                    CASE WHEN COALESCE(loan_payments_amount, 0) > 0 THEN loan_payments_amount ELSE 0 END
-                    + CASE WHEN COALESCE(loan_payments_interest, 0) > 0 THEN loan_payments_interest ELSE 0 END
-                ), 0) as paid_total')
-                ->value('paid_total');
-        } else {
-            $alreadyPaidThisPeriod = (float) DB::table('sacco_loan_payments')
-                ->where('loan_payments_loan_id', $loanId)
-                ->where('loan_payments_period', $period)
-                ->selectRaw('COALESCE(SUM(COALESCE(loan_payments_amount, 0) + COALESCE(loan_payments_interest, 0)), 0) as paid_total')
-                ->value('paid_total');
-        }
-
-        return max(0.0, $expectedMonthlyDue - $alreadyPaidThisPeriod);
+        return 0.0;
     }
+
+    $expectedMonthlyDue = (float) $loan->loan_monthly_repayment_amount;
+
+    $loanDuration = (int) ($loan->loan_type_duration ?? 0);
+
+    if ($loanDuration <= 1) {
+        /*
+         * One-month smart allocation:
+         * Use rolling one-month window, not YYYYMM.
+         */
+        $windowStart = Carbon::now()->subMonth()->toDateString();
+
+        $alreadyPaidThisPeriod = (float) DB::table('sacco_loan_payments')
+            ->where('loan_payments_loan_id', $loanId)
+            ->where('loan_payments_paid_on', '>=', $windowStart)
+            ->selectRaw('COALESCE(SUM(
+                CASE WHEN COALESCE(loan_payments_amount, 0) > 0 THEN loan_payments_amount ELSE 0 END
+                + CASE WHEN COALESCE(loan_payments_interest, 0) > 0 THEN loan_payments_interest ELSE 0 END
+            ), 0) as paid_total')
+            ->value('paid_total');
+    } else {
+        $alreadyPaidThisPeriod = (float) DB::table('sacco_loan_payments')
+            ->where('loan_payments_loan_id', $loanId)
+            ->where('loan_payments_period', $period)
+            ->selectRaw('COALESCE(SUM(
+                COALESCE(loan_payments_amount, 0)
+                + COALESCE(loan_payments_interest, 0)
+            ), 0) as paid_total')
+            ->value('paid_total');
+    }
+
+    return max(
+        0.0,
+        $expectedMonthlyDue - $alreadyPaidThisPeriod
+    );
+}
 }
