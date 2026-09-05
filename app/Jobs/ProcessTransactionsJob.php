@@ -2215,56 +2215,403 @@ class ProcessTransactionsJob implements ShouldQueue
             throw $e;
         }
     }
-    private function resolveMemberFromUnspecifiedReference($reference, $transaction): ?object
-    {
-        $rawReference = trim((string) $reference);
+    private function resolveMemberFromUnspecifiedReference(
+        $reference,
+        $transaction
+    ): ?object {
+        /*
+    |--------------------------------------------------------------------------
+    | Resolve Member for an Unspecified / Smart Allocation Reference
+    |--------------------------------------------------------------------------
+    |
+    | Resolution order:
+    |
+    | 1. Exact SACCO member number
+    | 2. Exact national ID
+    | 3. M-PESA payer phone hash
+    |
+    | A valid reference remains authoritative.
+    | Phone hash is only the fallback when the reference cannot identify
+    | a member.
+    |--------------------------------------------------------------------------
+    */
 
-        $cleanedId = preg_replace('/\D/', '', $rawReference);
+        $rawReference = strtoupper(
+            trim((string) $reference)
+        );
 
-        if (empty($cleanedId)) {
-            Log::warning("Smart allocation member resolve failed: no numeric identifier.", [
-                'reference' => $reference,
-                'transaction_id' => $transaction->id ?? null,
-            ]);
+        /*
+    |--------------------------------------------------------------------------
+    | 1. Try the supplied reference first
+    |--------------------------------------------------------------------------
+    |
+    | Example:
+    |
+    | 266
+    |
+    | can identify member_sacco_id = 266.
+    |
+    | We deliberately do NOT strip arbitrary letters from the reference and
+    | turn something such as ABC266XYZ into 266.
+    |--------------------------------------------------------------------------
+    */
+
+        if ($rawReference !== '') {
+            $members = DB::table('sacco_members')
+                ->where(function ($query) use ($rawReference) {
+
+                    /*
+                 * SACCO/member/account number.
+                 */
+                    $query->whereRaw(
+                        'UPPER(TRIM(member_sacco_id)) = ?',
+                        [$rawReference]
+                    );
+
+                    /*
+                 * Kenyan national IDs are numeric.
+                 *
+                 * Only consider national ID when the whole reference itself
+                 * is numeric.
+                 */
+                    if (preg_match('/^\d+$/', $rawReference)) {
+                        $query->orWhere(
+                            'member_national_id',
+                            $rawReference
+                        );
+                    }
+                })
+                ->get()
+                ->unique('member_id')
+                ->values();
+
+            if ($members->count() === 1) {
+                $member = $members->first();
+
+                Log::info(
+                    'Smart allocation member resolved from payment reference.',
+                    [
+                        'member_id' => $member->member_id,
+                        'reference' => $rawReference,
+                        'transaction_id' =>
+                        $transaction->id ?? null,
+                        'mpesa_transaction_id' =>
+                        $transaction->transaction_id ?? null,
+                    ]
+                );
+
+                return $member;
+            }
+
+            /*
+         * If the supplied reference itself identifies more than one different
+         * member, do NOT guess using the payer phone.
+         */
+            if ($members->count() > 1) {
+                Log::warning(
+                    'Smart allocation member resolution ambiguous from reference.',
+                    [
+                        'reference' => $rawReference,
+                        'matches' => $members->count(),
+                        'transaction_id' =>
+                        $transaction->id ?? null,
+                        'mpesa_transaction_id' =>
+                        $transaction->transaction_id ?? null,
+                    ]
+                );
+
+                return null;
+            }
+        }
+
+        /*
+    |--------------------------------------------------------------------------
+    | 2. Reference did not identify anybody — try M-PESA payer phone
+    |--------------------------------------------------------------------------
+    |
+    | Examples of references reaching here:
+    |
+    | loan
+    | payment
+    | pay
+    | blank / invalid member reference
+    |
+    | Incoming M-PESA MSISDN may already be:
+    |
+    | ad652902ac9acb...
+    |
+    | OR may still be:
+    |
+    | 254722400737
+    |
+    | Both cases are handled.
+    |--------------------------------------------------------------------------
+    */
+
+        return $this->resolveMemberFromMpesaMsisdn(
+            $transaction
+        );
+    }
+
+    private function resolveMemberFromMpesaMsisdn(
+        $transaction
+    ): ?object {
+        $incomingMsisdn = trim(
+            (string) (
+                $transaction->msisdn
+                ?? ''
+            )
+        );
+
+        if ($incomingMsisdn === '') {
+            Log::warning(
+                'Smart allocation phone resolution failed: M-PESA MSISDN is empty.',
+                [
+                    'transaction_id' =>
+                    $transaction->id ?? null,
+                    'mpesa_transaction_id' =>
+                    $transaction->transaction_id ?? null,
+                ]
+            );
 
             return null;
         }
 
         /*
-     * Existing fallback behaviour:
-     * - Known prefixes use member_id.
-     * - Unknown references use national ID.
-     */
-        $prefix = strtoupper(substr($rawReference, 0, 2));
+    |--------------------------------------------------------------------------
+    | Safaricom may already have supplied SHA-256
+    |--------------------------------------------------------------------------
+    |
+    | Example:
+    |
+    | ad652902ac9acb49443e5ef71d640fc94777c558b5f6c25172249470d5062dfb
+    |--------------------------------------------------------------------------
+    */
 
-        $isKnownPrefix = in_array($prefix, ['SH', 'LN', 'CA', 'RF']) ||
-            DB::table('sacco_fosa_types')
-            ->whereRaw('UPPER(type_prefix) = ?', [$prefix])
-            ->where('type_active', 'Y')
-            ->exists();
+        if (
+            preg_match(
+                '/^[a-f0-9]{64}$/i',
+                $incomingMsisdn
+            )
+        ) {
+            $phoneHash = strtolower(
+                $incomingMsisdn
+            );
 
-        if ($isKnownPrefix) {
-            $members = DB::table('sacco_members')
-                ->where('member_id', $cleanedId)
-                ->get();
+            $source = 'SAFARICOM_HASH';
         } else {
-            $members = DB::table('sacco_members')
-                ->where('member_national_id', $cleanedId)
-                ->get();
+            /*
+        |--------------------------------------------------------------------------
+        | Safaricom supplied plaintext MSISDN
+        |--------------------------------------------------------------------------
+        */
+
+            $normalizedPhone =
+                $this->normalizeKenyanMobileForMpesaHash(
+                    $incomingMsisdn
+                );
+
+            if ($normalizedPhone === null) {
+                Log::warning(
+                    'Smart allocation phone resolution failed: invalid Kenyan M-PESA MSISDN.',
+                    [
+                        'transaction_id' =>
+                        $transaction->id ?? null,
+                        'mpesa_transaction_id' =>
+                        $transaction->transaction_id ?? null,
+                    ]
+                );
+
+                return null;
+            }
+
+            /*
+         * Example:
+         *
+         * normalized:
+         * 254722400737
+         *
+         * SHA-256:
+         * ad652902ac9acb...
+         */
+            $phoneHash = hash(
+                'sha256',
+                $normalizedPhone
+            );
+
+            $source = 'PLAINTEXT_MSISDN_HASHED';
         }
 
+        /*
+    |--------------------------------------------------------------------------
+    | Match against our pre-generated member hash
+    |--------------------------------------------------------------------------
+    */
+
+        $members = DB::table('sacco_members')
+            ->whereRaw(
+                'LOWER(TRIM(member_phone_hash)) = ?',
+                [$phoneHash]
+            )
+            ->get();
+
+        /*
+     * One and only one member must match.
+     *
+     * Shared/duplicate numbers are not safe for automatic allocation.
+     */
         if ($members->count() !== 1) {
-            Log::warning("Smart allocation member resolve failed: expected exactly one member.", [
-                'reference' => $reference,
-                'cleaned_id' => $cleanedId,
-                'matches' => $members->count(),
-                'transaction_id' => $transaction->id ?? null,
-            ]);
+            Log::warning(
+                'Smart allocation phone hash did not identify exactly one member.',
+                [
+                    'matches' => $members->count(),
+                    'hash_source' => $source,
+                    'transaction_id' =>
+                    $transaction->id ?? null,
+                    'mpesa_transaction_id' =>
+                    $transaction->transaction_id ?? null,
+                ]
+            );
 
             return null;
         }
 
-        return $members->first();
+        $member = $members->first();
+
+        Log::info(
+            'Smart allocation member resolved from M-PESA phone hash.',
+            [
+                'member_id' => $member->member_id,
+                'hash_source' => $source,
+                'transaction_id' =>
+                $transaction->id ?? null,
+                'mpesa_transaction_id' =>
+                $transaction->transaction_id ?? null,
+            ]
+        );
+
+        return $member;
+    }
+
+
+
+    private function normalizeKenyanMobileForMpesaHash(
+        ?string $phone
+    ): ?string {
+        $phone = trim((string) $phone);
+
+        if ($phone === '') {
+            return null;
+        }
+
+        /*
+     * Reject alphabetic garbage rather than silently repairing it.
+     */
+        if (preg_match('/[a-z]/i', $phone)) {
+            return null;
+        }
+
+        /*
+     * Remove harmless formatting:
+     *
+     * +254 722 400 737
+     * 0722-400-737
+     * 722 400 737
+     */
+        $digits = preg_replace(
+            '/\D+/',
+            '',
+            $phone
+        );
+
+        if (
+            $digits === null
+            || $digits === ''
+        ) {
+            return null;
+        }
+
+        /*
+     * 00254722400737
+     * ->
+     * 254722400737
+     */
+        if (str_starts_with($digits, '00254')) {
+            $digits = substr(
+                $digits,
+                2
+            );
+        }
+
+        /*
+     * 2540722400737
+     * ->
+     * 254722400737
+     */
+        if (str_starts_with($digits, '2540')) {
+            $digits =
+                '254'
+                . substr(
+                    $digits,
+                    4
+                );
+        }
+
+        /*
+     * 0722400737
+     * ->
+     * 254722400737
+     */ elseif (
+            strlen($digits) === 10
+            && str_starts_with(
+                $digits,
+                '0'
+            )
+        ) {
+            $digits =
+                '254'
+                . substr(
+                    $digits,
+                    1
+                );
+        }
+
+        /*
+     * 722400737
+     * ->
+     * 254722400737
+     */ elseif (
+            strlen($digits) === 9
+            && in_array(
+                substr($digits, 0, 1),
+                ['7', '1'],
+                true
+            )
+        ) {
+            $digits =
+                '254'
+                . $digits;
+        }
+
+        /*
+     * Accept Kenyan mobile numbers only.
+     */
+        if (
+            !preg_match(
+                '/^254(?:7\d{8}|1\d{8})$/',
+                $digits
+            )
+        ) {
+            return null;
+        }
+
+        /*
+     * IMPORTANT:
+     *
+     * Return without "+" because this is exactly what Safaricom's
+     * SHA-256 value is based upon.
+     */
+        return $digits;
     }
     private function getMpesaAllocationPriorities()
     {
