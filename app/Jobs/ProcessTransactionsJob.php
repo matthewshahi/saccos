@@ -4430,150 +4430,163 @@ class ProcessTransactionsJob implements ShouldQueue
         );
     }
 
-    private function queueMpesaManagerSms(
-        $transaction,
-        bool $allocated,
-        ?object $member = null
-    ): void {
-        /*
+   private function queueMpesaManagerSms(
+    $transaction,
+    bool $allocated,
+    ?object $member = null
+): void {
+    /*
     |--------------------------------------------------------------------------
     | Secondary Management SMS Enabled?
     |--------------------------------------------------------------------------
     */
 
-        $smsEnabled = strtoupper(trim((string) DB::table('sacco_defaults')
-            ->where('default_name', 'SEND_SECONDARY_AUTO_ALERTS_SMS')
-            ->value('default_value')));
+    $smsEnabled = strtoupper(
+        trim(
+            (string) DB::table('sacco_defaults')
+                ->where('default_name', 'SEND_SECONDARY_AUTO_ALERTS_SMS')
+                ->value('default_value')
+        )
+    );
 
-        if ($smsEnabled !== 'Y') {
-            return;
-        }
+    if ($smsEnabled !== 'Y') {
+        return;
+    }
 
-        /*
+    /*
     |--------------------------------------------------------------------------
     | Management Phone Numbers
     |--------------------------------------------------------------------------
+    |
+    | IMPORTANT:
+    |
+    | Each SACCO_MANAGER_ALERT_PHONE_NUMBERS row represents ONE phone number.
+    |
+    | Example:
+    |
+    | SACCO_MANAGER_ALERT_PHONE_NUMBERS | 0722400737
+    | SACCO_MANAGER_ALERT_PHONE_NUMBERS | 254724275446
+    |
     */
 
-        $phoneDefault = DB::table('sacco_defaults')
-            ->where('default_name', 'SACCO_MANAGER_ALERT_PHONE_NUMBERS')
-            ->value('default_value');
+    $phones = DB::table('sacco_defaults')
+        ->where('default_name', 'SACCO_MANAGER_ALERT_PHONE_NUMBERS')
+        ->pluck('default_value')
+        ->map(function ($phone) {
+            return trim((string) $phone);
+        })
+        ->filter(function ($phone) {
+            return $phone !== '';
+        })
+        ->unique()
+        ->values()
+        ->all();
 
-        if (!$phoneDefault) {
-            return;
-        }
+    if (empty($phones)) {
+        return;
+    }
 
-        $phones = array_values(array_unique(array_filter(
-            array_map(
-                'trim',
-                explode(',', (string) $phoneDefault)
-            )
-        )));
-
-        if (empty($phones)) {
-            return;
-        }
-
-        /*
+    /*
     |--------------------------------------------------------------------------
     | Transaction Details
     |--------------------------------------------------------------------------
     */
 
-        $amount = number_format(
-            (float) ($transaction->transaction_amount ?? 0),
-            2
-        );
+    $amount = number_format(
+        (float) ($transaction->transaction_amount ?? 0),
+        2
+    );
 
-        $mpesaRef = trim(
-            (string) ($transaction->transaction_id ?? '')
-        );
+    $mpesaRef = trim(
+        (string) ($transaction->transaction_id ?? '')
+    );
 
-        $source = trim(
-            (string) ($transaction->first_name ?? '')
-        );
+    $source = trim(
+        (string) ($transaction->first_name ?? '')
+    );
 
-        $memberAccount = trim(
-            (string) ($member->member_sacco_id ?? '')
-        );
+    $memberAccount = trim(
+        (string) ($member->member_sacco_id ?? '')
+    );
 
-        /*
+    /*
     |--------------------------------------------------------------------------
-    | Build Economical SMS
+    | Build SMS
     |--------------------------------------------------------------------------
     */
 
-        if ($allocated) {
+    if ($allocated) {
 
-            $message = "M-PESA KES {$amount} Ref {$mpesaRef}";
+        $message = "M-PESA KES {$amount} Ref {$mpesaRef}";
 
-            if ($source !== '') {
-                $message .= " from {$source}";
-            }
-
-            if ($memberAccount !== '') {
-                $message .= " allocated to member {$memberAccount}";
-            } else {
-                $message .= " successfully allocated";
-            }
-
-            $message .= ". See SACCO system.";
-
-            $subject = 'M-PESA Auto Allocation Successful';
-            $status = 'allocated';
-        } else {
-
-            $message = "ALERT: M-PESA KES {$amount} Ref {$mpesaRef}";
-
-            if ($source !== '') {
-                $message .= " from {$source}";
-            }
-
-            if ($memberAccount !== '') {
-                $message .= " for member {$memberAccount}";
-            }
-
-            $message .= " could not be auto allocated. Held for review.";
-
-            $subject = 'M-PESA Auto Allocation Failed';
-            $status = 'failed';
+        if ($source !== '') {
+            $message .= " from {$source}";
         }
 
-        /*
+        if ($memberAccount !== '') {
+            $message .= " allocated to member {$memberAccount}";
+        } else {
+            $message .= " successfully allocated";
+        }
+
+        $message .= ". See SACCO system.";
+
+        $subject = 'M-PESA Auto Allocation Successful';
+        $status = 'allocated';
+
+    } else {
+
+        $message = "ALERT: M-PESA KES {$amount} Ref {$mpesaRef}";
+
+        if ($source !== '') {
+            $message .= " from {$source}";
+        }
+
+        if ($memberAccount !== '') {
+            $message .= " for member {$memberAccount}";
+        }
+
+        $message .= " could not be auto allocated. Held for review.";
+
+        $subject = 'M-PESA Auto Allocation Failed';
+        $status = 'failed';
+    }
+
+    /*
     |--------------------------------------------------------------------------
     | Queue One SMS Per Manager
     |--------------------------------------------------------------------------
     */
 
-        foreach ($phones as $index => $phone) {
+    foreach ($phones as $index => $phone) {
 
-            $this->queueMpesaSms(
-                phone: $phone,
-                message: $message,
-                subject: $subject,
-                requestReference: 'MPESA-MGR-'
-                    . strtoupper($status)
-                    . '-'
-                    . ($transaction->id ?? $mpesaRef)
-                    . '-'
-                    . ($index + 1),
-                memberId: isset($member->member_id)
-                    ? (int) $member->member_id
-                    : null,
-                recipientName: 'SACCO Manager',
-                meta: [
-                    'source' => 'mpesa_management_alert',
-                    'status' => $status,
-                    'c2b_payment_id' => $transaction->id ?? null,
-                    'mpesa_transaction_id' => $mpesaRef,
-                    'amount' => (float) ($transaction->transaction_amount ?? 0),
-                    'member_id' => $member->member_id ?? null,
-                    'member_account' => $memberAccount ?: null,
-                    'bill_reference' => $transaction->bill_ref_number ?? null,
-                ]
-            );
-        }
+        $this->queueMpesaSms(
+            phone: $phone,
+            message: $message,
+            subject: $subject,
+            requestReference: 'MPESA-MGR-'
+                . strtoupper($status)
+                . '-'
+                . ($transaction->id ?? $mpesaRef)
+                . '-'
+                . ($index + 1),
+            memberId: isset($member->member_id)
+                ? (int) $member->member_id
+                : null,
+            recipientName: 'SACCO Manager',
+            meta: [
+                'source' => 'mpesa_management_alert',
+                'status' => $status,
+                'c2b_payment_id' => $transaction->id ?? null,
+                'mpesa_transaction_id' => $mpesaRef,
+                'amount' => (float) ($transaction->transaction_amount ?? 0),
+                'member_id' => $member->member_id ?? null,
+                'member_account' => $memberAccount ?: null,
+                'bill_reference' => $transaction->bill_ref_number ?? null,
+            ]
+        );
     }
+}
 
     private function queueMpesaEmail(
         ?string $email,
@@ -4633,244 +4646,353 @@ class ProcessTransactionsJob implements ShouldQueue
         }
     }
     private function queueMpesaManagerEmail(
-        $transaction,
-        bool $allocated,
-        ?object $member = null,
-        ?string $failureReason = null
-    ): void {
-        /*
+    $transaction,
+    bool $allocated,
+    ?object $member = null,
+    ?string $failureReason = null
+): void {
+    /*
     |--------------------------------------------------------------------------
     | Management Email Addresses
     |--------------------------------------------------------------------------
+    |
+    | IMPORTANT:
+    |
+    | Each SACCO_MANAGER_ALERT_EMAILS row represents ONE email address.
+    |
+    | Example:
+    |
+    | SACCO_MANAGER_ALERT_EMAILS | info@kasssacco.com
+    | SACCO_MANAGER_ALERT_EMAILS | matthewshahi@gmail.com
+    |
     */
 
-        $emailDefault = DB::table('sacco_defaults')
-            ->where('default_name', 'SACCO_MANAGER_ALERT_EMAILS')
-            ->value('default_value');
+    $emails = DB::table('sacco_defaults')
+        ->where('default_name', 'SACCO_MANAGER_ALERT_EMAILS')
+        ->pluck('default_value')
+        ->map(function ($email) {
+            return trim((string) $email);
+        })
+        ->filter(function ($email) {
+            return (
+                $email !== ''
+                && filter_var(
+                    $email,
+                    FILTER_VALIDATE_EMAIL
+                )
+            );
+        })
+        ->unique()
+        ->values()
+        ->all();
 
-        if (!$emailDefault) {
-            return;
-        }
+    if (empty($emails)) {
+        return;
+    }
 
-        $emails = array_values(array_unique(array_filter(
-            array_map(
-                'trim',
-                explode(',', (string) $emailDefault)
-            )
-        )));
-
-        if (empty($emails)) {
-            return;
-        }
-
-        /*
+    /*
     |--------------------------------------------------------------------------
     | SACCO Name
     |--------------------------------------------------------------------------
     */
 
-        $saccoName = trim((string) DB::table('sacco_defaults')
+    $saccoName = trim(
+        (string) DB::table('sacco_defaults')
             ->where('default_name', 'company_name')
-            ->value('default_value'));
+            ->value('default_value')
+    );
 
-        if ($saccoName === '') {
-            $saccoName = 'SACCO';
-        }
+    if ($saccoName === '') {
+        $saccoName = 'SACCO';
+    }
 
-        /*
+    /*
     |--------------------------------------------------------------------------
     | Transaction Details
     |--------------------------------------------------------------------------
     */
 
-        $amount = (float) ($transaction->transaction_amount ?? 0);
+    $amount = (float) (
+        $transaction->transaction_amount ?? 0
+    );
 
-        $mpesaRef = trim(
-            (string) ($transaction->transaction_id ?? '')
-        );
+    $mpesaRef = trim(
+        (string) (
+            $transaction->transaction_id ?? ''
+        )
+    );
 
-        $billReference = trim(
-            (string) ($transaction->bill_ref_number ?? '')
-        );
+    $billReference = trim(
+        (string) (
+            $transaction->bill_ref_number ?? ''
+        )
+    );
 
-        $source = trim(
-            (string) ($transaction->first_name ?? '')
-        );
+    $source = trim(
+        (string) (
+            $transaction->first_name ?? ''
+        )
+    );
 
-        $memberName = trim(
-            (string) ($member->member_name ?? '')
-        );
+    $memberName = trim(
+        (string) (
+            $member->member_name ?? ''
+        )
+    );
 
-        $memberAccount = trim(
-            (string) ($member->member_sacco_id ?? '')
-        );
+    $memberAccount = trim(
+        (string) (
+            $member->member_sacco_id ?? ''
+        )
+    );
 
-        $relatedDoc = 'MPESA-' . (
-            $mpesaRef !== ''
+    $relatedDoc = 'MPESA-' . (
+        $mpesaRef !== ''
             ? $mpesaRef
             : ($transaction->id ?? 'UNKNOWN')
-        );
+    );
 
-        /*
+    /*
     |--------------------------------------------------------------------------
-    | Build Email
+    | Successful Allocation Email
     |--------------------------------------------------------------------------
     */
 
-        if ($allocated) {
+    if ($allocated) {
 
-            $subject = 'M-PESA Payment Auto Allocated';
+        $subject = 'M-PESA Payment Auto Allocated';
 
-            $message = "Dear SACCO Manager,\n\n";
+        $message = "Dear SACCO Manager,\n\n";
 
-            $message .= "An M-PESA payment has been received and successfully auto allocated.\n\n";
+        $message .=
+            "An M-PESA payment has been received and successfully auto allocated.\n\n";
 
-            $message .= "TRANSACTION DETAILS\n";
-            $message .= "-------------------\n";
-            $message .= "Amount Received: KES " . number_format($amount, 2) . "\n";
-            $message .= "M-PESA Ref: {$mpesaRef}\n";
+        $message .= "TRANSACTION DETAILS\n";
+        $message .= "-------------------\n";
 
-            if ($billReference !== '') {
-                $message .= "Payment Reference: {$billReference}\n";
-            }
+        $message .=
+            "Amount Received: KES "
+            . number_format($amount, 2)
+            . "\n";
 
-            if ($source !== '') {
-                $message .= "Source: {$source}\n";
-            }
+        $message .=
+            "M-PESA Ref: {$mpesaRef}\n";
 
-            if ($memberName !== '') {
-                $message .= "Member: {$memberName}\n";
-            }
+        if ($billReference !== '') {
+            $message .=
+                "Payment Reference: {$billReference}\n";
+        }
 
-            if ($memberAccount !== '') {
-                $message .= "Member Account: {$memberAccount}\n";
-            }
+        if ($source !== '') {
+            $message .=
+                "Source: {$source}\n";
+        }
 
-            /*
+        if ($memberName !== '') {
+            $message .=
+                "Member: {$memberName}\n";
+        }
+
+        if ($memberAccount !== '') {
+            $message .=
+                "Member Account: {$memberAccount}\n";
+        }
+
+        /*
         |--------------------------------------------------------------------------
         | Allocation Breakdown
         |--------------------------------------------------------------------------
         */
 
-            if (!empty($this->smartAllocationBreakdown)) {
+        if (!empty($this->smartAllocationBreakdown)) {
 
-                $message .= "\nALLOCATION BREAKDOWN\n";
-                $message .= "--------------------\n";
+            $message .= "\nALLOCATION BREAKDOWN\n";
+            $message .= "--------------------\n";
 
-                $totalAllocated = 0.0;
+            $totalAllocated = 0.0;
 
-                foreach ($this->smartAllocationBreakdown as $allocation) {
+            foreach (
+                $this->smartAllocationBreakdown
+                as $allocation
+            ) {
 
-                    $label = trim(
-                        (string) ($allocation['label'] ?? 'Allocation')
-                    );
+                $label = trim(
+                    (string) (
+                        $allocation['label']
+                        ?? 'Allocation'
+                    )
+                );
 
-                    $allocationAmount = (float) (
-                        $allocation['amount'] ?? 0
-                    );
+                $allocationAmount = (float) (
+                    $allocation['amount']
+                    ?? 0
+                );
 
-                    $totalAllocated += $allocationAmount;
+                $totalAllocated +=
+                    $allocationAmount;
 
-                    $message .= "- {$label}: KES "
-                        . number_format($allocationAmount, 2)
-                        . "\n";
-                }
-
-                $message .= "\nTotal Allocated: KES "
-                    . number_format($totalAllocated, 2)
+                $message .=
+                    "- {$label}: KES "
+                    . number_format(
+                        $allocationAmount,
+                        2
+                    )
                     . "\n";
-
-                $message .= "Unallocated Balance: KES 0.00\n";
-            } else {
-                /*
-             * This can happen if the smart allocator eventually used
-             * an existing fallback processor rather than individual
-             * smart allocation destinations.
-             */
-                $message .= "\nStatus: Successfully allocated.\n";
             }
 
-            $message .= "\nFor full transaction details, please log in to the SACCO system.\n\n";
-            $message .= "This is an automated notification from {$saccoName}.";
+            $message .=
+                "\nTotal Allocated: KES "
+                . number_format(
+                    $totalAllocated,
+                    2
+                )
+                . "\n";
 
-            $status = 'allocated';
+            $message .=
+                "Unallocated Balance: KES 0.00\n";
+
         } else {
 
-            $subject = 'M-PESA Auto Allocation Failed';
-
-            $message = "Dear SACCO Manager,\n\n";
-
-            $message .= "An M-PESA payment has been received but could not be safely auto allocated.\n\n";
-
-            $message .= "TRANSACTION DETAILS\n";
-            $message .= "-------------------\n";
-            $message .= "Amount Received: KES " . number_format($amount, 2) . "\n";
-            $message .= "M-PESA Ref: {$mpesaRef}\n";
-
-            if ($billReference !== '') {
-                $message .= "Payment Reference: {$billReference}\n";
-            }
-
-            if ($source !== '') {
-                $message .= "Source: {$source}\n";
-            }
-
-            if ($memberName !== '') {
-                $message .= "Member: {$memberName}\n";
-            }
-
-            if ($memberAccount !== '') {
-                $message .= "Member Account: {$memberAccount}\n";
-            }
-
-            $message .= "Status: Auto allocation failed\n";
-
-            if ($failureReason !== null && trim($failureReason) !== '') {
-                $message .= "Reason: " . trim($failureReason) . "\n";
-            }
-
-            $message .= "\nThe payment has been held for manual review and has not been automatically reassigned.\n";
-
-            $message .= "\nFor full transaction details and action, please log in to the SACCO system.\n\n";
-            $message .= "This is an automated notification from {$saccoName}.";
-
-            $status = 'failed';
+            $message .=
+                "\nStatus: Successfully allocated.\n";
         }
 
+        $message .=
+            "\nFor full transaction details, please log in to the SACCO system.\n\n";
+
+        $message .=
+            "This is an automated notification from {$saccoName}.";
+
+        $status = 'allocated';
+
+    } else {
+
         /*
+        |--------------------------------------------------------------------------
+        | Failed Allocation Email
+        |--------------------------------------------------------------------------
+        */
+
+        $subject = 'M-PESA Auto Allocation Failed';
+
+        $message = "Dear SACCO Manager,\n\n";
+
+        $message .=
+            "An M-PESA payment has been received but could not be safely auto allocated.\n\n";
+
+        $message .= "TRANSACTION DETAILS\n";
+        $message .= "-------------------\n";
+
+        $message .=
+            "Amount Received: KES "
+            . number_format($amount, 2)
+            . "\n";
+
+        $message .=
+            "M-PESA Ref: {$mpesaRef}\n";
+
+        if ($billReference !== '') {
+            $message .=
+                "Payment Reference: {$billReference}\n";
+        }
+
+        if ($source !== '') {
+            $message .=
+                "Source: {$source}\n";
+        }
+
+        if ($memberName !== '') {
+            $message .=
+                "Member: {$memberName}\n";
+        }
+
+        if ($memberAccount !== '') {
+            $message .=
+                "Member Account: {$memberAccount}\n";
+        }
+
+        $message .=
+            "Status: Auto allocation failed\n";
+
+        if (
+            $failureReason !== null
+            && trim($failureReason) !== ''
+        ) {
+            $message .=
+                "Reason: "
+                . trim($failureReason)
+                . "\n";
+        }
+
+        $message .=
+            "\nThe payment has been held for manual review and has not been automatically reassigned.\n";
+
+        $message .=
+            "\nFor full transaction details and action, please log in to the SACCO system.\n\n";
+
+        $message .=
+            "This is an automated notification from {$saccoName}.";
+
+        $status = 'failed';
+    }
+
+    /*
     |--------------------------------------------------------------------------
-    | Queue One Email Per Management Address
+    | Queue One Email Per Manager
     |--------------------------------------------------------------------------
     */
 
-        foreach ($emails as $email) {
+    foreach ($emails as $email) {
 
-            $this->queueMpesaEmail(
-                email: $email,
-                message: $message,
-                subject: $subject,
-                relatedDoc: $relatedDoc,
-                memberId: isset($member->member_id)
-                    ? (int) $member->member_id
-                    : null,
-                recipientName: 'SACCO Manager',
-                meta: [
-                    'source' => 'mpesa_management_alert',
-                    'status' => $status,
-                    'c2b_payment_id' => $transaction->id ?? null,
-                    'mpesa_transaction_id' => $mpesaRef,
-                    'amount' => $amount,
-                    'bill_reference' => $billReference ?: null,
-                    'source_name' => $source ?: null,
-                    'member_id' => $member->member_id ?? null,
-                    'member_name' => $memberName ?: null,
-                    'member_account' => $memberAccount ?: null,
-                    'allocation_breakdown' => $allocated
+        $this->queueMpesaEmail(
+            email: $email,
+            message: $message,
+            subject: $subject,
+            relatedDoc: $relatedDoc,
+            memberId: isset($member->member_id)
+                ? (int) $member->member_id
+                : null,
+            recipientName: 'SACCO Manager',
+            meta: [
+                'source' =>
+                    'mpesa_management_alert',
+
+                'status' =>
+                    $status,
+
+                'c2b_payment_id' =>
+                    $transaction->id ?? null,
+
+                'mpesa_transaction_id' =>
+                    $mpesaRef,
+
+                'amount' =>
+                    $amount,
+
+                'bill_reference' =>
+                    $billReference ?: null,
+
+                'source_name' =>
+                    $source ?: null,
+
+                'member_id' =>
+                    $member->member_id ?? null,
+
+                'member_name' =>
+                    $memberName ?: null,
+
+                'member_account' =>
+                    $memberAccount ?: null,
+
+                'allocation_breakdown' =>
+                    $allocated
                         ? $this->smartAllocationBreakdown
                         : [],
-                    'failure_reason' => $failureReason,
-                ]
-            );
-        }
+
+                'failure_reason' =>
+                    $failureReason,
+            ]
+        );
     }
+}
 }
