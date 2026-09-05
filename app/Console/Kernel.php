@@ -181,30 +181,29 @@ class Kernel extends ConsoleKernel
             ->timezone('Africa/Nairobi');
 
         /*
-        |--------------------------------------------------------------------------
-        | Automatic Loan Default Interest
-        |--------------------------------------------------------------------------
-        | Processes a maximum of 20 eligible defaulted loans per minute.
-        |
-        | Runs nightly from 22:00 through 05:59 Africa/Nairobi.
-        | The command itself performs loan-level eligibility, duplicate,
-        | balance, accounting and idempotency checks before posting.
-        |--------------------------------------------------------------------------
-        */
+|--------------------------------------------------------------------------
+| Automatic Loan Default Interest
+|--------------------------------------------------------------------------
+| Processes a maximum of 20 eligible defaulted loans per minute.
+|
+| Runs nightly from 20:00 through 22:59 Africa/Nairobi.
+| Stops processing at 23:00.
+|
+| The command itself performs loan-level eligibility, duplicate,
+| balance, accounting and idempotency checks before posting.
+|--------------------------------------------------------------------------
+*/
 
-        // $schedule->command(
-        //     'loans:process-default-interest --limit=20'
-        // )
-        //     ->everyMinute()
-        //     ->when(function () {
-        //         $hour = (int) now('Africa/Nairobi')->format('H');
+        $schedule->command(
+            'loans:process-default-interest --limit=20'
+        )
+            ->everyMinute()
+            ->between('20:00', '22:59')
+            ->withoutOverlapping(10)
+            ->onOneServer()
+            ->timezone('Africa/Nairobi')
+            ->runInBackground();
 
-        //         return $hour >= 22 || $hour < 6;
-        //     })
-        //     ->withoutOverlapping(10)
-        //     ->onOneServer()
-        //     ->timezone('Africa/Nairobi')
-        //     ->runInBackground();
 
         /*
         |--------------------------------------------------------------------------
@@ -350,6 +349,35 @@ class Kernel extends ConsoleKernel
             ->withoutOverlapping(30)
             ->onOneServer()
             ->timezone('Africa/Nairobi');
+
+        /*
+|--------------------------------------------------------------------------
+| Loan Grace-Period Payment Reminders
+|--------------------------------------------------------------------------
+| Checks active outstanding loans whose applicable repayment grace period
+| has expired and creates a payment-reminder notification.
+|
+| Maximum of 5 loans are examined per minute.
+|
+| One reminder is created per loan per calendar month. Once the reminder
+| is inserted into sacco_system_notifications, that month's reminder is
+| considered complete.
+|
+| Existing SendPendingNotificationsJob handles the actual email delivery.
+|
+| Runs daily from 03:00 through 07:59 Africa/Nairobi.
+|--------------------------------------------------------------------------
+*/
+
+        $schedule->command(
+            'loans:queue-grace-period-reminders --limit=5'
+        )
+            ->everyMinute()
+            ->between('03:00', '07:59')
+            ->withoutOverlapping(10)
+            ->onOneServer()
+            ->timezone('Africa/Nairobi')
+            ->runInBackground();
     }
 
     protected function commands(): void

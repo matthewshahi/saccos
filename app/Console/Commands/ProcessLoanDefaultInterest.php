@@ -13,16 +13,26 @@ class ProcessLoanDefaultInterest extends Command
 {
     protected $signature = 'loans:process-default-interest {--limit=20}';
 
-    protected $description = 'Process automatic default interest for at most 20 eligible SACCO loans';
+    protected $description = 'Process automatic defaulted interest for at most 20 eligible SACCO loans';
 
     public function handle(LoanDefaultInterestService $service): int
     {
-        // Hard cap: this command must never process more than 20 loans per invocation.
+        // Hard cap: never examine more than 20 loans in one invocation.
         $limit = max(1, min(20, (int) $this->option('limit')));
-        $threshold = $service->thresholdAmount();
+
+        // Global SACCO master switch + maximum automatic DFI cycles per loan.
+        $maxDefaultPeriods = $service->maxDefaultPeriods();
 
         $databaseName = (string) DB::connection()->getDatabaseName();
         $cursorKey = 'dfi:loan-cursor:' . sha1($databaseName);
+
+        if ($maxDefaultPeriods <= 0) {
+            Cache::put($cursorKey, 0, now()->addDays(7));
+            $this->info('DFI: globally disabled because loan_default_cut_off_max_period is 0.');
+            return self::SUCCESS;
+        }
+
+        $threshold = $service->thresholdAmount();
         $lastLoanId = (int) Cache::get($cursorKey, 0);
 
         $candidateIds = $this->candidateLoanIds(
@@ -33,7 +43,7 @@ class ProcessLoanDefaultInterest extends Command
 
         if ($candidateIds->isEmpty()) {
             if ($lastLoanId > 0) {
-                // End of this pass. Start again from the beginning next minute.
+                // End of this pass. Start again from the beginning next invocation.
                 Cache::put($cursorKey, 0, now()->addDays(7));
             }
 
@@ -74,7 +84,7 @@ class ProcessLoanDefaultInterest extends Command
 
                 $this->error("DFI loan {$loanId}: {$e->getMessage()}");
             } finally {
-                // Progress past bad/non-default loans so one record can never block the whole SACCO.
+                // One bad/non-default loan must never block the whole SACCO pass.
                 Cache::put($cursorKey, $loanId, now()->addDays(7));
             }
         }
@@ -103,7 +113,7 @@ class ProcessLoanDefaultInterest extends Command
                     ]);
             })
             // Deliberately no member_active/member_deleted filter.
-            // Existing loans remain financially valid even for inactive members.
+            // Existing loans remain financially valid for inactive members.
             ->orderBy('l.loan_id')
             ->limit($limit)
             ->pluck('l.loan_id');
