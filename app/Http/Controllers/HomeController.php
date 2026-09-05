@@ -688,285 +688,344 @@ class HomeController extends Controller
     }
 
     public function storeNewMember(Request $request)
-    {
-        /*
+{
+    /*
     |--------------------------------------------------------------------------
     | Normalise key identity and contact fields before validation
     |--------------------------------------------------------------------------
     */
-        $submittedEmail = mb_strtolower(trim(
-            (string) $request->input('member_email')
-        ));
 
-        $rawPhone = trim((string) $request->input(
-            'member_phone_no',
-            ''
-        ));
+    $submittedEmail = mb_strtolower(trim(
+        (string) $request->input('member_email')
+    ));
 
-        $submittedPhone = $this->normalizeKenyanMobileNumber($rawPhone);
+    $rawPhone = trim((string) $request->input(
+        'member_phone_no',
+        ''
+    ));
 
-        /*
-     * The phone field is optional, but when supplied it must be a valid
-     * Kenyan mobile number.
+    /*
+     * Examples accepted by normalizeKenyanMobileNumber():
+     *
+     * 0722400737
+     * 722400737
+     * 722 400 737
+     * +254722400737
+     *
+     * Canonical stored value:
+     *
+     * +254722400737
      */
-        if ($rawPhone !== '' && $submittedPhone === null) {
-            return redirect()
-                ->back()
-                ->withErrors([
-                    'member_phone_no' =>
-                    'Enter a valid Kenyan mobile number, for example 0722400737, 722400737 or +254722400737.',
-                ])
-                ->withInput();
-        }
+    $submittedPhone = $this->normalizeKenyanMobileNumber(
+        $rawPhone
+    );
 
-        /*
+    /*
+     * The phone field is optional, but when supplied it must be
+     * a valid Kenyan mobile number.
+     */
+    if ($rawPhone !== '' && $submittedPhone === null) {
+        return redirect()
+            ->back()
+            ->withErrors([
+                'member_phone_no' =>
+                'Enter a valid Kenyan mobile number, for example 0722400737, 722400737 or +254722400737.',
+            ])
+            ->withInput();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Generate M-PESA-compatible phone hash
+    |--------------------------------------------------------------------------
+    |
+    | member_phone_no:
+    | +254722400737
+    |
+    | Value actually hashed:
+    | 254722400737
+    |
+    | We deliberately remove ONLY the leading "+" here because the
+    | normalisation routine has already validated and canonicalised
+    | the number.
+    |
+    */
+
+    $submittedPhoneHash = $submittedPhone !== null
+        ? hash(
+            'sha256',
+            ltrim($submittedPhone, '+')
+        )
+        : null;
+
+    /*
      * Clean identifiers before uniqueness validation.
      */
-        $submittedSaccoId = strtoupper(trim(
-            (string) $request->input('member_sacco_id')
-        ));
+    $submittedSaccoId = strtoupper(trim(
+        (string) $request->input('member_sacco_id')
+    ));
 
-        $submittedNationalId = strtoupper(trim(
-            (string) $request->input('member_national_id')
-        ));
+    $submittedNationalId = strtoupper(trim(
+        (string) $request->input('member_national_id')
+    ));
 
-        /*
+    /*
      * Replace submitted values with their canonical versions.
      */
-        $request->merge([
-            'member_email'       => $submittedEmail,
-            'member_phone_no'    => $submittedPhone,
-            'member_sacco_id'    => $submittedSaccoId,
-            'member_national_id' => $submittedNationalId,
-        ]);
+    $request->merge([
+        'member_email'       => $submittedEmail,
+        'member_phone_no'    => $submittedPhone,
+        'member_sacco_id'    => $submittedSaccoId,
+        'member_national_id' => $submittedNationalId,
+    ]);
 
-        /*
+    /*
     |--------------------------------------------------------------------------
     | Validate new member
     |--------------------------------------------------------------------------
     */
-        $validator = Validator::make($request->all(), [
-            'member_name' => [
-                'required',
-                'string',
-                'max:100',
-            ],
 
-            'member_date_joined' => [
-                'required',
-                'date',
-            ],
+    $validator = Validator::make($request->all(), [
+        'member_name' => [
+            'required',
+            'string',
+            'max:100',
+        ],
 
-            'member_sacco_id' => [
-                'required',
-                'string',
-                'max:100',
-                'unique:sacco_members,member_sacco_id',
-            ],
+        'member_date_joined' => [
+            'required',
+            'date',
+        ],
 
-            'member_national_id' => [
-                'required',
-                'string',
-                'max:100',
-                'unique:sacco_members,member_national_id',
-            ],
+        'member_sacco_id' => [
+            'required',
+            'string',
+            'max:100',
+            'unique:sacco_members,member_sacco_id',
+        ],
 
-            'member_email' => [
-                'required',
-                'string',
-                'email:rfc',
-                'max:100',
-                'unique:sacco_members,member_email',
-            ],
+        'member_national_id' => [
+            'required',
+            'string',
+            'max:100',
+            'unique:sacco_members,member_national_id',
+        ],
 
-            'member_phone_no' => [
-                'nullable',
-                'string',
-                'max:16',
-                'regex:/^\+254(?:7\d{8}|1\d{8})$/',
-            ],
+        'member_email' => [
+            'required',
+            'string',
+            'email:rfc',
+            'max:100',
+            'unique:sacco_members,member_email',
+        ],
 
-            'member_dept' => [
-                'required',
-                'integer',
-                'exists:sacco_department,department_id',
-            ],
+        'member_phone_no' => [
+            'nullable',
+            'string',
+            'max:16',
+            'regex:/^\+254(?:7\d{8}|1\d{8})$/',
+        ],
 
-            'member_position' => [
-                'required',
-                'integer',
-                'exists:sacco_position,position_id',
-            ],
+        'member_dept' => [
+            'required',
+            'integer',
+            'exists:sacco_department,department_id',
+        ],
 
-            'member_postal_address' => [
-                'nullable',
-                'string',
-            ],
+        'member_position' => [
+            'required',
+            'integer',
+            'exists:sacco_position,position_id',
+        ],
 
-            'member_gender' => [
-                'required',
-                'string',
-                'in:M,F',
-            ],
+        'member_postal_address' => [
+            'nullable',
+            'string',
+        ],
 
-            'member_kra_pin' => [
-                'nullable',
-                'string',
-                'max:255',
-            ],
+        'member_gender' => [
+            'required',
+            'string',
+            'in:M,F',
+        ],
 
-            'member_dob' => [
-                'nullable',
-                'date',
-            ],
+        'member_kra_pin' => [
+            'nullable',
+            'string',
+            'max:255',
+        ],
 
-            'bank_name' => [
-                'nullable',
-                'string',
-                'max:255',
-            ],
+        'member_dob' => [
+            'nullable',
+            'date',
+        ],
 
-            'bank_branch' => [
-                'nullable',
-                'string',
-                'max:255',
-            ],
+        'bank_name' => [
+            'nullable',
+            'string',
+            'max:255',
+        ],
 
-            'bank_account_number' => [
-                'nullable',
-                'string',
-                'max:255',
-            ],
+        'bank_branch' => [
+            'nullable',
+            'string',
+            'max:255',
+        ],
 
-            'member_is_junior' => [
-                'required',
-                'in:0,1',
-            ],
+        'bank_account_number' => [
+            'nullable',
+            'string',
+            'max:255',
+        ],
 
-            'member_guardian_id' => [
-                'nullable',
-                'integer',
-                'exists:sacco_members,member_id',
-            ],
-        ], [
-            'member_phone_no.regex' =>
-            'Enter a valid Kenyan mobile number, for example 0722400737 or +254722400737.',
+        'member_is_junior' => [
+            'required',
+            'in:0,1',
+        ],
 
-            'member_email.email' =>
-            'Enter a valid email address.',
+        'member_guardian_id' => [
+            'nullable',
+            'integer',
+            'exists:sacco_members,member_id',
+        ],
+    ], [
+        'member_phone_no.regex' =>
+        'Enter a valid Kenyan mobile number, for example 0722400737 or +254722400737.',
 
-            'member_email.unique' =>
-            'That email address is already assigned to another member.',
+        'member_email.email' =>
+        'Enter a valid email address.',
 
-            'member_sacco_id.unique' =>
-            'That SACCO member number already exists.',
+        'member_email.unique' =>
+        'That email address is already assigned to another member.',
 
-            'member_national_id.unique' =>
-            'That national ID already exists.',
-        ]);
+        'member_sacco_id.unique' =>
+        'That SACCO member number already exists.',
 
-        if ($validator->fails()) {
-            return redirect()
-                ->back()
-                ->withErrors($validator)
-                ->withInput();
-        }
+        'member_national_id.unique' =>
+        'That national ID already exists.',
+    ]);
 
-        /*
+    if ($validator->fails()) {
+        return redirect()
+            ->back()
+            ->withErrors($validator)
+            ->withInput();
+    }
+
+    /*
     |--------------------------------------------------------------------------
     | Prepare clean database values
     |--------------------------------------------------------------------------
     */
-        $data = [
-            'member_name' => strtoupper(trim(
-                (string) $request->input('member_name')
-            )),
 
-            'member_date_joined' => $request->input(
-                'member_date_joined'
-            ),
+    $data = [
+        'member_name' => strtoupper(trim(
+            (string) $request->input('member_name')
+        )),
 
-            'member_dept' => $request->input(
-                'member_dept'
-            ),
+        'member_date_joined' => $request->input(
+            'member_date_joined'
+        ),
 
-            'member_sacco_id' => $submittedSaccoId,
+        'member_dept' => $request->input(
+            'member_dept'
+        ),
 
-            'member_national_id' => $submittedNationalId,
+        'member_sacco_id' => $submittedSaccoId,
 
-            'member_postal_address' => $request->filled(
-                'member_postal_address'
-            )
-                ? strtoupper(trim(
-                    (string) $request->input('member_postal_address')
-                ))
-                : null,
+        'member_national_id' => $submittedNationalId,
 
-            'member_phone_no' => $submittedPhone,
+        'member_postal_address' => $request->filled(
+            'member_postal_address'
+        )
+            ? strtoupper(trim(
+                (string) $request->input('member_postal_address')
+            ))
+            : null,
 
-            'member_gender' => strtoupper(trim(
-                (string) $request->input('member_gender')
-            )),
+        /*
+         * Human/application representation.
+         *
+         * Example:
+         * +254722400737
+         */
+        'member_phone_no' => $submittedPhone,
 
-            'member_email' => $submittedEmail,
+        /*
+         * M-PESA matching representation.
+         *
+         * SHA-256 of:
+         * 254722400737
+         */
+        'member_phone_hash' => $submittedPhoneHash,
 
-            'member_position' => $request->input(
-                'member_position'
-            ),
+        'member_gender' => strtoupper(trim(
+            (string) $request->input('member_gender')
+        )),
 
-            'member_kra_pin' => $request->filled('member_kra_pin')
-                ? strtoupper(trim(
-                    (string) $request->input('member_kra_pin')
-                ))
-                : null,
+        'member_email' => $submittedEmail,
 
-            'member_dob' => $request->filled('member_dob')
-                ? $request->input('member_dob')
-                : null,
+        'member_position' => $request->input(
+            'member_position'
+        ),
 
-            'bank_name' => $request->filled('bank_name')
-                ? strtoupper(trim(
-                    (string) $request->input('bank_name')
-                ))
-                : null,
+        'member_kra_pin' => $request->filled('member_kra_pin')
+            ? strtoupper(trim(
+                (string) $request->input('member_kra_pin')
+            ))
+            : null,
 
-            'bank_branch' => $request->filled('bank_branch')
-                ? strtoupper(trim(
-                    (string) $request->input('bank_branch')
-                ))
-                : null,
+        'member_dob' => $request->filled('member_dob')
+            ? $request->input('member_dob')
+            : null,
 
-            'bank_account_number' => $request->filled(
-                'bank_account_number'
-            )
-                ? strtoupper(trim(
-                    (string) $request->input('bank_account_number')
-                ))
-                : null,
+        'bank_name' => $request->filled('bank_name')
+            ? strtoupper(trim(
+                (string) $request->input('bank_name')
+            ))
+            : null,
 
-            'member_is_junior' => (int) $request->input(
-                'member_is_junior',
-                0
-            ),
+        'bank_branch' => $request->filled('bank_branch')
+            ? strtoupper(trim(
+                (string) $request->input('bank_branch')
+            ))
+            : null,
 
-            'member_guardian_id' => $request->filled(
-                'member_guardian_id'
-            )
-                ? $request->input('member_guardian_id')
-                : null,
-            'member_mobile_banking_active' => 'N',
-            'member_active' => 'Y',
-            'member_deleted' => 'N',
-            'member_ip' => $request->ip(),
-            'member_user_id' => Auth::user()->member_id,
-        ];
+        'bank_account_number' => $request->filled(
+            'bank_account_number'
+        )
+            ? strtoupper(trim(
+                (string) $request->input('bank_account_number')
+            ))
+            : null,
 
-        DB::table('sacco_members')->insert($data);
+        'member_is_junior' => (int) $request->input(
+            'member_is_junior',
+            0
+        ),
 
-        return redirect()
-            ->route('members.listing')
-            ->with('success', 'Member added successfully.');
-    }
+        'member_guardian_id' => $request->filled(
+            'member_guardian_id'
+        )
+            ? $request->input('member_guardian_id')
+            : null,
+
+        'member_mobile_banking_active' => 'N',
+        'member_active' => 'Y',
+        'member_deleted' => 'N',
+        'member_ip' => $request->ip(),
+        'member_user_id' => Auth::user()->member_id,
+    ];
+
+    DB::table('sacco_members')->insert($data);
+
+    return redirect()
+        ->route('members.listing')
+        ->with(
+            'success',
+            'Member added successfully.'
+        );
+}
 
     private function getMembers($orderby = 'member_name', $sort_order = 'asc', $search = '', $limit = null, $status = null)
     {
@@ -1043,619 +1102,651 @@ class HomeController extends Controller
     }
 
     public function updateMember(Request $request, $id)
-    {
-        /*
+{
+    /*
     |--------------------------------------------------------------------------
     | Normalise protected contact details before validation
     |--------------------------------------------------------------------------
     */
 
-        $rawEmail = trim(
-            (string) $request->input('member_email')
-        );
+    $rawEmail = trim(
+        (string) $request->input('member_email')
+    );
 
-        $submittedEmail = mb_strtolower($rawEmail);
+    $submittedEmail = mb_strtolower($rawEmail);
 
-        $rawPhone = trim(
-            (string) $request->input(
-                'member_phone_no',
-                ''
-            )
-        );
+    $rawPhone = trim(
+        (string) $request->input(
+            'member_phone_no',
+            ''
+        )
+    );
 
-        $submittedPhone = $this->normalizeKenyanMobileNumber(
-            $rawPhone
-        );
+    $submittedPhone = $this->normalizeKenyanMobileNumber(
+        $rawPhone
+    );
 
-        /*
+    /*
     |--------------------------------------------------------------------------
     | Validate supplied mobile number
     |--------------------------------------------------------------------------
     */
 
-        if (
-            $rawPhone !== ''
-            && $submittedPhone === null
-        ) {
-            return redirect()
-                ->back()
-                ->withErrors([
-                    'member_phone_no' =>
+    if (
+        $rawPhone !== ''
+        && $submittedPhone === null
+    ) {
+        return redirect()
+            ->back()
+            ->withErrors([
+                'member_phone_no' =>
                     'Enter a valid Kenyan mobile number, for example '
-                        . '0722400737, 722400737 or +254722400737.',
-                ])
-                ->withInput();
-        }
+                    . '0722400737, 722400737 or +254722400737.',
+            ])
+            ->withInput();
+    }
 
-        /*
+    /*
+    |--------------------------------------------------------------------------
+    | Generate M-PESA-compatible phone hash
+    |--------------------------------------------------------------------------
+    |
+    | Stored phone:
+    | +254722400737
+    |
+    | Hashed value:
+    | 254722400737
+    |
+    */
+
+    $submittedPhoneHash = $submittedPhone !== null
+        ? hash(
+            'sha256',
+            ltrim($submittedPhone, '+')
+        )
+        : null;
+
+    /*
     |--------------------------------------------------------------------------
     | Normalise Y/N values
     |--------------------------------------------------------------------------
     */
 
-        $submittedActive = strtoupper(
-            trim(
-                (string) $request->input(
-                    'member_active',
-                    'N'
-                )
+    $submittedActive = strtoupper(
+        trim(
+            (string) $request->input(
+                'member_active',
+                'N'
             )
-        );
+        )
+    );
 
-        $submittedDeleted = strtoupper(
-            trim(
-                (string) $request->input(
-                    'member_deleted',
-                    'N'
-                )
+    $submittedDeleted = strtoupper(
+        trim(
+            (string) $request->input(
+                'member_deleted',
+                'N'
             )
-        );
+        )
+    );
 
-        $submittedMobileBankingStatus = strtoupper(
-            trim(
-                (string) $request->input(
-                    'member_mobile_banking_active',
-                    'N'
-                )
+    $submittedMobileBankingStatus = strtoupper(
+        trim(
+            (string) $request->input(
+                'member_mobile_banking_active',
+                'N'
             )
-        );
+        )
+    );
 
-        /*
+    /*
     |--------------------------------------------------------------------------
     | Replace request values with canonical values
     |--------------------------------------------------------------------------
     */
 
-        $request->merge([
-            'member_email' => $submittedEmail,
+    $request->merge([
+        'member_email' => $submittedEmail,
 
-            'member_phone_no' => $submittedPhone,
+        'member_phone_no' => $submittedPhone,
 
-            'member_active' => $submittedActive,
+        'member_active' => $submittedActive,
 
-            'member_deleted' => $submittedDeleted,
+        'member_deleted' => $submittedDeleted,
 
-            'member_mobile_banking_active' =>
+        'member_mobile_banking_active' =>
             $submittedMobileBankingStatus,
-        ]);
+    ]);
 
-        /*
+    /*
     |--------------------------------------------------------------------------
     | Validate submitted member information
     |--------------------------------------------------------------------------
     */
 
-        $validator = Validator::make(
-            $request->all(),
-            [
-                'member_name' => [
-                    'required',
-                    'string',
-                    'max:255',
-                ],
-
-                'member_sacco_id' => [
-                    'required',
-                    'string',
-                    'max:255',
-
-                    Rule::unique(
-                        'sacco_members',
-                        'member_sacco_id'
-                    )->ignore(
-                        $id,
-                        'member_id'
-                    ),
-                ],
-
-                'member_national_id' => [
-                    'required',
-                    'string',
-                    'max:255',
-
-                    Rule::unique(
-                        'sacco_members',
-                        'member_national_id'
-                    )->ignore(
-                        $id,
-                        'member_id'
-                    ),
-                ],
-
-                'member_email' => [
-                    'required',
-                    'string',
-                    'email:rfc',
-                    'max:255',
-
-                    Rule::unique(
-                        'sacco_members',
-                        'member_email'
-                    )->ignore(
-                        $id,
-                        'member_id'
-                    ),
-                ],
-
-                'member_phone_no' => [
-                    'nullable',
-                    'string',
-                    'max:16',
-
-                    Rule::unique(
-                        'sacco_members',
-                        'member_phone_no'
-                    )->ignore(
-                        $id,
-                        'member_id'
-                    ),
-                ],
-
-                'member_date_joined' => [
-                    'required',
-                    'date',
-                ],
-
-                'member_gender' => [
-                    'nullable',
-                    'string',
-                    'in:M,F',
-                ],
-
-                'member_dob' => [
-                    'nullable',
-                    'date',
-                ],
-
-                'member_kra_pin' => [
-                    'nullable',
-                    'string',
-                    'max:255',
-                ],
-
-                'member_postal_address' => [
-                    'nullable',
-                    'string',
-                ],
-
-                'member_dept' => [
-                    'required',
-                    'integer',
-                    'exists:sacco_department,department_id',
-                ],
-
-                'member_position' => [
-                    'required',
-                    'integer',
-                    'exists:sacco_position,position_id',
-                ],
-
-                'bank_name' => [
-                    'nullable',
-                    'string',
-                    'max:255',
-                ],
-
-                'bank_branch' => [
-                    'nullable',
-                    'string',
-                    'max:255',
-                ],
-
-                'bank_account_number' => [
-                    'nullable',
-                    'string',
-                    'max:255',
-                ],
-
-                'member_active' => [
-                    'required',
-                    'in:Y,N',
-                ],
-
-                'member_deleted' => [
-                    'required',
-                    'in:Y,N',
-                ],
-
-                'member_mobile_banking_active' => [
-                    'required',
-                    'in:Y,N',
-                ],
-
-                'member_is_junior' => [
-                    'nullable',
-                    'boolean',
-                ],
-
-                'member_guardian_id' => [
-                    'nullable',
-                    'integer',
-                    'exists:sacco_members,member_id',
-                ],
+    $validator = Validator::make(
+        $request->all(),
+        [
+            'member_name' => [
+                'required',
+                'string',
+                'max:255',
             ],
-            [
-                'member_mobile_banking_active.required' =>
+
+            'member_sacco_id' => [
+                'required',
+                'string',
+                'max:255',
+
+                Rule::unique(
+                    'sacco_members',
+                    'member_sacco_id'
+                )->ignore(
+                    $id,
+                    'member_id'
+                ),
+            ],
+
+            'member_national_id' => [
+                'required',
+                'string',
+                'max:255',
+
+                Rule::unique(
+                    'sacco_members',
+                    'member_national_id'
+                )->ignore(
+                    $id,
+                    'member_id'
+                ),
+            ],
+
+            'member_email' => [
+                'required',
+                'string',
+                'email:rfc',
+                'max:255',
+
+                Rule::unique(
+                    'sacco_members',
+                    'member_email'
+                )->ignore(
+                    $id,
+                    'member_id'
+                ),
+            ],
+
+            'member_phone_no' => [
+                'nullable',
+                'string',
+                'max:16',
+
+                Rule::unique(
+                    'sacco_members',
+                    'member_phone_no'
+                )->ignore(
+                    $id,
+                    'member_id'
+                ),
+            ],
+
+            'member_date_joined' => [
+                'required',
+                'date',
+            ],
+
+            'member_gender' => [
+                'nullable',
+                'string',
+                'in:M,F',
+            ],
+
+            'member_dob' => [
+                'nullable',
+                'date',
+            ],
+
+            'member_kra_pin' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'member_postal_address' => [
+                'nullable',
+                'string',
+            ],
+
+            'member_dept' => [
+                'required',
+                'integer',
+                'exists:sacco_department,department_id',
+            ],
+
+            'member_position' => [
+                'required',
+                'integer',
+                'exists:sacco_position,position_id',
+            ],
+
+            'bank_name' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'bank_branch' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'bank_account_number' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'member_active' => [
+                'required',
+                'in:Y,N',
+            ],
+
+            'member_deleted' => [
+                'required',
+                'in:Y,N',
+            ],
+
+            'member_mobile_banking_active' => [
+                'required',
+                'in:Y,N',
+            ],
+
+            'member_is_junior' => [
+                'nullable',
+                'boolean',
+            ],
+
+            'member_guardian_id' => [
+                'nullable',
+                'integer',
+                'exists:sacco_members,member_id',
+            ],
+        ],
+        [
+            'member_mobile_banking_active.required' =>
                 'Select whether mobile banking is active for this member.',
 
-                'member_mobile_banking_active.in' =>
+            'member_mobile_banking_active.in' =>
                 'Mobile banking status must be Yes or No.',
-            ]
-        );
+        ]
+    );
 
-        if ($validator->fails()) {
-            return redirect()
-                ->back()
-                ->withErrors($validator)
-                ->withInput();
-        }
+    if ($validator->fails()) {
+        return redirect()
+            ->back()
+            ->withErrors($validator)
+            ->withInput();
+    }
 
-        /*
+    /*
     |--------------------------------------------------------------------------
     | Lock, compare and update atomically
     |--------------------------------------------------------------------------
     */
 
-        return DB::transaction(
-            function () use (
-                $request,
-                $id,
-                $submittedEmail,
-                $submittedPhone,
-                $submittedActive,
-                $submittedDeleted,
-                $submittedMobileBankingStatus
-            ) {
-                $member = DB::table('sacco_members')
-                    ->where(
-                        'member_id',
-                        $id
-                    )
-                    ->lockForUpdate()
-                    ->first();
+    return DB::transaction(
+        function () use (
+            $request,
+            $id,
+            $submittedEmail,
+            $submittedPhone,
+            $submittedPhoneHash,
+            $submittedActive,
+            $submittedDeleted,
+            $submittedMobileBankingStatus
+        ) {
+            $member = DB::table('sacco_members')
+                ->where(
+                    'member_id',
+                    $id
+                )
+                ->lockForUpdate()
+                ->first();
 
-                if (!$member) {
-                    return redirect()
-                        ->route('members.listing')
-                        ->with(
-                            'error',
-                            'Member not found.'
-                        );
-                }
+            if (!$member) {
+                return redirect()
+                    ->route('members.listing')
+                    ->with(
+                        'error',
+                        'Member not found.'
+                    );
+            }
 
-                /*
+            /*
             |--------------------------------------------------------------------------
             | Normalise existing values before comparing
             |--------------------------------------------------------------------------
             */
 
-                $currentEmail = mb_strtolower(
-                    trim(
-                        (string) (
-                            $member->member_email
-                            ?? ''
-                        )
-                    )
-                );
-
-                $currentRawPhone = trim(
+            $currentEmail = mb_strtolower(
+                trim(
                     (string) (
-                        $member->member_phone_no
+                        $member->member_email
                         ?? ''
                     )
+                )
+            );
+
+            $currentRawPhone = trim(
+                (string) (
+                    $member->member_phone_no
+                    ?? ''
+                )
+            );
+
+            $currentPhone = $this
+                ->normalizeKenyanMobileNumber(
+                    $currentRawPhone
                 );
 
-                $currentPhone = $this
-                    ->normalizeKenyanMobileNumber(
-                        $currentRawPhone
-                    );
-
-                /*
+            /*
              * Preserve an invalid historical phone value for comparison until
              * the user replaces or clears it.
              */
+            if (
+                $currentPhone === null
+                && $currentRawPhone !== ''
+            ) {
+                $currentPhone = $currentRawPhone;
+            }
 
-                if (
-                    $currentPhone === null
-                    && $currentRawPhone !== ''
-                ) {
-                    $currentPhone = $currentRawPhone;
-                }
-
-                $currentActive = strtoupper(
-                    trim(
-                        (string) (
-                            $member->member_active
-                            ?? 'N'
-                        )
+            $currentActive = strtoupper(
+                trim(
+                    (string) (
+                        $member->member_active
+                        ?? 'N'
                     )
-                );
+                )
+            );
 
-                $currentDeleted = strtoupper(
-                    trim(
-                        (string) (
-                            $member->member_deleted
-                            ?? 'N'
-                        )
+            $currentDeleted = strtoupper(
+                trim(
+                    (string) (
+                        $member->member_deleted
+                        ?? 'N'
                     )
-                );
+                )
+            );
 
-                $currentMobileBankingStatus = strtoupper(
-                    trim(
-                        (string) (
-                            $member->member_mobile_banking_active
-                            ?? 'N'
-                        )
+            $currentMobileBankingStatus = strtoupper(
+                trim(
+                    (string) (
+                        $member->member_mobile_banking_active
+                        ?? 'N'
                     )
-                );
+                )
+            );
 
-                /*
+            /*
             |--------------------------------------------------------------------------
             | Detect substantive changes
             |--------------------------------------------------------------------------
             */
 
-                $emailChanged =
-                    $currentEmail !== $submittedEmail;
+            $emailChanged =
+                $currentEmail !== $submittedEmail;
 
-                $phoneChanged =
-                    $currentPhone !== $submittedPhone;
+            $phoneChanged =
+                $currentPhone !== $submittedPhone;
 
-                $makingMemberInactive =
-                    $currentActive === 'Y'
-                    && $submittedActive === 'N';
+            $makingMemberInactive =
+                $currentActive === 'Y'
+                && $submittedActive === 'N';
 
-                $deletingMember =
-                    $currentDeleted !== 'Y'
-                    && $submittedDeleted === 'Y';
+            $deletingMember =
+                $currentDeleted !== 'Y'
+                && $submittedDeleted === 'Y';
 
-                $mobileBankingStatusChanged =
-                    $currentMobileBankingStatus
-                    !==
-                    $submittedMobileBankingStatus;
+            $mobileBankingStatusChanged =
+                $currentMobileBankingStatus
+                !==
+                $submittedMobileBankingStatus;
 
-                /*
+            /*
             |--------------------------------------------------------------------------
             | Check rights only when protected values actually change
             |--------------------------------------------------------------------------
             */
 
-                $permissionErrors = [];
+            $permissionErrors = [];
 
-                if (
-                    $emailChanged
-                    && !CheckUserRights::userHasRight(
-                        'ChangeEmail'
-                    )
-                ) {
-                    $permissionErrors['member_email'] =
-                        'You do not have permission to change '
-                        . 'a member email address.';
-                }
+            if (
+                $emailChanged
+                && !CheckUserRights::userHasRight(
+                    'ChangeEmail'
+                )
+            ) {
+                $permissionErrors['member_email'] =
+                    'You do not have permission to change '
+                    . 'a member email address.';
+            }
 
-                if (
-                    $phoneChanged
-                    && !CheckUserRights::userHasRight(
-                        'ChangePhone'
-                    )
-                ) {
-                    $permissionErrors['member_phone_no'] =
-                        'You do not have permission to change '
-                        . 'a member phone number.';
-                }
+            if (
+                $phoneChanged
+                && !CheckUserRights::userHasRight(
+                    'ChangePhone'
+                )
+            ) {
+                $permissionErrors['member_phone_no'] =
+                    'You do not have permission to change '
+                    . 'a member phone number.';
+            }
 
-                if (
-                    $makingMemberInactive
-                    && !CheckUserRights::userHasRight(
-                        'MakeMemberInActive'
-                    )
-                ) {
-                    $permissionErrors['member_active'] =
-                        'You do not have permission to make '
-                        . 'a member inactive.';
-                }
+            if (
+                $makingMemberInactive
+                && !CheckUserRights::userHasRight(
+                    'MakeMemberInActive'
+                )
+            ) {
+                $permissionErrors['member_active'] =
+                    'You do not have permission to make '
+                    . 'a member inactive.';
+            }
 
-                if (
-                    $deletingMember
-                    && !CheckUserRights::userHasRight(
-                        'DeleteMember'
-                    )
-                ) {
-                    $permissionErrors['member_deleted'] =
-                        'You do not have permission to delete '
-                        . 'a member.';
-                }
+            if (
+                $deletingMember
+                && !CheckUserRights::userHasRight(
+                    'DeleteMember'
+                )
+            ) {
+                $permissionErrors['member_deleted'] =
+                    'You do not have permission to delete '
+                    . 'a member.';
+            }
 
-                /*
+            /*
             |--------------------------------------------------------------------------
             | Mobile banking status right
             |--------------------------------------------------------------------------
-            | The right is required for both activation and deactivation.
-            |--------------------------------------------------------------------------
             */
 
-                if (
-                    $mobileBankingStatusChanged
-                    && !CheckUserRights::userHasRight(
-                        'edit_member_mobile_banking_status'
+            if (
+                $mobileBankingStatusChanged
+                && !CheckUserRights::userHasRight(
+                    'edit_member_mobile_banking_status'
+                )
+            ) {
+                $permissionErrors['member_mobile_banking_active'] =
+                    'You do not have permission to activate or '
+                    . 'deactivate mobile banking for this member.';
+            }
+
+            if (!empty($permissionErrors)) {
+                return redirect()
+                    ->back()
+                    ->withErrors(
+                        $permissionErrors
                     )
-                ) {
-                    $permissionErrors['member_mobile_banking_active'] =
-                        'You do not have permission to activate or '
-                        . 'deactivate mobile banking for this member.';
-                }
+                    ->withInput();
+            }
 
-                if (!empty($permissionErrors)) {
-                    return redirect()
-                        ->back()
-                        ->withErrors(
-                            $permissionErrors
-                        )
-                        ->withInput();
-                }
-
-                /*
+            /*
             |--------------------------------------------------------------------------
             | Update member
             |--------------------------------------------------------------------------
             */
 
-                DB::table('sacco_members')
-                    ->where(
-                        'member_id',
-                        $id
-                    )
-                    ->update([
-                        'member_name' => strtoupper(
-                            trim(
-                                (string) $request->input(
-                                    'member_name'
-                                )
+            DB::table('sacco_members')
+                ->where(
+                    'member_id',
+                    $id
+                )
+                ->update([
+                    'member_name' => strtoupper(
+                        trim(
+                            (string) $request->input(
+                                'member_name'
                             )
-                        ),
+                        )
+                    ),
 
-                        'member_sacco_id' => strtoupper(
-                            trim(
-                                (string) $request->input(
-                                    'member_sacco_id'
-                                )
+                    'member_sacco_id' => strtoupper(
+                        trim(
+                            (string) $request->input(
+                                'member_sacco_id'
                             )
-                        ),
+                        )
+                    ),
 
-                        'member_national_id' => strtoupper(
-                            trim(
-                                (string) $request->input(
-                                    'member_national_id'
-                                )
+                    'member_national_id' => strtoupper(
+                        trim(
+                            (string) $request->input(
+                                'member_national_id'
                             )
-                        ),
+                        )
+                    ),
 
-                        'member_email' =>
+                    'member_email' =>
                         $submittedEmail,
 
-                        'member_date_joined' =>
+                    'member_date_joined' =>
                         $request->input(
                             'member_date_joined'
                         ),
 
-                        'member_gender' =>
+                    'member_gender' =>
                         $request->input(
                             'member_gender'
                         ),
 
-                        'member_dob' =>
+                    'member_dob' =>
                         $request->input(
                             'member_dob'
                         ),
 
-                        'member_kra_pin' => strtoupper(
-                            trim(
-                                (string) $request->input(
-                                    'member_kra_pin',
-                                    ''
-                                )
+                    'member_kra_pin' => strtoupper(
+                        trim(
+                            (string) $request->input(
+                                'member_kra_pin',
+                                ''
                             )
-                        ),
+                        )
+                    ),
 
-                        'member_phone_no' =>
+                    /*
+                     * Canonical telephone number.
+                     *
+                     * Example:
+                     * +254722400737
+                     */
+                    'member_phone_no' =>
                         $submittedPhone,
 
-                        'member_postal_address' => strtoupper(
-                            trim(
-                                (string) $request->input(
-                                    'member_postal_address',
-                                    ''
-                                )
-                            )
-                        ),
+                    /*
+                     * M-PESA matching hash.
+                     *
+                     * SHA256(254722400737)
+                     */
+                    'member_phone_hash' =>
+                        $submittedPhoneHash,
 
-                        'member_dept' =>
+                    'member_postal_address' => strtoupper(
+                        trim(
+                            (string) $request->input(
+                                'member_postal_address',
+                                ''
+                            )
+                        )
+                    ),
+
+                    'member_dept' =>
                         $request->input(
                             'member_dept'
                         ),
 
-                        'member_position' =>
+                    'member_position' =>
                         $request->input(
                             'member_position'
                         ),
 
-                        'bank_name' => strtoupper(
-                            trim(
-                                (string) $request->input(
-                                    'bank_name',
-                                    ''
-                                )
+                    'bank_name' => strtoupper(
+                        trim(
+                            (string) $request->input(
+                                'bank_name',
+                                ''
                             )
-                        ),
+                        )
+                    ),
 
-                        'bank_branch' => strtoupper(
-                            trim(
-                                (string) $request->input(
-                                    'bank_branch',
-                                    ''
-                                )
+                    'bank_branch' => strtoupper(
+                        trim(
+                            (string) $request->input(
+                                'bank_branch',
+                                ''
                             )
-                        ),
+                        )
+                    ),
 
-                        'bank_account_number' => strtoupper(
-                            trim(
-                                (string) $request->input(
-                                    'bank_account_number',
-                                    ''
-                                )
+                    'bank_account_number' => strtoupper(
+                        trim(
+                            (string) $request->input(
+                                'bank_account_number',
+                                ''
                             )
-                        ),
+                        )
+                    ),
 
-                        'member_active' =>
+                    'member_active' =>
                         $submittedActive,
 
-                        'member_deleted' =>
+                    'member_deleted' =>
                         $submittedDeleted,
 
-                        'member_mobile_banking_active' =>
+                    'member_mobile_banking_active' =>
                         $submittedMobileBankingStatus,
 
-                        'member_is_junior' =>
+                    'member_is_junior' =>
                         $request->input(
                             'member_is_junior',
                             0
                         ),
 
-                        'member_guardian_id' =>
+                    'member_guardian_id' =>
                         $request->input(
                             'member_guardian_id'
                         ),
-                    ]);
+                ]);
 
-                return redirect()
-                    ->route('members.listing')
-                    ->with(
-                        'success',
-                        'Member updated successfully.'
-                    );
-            }
-        );
-    }
+            return redirect()
+                ->route('members.listing')
+                ->with(
+                    'success',
+                    'Member updated successfully.'
+                );
+        }
+    );
+}
     private function normalizeKenyanMobileNumber(?string $phone): ?string
     {
         $phone = trim((string) $phone);
