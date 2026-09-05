@@ -295,15 +295,15 @@ class Kernel extends ConsoleKernel
         |--------------------------------------------------------------------------
         */
 
-        // $schedule->command(
-        //     'special-savings:process-due-vesting'
-        // )
-        //     ->everyMinute()
-        //     ->between('04:00', '07:59')
-        //     ->withoutOverlapping(10)
-        //     ->onOneServer()
-        //     ->timezone('Africa/Nairobi')
-        //     ->runInBackground();
+        $schedule->command(
+            'special-savings:process-due-vesting'
+        )
+            ->everyMinute()
+            ->between('04:00', '07:59')
+            ->withoutOverlapping(10)
+            ->onOneServer()
+            ->timezone('Africa/Nairobi')
+            ->runInBackground();
         /*
         |--------------------------------------------------------------------------
         | SACCO CRB REPORTING SCHEDULE
