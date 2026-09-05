@@ -242,7 +242,7 @@ class Kernel extends ConsoleKernel
             ->onOneServer()
             ->timezone('Africa/Nairobi');
 
-            /*
+        /*
 |--------------------------------------------------------------------------
 | Sync Missing User Rights Modules
 |--------------------------------------------------------------------------
@@ -253,12 +253,13 @@ class Kernel extends ConsoleKernel
 |--------------------------------------------------------------------------
 */
 
-$schedule->command('modules:sync-route-rights')
-    ->dailyAt('06:00')
-    ->withoutOverlapping(10)
-    ->onOneServer()
-    ->timezone('Africa/Nairobi');
-    
+        $schedule->command('modules:sync-route-rights')
+            ->dailyAt('06:00')
+            ->withoutOverlapping(10)
+            ->onOneServer()
+            ->timezone('Africa/Nairobi');
+
+
 
         /*
         |--------------------------------------------------------------------------
@@ -328,6 +329,27 @@ $schedule->command('modules:sync-route-rights')
             ->onOneServer()
             ->timezone('Africa/Nairobi');
 
+        /*
+|--------------------------------------------------------------------------
+| Member Phone Hash Backfill
+|--------------------------------------------------------------------------
+| Generates missing SHA-256 phone hashes for valid Kenyan mobile numbers.
+|
+| The original member_phone_no is never changed by this process.
+| Invalid or incomplete phone numbers remain unhashed.
+|
+| This provides a safety net for imported members or records created outside
+| the normal member create/edit workflow.
+|--------------------------------------------------------------------------
+*/
+
+        $schedule->command(
+            'members:hash-missing-phone-numbers --chunk=500'
+        )
+            ->dailyAt('12:00')
+            ->withoutOverlapping(30)
+            ->onOneServer()
+            ->timezone('Africa/Nairobi');
     }
 
     protected function commands(): void
