@@ -688,23 +688,23 @@ class HomeController extends Controller
     }
 
     public function storeNewMember(Request $request)
-{
-    /*
+    {
+        /*
     |--------------------------------------------------------------------------
     | Normalise key identity and contact fields before validation
     |--------------------------------------------------------------------------
     */
 
-    $submittedEmail = mb_strtolower(trim(
-        (string) $request->input('member_email')
-    ));
+        $submittedEmail = mb_strtolower(trim(
+            (string) $request->input('member_email')
+        ));
 
-    $rawPhone = trim((string) $request->input(
-        'member_phone_no',
-        ''
-    ));
+        $rawPhone = trim((string) $request->input(
+            'member_phone_no',
+            ''
+        ));
 
-    /*
+        /*
      * Examples accepted by normalizeKenyanMobileNumber():
      *
      * 0722400737
@@ -716,25 +716,25 @@ class HomeController extends Controller
      *
      * +254722400737
      */
-    $submittedPhone = $this->normalizeKenyanMobileNumber(
-        $rawPhone
-    );
+        $submittedPhone = $this->normalizeKenyanMobileNumber(
+            $rawPhone
+        );
 
-    /*
+        /*
      * The phone field is optional, but when supplied it must be
      * a valid Kenyan mobile number.
      */
-    if ($rawPhone !== '' && $submittedPhone === null) {
-        return redirect()
-            ->back()
-            ->withErrors([
-                'member_phone_no' =>
-                'Enter a valid Kenyan mobile number, for example 0722400737, 722400737 or +254722400737.',
-            ])
-            ->withInput();
-    }
+        if ($rawPhone !== '' && $submittedPhone === null) {
+            return redirect()
+                ->back()
+                ->withErrors([
+                    'member_phone_no' =>
+                    'Enter a valid Kenyan mobile number, for example 0722400737, 722400737 or +254722400737.',
+                ])
+                ->withInput();
+        }
 
-    /*
+        /*
     |--------------------------------------------------------------------------
     | Generate M-PESA-compatible phone hash
     |--------------------------------------------------------------------------
@@ -751,281 +751,281 @@ class HomeController extends Controller
     |
     */
 
-    $submittedPhoneHash = $submittedPhone !== null
-        ? hash(
-            'sha256',
-            ltrim($submittedPhone, '+')
-        )
-        : null;
+        $submittedPhoneHash = $submittedPhone !== null
+            ? hash(
+                'sha256',
+                ltrim($submittedPhone, '+')
+            )
+            : null;
 
-    /*
+        /*
      * Clean identifiers before uniqueness validation.
      */
-    $submittedSaccoId = strtoupper(trim(
-        (string) $request->input('member_sacco_id')
-    ));
+        $submittedSaccoId = strtoupper(trim(
+            (string) $request->input('member_sacco_id')
+        ));
 
-    $submittedNationalId = strtoupper(trim(
-        (string) $request->input('member_national_id')
-    ));
+        $submittedNationalId = strtoupper(trim(
+            (string) $request->input('member_national_id')
+        ));
 
-    /*
+        /*
      * Replace submitted values with their canonical versions.
      */
-    $request->merge([
-        'member_email'       => $submittedEmail,
-        'member_phone_no'    => $submittedPhone,
-        'member_sacco_id'    => $submittedSaccoId,
-        'member_national_id' => $submittedNationalId,
-    ]);
+        $request->merge([
+            'member_email'       => $submittedEmail,
+            'member_phone_no'    => $submittedPhone,
+            'member_sacco_id'    => $submittedSaccoId,
+            'member_national_id' => $submittedNationalId,
+        ]);
 
-    /*
+        /*
     |--------------------------------------------------------------------------
     | Validate new member
     |--------------------------------------------------------------------------
     */
 
-    $validator = Validator::make($request->all(), [
-        'member_name' => [
-            'required',
-            'string',
-            'max:100',
-        ],
+        $validator = Validator::make($request->all(), [
+            'member_name' => [
+                'required',
+                'string',
+                'max:100',
+            ],
 
-        'member_date_joined' => [
-            'required',
-            'date',
-        ],
+            'member_date_joined' => [
+                'required',
+                'date',
+            ],
 
-        'member_sacco_id' => [
-            'required',
-            'string',
-            'max:100',
-            'unique:sacco_members,member_sacco_id',
-        ],
+            'member_sacco_id' => [
+                'required',
+                'string',
+                'max:100',
+                'unique:sacco_members,member_sacco_id',
+            ],
 
-        'member_national_id' => [
-            'required',
-            'string',
-            'max:100',
-            'unique:sacco_members,member_national_id',
-        ],
+            'member_national_id' => [
+                'required',
+                'string',
+                'max:100',
+                'unique:sacco_members,member_national_id',
+            ],
 
-        'member_email' => [
-            'required',
-            'string',
-            'email:rfc',
-            'max:100',
-            'unique:sacco_members,member_email',
-        ],
+            'member_email' => [
+                'required',
+                'string',
+                'email:rfc',
+                'max:100',
+                'unique:sacco_members,member_email',
+            ],
 
-        'member_phone_no' => [
-            'nullable',
-            'string',
-            'max:16',
-            'regex:/^\+254(?:7\d{8}|1\d{8})$/',
-        ],
+            'member_phone_no' => [
+                'nullable',
+                'string',
+                'max:16',
+                'regex:/^\+254(?:7\d{8}|1\d{8})$/',
+            ],
 
-        'member_dept' => [
-            'required',
-            'integer',
-            'exists:sacco_department,department_id',
-        ],
+            'member_dept' => [
+                'required',
+                'integer',
+                'exists:sacco_department,department_id',
+            ],
 
-        'member_position' => [
-            'required',
-            'integer',
-            'exists:sacco_position,position_id',
-        ],
+            'member_position' => [
+                'required',
+                'integer',
+                'exists:sacco_position,position_id',
+            ],
 
-        'member_postal_address' => [
-            'nullable',
-            'string',
-        ],
+            'member_postal_address' => [
+                'nullable',
+                'string',
+            ],
 
-        'member_gender' => [
-            'required',
-            'string',
-            'in:M,F',
-        ],
+            'member_gender' => [
+                'required',
+                'string',
+                'in:M,F',
+            ],
 
-        'member_kra_pin' => [
-            'nullable',
-            'string',
-            'max:255',
-        ],
+            'member_kra_pin' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
 
-        'member_dob' => [
-            'nullable',
-            'date',
-        ],
+            'member_dob' => [
+                'nullable',
+                'date',
+            ],
 
-        'bank_name' => [
-            'nullable',
-            'string',
-            'max:255',
-        ],
+            'bank_name' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
 
-        'bank_branch' => [
-            'nullable',
-            'string',
-            'max:255',
-        ],
+            'bank_branch' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
 
-        'bank_account_number' => [
-            'nullable',
-            'string',
-            'max:255',
-        ],
+            'bank_account_number' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
 
-        'member_is_junior' => [
-            'required',
-            'in:0,1',
-        ],
+            'member_is_junior' => [
+                'required',
+                'in:0,1',
+            ],
 
-        'member_guardian_id' => [
-            'nullable',
-            'integer',
-            'exists:sacco_members,member_id',
-        ],
-    ], [
-        'member_phone_no.regex' =>
-        'Enter a valid Kenyan mobile number, for example 0722400737 or +254722400737.',
+            'member_guardian_id' => [
+                'nullable',
+                'integer',
+                'exists:sacco_members,member_id',
+            ],
+        ], [
+            'member_phone_no.regex' =>
+            'Enter a valid Kenyan mobile number, for example 0722400737 or +254722400737.',
 
-        'member_email.email' =>
-        'Enter a valid email address.',
+            'member_email.email' =>
+            'Enter a valid email address.',
 
-        'member_email.unique' =>
-        'That email address is already assigned to another member.',
+            'member_email.unique' =>
+            'That email address is already assigned to another member.',
 
-        'member_sacco_id.unique' =>
-        'That SACCO member number already exists.',
+            'member_sacco_id.unique' =>
+            'That SACCO member number already exists.',
 
-        'member_national_id.unique' =>
-        'That national ID already exists.',
-    ]);
+            'member_national_id.unique' =>
+            'That national ID already exists.',
+        ]);
 
-    if ($validator->fails()) {
-        return redirect()
-            ->back()
-            ->withErrors($validator)
-            ->withInput();
-    }
+        if ($validator->fails()) {
+            return redirect()
+                ->back()
+                ->withErrors($validator)
+                ->withInput();
+        }
 
-    /*
+        /*
     |--------------------------------------------------------------------------
     | Prepare clean database values
     |--------------------------------------------------------------------------
     */
 
-    $data = [
-        'member_name' => strtoupper(trim(
-            (string) $request->input('member_name')
-        )),
+        $data = [
+            'member_name' => strtoupper(trim(
+                (string) $request->input('member_name')
+            )),
 
-        'member_date_joined' => $request->input(
-            'member_date_joined'
-        ),
+            'member_date_joined' => $request->input(
+                'member_date_joined'
+            ),
 
-        'member_dept' => $request->input(
-            'member_dept'
-        ),
+            'member_dept' => $request->input(
+                'member_dept'
+            ),
 
-        'member_sacco_id' => $submittedSaccoId,
+            'member_sacco_id' => $submittedSaccoId,
 
-        'member_national_id' => $submittedNationalId,
+            'member_national_id' => $submittedNationalId,
 
-        'member_postal_address' => $request->filled(
-            'member_postal_address'
-        )
-            ? strtoupper(trim(
-                (string) $request->input('member_postal_address')
-            ))
-            : null,
+            'member_postal_address' => $request->filled(
+                'member_postal_address'
+            )
+                ? strtoupper(trim(
+                    (string) $request->input('member_postal_address')
+                ))
+                : null,
 
-        /*
+            /*
          * Human/application representation.
          *
          * Example:
          * +254722400737
          */
-        'member_phone_no' => $submittedPhone,
+            'member_phone_no' => $submittedPhone,
 
-        /*
+            /*
          * M-PESA matching representation.
          *
          * SHA-256 of:
          * 254722400737
          */
-        'member_phone_hash' => $submittedPhoneHash,
+            'member_phone_hash' => $submittedPhoneHash,
 
-        'member_gender' => strtoupper(trim(
-            (string) $request->input('member_gender')
-        )),
+            'member_gender' => strtoupper(trim(
+                (string) $request->input('member_gender')
+            )),
 
-        'member_email' => $submittedEmail,
+            'member_email' => $submittedEmail,
 
-        'member_position' => $request->input(
-            'member_position'
-        ),
+            'member_position' => $request->input(
+                'member_position'
+            ),
 
-        'member_kra_pin' => $request->filled('member_kra_pin')
-            ? strtoupper(trim(
-                (string) $request->input('member_kra_pin')
-            ))
-            : null,
+            'member_kra_pin' => $request->filled('member_kra_pin')
+                ? strtoupper(trim(
+                    (string) $request->input('member_kra_pin')
+                ))
+                : null,
 
-        'member_dob' => $request->filled('member_dob')
-            ? $request->input('member_dob')
-            : null,
+            'member_dob' => $request->filled('member_dob')
+                ? $request->input('member_dob')
+                : null,
 
-        'bank_name' => $request->filled('bank_name')
-            ? strtoupper(trim(
-                (string) $request->input('bank_name')
-            ))
-            : null,
+            'bank_name' => $request->filled('bank_name')
+                ? strtoupper(trim(
+                    (string) $request->input('bank_name')
+                ))
+                : null,
 
-        'bank_branch' => $request->filled('bank_branch')
-            ? strtoupper(trim(
-                (string) $request->input('bank_branch')
-            ))
-            : null,
+            'bank_branch' => $request->filled('bank_branch')
+                ? strtoupper(trim(
+                    (string) $request->input('bank_branch')
+                ))
+                : null,
 
-        'bank_account_number' => $request->filled(
-            'bank_account_number'
-        )
-            ? strtoupper(trim(
-                (string) $request->input('bank_account_number')
-            ))
-            : null,
+            'bank_account_number' => $request->filled(
+                'bank_account_number'
+            )
+                ? strtoupper(trim(
+                    (string) $request->input('bank_account_number')
+                ))
+                : null,
 
-        'member_is_junior' => (int) $request->input(
-            'member_is_junior',
-            0
-        ),
+            'member_is_junior' => (int) $request->input(
+                'member_is_junior',
+                0
+            ),
 
-        'member_guardian_id' => $request->filled(
-            'member_guardian_id'
-        )
-            ? $request->input('member_guardian_id')
-            : null,
+            'member_guardian_id' => $request->filled(
+                'member_guardian_id'
+            )
+                ? $request->input('member_guardian_id')
+                : null,
 
-        'member_mobile_banking_active' => 'N',
-        'member_active' => 'Y',
-        'member_deleted' => 'N',
-        'member_ip' => $request->ip(),
-        'member_user_id' => Auth::user()->member_id,
-    ];
+            'member_mobile_banking_active' => 'N',
+            'member_active' => 'Y',
+            'member_deleted' => 'N',
+            'member_ip' => $request->ip(),
+            'member_user_id' => Auth::user()->member_id,
+        ];
 
-    DB::table('sacco_members')->insert($data);
+        DB::table('sacco_members')->insert($data);
 
-    return redirect()
-        ->route('members.listing')
-        ->with(
-            'success',
-            'Member added successfully.'
-        );
-}
+        return redirect()
+            ->route('members.listing')
+            ->with(
+                'success',
+                'Member added successfully.'
+            );
+    }
 
     private function getMembers($orderby = 'member_name', $sort_order = 'asc', $search = '', $limit = null, $status = null)
     {
@@ -1102,51 +1102,51 @@ class HomeController extends Controller
     }
 
     public function updateMember(Request $request, $id)
-{
-    /*
+    {
+        /*
     |--------------------------------------------------------------------------
     | Normalise protected contact details before validation
     |--------------------------------------------------------------------------
     */
 
-    $rawEmail = trim(
-        (string) $request->input('member_email')
-    );
+        $rawEmail = trim(
+            (string) $request->input('member_email')
+        );
 
-    $submittedEmail = mb_strtolower($rawEmail);
+        $submittedEmail = mb_strtolower($rawEmail);
 
-    $rawPhone = trim(
-        (string) $request->input(
-            'member_phone_no',
-            ''
-        )
-    );
+        $rawPhone = trim(
+            (string) $request->input(
+                'member_phone_no',
+                ''
+            )
+        );
 
-    $submittedPhone = $this->normalizeKenyanMobileNumber(
-        $rawPhone
-    );
+        $submittedPhone = $this->normalizeKenyanMobileNumber(
+            $rawPhone
+        );
 
-    /*
+        /*
     |--------------------------------------------------------------------------
     | Validate supplied mobile number
     |--------------------------------------------------------------------------
     */
 
-    if (
-        $rawPhone !== ''
-        && $submittedPhone === null
-    ) {
-        return redirect()
-            ->back()
-            ->withErrors([
-                'member_phone_no' =>
+        if (
+            $rawPhone !== ''
+            && $submittedPhone === null
+        ) {
+            return redirect()
+                ->back()
+                ->withErrors([
+                    'member_phone_no' =>
                     'Enter a valid Kenyan mobile number, for example '
-                    . '0722400737, 722400737 or +254722400737.',
-            ])
-            ->withInput();
-    }
+                        . '0722400737, 722400737 or +254722400737.',
+                ])
+                ->withInput();
+        }
 
-    /*
+        /*
     |--------------------------------------------------------------------------
     | Generate M-PESA-compatible phone hash
     |--------------------------------------------------------------------------
@@ -1159,594 +1159,594 @@ class HomeController extends Controller
     |
     */
 
-    $submittedPhoneHash = $submittedPhone !== null
-        ? hash(
-            'sha256',
-            ltrim($submittedPhone, '+')
-        )
-        : null;
+        $submittedPhoneHash = $submittedPhone !== null
+            ? hash(
+                'sha256',
+                ltrim($submittedPhone, '+')
+            )
+            : null;
 
-    /*
+        /*
     |--------------------------------------------------------------------------
     | Normalise Y/N values
     |--------------------------------------------------------------------------
     */
 
-    $submittedActive = strtoupper(
-        trim(
-            (string) $request->input(
-                'member_active',
-                'N'
+        $submittedActive = strtoupper(
+            trim(
+                (string) $request->input(
+                    'member_active',
+                    'N'
+                )
             )
-        )
-    );
+        );
 
-    $submittedDeleted = strtoupper(
-        trim(
-            (string) $request->input(
-                'member_deleted',
-                'N'
+        $submittedDeleted = strtoupper(
+            trim(
+                (string) $request->input(
+                    'member_deleted',
+                    'N'
+                )
             )
-        )
-    );
+        );
 
-    $submittedMobileBankingStatus = strtoupper(
-        trim(
-            (string) $request->input(
-                'member_mobile_banking_active',
-                'N'
+        $submittedMobileBankingStatus = strtoupper(
+            trim(
+                (string) $request->input(
+                    'member_mobile_banking_active',
+                    'N'
+                )
             )
-        )
-    );
+        );
 
-    /*
+        /*
     |--------------------------------------------------------------------------
     | Replace request values with canonical values
     |--------------------------------------------------------------------------
     */
 
-    $request->merge([
-        'member_email' => $submittedEmail,
+        $request->merge([
+            'member_email' => $submittedEmail,
 
-        'member_phone_no' => $submittedPhone,
+            'member_phone_no' => $submittedPhone,
 
-        'member_active' => $submittedActive,
+            'member_active' => $submittedActive,
 
-        'member_deleted' => $submittedDeleted,
+            'member_deleted' => $submittedDeleted,
 
-        'member_mobile_banking_active' =>
+            'member_mobile_banking_active' =>
             $submittedMobileBankingStatus,
-    ]);
+        ]);
 
-    /*
+        /*
     |--------------------------------------------------------------------------
     | Validate submitted member information
     |--------------------------------------------------------------------------
     */
 
-    $validator = Validator::make(
-        $request->all(),
-        [
-            'member_name' => [
-                'required',
-                'string',
-                'max:255',
+        $validator = Validator::make(
+            $request->all(),
+            [
+                'member_name' => [
+                    'required',
+                    'string',
+                    'max:255',
+                ],
+
+                'member_sacco_id' => [
+                    'required',
+                    'string',
+                    'max:255',
+
+                    Rule::unique(
+                        'sacco_members',
+                        'member_sacco_id'
+                    )->ignore(
+                        $id,
+                        'member_id'
+                    ),
+                ],
+
+                'member_national_id' => [
+                    'required',
+                    'string',
+                    'max:255',
+
+                    Rule::unique(
+                        'sacco_members',
+                        'member_national_id'
+                    )->ignore(
+                        $id,
+                        'member_id'
+                    ),
+                ],
+
+                'member_email' => [
+                    'required',
+                    'string',
+                    'email:rfc',
+                    'max:255',
+
+                    Rule::unique(
+                        'sacco_members',
+                        'member_email'
+                    )->ignore(
+                        $id,
+                        'member_id'
+                    ),
+                ],
+
+                'member_phone_no' => [
+                    'nullable',
+                    'string',
+                    'max:16',
+
+                    Rule::unique(
+                        'sacco_members',
+                        'member_phone_no'
+                    )->ignore(
+                        $id,
+                        'member_id'
+                    ),
+                ],
+
+                'member_date_joined' => [
+                    'required',
+                    'date',
+                ],
+
+                'member_gender' => [
+                    'nullable',
+                    'string',
+                    'in:M,F',
+                ],
+
+                'member_dob' => [
+                    'nullable',
+                    'date',
+                ],
+
+                'member_kra_pin' => [
+                    'nullable',
+                    'string',
+                    'max:255',
+                ],
+
+                'member_postal_address' => [
+                    'nullable',
+                    'string',
+                ],
+
+                'member_dept' => [
+                    'required',
+                    'integer',
+                    'exists:sacco_department,department_id',
+                ],
+
+                'member_position' => [
+                    'required',
+                    'integer',
+                    'exists:sacco_position,position_id',
+                ],
+
+                'bank_name' => [
+                    'nullable',
+                    'string',
+                    'max:255',
+                ],
+
+                'bank_branch' => [
+                    'nullable',
+                    'string',
+                    'max:255',
+                ],
+
+                'bank_account_number' => [
+                    'nullable',
+                    'string',
+                    'max:255',
+                ],
+
+                'member_active' => [
+                    'required',
+                    'in:Y,N',
+                ],
+
+                'member_deleted' => [
+                    'required',
+                    'in:Y,N',
+                ],
+
+                'member_mobile_banking_active' => [
+                    'required',
+                    'in:Y,N',
+                ],
+
+                'member_is_junior' => [
+                    'nullable',
+                    'boolean',
+                ],
+
+                'member_guardian_id' => [
+                    'nullable',
+                    'integer',
+                    'exists:sacco_members,member_id',
+                ],
             ],
-
-            'member_sacco_id' => [
-                'required',
-                'string',
-                'max:255',
-
-                Rule::unique(
-                    'sacco_members',
-                    'member_sacco_id'
-                )->ignore(
-                    $id,
-                    'member_id'
-                ),
-            ],
-
-            'member_national_id' => [
-                'required',
-                'string',
-                'max:255',
-
-                Rule::unique(
-                    'sacco_members',
-                    'member_national_id'
-                )->ignore(
-                    $id,
-                    'member_id'
-                ),
-            ],
-
-            'member_email' => [
-                'required',
-                'string',
-                'email:rfc',
-                'max:255',
-
-                Rule::unique(
-                    'sacco_members',
-                    'member_email'
-                )->ignore(
-                    $id,
-                    'member_id'
-                ),
-            ],
-
-            'member_phone_no' => [
-                'nullable',
-                'string',
-                'max:16',
-
-                Rule::unique(
-                    'sacco_members',
-                    'member_phone_no'
-                )->ignore(
-                    $id,
-                    'member_id'
-                ),
-            ],
-
-            'member_date_joined' => [
-                'required',
-                'date',
-            ],
-
-            'member_gender' => [
-                'nullable',
-                'string',
-                'in:M,F',
-            ],
-
-            'member_dob' => [
-                'nullable',
-                'date',
-            ],
-
-            'member_kra_pin' => [
-                'nullable',
-                'string',
-                'max:255',
-            ],
-
-            'member_postal_address' => [
-                'nullable',
-                'string',
-            ],
-
-            'member_dept' => [
-                'required',
-                'integer',
-                'exists:sacco_department,department_id',
-            ],
-
-            'member_position' => [
-                'required',
-                'integer',
-                'exists:sacco_position,position_id',
-            ],
-
-            'bank_name' => [
-                'nullable',
-                'string',
-                'max:255',
-            ],
-
-            'bank_branch' => [
-                'nullable',
-                'string',
-                'max:255',
-            ],
-
-            'bank_account_number' => [
-                'nullable',
-                'string',
-                'max:255',
-            ],
-
-            'member_active' => [
-                'required',
-                'in:Y,N',
-            ],
-
-            'member_deleted' => [
-                'required',
-                'in:Y,N',
-            ],
-
-            'member_mobile_banking_active' => [
-                'required',
-                'in:Y,N',
-            ],
-
-            'member_is_junior' => [
-                'nullable',
-                'boolean',
-            ],
-
-            'member_guardian_id' => [
-                'nullable',
-                'integer',
-                'exists:sacco_members,member_id',
-            ],
-        ],
-        [
-            'member_mobile_banking_active.required' =>
+            [
+                'member_mobile_banking_active.required' =>
                 'Select whether mobile banking is active for this member.',
 
-            'member_mobile_banking_active.in' =>
+                'member_mobile_banking_active.in' =>
                 'Mobile banking status must be Yes or No.',
-        ]
-    );
+            ]
+        );
 
-    if ($validator->fails()) {
-        return redirect()
-            ->back()
-            ->withErrors($validator)
-            ->withInput();
-    }
+        if ($validator->fails()) {
+            return redirect()
+                ->back()
+                ->withErrors($validator)
+                ->withInput();
+        }
 
-    /*
+        /*
     |--------------------------------------------------------------------------
     | Lock, compare and update atomically
     |--------------------------------------------------------------------------
     */
 
-    return DB::transaction(
-        function () use (
-            $request,
-            $id,
-            $submittedEmail,
-            $submittedPhone,
-            $submittedPhoneHash,
-            $submittedActive,
-            $submittedDeleted,
-            $submittedMobileBankingStatus
-        ) {
-            $member = DB::table('sacco_members')
-                ->where(
-                    'member_id',
-                    $id
-                )
-                ->lockForUpdate()
-                ->first();
+        return DB::transaction(
+            function () use (
+                $request,
+                $id,
+                $submittedEmail,
+                $submittedPhone,
+                $submittedPhoneHash,
+                $submittedActive,
+                $submittedDeleted,
+                $submittedMobileBankingStatus
+            ) {
+                $member = DB::table('sacco_members')
+                    ->where(
+                        'member_id',
+                        $id
+                    )
+                    ->lockForUpdate()
+                    ->first();
 
-            if (!$member) {
-                return redirect()
-                    ->route('members.listing')
-                    ->with(
-                        'error',
-                        'Member not found.'
-                    );
-            }
+                if (!$member) {
+                    return redirect()
+                        ->route('members.listing')
+                        ->with(
+                            'error',
+                            'Member not found.'
+                        );
+                }
 
-            /*
+                /*
             |--------------------------------------------------------------------------
             | Normalise existing values before comparing
             |--------------------------------------------------------------------------
             */
 
-            $currentEmail = mb_strtolower(
-                trim(
-                    (string) (
-                        $member->member_email
-                        ?? ''
+                $currentEmail = mb_strtolower(
+                    trim(
+                        (string) (
+                            $member->member_email
+                            ?? ''
+                        )
                     )
-                )
-            );
-
-            $currentRawPhone = trim(
-                (string) (
-                    $member->member_phone_no
-                    ?? ''
-                )
-            );
-
-            $currentPhone = $this
-                ->normalizeKenyanMobileNumber(
-                    $currentRawPhone
                 );
 
-            /*
+                $currentRawPhone = trim(
+                    (string) (
+                        $member->member_phone_no
+                        ?? ''
+                    )
+                );
+
+                $currentPhone = $this
+                    ->normalizeKenyanMobileNumber(
+                        $currentRawPhone
+                    );
+
+                /*
              * Preserve an invalid historical phone value for comparison until
              * the user replaces or clears it.
              */
-            if (
-                $currentPhone === null
-                && $currentRawPhone !== ''
-            ) {
-                $currentPhone = $currentRawPhone;
-            }
+                if (
+                    $currentPhone === null
+                    && $currentRawPhone !== ''
+                ) {
+                    $currentPhone = $currentRawPhone;
+                }
 
-            $currentActive = strtoupper(
-                trim(
-                    (string) (
-                        $member->member_active
-                        ?? 'N'
+                $currentActive = strtoupper(
+                    trim(
+                        (string) (
+                            $member->member_active
+                            ?? 'N'
+                        )
                     )
-                )
-            );
+                );
 
-            $currentDeleted = strtoupper(
-                trim(
-                    (string) (
-                        $member->member_deleted
-                        ?? 'N'
+                $currentDeleted = strtoupper(
+                    trim(
+                        (string) (
+                            $member->member_deleted
+                            ?? 'N'
+                        )
                     )
-                )
-            );
+                );
 
-            $currentMobileBankingStatus = strtoupper(
-                trim(
-                    (string) (
-                        $member->member_mobile_banking_active
-                        ?? 'N'
+                $currentMobileBankingStatus = strtoupper(
+                    trim(
+                        (string) (
+                            $member->member_mobile_banking_active
+                            ?? 'N'
+                        )
                     )
-                )
-            );
+                );
 
-            /*
+                /*
             |--------------------------------------------------------------------------
             | Detect substantive changes
             |--------------------------------------------------------------------------
             */
 
-            $emailChanged =
-                $currentEmail !== $submittedEmail;
+                $emailChanged =
+                    $currentEmail !== $submittedEmail;
 
-            $phoneChanged =
-                $currentPhone !== $submittedPhone;
+                $phoneChanged =
+                    $currentPhone !== $submittedPhone;
 
-            $makingMemberInactive =
-                $currentActive === 'Y'
-                && $submittedActive === 'N';
+                $makingMemberInactive =
+                    $currentActive === 'Y'
+                    && $submittedActive === 'N';
 
-            $deletingMember =
-                $currentDeleted !== 'Y'
-                && $submittedDeleted === 'Y';
+                $deletingMember =
+                    $currentDeleted !== 'Y'
+                    && $submittedDeleted === 'Y';
 
-            $mobileBankingStatusChanged =
-                $currentMobileBankingStatus
-                !==
-                $submittedMobileBankingStatus;
+                $mobileBankingStatusChanged =
+                    $currentMobileBankingStatus
+                    !==
+                    $submittedMobileBankingStatus;
 
-            /*
+                /*
             |--------------------------------------------------------------------------
             | Check rights only when protected values actually change
             |--------------------------------------------------------------------------
             */
 
-            $permissionErrors = [];
+                $permissionErrors = [];
 
-            if (
-                $emailChanged
-                && !CheckUserRights::userHasRight(
-                    'ChangeEmail'
-                )
-            ) {
-                $permissionErrors['member_email'] =
-                    'You do not have permission to change '
-                    . 'a member email address.';
-            }
+                if (
+                    $emailChanged
+                    && !CheckUserRights::userHasRight(
+                        'ChangeEmail'
+                    )
+                ) {
+                    $permissionErrors['member_email'] =
+                        'You do not have permission to change '
+                        . 'a member email address.';
+                }
 
-            if (
-                $phoneChanged
-                && !CheckUserRights::userHasRight(
-                    'ChangePhone'
-                )
-            ) {
-                $permissionErrors['member_phone_no'] =
-                    'You do not have permission to change '
-                    . 'a member phone number.';
-            }
+                if (
+                    $phoneChanged
+                    && !CheckUserRights::userHasRight(
+                        'ChangePhone'
+                    )
+                ) {
+                    $permissionErrors['member_phone_no'] =
+                        'You do not have permission to change '
+                        . 'a member phone number.';
+                }
 
-            if (
-                $makingMemberInactive
-                && !CheckUserRights::userHasRight(
-                    'MakeMemberInActive'
-                )
-            ) {
-                $permissionErrors['member_active'] =
-                    'You do not have permission to make '
-                    . 'a member inactive.';
-            }
+                if (
+                    $makingMemberInactive
+                    && !CheckUserRights::userHasRight(
+                        'MakeMemberInActive'
+                    )
+                ) {
+                    $permissionErrors['member_active'] =
+                        'You do not have permission to make '
+                        . 'a member inactive.';
+                }
 
-            if (
-                $deletingMember
-                && !CheckUserRights::userHasRight(
-                    'DeleteMember'
-                )
-            ) {
-                $permissionErrors['member_deleted'] =
-                    'You do not have permission to delete '
-                    . 'a member.';
-            }
+                if (
+                    $deletingMember
+                    && !CheckUserRights::userHasRight(
+                        'DeleteMember'
+                    )
+                ) {
+                    $permissionErrors['member_deleted'] =
+                        'You do not have permission to delete '
+                        . 'a member.';
+                }
 
-            /*
+                /*
             |--------------------------------------------------------------------------
             | Mobile banking status right
             |--------------------------------------------------------------------------
             */
 
-            if (
-                $mobileBankingStatusChanged
-                && !CheckUserRights::userHasRight(
-                    'edit_member_mobile_banking_status'
-                )
-            ) {
-                $permissionErrors['member_mobile_banking_active'] =
-                    'You do not have permission to activate or '
-                    . 'deactivate mobile banking for this member.';
-            }
-
-            if (!empty($permissionErrors)) {
-                return redirect()
-                    ->back()
-                    ->withErrors(
-                        $permissionErrors
+                if (
+                    $mobileBankingStatusChanged
+                    && !CheckUserRights::userHasRight(
+                        'edit_member_mobile_banking_status'
                     )
-                    ->withInput();
-            }
+                ) {
+                    $permissionErrors['member_mobile_banking_active'] =
+                        'You do not have permission to activate or '
+                        . 'deactivate mobile banking for this member.';
+                }
 
-            /*
+                if (!empty($permissionErrors)) {
+                    return redirect()
+                        ->back()
+                        ->withErrors(
+                            $permissionErrors
+                        )
+                        ->withInput();
+                }
+
+                /*
             |--------------------------------------------------------------------------
             | Update member
             |--------------------------------------------------------------------------
             */
 
-            DB::table('sacco_members')
-                ->where(
-                    'member_id',
-                    $id
-                )
-                ->update([
-                    'member_name' => strtoupper(
-                        trim(
-                            (string) $request->input(
-                                'member_name'
+                DB::table('sacco_members')
+                    ->where(
+                        'member_id',
+                        $id
+                    )
+                    ->update([
+                        'member_name' => strtoupper(
+                            trim(
+                                (string) $request->input(
+                                    'member_name'
+                                )
                             )
-                        )
-                    ),
+                        ),
 
-                    'member_sacco_id' => strtoupper(
-                        trim(
-                            (string) $request->input(
-                                'member_sacco_id'
+                        'member_sacco_id' => strtoupper(
+                            trim(
+                                (string) $request->input(
+                                    'member_sacco_id'
+                                )
                             )
-                        )
-                    ),
+                        ),
 
-                    'member_national_id' => strtoupper(
-                        trim(
-                            (string) $request->input(
-                                'member_national_id'
+                        'member_national_id' => strtoupper(
+                            trim(
+                                (string) $request->input(
+                                    'member_national_id'
+                                )
                             )
-                        )
-                    ),
+                        ),
 
-                    'member_email' =>
+                        'member_email' =>
                         $submittedEmail,
 
-                    'member_date_joined' =>
+                        'member_date_joined' =>
                         $request->input(
                             'member_date_joined'
                         ),
 
-                    'member_gender' =>
+                        'member_gender' =>
                         $request->input(
                             'member_gender'
                         ),
 
-                    'member_dob' =>
+                        'member_dob' =>
                         $request->input(
                             'member_dob'
                         ),
 
-                    'member_kra_pin' => strtoupper(
-                        trim(
-                            (string) $request->input(
-                                'member_kra_pin',
-                                ''
+                        'member_kra_pin' => strtoupper(
+                            trim(
+                                (string) $request->input(
+                                    'member_kra_pin',
+                                    ''
+                                )
                             )
-                        )
-                    ),
+                        ),
 
-                    /*
+                        /*
                      * Canonical telephone number.
                      *
                      * Example:
                      * +254722400737
                      */
-                    'member_phone_no' =>
+                        'member_phone_no' =>
                         $submittedPhone,
 
-                    /*
+                        /*
                      * M-PESA matching hash.
                      *
                      * SHA256(254722400737)
                      */
-                    'member_phone_hash' =>
+                        'member_phone_hash' =>
                         $submittedPhoneHash,
 
-                    'member_postal_address' => strtoupper(
-                        trim(
-                            (string) $request->input(
-                                'member_postal_address',
-                                ''
+                        'member_postal_address' => strtoupper(
+                            trim(
+                                (string) $request->input(
+                                    'member_postal_address',
+                                    ''
+                                )
                             )
-                        )
-                    ),
+                        ),
 
-                    'member_dept' =>
+                        'member_dept' =>
                         $request->input(
                             'member_dept'
                         ),
 
-                    'member_position' =>
+                        'member_position' =>
                         $request->input(
                             'member_position'
                         ),
 
-                    'bank_name' => strtoupper(
-                        trim(
-                            (string) $request->input(
-                                'bank_name',
-                                ''
+                        'bank_name' => strtoupper(
+                            trim(
+                                (string) $request->input(
+                                    'bank_name',
+                                    ''
+                                )
                             )
-                        )
-                    ),
+                        ),
 
-                    'bank_branch' => strtoupper(
-                        trim(
-                            (string) $request->input(
-                                'bank_branch',
-                                ''
+                        'bank_branch' => strtoupper(
+                            trim(
+                                (string) $request->input(
+                                    'bank_branch',
+                                    ''
+                                )
                             )
-                        )
-                    ),
+                        ),
 
-                    'bank_account_number' => strtoupper(
-                        trim(
-                            (string) $request->input(
-                                'bank_account_number',
-                                ''
+                        'bank_account_number' => strtoupper(
+                            trim(
+                                (string) $request->input(
+                                    'bank_account_number',
+                                    ''
+                                )
                             )
-                        )
-                    ),
+                        ),
 
-                    'member_active' =>
+                        'member_active' =>
                         $submittedActive,
 
-                    'member_deleted' =>
+                        'member_deleted' =>
                         $submittedDeleted,
 
-                    'member_mobile_banking_active' =>
+                        'member_mobile_banking_active' =>
                         $submittedMobileBankingStatus,
 
-                    'member_is_junior' =>
+                        'member_is_junior' =>
                         $request->input(
                             'member_is_junior',
                             0
                         ),
 
-                    'member_guardian_id' =>
+                        'member_guardian_id' =>
                         $request->input(
                             'member_guardian_id'
                         ),
-                ]);
+                    ]);
 
-            return redirect()
-                ->route('members.listing')
-                ->with(
-                    'success',
-                    'Member updated successfully.'
-                );
-        }
-    );
-}
+                return redirect()
+                    ->route('members.listing')
+                    ->with(
+                        'success',
+                        'Member updated successfully.'
+                    );
+            }
+        );
+    }
     private function normalizeKenyanMobileNumber(?string $phone): ?string
     {
         $phone = trim((string) $phone);
@@ -2179,15 +2179,205 @@ class HomeController extends Controller
 
         // Fetch loans taken by the member
         $loansTaken = DB::table('sacco_loans')
-            ->join('sacco_loan_types', 'sacco_loans.loan_loan_type', '=', 'sacco_loan_types.loan_type_id')
-            ->join('sacco_loan_category', 'sacco_loans.loan_loan_category', '=', 'sacco_loan_category.loan_category_id')
-            ->where('loan_member', $id)
-            ->whereRaw('COALESCE(loan_amount,0) - COALESCE(loan_loan_paid,0) > ?', [$threshold_amount])
-            //->whereRaw('loan_amount - loan_loan_paid > ?', [$threshold_amount])
-            ->select('sacco_loans.*', 'sacco_loan_types.loan_type_name', 'sacco_loan_category.loan_category_name')
-            ->orderBy('loan_taken_period')
-            ->orderBy('loan_on')
+            ->join(
+                'sacco_loan_types',
+                'sacco_loans.loan_loan_type',
+                '=',
+                'sacco_loan_types.loan_type_id'
+            )
+            ->join(
+                'sacco_loan_category',
+                'sacco_loans.loan_loan_category',
+                '=',
+                'sacco_loan_category.loan_category_id'
+            )
+            ->where('sacco_loans.loan_member', $id)
+            ->whereRaw(
+                'COALESCE(sacco_loans.loan_amount, 0) - COALESCE(sacco_loans.loan_loan_paid, 0) > ?',
+                [$threshold_amount]
+            )
+            ->select(
+                'sacco_loans.*',
+
+                'sacco_loan_types.loan_type_name',
+                'sacco_loan_types.loan_type_interest',
+                'sacco_loan_types.loan_type_interest_type',
+
+                'sacco_loan_category.loan_category_name'
+            )
+            ->orderBy('sacco_loans.loan_taken_period')
+            ->orderBy('sacco_loans.loan_on')
             ->get();
+
+
+        /*
+|--------------------------------------------------------------------------
+| Current period interest status
+|--------------------------------------------------------------------------
+|
+| Example:
+| September 2026 = 202609
+|
+| A loan can have MULTIPLE repayments during the same period.
+|
+| If ANY repayment for the loan in the current YYYYMM period contains:
+|
+|     loan_payments_interest > 0
+|
+| then interest for that period has already been serviced.
+|--------------------------------------------------------------------------
+*/
+
+        $currentPeriod = (int) now()->format('Ym');
+
+        $loanIds = $loansTaken
+            ->pluck('loan_id')
+            ->map(fn($loanId) => (int) $loanId)
+            ->values();
+
+        $loansWithInterestPaidThisPeriod = collect();
+
+        if ($loanIds->isNotEmpty()) {
+            $loansWithInterestPaidThisPeriod = DB::table(
+                'sacco_loan_payments'
+            )
+                ->whereIn(
+                    'loan_payments_loan_id',
+                    $loanIds
+                )
+                ->where(
+                    'loan_payments_period',
+                    $currentPeriod
+                )
+                ->where(
+                    'loan_payments_interest',
+                    '>',
+                    0
+                )
+                ->pluck(
+                    'loan_payments_loan_id'
+                )
+                ->map(
+                    fn($loanId) => (int) $loanId
+                )
+                ->unique()
+                ->values();
+        }
+
+
+        /*
+|--------------------------------------------------------------------------
+| Calculate principal and amount payable
+|--------------------------------------------------------------------------
+|
+| DISPLAY ONLY.
+|
+| Nothing is inserted or updated in the database.
+|--------------------------------------------------------------------------
+*/
+
+        foreach ($loansTaken as $loan) {
+
+            $principalBalance = max(
+                0,
+                (float) ($loan->loan_amount ?? 0)
+                    -
+                    (float) ($loan->loan_loan_paid ?? 0)
+            );
+
+            $interestRate = (float) (
+                $loan->loan_type_interest ?? 0
+            );
+
+            $interestType = strtoupper(
+                trim(
+                    (string) (
+                        $loan->loan_type_interest_type ?? ''
+                    )
+                )
+            );
+
+            $interestToPay = 0.0;
+
+            /*
+    |--------------------------------------------------------------------------
+    | Has interest already been paid in this YYYYMM period?
+    |--------------------------------------------------------------------------
+    */
+
+            $interestPaidThisPeriod =
+                $loansWithInterestPaidThisPeriod
+                ->contains(
+                    (int) $loan->loan_id
+                );
+
+
+            /*
+    |--------------------------------------------------------------------------
+    | Only calculate interest if none has been paid this period
+    |--------------------------------------------------------------------------
+    */
+
+            if (!$interestPaidThisPeriod) {
+
+                /*
+         * FIXED INTEREST
+         *
+         * Principal balance × rate %
+         */
+                if ($interestType === 'FIXED INTEREST') {
+
+                    $interestToPay =
+                        $principalBalance
+                        *
+                        ($interestRate / 100);
+                }
+
+                /*
+         * REDUCING BALANCE
+         *
+         * Principal balance × annual rate / 12
+         */ elseif ($interestType === 'REDUCING BALANCE') {
+
+                    $interestToPay =
+                        $principalBalance
+                        *
+                        ($interestRate / 12 / 100);
+                }
+            }
+
+
+            /*
+    |--------------------------------------------------------------------------
+    | Blade display values
+    |--------------------------------------------------------------------------
+    */
+
+            $loan->principal_balance = round(
+                $principalBalance,
+                2
+            );
+
+            $loan->interest_to_pay = round(
+                $interestToPay,
+                2
+            );
+
+            $loan->amount_to_pay = round(
+                $principalBalance + $interestToPay,
+                2
+            );
+
+            $loan->interest_paid_this_period =
+                $interestPaidThisPeriod;
+        }
+
+        $memberFinancials['total_amount_to_pay'] = round(
+            $loansTaken->sum(function ($loan) {
+                return (float) ($loan->amount_to_pay ?? 0);
+            }),
+            2
+        );
 
         // Fetch guarantors for loans taken by the member
         $loansTakenWithGuarantors = [];
@@ -10487,47 +10677,47 @@ class HomeController extends Controller
 
 
 
-    
 
-public function reportsLoansIssued(Request $request)
-{
-    $this->validateLoansIssuedFilters($request);
 
-    /*
+    public function reportsLoansIssued(Request $request)
+    {
+        $this->validateLoansIssuedFilters($request);
+
+        /*
     |--------------------------------------------------------------------------
     | Pagination
     |--------------------------------------------------------------------------
     */
 
-    $allowedPerPage = [25, 50, 100, 200];
+        $allowedPerPage = [25, 50, 100, 200];
 
-    $perPage = (int) $request->input('per_page', 50);
+        $perPage = (int) $request->input('per_page', 50);
 
-    if (!in_array($perPage, $allowedPerPage, true)) {
-        $perPage = 50;
-    }
+        if (!in_array($perPage, $allowedPerPage, true)) {
+            $perPage = 50;
+        }
 
-    /*
+        /*
     |--------------------------------------------------------------------------
     | Build report query
     |--------------------------------------------------------------------------
     */
 
-    $query = $this->buildLoansIssuedReportQuery($request);
+        $query = $this->buildLoansIssuedReportQuery($request);
 
-    /*
+        /*
     |--------------------------------------------------------------------------
     | Proper server-side pagination
     |--------------------------------------------------------------------------
     */
 
-    $loansIssued = $query
-        ->paginate($perPage)
-        ->appends(
-            $request->except('page')
-        );
+        $loansIssued = $query
+            ->paginate($perPage)
+            ->appends(
+                $request->except('page')
+            );
 
-    /*
+        /*
     |--------------------------------------------------------------------------
     | Loan types for filter
     |--------------------------------------------------------------------------
@@ -10537,24 +10727,24 @@ public function reportsLoansIssued(Request $request)
     |
     */
 
-    $loanTypes = DB::table('sacco_loan_types')
-        ->select(
-            'loan_type_id',
-            'loan_type_name'
-        )
-        ->orderBy('loan_type_name', 'asc')
-        ->get();
+        $loanTypes = DB::table('sacco_loan_types')
+            ->select(
+                'loan_type_id',
+                'loan_type_name'
+            )
+            ->orderBy('loan_type_name', 'asc')
+            ->get();
 
-    return view('reports.loans.issued', [
-        'loansIssued'  => $loansIssued,
-        'loanTypes'    => $loanTypes,
-        'currentPeriod' => $this->currentPeriod,
-        'perPage'      => $perPage,
-    ]);
-}
+        return view('reports.loans.issued', [
+            'loansIssued'  => $loansIssued,
+            'loanTypes'    => $loanTypes,
+            'currentPeriod' => $this->currentPeriod,
+            'perPage'      => $perPage,
+        ]);
+    }
 
 
-/*
+    /*
 |--------------------------------------------------------------------------
 | Build Loans Issued Report Query
 |--------------------------------------------------------------------------
@@ -10570,139 +10760,139 @@ public function reportsLoansIssued(Request $request)
 |
 */
 
-private function buildLoansIssuedReportQuery(Request $request)
-{
-    $memberSearch = trim(
-        (string) $request->input('member_search', '')
-    );
+    private function buildLoansIssuedReportQuery(Request $request)
+    {
+        $memberSearch = trim(
+            (string) $request->input('member_search', '')
+        );
 
-    /*
+        /*
      * Keep compatibility with your old filter URLs.
      */
-    $searchName = trim(
-        (string) $request->input('search_name', '')
-    );
+        $searchName = trim(
+            (string) $request->input('search_name', '')
+        );
 
-    $searchSaccoId = trim(
-        (string) $request->input('search_sacco_id', '')
-    );
+        $searchSaccoId = trim(
+            (string) $request->input('search_sacco_id', '')
+        );
 
-    $searchCompanyName = trim(
-        (string) $request->input('search_company_name', '')
-    );
+        $searchCompanyName = trim(
+            (string) $request->input('search_company_name', '')
+        );
 
-    $loanSearch = trim(
-        (string) $request->input('loan_search', '')
-    );
+        $loanSearch = trim(
+            (string) $request->input('loan_search', '')
+        );
 
-    $loanTypeId = $request->input('loan_type_id');
+        $loanTypeId = $request->input('loan_type_id');
 
-    $startDate = trim(
-        (string) $request->input('start_date', '')
-    );
+        $startDate = trim(
+            (string) $request->input('start_date', '')
+        );
 
-    $endDate = trim(
-        (string) $request->input('end_date', '')
-    );
+        $endDate = trim(
+            (string) $request->input('end_date', '')
+        );
 
-    $startPeriod = trim(
-        (string) $request->input('start_period', '')
-    );
+        $startPeriod = trim(
+            (string) $request->input('start_period', '')
+        );
 
-    $endPeriod = trim(
-        (string) $request->input('end_period', '')
-    );
+        $endPeriod = trim(
+            (string) $request->input('end_period', '')
+        );
 
-    $loanStatus = strtoupper(
-        trim(
-            (string) $request->input('loan_status', '')
-        )
-    );
+        $loanStatus = strtoupper(
+            trim(
+                (string) $request->input('loan_status', '')
+            )
+        );
 
 
-    /*
+        /*
     |--------------------------------------------------------------------------
     | Base query
     |--------------------------------------------------------------------------
     */
 
-    $query = DB::table('sacco_loans as l')
-        ->join(
-            'sacco_members as m',
-            'l.loan_member',
-            '=',
-            'm.member_id'
-        )
-        ->leftJoin(
-            'sacco_department as d',
-            'm.member_dept',
-            '=',
-            'd.department_id'
-        )
-        ->leftJoin(
-            'sacco_company as c',
-            'd.department_company_id',
-            '=',
-            'c.company_id'
-        )
-        ->leftJoin(
-            'sacco_loan_types as lt',
-            'l.loan_loan_type',
-            '=',
-            'lt.loan_type_id'
-        )
-        ->select(
+        $query = DB::table('sacco_loans as l')
+            ->join(
+                'sacco_members as m',
+                'l.loan_member',
+                '=',
+                'm.member_id'
+            )
+            ->leftJoin(
+                'sacco_department as d',
+                'm.member_dept',
+                '=',
+                'd.department_id'
+            )
+            ->leftJoin(
+                'sacco_company as c',
+                'd.department_company_id',
+                '=',
+                'c.company_id'
+            )
+            ->leftJoin(
+                'sacco_loan_types as lt',
+                'l.loan_loan_type',
+                '=',
+                'lt.loan_type_id'
+            )
+            ->select(
 
-            /*
+                /*
             |--------------------------------------------------------------------------
             | Loan
             |--------------------------------------------------------------------------
             */
 
-            'l.loan_id',
-            'l.loan_amount',
-            'l.loan_insurance',
-            'l.loan_loan_paid',
-            'l.loan_payment_period',
+                'l.loan_id',
+                'l.loan_amount',
+                'l.loan_insurance',
+                'l.loan_loan_paid',
+                'l.loan_payment_period',
 
-            'l.loan_taken_period',
-            'l.loan_start_deduction_period',
+                'l.loan_taken_period',
+                'l.loan_start_deduction_period',
 
-            'l.loan_doc_no',
-            'l.loan_description',
+                'l.loan_doc_no',
+                'l.loan_description',
 
-            'l.loan_stoped',
-            'l.loan_on',
+                'l.loan_stoped',
+                'l.loan_on',
 
-            'lt.loan_type_name',
+                'lt.loan_type_name',
 
 
-            /*
+                /*
             |--------------------------------------------------------------------------
             | Member
             |--------------------------------------------------------------------------
             */
 
-            'm.member_name',
-            'm.member_sacco_id',
-            'm.member_national_id',
+                'm.member_name',
+                'm.member_sacco_id',
+                'm.member_national_id',
 
-            'm.member_total_share',
-            'm.member_total_fosa',
-            'm.member_total_share_capital',
+                'm.member_total_share',
+                'm.member_total_fosa',
+                'm.member_total_share_capital',
 
 
-            /*
+                /*
             |--------------------------------------------------------------------------
             | Company
             |--------------------------------------------------------------------------
             */
 
-            'c.company_name'
-        );
+                'c.company_name'
+            );
 
 
-    /*
+        /*
     |--------------------------------------------------------------------------
     | General member search
     |--------------------------------------------------------------------------
@@ -10719,22 +10909,22 @@ private function buildLoansIssuedReportQuery(Request $request)
     |
     */
 
-    if ($memberSearch !== '') {
+        if ($memberSearch !== '') {
 
-        $normalizedSearch = preg_replace(
-            '/\s+/',
-            ' ',
-            $memberSearch
-        );
+            $normalizedSearch = preg_replace(
+                '/\s+/',
+                ' ',
+                $memberSearch
+            );
 
-        $nameTokens = preg_split(
-            '/\s+/',
-            $normalizedSearch,
-            -1,
-            PREG_SPLIT_NO_EMPTY
-        );
+            $nameTokens = preg_split(
+                '/\s+/',
+                $normalizedSearch,
+                -1,
+                PREG_SPLIT_NO_EMPTY
+            );
 
-        /*
+            /*
          * If the user types:
          *
          * 0722400737
@@ -10743,45 +10933,45 @@ private function buildLoansIssuedReportQuery(Request $request)
          *
          * +254722400737
          */
-        $normalizedPhone = $this->normalizeKenyanMobileNumber(
-            $normalizedSearch
-        );
+            $normalizedPhone = $this->normalizeKenyanMobileNumber(
+                $normalizedSearch
+            );
 
-        $query->where(function ($q) use (
-            $normalizedSearch,
-            $nameTokens,
-            $normalizedPhone
-        ) {
+            $query->where(function ($q) use (
+                $normalizedSearch,
+                $nameTokens,
+                $normalizedPhone
+            ) {
 
-            $like = '%' . $normalizedSearch . '%';
+                $like = '%' . $normalizedSearch . '%';
 
-            $q->where(
-                'm.member_name',
-                'like',
-                $like
-            )
-                ->orWhere(
-                    'm.member_sacco_id',
+                $q->where(
+                    'm.member_name',
                     'like',
                     $like
                 )
-                ->orWhere(
-                    'm.member_national_id',
-                    'like',
-                    $like
-                )
-                ->orWhere(
-                    'm.member_phone_no',
-                    'like',
-                    $like
-                )
-                ->orWhere(
-                    'm.member_email',
-                    'like',
-                    $like
-                );
+                    ->orWhere(
+                        'm.member_sacco_id',
+                        'like',
+                        $like
+                    )
+                    ->orWhere(
+                        'm.member_national_id',
+                        'like',
+                        $like
+                    )
+                    ->orWhere(
+                        'm.member_phone_no',
+                        'like',
+                        $like
+                    )
+                    ->orWhere(
+                        'm.member_email',
+                        'like',
+                        $like
+                    );
 
-            /*
+                /*
              * Search member names without depending on word order.
              *
              * Search:
@@ -10790,82 +10980,82 @@ private function buildLoansIssuedReportQuery(Request $request)
              * Can match:
              *   MAINA PETER MWANGI
              */
-            if (count($nameTokens) >= 2) {
+                if (count($nameTokens) >= 2) {
 
-                $q->orWhere(function ($nameQuery) use ($nameTokens) {
+                    $q->orWhere(function ($nameQuery) use ($nameTokens) {
 
-                    foreach ($nameTokens as $token) {
+                        foreach ($nameTokens as $token) {
 
-                        $nameQuery->where(
-                            'm.member_name',
-                            'like',
-                            '%' . $token . '%'
-                        );
-                    }
-                });
-            }
+                            $nameQuery->where(
+                                'm.member_name',
+                                'like',
+                                '%' . $token . '%'
+                            );
+                        }
+                    });
+                }
 
-            if ($normalizedPhone !== null) {
+                if ($normalizedPhone !== null) {
 
-                $q->orWhere(
-                    'm.member_phone_no',
-                    '=',
-                    $normalizedPhone
-                );
-            }
-        });
-    }
+                    $q->orWhere(
+                        'm.member_phone_no',
+                        '=',
+                        $normalizedPhone
+                    );
+                }
+            });
+        }
 
 
-    /*
+        /*
     |--------------------------------------------------------------------------
     | Backward compatibility with old Member Name filter
     |--------------------------------------------------------------------------
     */
 
-    if ($searchName !== '') {
+        if ($searchName !== '') {
 
-        $query->where(
-            'm.member_name',
-            'like',
-            '%' . $searchName . '%'
-        );
-    }
+            $query->where(
+                'm.member_name',
+                'like',
+                '%' . $searchName . '%'
+            );
+        }
 
 
-    /*
+        /*
     |--------------------------------------------------------------------------
     | Backward compatibility with old SACCO ID filter
     |--------------------------------------------------------------------------
     */
 
-    if ($searchSaccoId !== '') {
+        if ($searchSaccoId !== '') {
 
-        $query->where(
-            'm.member_sacco_id',
-            'like',
-            '%' . $searchSaccoId . '%'
-        );
-    }
+            $query->where(
+                'm.member_sacco_id',
+                'like',
+                '%' . $searchSaccoId . '%'
+            );
+        }
 
 
-    /*
+        /*
     |--------------------------------------------------------------------------
     | Company search
     |--------------------------------------------------------------------------
     */
 
-    if ($searchCompanyName !== '') {
+        if ($searchCompanyName !== '') {
 
-        $query->where(
-            'c.company_name',
-            'like',
-            '%' . $searchCompanyName . '%'
-        );
-    }
+            $query->where(
+                'c.company_name',
+                'like',
+                '%' . $searchCompanyName . '%'
+            );
+        }
 
 
-    /*
+        /*
     |--------------------------------------------------------------------------
     | Loan/reference search
     |--------------------------------------------------------------------------
@@ -10879,60 +11069,60 @@ private function buildLoansIssuedReportQuery(Request $request)
     |
     */
 
-    if ($loanSearch !== '') {
+        if ($loanSearch !== '') {
 
-        $query->where(function ($q) use ($loanSearch) {
+            $query->where(function ($q) use ($loanSearch) {
 
-            $like = '%' . $loanSearch . '%';
+                $like = '%' . $loanSearch . '%';
 
-            $q->where(
-                'lt.loan_type_name',
-                'like',
-                $like
-            )
-                ->orWhere(
-                    'l.loan_doc_no',
+                $q->where(
+                    'lt.loan_type_name',
                     'like',
                     $like
                 )
-                ->orWhere(
-                    'l.loan_description',
-                    'like',
-                    $like
-                );
+                    ->orWhere(
+                        'l.loan_doc_no',
+                        'like',
+                        $like
+                    )
+                    ->orWhere(
+                        'l.loan_description',
+                        'like',
+                        $like
+                    );
 
-            if (is_numeric($loanSearch)) {
+                if (is_numeric($loanSearch)) {
 
-                $q->orWhere(
-                    'l.loan_id',
-                    '=',
-                    (int) $loanSearch
-                );
-            }
-        });
-    }
+                    $q->orWhere(
+                        'l.loan_id',
+                        '=',
+                        (int) $loanSearch
+                    );
+                }
+            });
+        }
 
 
-    /*
+        /*
     |--------------------------------------------------------------------------
     | Specific loan type
     |--------------------------------------------------------------------------
     */
 
-    if (
-        $loanTypeId !== null
-        && $loanTypeId !== ''
-    ) {
+        if (
+            $loanTypeId !== null
+            && $loanTypeId !== ''
+        ) {
 
-        $query->where(
-            'l.loan_loan_type',
-            '=',
-            (int) $loanTypeId
-        );
-    }
+            $query->where(
+                'l.loan_loan_type',
+                '=',
+                (int) $loanTypeId
+            );
+        }
 
 
-    /*
+        /*
     |--------------------------------------------------------------------------
     | Actual issue DATE range
     |--------------------------------------------------------------------------
@@ -10943,26 +11133,26 @@ private function buildLoansIssuedReportQuery(Request $request)
     |
     */
 
-    if ($startDate !== '') {
+        if ($startDate !== '') {
 
-        $query->where(
-            'l.loan_on',
-            '>=',
-            $startDate . ' 00:00:00'
-        );
-    }
+            $query->where(
+                'l.loan_on',
+                '>=',
+                $startDate . ' 00:00:00'
+            );
+        }
 
-    if ($endDate !== '') {
+        if ($endDate !== '') {
 
-        $query->where(
-            'l.loan_on',
-            '<=',
-            $endDate . ' 23:59:59'
-        );
-    }
+            $query->where(
+                'l.loan_on',
+                '<=',
+                $endDate . ' 23:59:59'
+            );
+        }
 
 
-    /*
+        /*
     |--------------------------------------------------------------------------
     | Accounting PERIOD range
     |--------------------------------------------------------------------------
@@ -10973,45 +11163,45 @@ private function buildLoansIssuedReportQuery(Request $request)
     |
     */
 
-    if ($startPeriod !== '') {
+        if ($startPeriod !== '') {
 
-        $query->where(
-            'l.loan_taken_period',
-            '>=',
-            $startPeriod
-        );
-    }
+            $query->where(
+                'l.loan_taken_period',
+                '>=',
+                $startPeriod
+            );
+        }
 
-    if ($endPeriod !== '') {
+        if ($endPeriod !== '') {
 
-        $query->where(
-            'l.loan_taken_period',
-            '<=',
-            $endPeriod
-        );
-    }
+            $query->where(
+                'l.loan_taken_period',
+                '<=',
+                $endPeriod
+            );
+        }
 
 
-    /*
+        /*
     |--------------------------------------------------------------------------
     | Loan stopped status
     |--------------------------------------------------------------------------
     */
 
-    if (
-        $loanStatus === 'Y'
-        || $loanStatus === 'N'
-    ) {
+        if (
+            $loanStatus === 'Y'
+            || $loanStatus === 'N'
+        ) {
 
-        $query->where(
-            'l.loan_stoped',
-            '=',
-            $loanStatus
-        );
-    }
+            $query->where(
+                'l.loan_stoped',
+                '=',
+                $loanStatus
+            );
+        }
 
 
-    /*
+        /*
     |--------------------------------------------------------------------------
     | ORDERING
     |--------------------------------------------------------------------------
@@ -11026,172 +11216,172 @@ private function buildLoansIssuedReportQuery(Request $request)
     |
     */
 
-    return $query
-        ->orderBy('l.loan_on', 'desc')
-        ->orderBy('l.loan_taken_period', 'desc')
-        ->orderBy('l.loan_id', 'desc');
-}
+        return $query
+            ->orderBy('l.loan_on', 'desc')
+            ->orderBy('l.loan_taken_period', 'desc')
+            ->orderBy('l.loan_id', 'desc');
+    }
 
 
-/*
+    /*
 |--------------------------------------------------------------------------
 | Validate report filters
 |--------------------------------------------------------------------------
 */
 
-private function validateLoansIssuedFilters(Request $request): void
-{
-    $validator = Validator::make(
-        $request->all(),
-        [
-            'member_search' => [
-                'nullable',
-                'string',
-                'max:255',
-            ],
+    private function validateLoansIssuedFilters(Request $request): void
+    {
+        $validator = Validator::make(
+            $request->all(),
+            [
+                'member_search' => [
+                    'nullable',
+                    'string',
+                    'max:255',
+                ],
 
-            'search_name' => [
-                'nullable',
-                'string',
-                'max:255',
-            ],
+                'search_name' => [
+                    'nullable',
+                    'string',
+                    'max:255',
+                ],
 
-            'search_sacco_id' => [
-                'nullable',
-                'string',
-                'max:255',
-            ],
+                'search_sacco_id' => [
+                    'nullable',
+                    'string',
+                    'max:255',
+                ],
 
-            'search_company_name' => [
-                'nullable',
-                'string',
-                'max:255',
-            ],
+                'search_company_name' => [
+                    'nullable',
+                    'string',
+                    'max:255',
+                ],
 
-            'loan_search' => [
-                'nullable',
-                'string',
-                'max:255',
-            ],
+                'loan_search' => [
+                    'nullable',
+                    'string',
+                    'max:255',
+                ],
 
-            'loan_type_id' => [
-                'nullable',
-                'integer',
-                'exists:sacco_loan_types,loan_type_id',
-            ],
+                'loan_type_id' => [
+                    'nullable',
+                    'integer',
+                    'exists:sacco_loan_types,loan_type_id',
+                ],
 
-            'start_date' => [
-                'nullable',
-                'date',
-            ],
+                'start_date' => [
+                    'nullable',
+                    'date',
+                ],
 
-            'end_date' => [
-                'nullable',
-                'date',
-                'after_or_equal:start_date',
-            ],
+                'end_date' => [
+                    'nullable',
+                    'date',
+                    'after_or_equal:start_date',
+                ],
 
-            'start_period' => [
-                'nullable',
-                'regex:/^\d{4}(0[1-9]|1[0-2])$/',
-            ],
+                'start_period' => [
+                    'nullable',
+                    'regex:/^\d{4}(0[1-9]|1[0-2])$/',
+                ],
 
-            'end_period' => [
-                'nullable',
-                'regex:/^\d{4}(0[1-9]|1[0-2])$/',
-            ],
+                'end_period' => [
+                    'nullable',
+                    'regex:/^\d{4}(0[1-9]|1[0-2])$/',
+                ],
 
-            'loan_status' => [
-                'nullable',
-                'in:Y,N',
-            ],
+                'loan_status' => [
+                    'nullable',
+                    'in:Y,N',
+                ],
 
-            'per_page' => [
-                'nullable',
-                'integer',
-                'in:25,50,100,200',
+                'per_page' => [
+                    'nullable',
+                    'integer',
+                    'in:25,50,100,200',
+                ],
             ],
-        ],
-        [
-            'start_period.regex' =>
+            [
+                'start_period.regex' =>
                 'Start period must be a valid period in YYYYMM format, for example 202609.',
 
-            'end_period.regex' =>
+                'end_period.regex' =>
                 'End period must be a valid period in YYYYMM format, for example 202609.',
 
-            'end_date.after_or_equal' =>
+                'end_date.after_or_equal' =>
                 'The end date cannot be earlier than the start date.',
-        ]
-    );
+            ]
+        );
 
 
-    /*
+        /*
     |--------------------------------------------------------------------------
     | Period range validation
     |--------------------------------------------------------------------------
     */
 
-    $validator->after(function ($validator) use ($request) {
+        $validator->after(function ($validator) use ($request) {
 
-        $startPeriod = trim(
-            (string) $request->input('start_period', '')
-        );
+            $startPeriod = trim(
+                (string) $request->input('start_period', '')
+            );
 
-        $endPeriod = trim(
-            (string) $request->input('end_period', '')
-        );
+            $endPeriod = trim(
+                (string) $request->input('end_period', '')
+            );
 
-        if (
-            $startPeriod !== ''
-            && $endPeriod !== ''
-            && preg_match(
-                '/^\d{4}(0[1-9]|1[0-2])$/',
-                $startPeriod
-            )
-            && preg_match(
-                '/^\d{4}(0[1-9]|1[0-2])$/',
-                $endPeriod
-            )
-            && $startPeriod > $endPeriod
-        ) {
+            if (
+                $startPeriod !== ''
+                && $endPeriod !== ''
+                && preg_match(
+                    '/^\d{4}(0[1-9]|1[0-2])$/',
+                    $startPeriod
+                )
+                && preg_match(
+                    '/^\d{4}(0[1-9]|1[0-2])$/',
+                    $endPeriod
+                )
+                && $startPeriod > $endPeriod
+            ) {
 
-            $validator
-                ->errors()
-                ->add(
-                    'end_period',
-                    'The end period cannot be earlier than the start period.'
-                );
-        }
-    });
+                $validator
+                    ->errors()
+                    ->add(
+                        'end_period',
+                        'The end period cannot be earlier than the start period.'
+                    );
+            }
+        });
 
-    $validator->validate();
-}
+        $validator->validate();
+    }
 
 
-/*
+    /*
 |--------------------------------------------------------------------------
 | Download Loans Issued Report
 |--------------------------------------------------------------------------
 */
 
-public function downloadLoansIssuedReport(Request $request)
-{
-    $this->validateLoansIssuedFilters($request);
+    public function downloadLoansIssuedReport(Request $request)
+    {
+        $this->validateLoansIssuedFilters($request);
 
-    /*
+        /*
      * Same exact filters and ordering as the browser report.
      *
      * Do NOT paginate the Excel export.
      */
-    $query = $this->buildLoansIssuedReportQuery(
-        $request
-    );
+        $query = $this->buildLoansIssuedReportQuery(
+            $request
+        );
 
-    return Excel::download(
-        new LoansIssuedExport($query),
-        'loans_issued_' . now()->format('Ymd_His') . '.xlsx'
-    );
-}
+        return Excel::download(
+            new LoansIssuedExport($query),
+            'loans_issued_' . now()->format('Ymd_His') . '.xlsx'
+        );
+    }
 
 
     public function reportsLoansRepayments(Request $request)
