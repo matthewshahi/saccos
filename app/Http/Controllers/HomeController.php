@@ -2278,12 +2278,25 @@ class HomeController extends Controller
 
         foreach ($loansTaken as $loan) {
 
+            /*
+    |--------------------------------------------------------------------------
+    | Principal balance
+    |--------------------------------------------------------------------------
+    */
+
             $principalBalance = max(
                 0,
                 (float) ($loan->loan_amount ?? 0)
                     -
                     (float) ($loan->loan_loan_paid ?? 0)
             );
+
+
+            /*
+    |--------------------------------------------------------------------------
+    | Loan interest settings
+    |--------------------------------------------------------------------------
+    */
 
             $interestRate = (float) (
                 $loan->loan_type_interest ?? 0
@@ -2297,47 +2310,71 @@ class HomeController extends Controller
                 )
             );
 
+
+            /*
+    |--------------------------------------------------------------------------
+    | Defaults
+    |--------------------------------------------------------------------------
+    */
+
             $interestToPay = 0.0;
 
             /*
-    |--------------------------------------------------------------------------
-    | Has interest already been paid in this YYYYMM period?
-    |--------------------------------------------------------------------------
-    */
-
-            $interestPaidThisPeriod =
-                $loansWithInterestPaidThisPeriod
-                ->contains(
-                    (int) $loan->loan_id
-                );
+     * This flag is ONLY meaningful for REDUCING BALANCE loans.
+     */
+            $interestPaidThisPeriod = false;
 
 
             /*
     |--------------------------------------------------------------------------
-    | Only calculate interest if none has been paid this period
+    | FIXED INTEREST
     |--------------------------------------------------------------------------
+    |
+    | Do NOT check whether interest was paid this period.
+    |
+    | Formula:
+    |
+    | interest = outstanding principal × fixed rate %
+    |
     */
 
-            if (!$interestPaidThisPeriod) {
+            if ($interestType === 'FIXED INTEREST') {
+
+                $interestToPay =
+                    $principalBalance
+                    *
+                    ($interestRate / 100);
+            }
+
+
+            /*
+    |--------------------------------------------------------------------------
+    | REDUCING BALANCE
+    |--------------------------------------------------------------------------
+    |
+    | For reducing balance ONLY:
+    |
+    | Check all repayments for this loan in the current YYYYMM period.
+    |
+    | If ANY repayment has:
+    |
+    | loan_payments_interest > 0
+    |
+    | then this period's interest is already serviced.
+    |
+    */ elseif ($interestType === 'REDUCING BALANCE') {
+
+                $interestPaidThisPeriod =
+                    $loansWithInterestPaidThisPeriod
+                    ->contains(
+                        (int) $loan->loan_id
+                    );
 
                 /*
-         * FIXED INTEREST
-         *
-         * Principal balance × rate %
+         * If interest has NOT been paid this period,
+         * calculate one month's reducing-balance interest.
          */
-                if ($interestType === 'FIXED INTEREST') {
-
-                    $interestToPay =
-                        $principalBalance
-                        *
-                        ($interestRate / 100);
-                }
-
-                /*
-         * REDUCING BALANCE
-         *
-         * Principal balance × annual rate / 12
-         */ elseif ($interestType === 'REDUCING BALANCE') {
+                if (!$interestPaidThisPeriod) {
 
                     $interestToPay =
                         $principalBalance
@@ -2349,7 +2386,7 @@ class HomeController extends Controller
 
             /*
     |--------------------------------------------------------------------------
-    | Blade display values
+    | Values passed to Blade
     |--------------------------------------------------------------------------
     */
 
@@ -2364,7 +2401,9 @@ class HomeController extends Controller
             );
 
             $loan->amount_to_pay = round(
-                $principalBalance + $interestToPay,
+                $principalBalance
+                    +
+                    $interestToPay,
                 2
             );
 
@@ -2372,9 +2411,19 @@ class HomeController extends Controller
                 $interestPaidThisPeriod;
         }
 
+
+        /*
+|--------------------------------------------------------------------------
+| Total current amount payable
+|--------------------------------------------------------------------------
+*/
+
         $memberFinancials['total_amount_to_pay'] = round(
             $loansTaken->sum(function ($loan) {
-                return (float) ($loan->amount_to_pay ?? 0);
+
+                return (float) (
+                    $loan->amount_to_pay ?? 0
+                );
             }),
             2
         );
