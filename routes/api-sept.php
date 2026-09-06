@@ -13,11 +13,9 @@ use App\Http\Controllers\Api\GuaranteeRequestController;
 use App\Http\Controllers\Api\MpesaB2cCallbackController;
 use App\Http\Controllers\Api\MemberAccountsController;
 
-
 // Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 //     return $request->user();
 // });
-
 
 /*
 |--------------------------------------------------------------------------
@@ -27,12 +25,6 @@ use App\Http\Controllers\Api\MemberAccountsController;
 
 Route::prefix('mobile')->group(function () {
 
-    /*
-    |--------------------------------------------------------------------------
-    | STK Push Callback
-    |--------------------------------------------------------------------------
-    */
-
     Route::match(
         ['get', 'post'],
         '/stkpush/callback/{unique_number?}',
@@ -41,13 +33,6 @@ Route::prefix('mobile')->group(function () {
         ->name('stkpush.callback')
         ->middleware('safaricom.ip');
 
-
-    /*
-    |--------------------------------------------------------------------------
-    | C2B Validation
-    |--------------------------------------------------------------------------
-    */
-
     Route::post(
         '/pay/validation',
         [MpesaTheController::class, 'validationRequest']
@@ -55,20 +40,12 @@ Route::prefix('mobile')->group(function () {
         ->name('mpesa.pay.validation')
         ->middleware('safaricom.ip');
 
-
-    /*
-    |--------------------------------------------------------------------------
-    | C2B Confirmation
-    |--------------------------------------------------------------------------
-    */
-
     Route::post(
         '/pay/stk_confirmation',
         [MpesaTheController::class, 'handleC2BPayment']
     )
         ->name('mpesa.pay.confirmation')
         ->middleware('safaricom.ip');
-
 
     /*
     |--------------------------------------------------------------------------
@@ -86,7 +63,6 @@ Route::prefix('mobile')->group(function () {
         ->name('mpesa.status.result')
         ->middleware('safaricom.ip');
 
-
     Route::post(
         '/status/timeout',
         [
@@ -96,7 +72,6 @@ Route::prefix('mobile')->group(function () {
     )
         ->name('mpesa.status.timeout')
         ->middleware('safaricom.ip');
-
 
     /*
     |--------------------------------------------------------------------------
@@ -124,7 +99,6 @@ Route::prefix('mobile')->group(function () {
             'safaricom.ip',
         ]);
 
-
     Route::post(
         '/b2c/timeout',
         [MpesaB2cCallbackController::class, 'timeout']
@@ -149,7 +123,6 @@ Route::post(
 )
     ->middleware('throttle:5,1');
 
-
 Route::post(
     '/auth/refresh',
     [AuthController::class, 'refresh']
@@ -165,23 +138,10 @@ Route::post(
 
 Route::middleware(['auth.api'])->group(function () {
 
-    /*
-    |--------------------------------------------------------------------------
-    | Dashboard
-    |--------------------------------------------------------------------------
-    */
-
     Route::get(
         '/auth/dashboard',
         [MemberDashboardController::class, 'index']
     );
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Member Accounts
-    |--------------------------------------------------------------------------
-    */
 
     Route::get(
         '/auth/accounts',
@@ -189,106 +149,27 @@ Route::middleware(['auth.api'])->group(function () {
     )
         ->middleware('throttle:60,1');
 
-
-    /*
-    |--------------------------------------------------------------------------
-    | Legacy / Existing Savings Endpoint
-    |--------------------------------------------------------------------------
-    |
-    | Retained temporarily for existing Flutter screens.
-    |
-    */
-
+    // Old endpoints retained temporarily for existing Flutter screens.
     Route::get(
         '/auth/savings',
         [MemberDashboardController::class, 'savings']
     );
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Legacy / Existing FOSA Endpoint
-    |--------------------------------------------------------------------------
-    |
-    | Retained temporarily for existing Flutter screens.
-    |
-    */
 
     Route::get(
         '/auth/fosa',
         [MemberDashboardController::class, 'fosaSavings']
     );
 
-
-    /*
-    |--------------------------------------------------------------------------
-    | Member Loans
-    |--------------------------------------------------------------------------
-    |
-    | Returns the member's current outstanding loans.
-    |
-    | This endpoint should return the CURRENT POSITION only:
-    |
-    | - Loan Amount
-    | - Principal Balance
-    | - Current Interest
-    | - Amount To Pay
-    |
-    | It should NOT return the entire loan statement.
-    |
-    */
-
     Route::get(
         '/auth/loans',
         [MemberDashboardController::class, 'loans']
-    )
-        ->middleware('throttle:60,1');
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Full Individual Loan Statement
-    |--------------------------------------------------------------------------
-    |
-    | Returns the COMPLETE transaction history for one loan.
-    |
-    | The controller MUST:
-    |
-    | - verify that the loan belongs to the authenticated member
-    | - return every transaction
-    | - NOT cap results at 5, 10, 20, etc.
-    | - order transactions chronologically
-    | - preserve principal movement signs
-    | - return principal and interest separately
-    | - return total paid
-    | - return the running principal balance
-    |
-    | Example:
-    |
-    | GET /api/auth/loans/16994/statement
-    |
-    */
-
-    Route::get(
-        '/auth/loans/{loanId}/statement',
-        [MemberDashboardController::class, 'loanStatement']
-    )
-        ->whereNumber('loanId')
-        ->middleware('throttle:60,1');
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Member Profile
-    |--------------------------------------------------------------------------
-    */
+    );
 
     Route::get(
         '/auth/profile',
         [MemberDashboardController::class, 'profile']
     );
 });
-
 
 /*
 |--------------------------------------------------------------------------
@@ -303,68 +184,33 @@ Route::middleware([
     ->prefix('auth/guarantee-requests')
     ->group(function () {
 
-        /*
-        |--------------------------------------------------------------------------
-        | Pending Requests
-        |--------------------------------------------------------------------------
-        |
-        | Pending requests for the logged-in guarantor.
-        |
-        */
-
+        // Pending requests for the logged-in guarantor
         Route::get(
             '/',
             [GuaranteeRequestController::class, 'index']
         );
 
-
-        /*
-        |--------------------------------------------------------------------------
-        | Guarantee Request Summary
-        |--------------------------------------------------------------------------
-        |
-        | Small summary for dashboard alert/badge.
-        |
-        */
-
+        // Small summary for dashboard alert/badge
         Route::get(
             '/summary',
             [GuaranteeRequestController::class, 'summary']
         );
 
-
-        /*
-        |--------------------------------------------------------------------------
-        | Single Guarantee Request
-        |--------------------------------------------------------------------------
-        */
-
+        // Optional single request details
         Route::get(
             '/{id}',
             [GuaranteeRequestController::class, 'show']
         )
             ->whereNumber('id');
 
-
-        /*
-        |--------------------------------------------------------------------------
-        | Approve Guarantee Request
-        |--------------------------------------------------------------------------
-        */
-
+        // Approve request
         Route::post(
             '/{id}/approve',
             [GuaranteeRequestController::class, 'approve']
         )
             ->whereNumber('id');
 
-
-        /*
-        |--------------------------------------------------------------------------
-        | Decline Guarantee Request
-        |--------------------------------------------------------------------------
-        */
-
+        // Decline request
         Route::post(
             '/{id}/decline',
             [GuaranteeRequestController::class, 'decline']
@@ -397,7 +243,6 @@ Route::middleware(['auth.api'])
             [LoanApplicationController::class, 'products']
         );
 
-
         /*
         |--------------------------------------------------------------------------
         | Loan Application Context
@@ -413,7 +258,6 @@ Route::middleware(['auth.api'])
             [LoanApplicationController::class, 'context']
         );
 
-
         /*
         |--------------------------------------------------------------------------
         | Top-Up Eligible Loans
@@ -428,7 +272,6 @@ Route::middleware(['auth.api'])
             [LoanApplicationController::class, 'topupLoans']
         );
 
-
         /*
         |--------------------------------------------------------------------------
         | Future: Submit Loan Application
@@ -440,7 +283,6 @@ Route::middleware(['auth.api'])
         | );
         |
         */
-
 
         /*
         |--------------------------------------------------------------------------
@@ -454,18 +296,10 @@ Route::middleware(['auth.api'])
         |
         */
 
-
-        /*
-        |--------------------------------------------------------------------------
-        | Submit Loan Application
-        |--------------------------------------------------------------------------
-        */
-
         Route::post(
             '/apply',
             [LoanApplicationController::class, 'apply']
-        )
-            ->middleware('throttle:5,1');
+        )->middleware('throttle:5,1');
     });
 
 
@@ -492,24 +326,11 @@ Route::middleware(['auth.api'])->group(function () {
 
 Route::prefix('public/registration')->group(function () {
 
-    /*
-    |--------------------------------------------------------------------------
-    | Registration Metadata
-    |--------------------------------------------------------------------------
-    */
-
     Route::get(
         '/meta',
         [PublicRegistrationApiController::class, 'meta']
     )
         ->middleware('throttle:60,1');
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Submit Registration
-    |--------------------------------------------------------------------------
-    */
 
     Route::post(
         '/submit',

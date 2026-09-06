@@ -617,94 +617,926 @@ private function getQuickPayments(int $memberId): array
         ]);
     }
 
+    
     public function loans(Request $request)
-    {
-        // 🔐 Authenticated member
-        $member = $request->user();
-
-        if (!$member || !isset($member->member_id)) {
-            return response()->json(['message' => 'Unauthenticated.'], 401);
-        }
-
-        $memberId = $member->member_id;
-
-        /*
-    |------------------------------------------------------------
-    | 1. Fetch outstanding loans only
-    |------------------------------------------------------------
-    | loan_amount_guaranteed = original principal
-    | loan_loan_paid        = total repaid (can be NULL)
-    | balance               = principal - paid
+{
+    /*
+    |--------------------------------------------------------------------------
+    | Authenticated Member
+    |--------------------------------------------------------------------------
     */
 
-        $loans = DB::table('sacco_loans as l')
-            ->join('sacco_loan_types as t', 't.loan_type_id', '=', 'l.loan_loan_type')
-            ->where('l.loan_member', $memberId)
-            ->where('l.loan_stoped', 'N')
-            ->get()
-            ->map(function ($loan) {
+    $member = $request->user();
 
-                $principal = (float) ($loan->loan_amount ?? 0);
-                $paid      = (float) ($loan->loan_loan_paid ?? 0);
-                $balance   = $principal - $paid;
+    if (!$member || !isset($member->member_id)) {
+        return response()->json([
+            'message' => 'Unauthenticated.',
+        ], 401);
+    }
 
-                return [
-                    'loan_id'        => $loan->loan_id,
-                    'loan_type'      => sprintf(
-                        '%s (%d)',
-                        strtoupper($loan->loan_type_name),
-                        $loan->loan_id
-                    ),
-                    'principal'      => $principal,
-                    'balance'        => $balance,
-                    'repayment_term' => (int) $loan->loan_payment_period,
-                    'taken_period'   => $loan->loan_taken_period,
-                ];
-            })
-            // ✅ ONLY outstanding loans
-            ->filter(fn($l) => $l['balance'] > 1)
-            ->values();
+    $memberId = (int) $member->member_id;
 
-        /*
-    |------------------------------------------------------------
-    | 2. Attach latest 5 repayments per loan
-    |------------------------------------------------------------
+    /*
+    |--------------------------------------------------------------------------
+    | Current Period
+    |--------------------------------------------------------------------------
+    |
+    | SACCO periods are YYYYMM.
+    |
+    | Example:
+    | September 2026 = 202609
+    |
     */
 
-        $loans = $loans->map(function ($loan) {
+    $currentPeriod = date('Ym');
 
-            $payments = DB::table('sacco_loan_payments')
-                ->where('loan_payments_loan_id', $loan['loan_id'])
+
+    /*
+    |--------------------------------------------------------------------------
+    | Outstanding Loan Threshold
+    |--------------------------------------------------------------------------
+    |
+    | Keep this consistent with the desktop member-status logic.
+    |
+    */
+
+    $threshold = DB::table('sacco_defaults')
+        ->where('default_name', 'threshold_amount')
+        ->value('default_value');
+
+    $thresholdAmount = is_numeric($threshold)
+        ? (float) $threshold
+        : 1.0;
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Fetch Outstanding Loans
+    |--------------------------------------------------------------------------
+    |
+    | Principal Balance:
+    |
+    |     loan_amount - loan_loan_paid
+    |
+    | Do NOT calculate interest in Flutter.
+    |
+    */
+
+    $loans = DB::table('sacco_loans as l')
+        ->join(
+            'sacco_loan_types as t',
+            't.loan_type_id',
+            '=',
+            'l.loan_loan_type'
+        )
+        ->leftJoin(
+            'sacco_loan_category as c',
+            'c.loan_category_id',
+            '=',
+            'l.loan_loan_category'
+        )
+        ->where(
+            'l.loan_member',
+            $memberId
+        )
+        ->where(
+            'l.loan_stoped',
+            'N'
+        )
+        ->whereRaw(
+            '
+                COALESCE(l.loan_amount, 0)
+                -
+                COALESCE(l.loan_loan_paid, 0)
+                > ?
+            ',
+            [$thresholdAmount]
+        )
+        ->select(
+            'l.loan_id',
+            'l.loan_amount',
+            'l.loan_loan_paid',
+            'l.loan_payment_period',
+            'l.loan_taken_period',
+            'l.loan_on',
+            'l.loan_doc_no',
+            'l.loan_description',
+
+            't.loan_type_id',
+            't.loan_type_name',
+            't.loan_type_interest',
+            't.loan_type_interest_type',
+
+            'c.loan_category_name'
+        )
+        ->orderByDesc('l.loan_taken_period')
+        ->orderByDesc('l.loan_on')
+        ->orderByDesc('l.loan_id')
+        ->get();
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Find REDUCING BALANCE Loans
+    |--------------------------------------------------------------------------
+    |
+    | For reducing-balance loans only:
+    |
+    | If interest has already been serviced during the current YYYYMM period,
+    | current interest must be ZERO.
+    |
+    | FIXED INTEREST does NOT use this suppression.
+    |
+    */
+
+    $reducingLoanIds = $loans
+        ->filter(function ($loan) {
+
+            return strtoupper(
+                trim(
+                    (string) (
+                        $loan->loan_type_interest_type ?? ''
+                    )
+                )
+            ) === 'REDUCING BALANCE';
+        })
+        ->pluck('loan_id')
+        ->map(
+            fn($loanId) => (int) $loanId
+        )
+        ->values();
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Reducing Loans With Interest Already Paid This Period
+    |--------------------------------------------------------------------------
+    |
+    | One bulk query.
+    |
+    | Avoid querying sacco_loan_payments once per loan.
+    |
+    */
+
+    $loansWithInterestPaidThisPeriod = collect();
+
+    if ($reducingLoanIds->isNotEmpty()) {
+
+        $loansWithInterestPaidThisPeriod =
+            DB::table('sacco_loan_payments')
+                ->whereIn(
+                    'loan_payments_loan_id',
+                    $reducingLoanIds
+                )
+                ->where(
+                    'loan_payments_period',
+                    $currentPeriod
+                )
+                ->where(
+                    'loan_payments_interest',
+                    '>',
+                    0
+                )
+                ->pluck(
+                    'loan_payments_loan_id'
+                )
+                ->map(
+                    fn($loanId) => (int) $loanId
+                )
+                ->unique()
+                ->values();
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Build Mobile Loan Listing
+    |--------------------------------------------------------------------------
+    */
+
+    $loanData = $loans
+        ->map(function ($loan) use (
+            $loansWithInterestPaidThisPeriod
+        ) {
+
+            $interestType = strtoupper(
+                trim(
+                    (string) (
+                        $loan->loan_type_interest_type ?? ''
+                    )
+                )
+            );
+
+            /*
+            |--------------------------------------------------------------------------
+            | Has reducing-balance interest already been paid this period?
+            |--------------------------------------------------------------------------
+            */
+
+            $interestPaidThisPeriod =
+                $interestType === 'REDUCING BALANCE'
+                &&
+                $loansWithInterestPaidThisPeriod
+                    ->contains(
+                        (int) $loan->loan_id
+                    );
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Authoritative Current Position
+            |--------------------------------------------------------------------------
+            */
+
+            $position = $this->calculateCurrentLoanPosition(
+                $loan,
+                $interestPaidThisPeriod
+            );
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Temporary Legacy Payments
+            |--------------------------------------------------------------------------
+            |
+            | The CURRENT released Flutter app expects a "payments" array.
+            |
+            | Keep the old latest-five structure temporarily so deploying this API
+            | does not break/change the currently installed app before we publish
+            | the new Flutter loan-statement screen.
+            |
+            | The NEW app will ignore this and use:
+            |
+            | /api/auth/loans/{loanId}/statement
+            |
+            */
+
+            $legacyPayments = DB::table('sacco_loan_payments')
+                ->where(
+                    'loan_payments_loan_id',
+                    $loan->loan_id
+                )
                 ->orderByDesc('loan_payments_period')
                 ->orderByDesc('loan_payments_paid_on')
                 ->orderByDesc('loan_payments_id')
                 ->limit(5)
                 ->get()
-                ->map(function ($p) {
+                ->map(function ($payment) {
+
                     return [
-                        'date'        => Carbon::parse($p->loan_payments_paid_on)->format('d M Y'),
-                        'description' => $p->loan_payments_description ?? 'Loan Repayment',
-                        'amount'      => abs((float) ($p->loan_payments_amount ?? 0)),
-                        // repayments reduce balance → debit to member
-                        'is_credit'   => false,
+                        'date' =>
+                            $payment->loan_payments_paid_on
+                            ? Carbon::parse(
+                                $payment->loan_payments_paid_on
+                            )->format('d M Y')
+                            : '',
+
+                        'description' =>
+                            $payment->loan_payments_description
+                            ?? 'Loan Repayment',
+
+                        /*
+                         * Keep legacy behaviour until Flutter is replaced.
+                         */
+                        'amount' =>
+                            abs(
+                                (float) (
+                                    $payment->loan_payments_amount ?? 0
+                                )
+                            ),
+
+                        'is_credit' => false,
                     ];
                 });
 
-            $loan['payments'] = $payments;
 
-            return $loan;
-        });
+            return [
 
-        /*
-    |------------------------------------------------------------
-    | 3. Final response (Loans screen contract)
-    |------------------------------------------------------------
+                /*
+                |--------------------------------------------------------------------------
+                | Loan Identity
+                |--------------------------------------------------------------------------
+                */
+
+                'loan_id' =>
+                    (int) $loan->loan_id,
+
+                /*
+                 * Existing Flutter currently expects loan_type.
+                 * Preserve its existing format for backward compatibility.
+                 */
+                'loan_type' =>
+                    sprintf(
+                        '%s (%d)',
+                        strtoupper(
+                            trim(
+                                (string) (
+                                    $loan->loan_type_name ?? 'LOAN'
+                                )
+                            )
+                        ),
+                        (int) $loan->loan_id
+                    ),
+
+                /*
+                 * New Flutter should use this clean name.
+                 */
+                'loan_type_name' =>
+                    strtoupper(
+                        trim(
+                            (string) (
+                                $loan->loan_type_name ?? 'LOAN'
+                            )
+                        )
+                    ),
+
+                'loan_number' =>
+                    (int) $loan->loan_id,
+
+                'loan_category' =>
+                    $loan->loan_category_name !== null
+                    ? (string) $loan->loan_category_name
+                    : null,
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | Financial Position
+                |--------------------------------------------------------------------------
+                |
+                | THIS is what the new Flutter Loans screen will use.
+                |--------------------------------------------------------------------------
+                */
+
+                'loan_amount' =>
+                    round(
+                        (float) (
+                            $loan->loan_amount ?? 0
+                        ),
+                        2
+                    ),
+
+                'principal_balance' =>
+                    $position['principal_balance'],
+
+                'current_interest' =>
+                    $position['current_interest'],
+
+                'amount_to_pay' =>
+                    $position['amount_to_pay'],
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | Interest Information
+                |--------------------------------------------------------------------------
+                */
+
+                'interest_rate' =>
+                    round(
+                        (float) (
+                            $loan->loan_type_interest ?? 0
+                        ),
+                        6
+                    ),
+
+                'interest_type' =>
+                    $interestType,
+
+                'interest_serviced_this_period' =>
+                    $interestPaidThisPeriod,
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | Loan Details
+                |--------------------------------------------------------------------------
+                */
+
+                'repayment_term' =>
+                    (int) (
+                        $loan->loan_payment_period ?? 0
+                    ),
+
+                'taken_period' =>
+                    $loan->loan_taken_period !== null
+                    ? (int) $loan->loan_taken_period
+                    : null,
+
+                'loan_date' =>
+                    $loan->loan_on
+                    ? Carbon::parse(
+                        $loan->loan_on
+                    )->format('d M Y')
+                    : null,
+
+                'document_no' =>
+                    $loan->loan_doc_no,
+
+                'description' =>
+                    $loan->loan_description,
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | Backward Compatibility
+                |--------------------------------------------------------------------------
+                |
+                | Existing Flutter currently reads:
+                |
+                | principal
+                | balance
+                | payments
+                |
+                | Keep these until the new app has been released.
+                |
+                */
+
+                'principal' =>
+                    round(
+                        (float) (
+                            $loan->loan_amount ?? 0
+                        ),
+                        2
+                    ),
+
+                'balance' =>
+                    $position['principal_balance'],
+
+                'payments' =>
+                    $legacyPayments,
+            ];
+        })
+        ->values();
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Response
+    |--------------------------------------------------------------------------
     */
 
+    return response()->json([
+        'period' => (int) $currentPeriod,
+        'loans'  => $loanData,
+    ]);
+}
+
+public function loanStatement(
+    Request $request,
+    int $loanId
+) {
+    /*
+    |--------------------------------------------------------------------------
+    | Authenticated Member
+    |--------------------------------------------------------------------------
+    */
+
+    $member = $request->user();
+
+    if (!$member || !isset($member->member_id)) {
         return response()->json([
-            'loans' => $loans,
-        ]);
+            'message' => 'Unauthenticated.',
+        ], 401);
     }
+
+    $memberId = (int) $member->member_id;
+
+    $currentPeriod = date('Ym');
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Fetch Loan
+    |--------------------------------------------------------------------------
+    |
+    | SECURITY:
+    |
+    | We filter BOTH loan_id and loan_member.
+    |
+    | Therefore a member cannot change the URL from:
+    |
+    | /loans/16994/statement
+    |
+    | to another member's loan ID and obtain their statement.
+    |
+    */
+
+    $loan = DB::table('sacco_loans as l')
+        ->join(
+            'sacco_loan_types as t',
+            't.loan_type_id',
+            '=',
+            'l.loan_loan_type'
+        )
+        ->leftJoin(
+            'sacco_loan_category as c',
+            'c.loan_category_id',
+            '=',
+            'l.loan_loan_category'
+        )
+        ->where(
+            'l.loan_id',
+            $loanId
+        )
+        ->where(
+            'l.loan_member',
+            $memberId
+        )
+        ->select(
+            'l.*',
+
+            't.loan_type_name',
+            't.loan_type_interest',
+            't.loan_type_interest_type',
+
+            'c.loan_category_name'
+        )
+        ->first();
+
+
+    if (!$loan) {
+        return response()->json([
+            'message' => 'Loan not found.',
+        ], 404);
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Interest Type
+    |--------------------------------------------------------------------------
+    */
+
+    $interestType = strtoupper(
+        trim(
+            (string) (
+                $loan->loan_type_interest_type ?? ''
+            )
+        )
+    );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Current Period Interest Check
+    |--------------------------------------------------------------------------
+    |
+    | Only required for REDUCING BALANCE.
+    |
+    */
+
+    $interestPaidThisPeriod = false;
+
+    if ($interestType === 'REDUCING BALANCE') {
+
+        $interestPaidThisPeriod =
+            DB::table('sacco_loan_payments')
+                ->where(
+                    'loan_payments_loan_id',
+                    $loanId
+                )
+                ->where(
+                    'loan_payments_period',
+                    $currentPeriod
+                )
+                ->where(
+                    'loan_payments_interest',
+                    '>',
+                    0
+                )
+                ->exists();
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Current Loan Position
+    |--------------------------------------------------------------------------
+    */
+
+    $position = $this->calculateCurrentLoanPosition(
+        $loan,
+        $interestPaidThisPeriod
+    );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | COMPLETE Loan Statement
+    |--------------------------------------------------------------------------
+    |
+    | IMPORTANT:
+    |
+    | NO limit().
+    |
+    | We return every loan-payment record.
+    |
+    | Ordering:
+    |
+    | 1. YYYYMM period
+    | 2. Date paid
+    | 3. Payment ID
+    |
+    | Therefore even two transactions on the same date/period have a stable,
+    | deterministic order.
+    |
+    */
+
+    $payments = DB::table('sacco_loan_payments')
+        ->where(
+            'loan_payments_loan_id',
+            $loanId
+        )
+        ->orderBy(
+            'loan_payments_period',
+            'asc'
+        )
+        ->orderBy(
+            'loan_payments_paid_on',
+            'asc'
+        )
+        ->orderBy(
+            'loan_payments_id',
+            'asc'
+        )
+        ->get();
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Running Principal Balance
+    |--------------------------------------------------------------------------
+    |
+    | loan_payments_amount = PRINCIPAL movement.
+    |
+    | loan_payments_interest = INTEREST paid.
+    |
+    | Do NOT use abs() here.
+    |
+    | The database contains legitimate negative principal adjustments.
+    | Their sign must be preserved.
+    |
+    */
+
+    $runningPrincipal =
+        (float) (
+            $loan->loan_amount ?? 0
+        );
+
+
+    $transactions = $payments
+        ->values()
+        ->map(function (
+            $payment,
+            $index
+        ) use (
+            &$runningPrincipal
+        ) {
+
+            $principalMovement =
+                (float) (
+                    $payment->loan_payments_amount ?? 0
+                );
+
+            $interest =
+                (float) (
+                    $payment->loan_payments_interest ?? 0
+                );
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Total Transaction Amount
+            |--------------------------------------------------------------------------
+            |
+            | Example:
+            |
+            | Principal = 65,435.05
+            | Interest  = 26,150.95
+            |
+            | Total     = 91,586.00
+            |
+            */
+
+            $totalPaid =
+                $principalMovement
+                +
+                $interest;
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Running Principal
+            |--------------------------------------------------------------------------
+            */
+
+            $runningPrincipal =
+                $runningPrincipal
+                -
+                $principalMovement;
+
+
+            return [
+
+                'sequence' =>
+                    $index + 1,
+
+                'payment_id' =>
+                    (int) $payment->loan_payments_id,
+
+                'period' =>
+                    $payment->loan_payments_period !== null
+                    ? (int) $payment->loan_payments_period
+                    : null,
+
+                'date' =>
+                    $payment->loan_payments_paid_on
+                    ? Carbon::parse(
+                        $payment->loan_payments_paid_on
+                    )->format('d M Y')
+                    : null,
+
+                'document_no' =>
+                    $payment->loan_payments_docno,
+
+                'description' =>
+                    $payment->loan_payments_description
+                    ?? 'Loan Repayment',
+
+                'paid_in_by' =>
+                    $payment->loan_payments_paid_in_by,
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | Transaction Financial Breakdown
+                |--------------------------------------------------------------------------
+                */
+
+                'principal' =>
+                    round(
+                        $principalMovement,
+                        2
+                    ),
+
+                'interest' =>
+                    round(
+                        $interest,
+                        2
+                    ),
+
+                'total_paid' =>
+                    round(
+                        $totalPaid,
+                        2
+                    ),
+
+                'running_principal_balance' =>
+                    round(
+                        $runningPrincipal,
+                        2
+                    ),
+            ];
+        });
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Final Response
+    |--------------------------------------------------------------------------
+    */
+
+    return response()->json([
+
+        'period' =>
+            (int) $currentPeriod,
+
+        'loan' => [
+
+            'loan_id' =>
+                (int) $loan->loan_id,
+
+            'loan_type_name' =>
+                strtoupper(
+                    trim(
+                        (string) (
+                            $loan->loan_type_name ?? 'LOAN'
+                        )
+                    )
+                ),
+
+            'loan_number' =>
+                (int) $loan->loan_id,
+
+            'loan_category' =>
+                $loan->loan_category_name !== null
+                ? (string) $loan->loan_category_name
+                : null,
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Current Position
+            |--------------------------------------------------------------------------
+            */
+
+            'loan_amount' =>
+                round(
+                    (float) (
+                        $loan->loan_amount ?? 0
+                    ),
+                    2
+                ),
+
+            'principal_paid' =>
+                round(
+                    (float) (
+                        $loan->loan_loan_paid ?? 0
+                    ),
+                    2
+                ),
+
+            'principal_balance' =>
+                $position['principal_balance'],
+
+            'current_interest' =>
+                $position['current_interest'],
+
+            'amount_to_pay' =>
+                $position['amount_to_pay'],
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Interest Rules
+            |--------------------------------------------------------------------------
+            */
+
+            'interest_rate' =>
+                round(
+                    (float) (
+                        $loan->loan_type_interest ?? 0
+                    ),
+                    6
+                ),
+
+            'interest_type' =>
+                $interestType,
+
+            'interest_serviced_this_period' =>
+                $interestPaidThisPeriod,
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Loan Information
+            |--------------------------------------------------------------------------
+            */
+
+            'repayment_term' =>
+                (int) (
+                    $loan->loan_payment_period ?? 0
+                ),
+
+            'taken_period' =>
+                $loan->loan_taken_period !== null
+                ? (int) $loan->loan_taken_period
+                : null,
+
+            'loan_date' =>
+                $loan->loan_on
+                ? Carbon::parse(
+                    $loan->loan_on
+                )->format('d M Y')
+                : null,
+
+            'document_no' =>
+                $loan->loan_doc_no,
+
+            'description' =>
+                $loan->loan_description,
+        ],
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Full Statement
+        |--------------------------------------------------------------------------
+        */
+
+        'statement' => [
+
+            'transaction_count' =>
+                $transactions->count(),
+
+            'transactions' =>
+                $transactions,
+        ],
+    ]);
+}
+
+
     public function profile(Request $request)
     {
         // 🔐 Authenticated member
