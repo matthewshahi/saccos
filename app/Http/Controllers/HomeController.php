@@ -10557,114 +10557,716 @@ class HomeController extends Controller
 
 
 
-    public function getLoansIssued(Request $request)
-    {
-        $offset = $request->input('offset', 0);
-        $limit = $request->input('limit', 30);
-        $search = $request->input('search', '');
+    /*
+|--------------------------------------------------------------------------
+| Loans Issued Report
+|--------------------------------------------------------------------------
+*/
 
-        $query = DB::table('sacco_loans')
-            ->join('sacco_members', 'sacco_loans.loan_member', '=', 'sacco_members.member_id')
-            ->join('sacco_department', 'sacco_members.member_dept', '=', 'sacco_department.department_id')
-            ->join('sacco_company', 'sacco_department.department_company_id', '=', 'sacco_company.company_id')
-            ->join('sacco_loan_types', 'sacco_loans.loan_loan_type', '=', 'sacco_loan_types.loan_type_id')
-            ->select(
-                'sacco_loans.loan_id',
-                'sacco_loans.loan_amount',
-                'sacco_loans.loan_loan_paid',
-                'sacco_loans.loan_on as loan_issued_date',
-                'sacco_loans.loan_stoped as loan_status',
-                'sacco_members.member_name',
-                'sacco_members.member_phone_no',
-                'sacco_members.member_national_id',
-                'sacco_members.member_kra_pin',
-                'sacco_loan_types.loan_type_name',
-                'sacco_company.company_name',
-                'sacco_loans.loan_taken_period'
-            );
+public function reportsLoansIssued(Request $request)
+{
+    $this->validateLoansIssuedFilters($request);
 
-        if (!empty($search)) {
-            $query->where(function ($q) use ($search) {
-                $q->where('sacco_members.member_name', 'like', "%$search%")
-                    ->orWhere('sacco_members.member_phone_no', 'like', "%$search%")
-                    ->orWhere('sacco_members.member_national_id', 'like', "%$search%")
-                    ->orWhere('sacco_loan_types.loan_type_name', 'like', "%$search%")
-                    ->orWhere('sacco_company.company_name', 'like', "%$search%");
-            });
-        }
+    /*
+    |--------------------------------------------------------------------------
+    | Pagination
+    |--------------------------------------------------------------------------
+    */
 
-        $issuedLoans = $query->orderBy('sacco_loans.loan_taken_period', 'desc')
-            ->orderBy('sacco_loans.loan_id', 'desc')
-            ->offset($offset)
-            ->limit($limit)
-            ->get();
+    $allowedPerPage = [25, 50, 100, 200];
 
-        return response()->json(['data' => $issuedLoans]);
+    $perPage = (int) $request->input('per_page', 50);
+
+    if (!in_array($perPage, $allowedPerPage, true)) {
+        $perPage = 50;
     }
-    public function downloadLoansIssuedReport(Request $request)
-    {
-        $searchName        = $request->input('search_name');
-        $searchSaccoId     = $request->input('search_sacco_id');
-        $searchCompanyName = $request->input('search_company_name');
-        $startPeriod       = $request->input('start_period'); // YYYYMM
-        $endPeriod         = $request->input('end_period');   // YYYYMM
 
-        // IMPORTANT: build query WITHOUT ->get() or paginate()
-        $query = DB::table('sacco_loans as l')
-            ->join('sacco_members as m', 'l.loan_member', '=', 'm.member_id')
-            ->leftJoin('sacco_department as d', 'm.member_dept', '=', 'd.department_id')
-            ->leftJoin('sacco_company as c', 'd.department_company_id', '=', 'c.company_id')
-            ->leftJoin('sacco_loan_types as lt', 'l.loan_loan_type', '=', 'lt.loan_type_id')
-            ->select(
-                // Loan
-                'l.loan_id',
-                'l.loan_amount',
-                'l.loan_insurance',
-                'l.loan_loan_paid',
-                'l.loan_payment_period',
-                'l.loan_taken_period',
-                'l.loan_start_deduction_period',
-                'l.loan_doc_no',
-                'l.loan_description',
-                'l.loan_stoped',
-                'l.loan_on',
-                'lt.loan_type_name',
+    /*
+    |--------------------------------------------------------------------------
+    | Build report query
+    |--------------------------------------------------------------------------
+    */
 
-                // Member
+    $query = $this->buildLoansIssuedReportQuery($request);
+
+    /*
+    |--------------------------------------------------------------------------
+    | Proper server-side pagination
+    |--------------------------------------------------------------------------
+    */
+
+    $loansIssued = $query
+        ->paginate($perPage)
+        ->appends(
+            $request->except('page')
+        );
+
+    /*
+    |--------------------------------------------------------------------------
+    | Loan types for filter
+    |--------------------------------------------------------------------------
+    |
+    | Do not exclude old/inactive types here because this is a historical
+    | report and old loans may belong to an old loan type.
+    |
+    */
+
+    $loanTypes = DB::table('sacco_loan_types')
+        ->select(
+            'loan_type_id',
+            'loan_type_name'
+        )
+        ->orderBy('loan_type_name', 'asc')
+        ->get();
+
+    return view('reports.loans.issued', [
+        'loansIssued'  => $loansIssued,
+        'loanTypes'    => $loanTypes,
+        'currentPeriod' => $this->currentPeriod,
+        'perPage'      => $perPage,
+    ]);
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| Build Loans Issued Report Query
+|--------------------------------------------------------------------------
+|
+| IMPORTANT:
+|
+| This function is shared between:
+|
+| - Browser report
+| - Excel download
+|
+| This ensures both outputs always use identical filtering and ordering.
+|
+*/
+
+private function buildLoansIssuedReportQuery(Request $request)
+{
+    $memberSearch = trim(
+        (string) $request->input('member_search', '')
+    );
+
+    /*
+     * Keep compatibility with your old filter URLs.
+     */
+    $searchName = trim(
+        (string) $request->input('search_name', '')
+    );
+
+    $searchSaccoId = trim(
+        (string) $request->input('search_sacco_id', '')
+    );
+
+    $searchCompanyName = trim(
+        (string) $request->input('search_company_name', '')
+    );
+
+    $loanSearch = trim(
+        (string) $request->input('loan_search', '')
+    );
+
+    $loanTypeId = $request->input('loan_type_id');
+
+    $startDate = trim(
+        (string) $request->input('start_date', '')
+    );
+
+    $endDate = trim(
+        (string) $request->input('end_date', '')
+    );
+
+    $startPeriod = trim(
+        (string) $request->input('start_period', '')
+    );
+
+    $endPeriod = trim(
+        (string) $request->input('end_period', '')
+    );
+
+    $loanStatus = strtoupper(
+        trim(
+            (string) $request->input('loan_status', '')
+        )
+    );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Base query
+    |--------------------------------------------------------------------------
+    */
+
+    $query = DB::table('sacco_loans as l')
+        ->join(
+            'sacco_members as m',
+            'l.loan_member',
+            '=',
+            'm.member_id'
+        )
+        ->leftJoin(
+            'sacco_department as d',
+            'm.member_dept',
+            '=',
+            'd.department_id'
+        )
+        ->leftJoin(
+            'sacco_company as c',
+            'd.department_company_id',
+            '=',
+            'c.company_id'
+        )
+        ->leftJoin(
+            'sacco_loan_types as lt',
+            'l.loan_loan_type',
+            '=',
+            'lt.loan_type_id'
+        )
+        ->select(
+
+            /*
+            |--------------------------------------------------------------------------
+            | Loan
+            |--------------------------------------------------------------------------
+            */
+
+            'l.loan_id',
+            'l.loan_amount',
+            'l.loan_insurance',
+            'l.loan_loan_paid',
+            'l.loan_payment_period',
+
+            'l.loan_taken_period',
+            'l.loan_start_deduction_period',
+
+            'l.loan_doc_no',
+            'l.loan_description',
+
+            'l.loan_stoped',
+            'l.loan_on',
+
+            'lt.loan_type_name',
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Member
+            |--------------------------------------------------------------------------
+            */
+
+            'm.member_name',
+            'm.member_sacco_id',
+            'm.member_national_id',
+
+            'm.member_total_share',
+            'm.member_total_fosa',
+            'm.member_total_share_capital',
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Company
+            |--------------------------------------------------------------------------
+            */
+
+            'c.company_name'
+        );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | General member search
+    |--------------------------------------------------------------------------
+    |
+    | One search box can find:
+    |
+    | - Member name
+    | - SACCO ID
+    | - National ID
+    | - Phone number
+    | - Email address
+    |
+    | Name searches also support words in different order.
+    |
+    */
+
+    if ($memberSearch !== '') {
+
+        $normalizedSearch = preg_replace(
+            '/\s+/',
+            ' ',
+            $memberSearch
+        );
+
+        $nameTokens = preg_split(
+            '/\s+/',
+            $normalizedSearch,
+            -1,
+            PREG_SPLIT_NO_EMPTY
+        );
+
+        /*
+         * If the user types:
+         *
+         * 0722400737
+         *
+         * also search:
+         *
+         * +254722400737
+         */
+        $normalizedPhone = $this->normalizeKenyanMobileNumber(
+            $normalizedSearch
+        );
+
+        $query->where(function ($q) use (
+            $normalizedSearch,
+            $nameTokens,
+            $normalizedPhone
+        ) {
+
+            $like = '%' . $normalizedSearch . '%';
+
+            $q->where(
                 'm.member_name',
-                'm.member_sacco_id',
-                'm.member_national_id',
-                'm.member_total_share',
-                'm.member_total_fosa',
-                'm.member_total_share_capital',
-
-                // Company
-                'c.company_name'
+                'like',
+                $like
             )
-            ->when($searchName, function ($q) use ($searchName) {
-                return $q->where('m.member_name', 'like', "%{$searchName}%");
-            })
-            ->when($searchSaccoId, function ($q) use ($searchSaccoId) {
-                return $q->where('m.member_sacco_id', 'like', "%{$searchSaccoId}%");
-            })
-            ->when($searchCompanyName, function ($q) use ($searchCompanyName) {
-                return $q->where('c.company_name', 'like', "%{$searchCompanyName}%");
-            })
-            // ✅ FILTER BY loan_taken_period
-            ->when($startPeriod && $endPeriod, function ($q) use ($startPeriod, $endPeriod) {
-                return $q->whereBetween('l.loan_taken_period', [$startPeriod, $endPeriod]);
-            })
-            ->when($startPeriod && !$endPeriod, function ($q) use ($startPeriod) {
-                return $q->where('l.loan_taken_period', '>=', $startPeriod);
-            })
-            ->when($endPeriod && !$startPeriod, function ($q) use ($endPeriod) {
-                return $q->where('l.loan_taken_period', '<=', $endPeriod);
-            })
-            ->orderBy('l.loan_taken_period', 'desc')
-            ->orderBy('l.loan_on', 'desc');
+                ->orWhere(
+                    'm.member_sacco_id',
+                    'like',
+                    $like
+                )
+                ->orWhere(
+                    'm.member_national_id',
+                    'like',
+                    $like
+                )
+                ->orWhere(
+                    'm.member_phone_no',
+                    'like',
+                    $like
+                )
+                ->orWhere(
+                    'm.member_email',
+                    'like',
+                    $like
+                );
 
-        return Excel::download(new LoansIssuedExport($query), 'loans_issued.xlsx');
+            /*
+             * Search member names without depending on word order.
+             *
+             * Search:
+             *   MWANGI MAINA
+             *
+             * Can match:
+             *   MAINA PETER MWANGI
+             */
+            if (count($nameTokens) >= 2) {
+
+                $q->orWhere(function ($nameQuery) use ($nameTokens) {
+
+                    foreach ($nameTokens as $token) {
+
+                        $nameQuery->where(
+                            'm.member_name',
+                            'like',
+                            '%' . $token . '%'
+                        );
+                    }
+                });
+            }
+
+            if ($normalizedPhone !== null) {
+
+                $q->orWhere(
+                    'm.member_phone_no',
+                    '=',
+                    $normalizedPhone
+                );
+            }
+        });
     }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Backward compatibility with old Member Name filter
+    |--------------------------------------------------------------------------
+    */
+
+    if ($searchName !== '') {
+
+        $query->where(
+            'm.member_name',
+            'like',
+            '%' . $searchName . '%'
+        );
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Backward compatibility with old SACCO ID filter
+    |--------------------------------------------------------------------------
+    */
+
+    if ($searchSaccoId !== '') {
+
+        $query->where(
+            'm.member_sacco_id',
+            'like',
+            '%' . $searchSaccoId . '%'
+        );
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Company search
+    |--------------------------------------------------------------------------
+    */
+
+    if ($searchCompanyName !== '') {
+
+        $query->where(
+            'c.company_name',
+            'like',
+            '%' . $searchCompanyName . '%'
+        );
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Loan/reference search
+    |--------------------------------------------------------------------------
+    |
+    | Searches:
+    |
+    | - Loan type
+    | - Loan document number
+    | - Loan description
+    | - Loan ID
+    |
+    */
+
+    if ($loanSearch !== '') {
+
+        $query->where(function ($q) use ($loanSearch) {
+
+            $like = '%' . $loanSearch . '%';
+
+            $q->where(
+                'lt.loan_type_name',
+                'like',
+                $like
+            )
+                ->orWhere(
+                    'l.loan_doc_no',
+                    'like',
+                    $like
+                )
+                ->orWhere(
+                    'l.loan_description',
+                    'like',
+                    $like
+                );
+
+            if (is_numeric($loanSearch)) {
+
+                $q->orWhere(
+                    'l.loan_id',
+                    '=',
+                    (int) $loanSearch
+                );
+            }
+        });
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Specific loan type
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+        $loanTypeId !== null
+        && $loanTypeId !== ''
+    ) {
+
+        $query->where(
+            'l.loan_loan_type',
+            '=',
+            (int) $loanTypeId
+        );
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Actual issue DATE range
+    |--------------------------------------------------------------------------
+    |
+    | loan_on is the actual loan issue/disbursement date.
+    |
+    | Both boundaries are inclusive.
+    |
+    */
+
+    if ($startDate !== '') {
+
+        $query->where(
+            'l.loan_on',
+            '>=',
+            $startDate . ' 00:00:00'
+        );
+    }
+
+    if ($endDate !== '') {
+
+        $query->where(
+            'l.loan_on',
+            '<=',
+            $endDate . ' 23:59:59'
+        );
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Accounting PERIOD range
+    |--------------------------------------------------------------------------
+    |
+    | Example:
+    |
+    | 202601 to 202609
+    |
+    */
+
+    if ($startPeriod !== '') {
+
+        $query->where(
+            'l.loan_taken_period',
+            '>=',
+            $startPeriod
+        );
+    }
+
+    if ($endPeriod !== '') {
+
+        $query->where(
+            'l.loan_taken_period',
+            '<=',
+            $endPeriod
+        );
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Loan stopped status
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+        $loanStatus === 'Y'
+        || $loanStatus === 'N'
+    ) {
+
+        $query->where(
+            'l.loan_stoped',
+            '=',
+            $loanStatus
+        );
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | ORDERING
+    |--------------------------------------------------------------------------
+    |
+    | User requirement:
+    |
+    | 1. Actual issue date
+    | 2. Accounting period
+    | 3. Loan ID
+    |
+    | DESC means newest loans appear first.
+    |
+    */
+
+    return $query
+        ->orderBy('l.loan_on', 'desc')
+        ->orderBy('l.loan_taken_period', 'desc')
+        ->orderBy('l.loan_id', 'desc');
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| Validate report filters
+|--------------------------------------------------------------------------
+*/
+
+private function validateLoansIssuedFilters(Request $request): void
+{
+    $validator = Validator::make(
+        $request->all(),
+        [
+            'member_search' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'search_name' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'search_sacco_id' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'search_company_name' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'loan_search' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'loan_type_id' => [
+                'nullable',
+                'integer',
+                'exists:sacco_loan_types,loan_type_id',
+            ],
+
+            'start_date' => [
+                'nullable',
+                'date',
+            ],
+
+            'end_date' => [
+                'nullable',
+                'date',
+                'after_or_equal:start_date',
+            ],
+
+            'start_period' => [
+                'nullable',
+                'regex:/^\d{4}(0[1-9]|1[0-2])$/',
+            ],
+
+            'end_period' => [
+                'nullable',
+                'regex:/^\d{4}(0[1-9]|1[0-2])$/',
+            ],
+
+            'loan_status' => [
+                'nullable',
+                'in:Y,N',
+            ],
+
+            'per_page' => [
+                'nullable',
+                'integer',
+                'in:25,50,100,200',
+            ],
+        ],
+        [
+            'start_period.regex' =>
+                'Start period must be a valid period in YYYYMM format, for example 202609.',
+
+            'end_period.regex' =>
+                'End period must be a valid period in YYYYMM format, for example 202609.',
+
+            'end_date.after_or_equal' =>
+                'The end date cannot be earlier than the start date.',
+        ]
+    );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Period range validation
+    |--------------------------------------------------------------------------
+    */
+
+    $validator->after(function ($validator) use ($request) {
+
+        $startPeriod = trim(
+            (string) $request->input('start_period', '')
+        );
+
+        $endPeriod = trim(
+            (string) $request->input('end_period', '')
+        );
+
+        if (
+            $startPeriod !== ''
+            && $endPeriod !== ''
+            && preg_match(
+                '/^\d{4}(0[1-9]|1[0-2])$/',
+                $startPeriod
+            )
+            && preg_match(
+                '/^\d{4}(0[1-9]|1[0-2])$/',
+                $endPeriod
+            )
+            && $startPeriod > $endPeriod
+        ) {
+
+            $validator
+                ->errors()
+                ->add(
+                    'end_period',
+                    'The end period cannot be earlier than the start period.'
+                );
+        }
+    });
+
+    $validator->validate();
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| Download Loans Issued Report
+|--------------------------------------------------------------------------
+*/
+
+public function downloadLoansIssuedReport(Request $request)
+{
+    $this->validateLoansIssuedFilters($request);
+
+    /*
+     * Same exact filters and ordering as the browser report.
+     *
+     * Do NOT paginate the Excel export.
+     */
+    $query = $this->buildLoansIssuedReportQuery(
+        $request
+    );
+
+    return Excel::download(
+        new LoansIssuedExport($query),
+        'loans_issued_' . now()->format('Ymd_His') . '.xlsx'
+    );
+}
+
 
     public function reportsLoansRepayments(Request $request)
     {
