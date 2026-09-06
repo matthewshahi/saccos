@@ -114,20 +114,210 @@ class MemberDashboardController extends Controller
 
         // Pending loans (effective member)
         $pendingLoans = DB::table('sacco_loans')
-            ->join('sacco_loan_types', 'sacco_loans.loan_loan_type', '=', 'sacco_loan_types.loan_type_id')
+            ->join(
+                'sacco_loan_types',
+                'sacco_loans.loan_loan_type',
+                '=',
+                'sacco_loan_types.loan_type_id'
+            )
             ->select(
                 'sacco_loans.loan_id',
+
                 'sacco_loan_types.loan_type_name',
+                'sacco_loan_types.loan_type_interest',
+                'sacco_loan_types.loan_type_interest_type',
+
                 'sacco_loans.loan_amount',
                 'sacco_loans.loan_loan_paid',
                 'sacco_loans.loan_taken_period',
-                DB::raw('loan_amount - loan_loan_paid AS loan_balance')
+
+                DB::raw(
+                    '(sacco_loans.loan_amount - sacco_loans.loan_loan_paid) AS loan_balance'
+                )
             )
-            ->where('loan_member', $memberId)
-            ->whereRaw('loan_amount - loan_loan_paid > 1')
-            ->orderBy('loan_taken_period', 'desc')
-            ->limit(6)
+            ->where('sacco_loans.loan_member', $memberId)
+            ->whereRaw(
+                '(sacco_loans.loan_amount - sacco_loans.loan_loan_paid) > 1'
+            )
+            ->orderBy('sacco_loans.loan_taken_period', 'desc')
+            ->limit(20)
             ->get();
+
+
+        /*
+|--------------------------------------------------------------------------
+| Calculate current amount payable
+|--------------------------------------------------------------------------
+|
+| This calculation is ONLY for display on the member dashboard.
+|
+| Nothing is posted to:
+| - sacco_loans
+| - sacco_loan_payments
+| - ledger/accounts
+|
+|--------------------------------------------------------------------------
+*/
+
+        $currentPeriod = (int) now()->format('Ym');
+
+
+        /*
+|--------------------------------------------------------------------------
+| Find loans whose interest has already been paid this period
+|--------------------------------------------------------------------------
+|
+| There may be MULTIPLE repayments for one loan in the same period.
+|
+| If ANY repayment for the loan in YYYYMM has:
+|
+|     loan_payments_interest > 0
+|
+| then reducing-balance interest for this period has already been serviced.
+|--------------------------------------------------------------------------
+*/
+
+        $loanIds = $pendingLoans
+            ->pluck('loan_id')
+            ->map(fn($id) => (int) $id)
+            ->values();
+
+
+        $loansWithInterestPaidThisPeriod = collect();
+
+        if ($loanIds->isNotEmpty()) {
+
+            $loansWithInterestPaidThisPeriod = DB::table(
+                'sacco_loan_payments'
+            )
+                ->whereIn(
+                    'loan_payments_loan_id',
+                    $loanIds
+                )
+                ->where(
+                    'loan_payments_period',
+                    $currentPeriod
+                )
+                ->where(
+                    'loan_payments_interest',
+                    '>',
+                    0
+                )
+                ->pluck(
+                    'loan_payments_loan_id'
+                )
+                ->map(
+                    fn($id) => (int) $id
+                )
+                ->unique()
+                ->values();
+        }
+
+
+        /*
+|--------------------------------------------------------------------------
+| Attach display values to each loan
+|--------------------------------------------------------------------------
+*/
+
+        foreach ($pendingLoans as $loan) {
+
+            $principalBalance = max(
+                0,
+                (float) $loan->loan_amount
+                    - (float) $loan->loan_loan_paid
+            );
+
+            $interestRate = (float) $loan->loan_type_interest;
+
+            $interestType = strtoupper(
+                trim(
+                    (string) $loan->loan_type_interest_type
+                )
+            );
+
+            $interestToPay = 0.0;
+
+
+            /*
+    |--------------------------------------------------------------------------
+    | Fixed interest
+    |--------------------------------------------------------------------------
+    |
+    | User-defined rule:
+    |
+    |     interest = principal balance × rate / 100
+    |
+    |--------------------------------------------------------------------------
+    */
+            if ($interestType === 'FIXED INTEREST') {
+
+                $interestToPay =
+                    $principalBalance
+                    * $interestRate
+                    / 100;
+            }
+
+
+            /*
+    |--------------------------------------------------------------------------
+    | Reducing balance
+    |--------------------------------------------------------------------------
+    |
+    | Interest is charged once per YYYYMM period.
+    |
+    | If ANY repayment in the current period already contains interest,
+    | current interest is zero.
+    |
+    | Otherwise:
+    |
+    |     balance × annual rate / 12 / 100
+    |
+    |--------------------------------------------------------------------------
+    */ elseif ($interestType === 'REDUCING BALANCE') {
+
+                $interestPaidThisPeriod =
+                    $loansWithInterestPaidThisPeriod
+                    ->contains(
+                        (int) $loan->loan_id
+                    );
+
+                if (!$interestPaidThisPeriod) {
+
+                    $interestToPay =
+                        $principalBalance
+                        * $interestRate
+                        / 12
+                        / 100;
+                }
+            }
+
+
+            /*
+    |--------------------------------------------------------------------------
+    | Values used by the Blade ONLY
+    |--------------------------------------------------------------------------
+    */
+
+            $loan->principal_balance =
+                round(
+                    $principalBalance,
+                    2
+                );
+
+            $loan->interest_to_pay =
+                round(
+                    $interestToPay,
+                    2
+                );
+
+            $loan->amount_to_pay =
+                round(
+                    $principalBalance
+                        + $interestToPay,
+                    2
+                );
+        }
 
         // Next of kin (effective member)
         $nextOfKin = DB::table('sacco_next_of_kin')
@@ -350,10 +540,10 @@ class MemberDashboardController extends Controller
         $repaymentsByLoan = $repayments->groupBy('loan_payments_loan_id');
         foreach ($loans as $loan) {
             $loan->repayments =
-    $repaymentsByLoan->get(
-        $loan->loan_id,
-        collect()
-    );
+                $repaymentsByLoan->get(
+                    $loan->loan_id,
+                    collect()
+                );
             $runningBalance = $loan->loan_amount;
 
             foreach ($loan->repayments as $repayment) {
@@ -371,8 +561,8 @@ class MemberDashboardController extends Controller
     }
 
     public function specialSavingsListings()
-{
-    /*
+    {
+        /*
     |--------------------------------------------------------------------------
     | Resolve effective member
     |--------------------------------------------------------------------------
@@ -385,59 +575,59 @@ class MemberDashboardController extends Controller
     | The existing resolveEffectiveMemberId() performs the ownership check.
     |--------------------------------------------------------------------------
     */
-    $memberId = $this->resolveEffectiveMemberId();
+        $memberId = $this->resolveEffectiveMemberId();
 
-    /*
+        /*
     |--------------------------------------------------------------------------
     | Statement period
     |--------------------------------------------------------------------------
     */
-    $periodFrom = trim((string) request()->query(
-        'period_from',
-        '000000'
-    ));
+        $periodFrom = trim((string) request()->query(
+            'period_from',
+            '000000'
+        ));
 
-    $periodTo = trim((string) request()->query(
-        'period_to',
-        '999999'
-    ));
+        $periodTo = trim((string) request()->query(
+            'period_to',
+            '999999'
+        ));
 
-    /*
+        /*
      * Only allow YYYYMM-style numeric periods.
      */
-    if (!preg_match('/^\d{6}$/', $periodFrom)) {
-        $periodFrom = '000000';
-    }
+        if (!preg_match('/^\d{6}$/', $periodFrom)) {
+            $periodFrom = '000000';
+        }
 
-    if (!preg_match('/^\d{6}$/', $periodTo)) {
-        $periodTo = '999999';
-    }
+        if (!preg_match('/^\d{6}$/', $periodTo)) {
+            $periodTo = '999999';
+        }
 
-    /*
+        /*
      * Do not allow an inverted period range.
      */
-    if ((int) $periodFrom > (int) $periodTo) {
-        [$periodFrom, $periodTo] = [
-            $periodTo,
-            $periodFrom,
-        ];
-    }
+        if ((int) $periodFrom > (int) $periodTo) {
+            [$periodFrom, $periodTo] = [
+                $periodTo,
+                $periodFrom,
+            ];
+        }
 
-    /*
+        /*
     |--------------------------------------------------------------------------
     | Member
     |--------------------------------------------------------------------------
     */
-    $member = DB::table('sacco_members')
-        ->where('member_id', $memberId)
-        ->where('member_deleted', 'N')
-        ->first();
+        $member = DB::table('sacco_members')
+            ->where('member_id', $memberId)
+            ->where('member_deleted', 'N')
+            ->first();
 
-    if (!$member) {
-        abort(404, 'Member not found');
-    }
+        if (!$member) {
+            abort(404, 'Member not found');
+        }
 
-    /*
+        /*
     |--------------------------------------------------------------------------
     | Member Special Savings Accounts
     |--------------------------------------------------------------------------
@@ -450,42 +640,42 @@ class MemberDashboardController extends Controller
     | owns a valid, non-deleted account.
     |--------------------------------------------------------------------------
     */
-    $accounts = DB::table(
-        'sacco_special_saving_accounts as a'
-    )
-        ->leftJoin(
-            'sacco_special_saving_products as p',
-            'p.special_saving_product_id',
-            '=',
-            'a.special_saving_account_product_id'
+        $accounts = DB::table(
+            'sacco_special_saving_accounts as a'
         )
-        ->where(
-            'a.special_saving_account_member_id',
-            $memberId
-        )
-        ->where(
-            'a.special_saving_account_deleted',
-            'N'
-        )
-        ->select(
-            'a.*',
+            ->leftJoin(
+                'sacco_special_saving_products as p',
+                'p.special_saving_product_id',
+                '=',
+                'a.special_saving_account_product_id'
+            )
+            ->where(
+                'a.special_saving_account_member_id',
+                $memberId
+            )
+            ->where(
+                'a.special_saving_account_deleted',
+                'N'
+            )
+            ->select(
+                'a.*',
 
-            'p.special_saving_product_name',
-            'p.special_saving_product_code',
-            'p.special_saving_product_description'
-        )
-        ->orderByRaw(
-            'p.special_saving_product_name IS NULL ASC'
-        )
-        ->orderBy(
-            'p.special_saving_product_name'
-        )
-        ->orderBy(
-            'a.special_saving_account_number'
-        )
-        ->get();
+                'p.special_saving_product_name',
+                'p.special_saving_product_code',
+                'p.special_saving_product_description'
+            )
+            ->orderByRaw(
+                'p.special_saving_product_name IS NULL ASC'
+            )
+            ->orderBy(
+                'p.special_saving_product_name'
+            )
+            ->orderBy(
+                'a.special_saving_account_number'
+            )
+            ->get();
 
-    /*
+        /*
     |--------------------------------------------------------------------------
     | Build Member Special Savings Statements
     |--------------------------------------------------------------------------
@@ -502,124 +692,124 @@ class MemberDashboardController extends Controller
     |    within the selected period — NOT today's account balance.
     |--------------------------------------------------------------------------
     */
-    $specialSavings = $accounts->map(
-        function ($account) use (
-            $periodFrom,
-            $periodTo
-        ) {
+        $specialSavings = $accounts->map(
+            function ($account) use (
+                $periodFrom,
+                $periodTo
+            ) {
 
-            /*
+                /*
             |--------------------------------------------------------------------------
             | Opening transaction
             |--------------------------------------------------------------------------
             */
-            $openingTxn = DB::table(
-                'sacco_special_saving_transactions'
-            )
-                ->where(
-                    'special_saving_transaction_account_id',
-                    $account->special_saving_account_id
+                $openingTxn = DB::table(
+                    'sacco_special_saving_transactions'
                 )
-                ->where(
-                    'special_saving_transaction_deleted',
-                    'N'
-                )
-                ->where(function ($query) {
-                    $query
-                        ->where(
-                            'special_saving_transaction_reversed',
-                            'N'
-                        )
-                        ->orWhereNull(
-                            'special_saving_transaction_reversed'
-                        );
-                })
-                ->where(
-                    'special_saving_transaction_period',
-                    '<',
-                    $periodFrom
-                )
-                ->orderByDesc(
-                    'special_saving_transaction_period'
-                )
-                ->orderByDesc(
-                    'special_saving_transaction_date'
-                )
-                ->orderByDesc(
-                    'special_saving_transaction_id'
-                )
-                ->first();
+                    ->where(
+                        'special_saving_transaction_account_id',
+                        $account->special_saving_account_id
+                    )
+                    ->where(
+                        'special_saving_transaction_deleted',
+                        'N'
+                    )
+                    ->where(function ($query) {
+                        $query
+                            ->where(
+                                'special_saving_transaction_reversed',
+                                'N'
+                            )
+                            ->orWhereNull(
+                                'special_saving_transaction_reversed'
+                            );
+                    })
+                    ->where(
+                        'special_saving_transaction_period',
+                        '<',
+                        $periodFrom
+                    )
+                    ->orderByDesc(
+                        'special_saving_transaction_period'
+                    )
+                    ->orderByDesc(
+                        'special_saving_transaction_date'
+                    )
+                    ->orderByDesc(
+                        'special_saving_transaction_id'
+                    )
+                    ->first();
 
-            /*
+                /*
             |--------------------------------------------------------------------------
             | Transactions in selected period
             |--------------------------------------------------------------------------
             */
-            $transactions = DB::table(
-                'sacco_special_saving_transactions'
-            )
-                ->where(
-                    'special_saving_transaction_account_id',
-                    $account->special_saving_account_id
+                $transactions = DB::table(
+                    'sacco_special_saving_transactions'
                 )
-                ->where(
-                    'special_saving_transaction_deleted',
-                    'N'
-                )
-                ->where(function ($query) {
-                    $query
-                        ->where(
-                            'special_saving_transaction_reversed',
-                            'N'
-                        )
-                        ->orWhereNull(
-                            'special_saving_transaction_reversed'
-                        );
-                })
-                ->whereBetween(
-                    'special_saving_transaction_period',
-                    [
-                        $periodFrom,
-                        $periodTo,
-                    ]
-                )
-                ->orderBy(
-                    'special_saving_transaction_period'
-                )
-                ->orderBy(
-                    'special_saving_transaction_date'
-                )
-                ->orderBy(
-                    'special_saving_transaction_id'
-                )
-                ->get();
+                    ->where(
+                        'special_saving_transaction_account_id',
+                        $account->special_saving_account_id
+                    )
+                    ->where(
+                        'special_saving_transaction_deleted',
+                        'N'
+                    )
+                    ->where(function ($query) {
+                        $query
+                            ->where(
+                                'special_saving_transaction_reversed',
+                                'N'
+                            )
+                            ->orWhereNull(
+                                'special_saving_transaction_reversed'
+                            );
+                    })
+                    ->whereBetween(
+                        'special_saving_transaction_period',
+                        [
+                            $periodFrom,
+                            $periodTo,
+                        ]
+                    )
+                    ->orderBy(
+                        'special_saving_transaction_period'
+                    )
+                    ->orderBy(
+                        'special_saving_transaction_date'
+                    )
+                    ->orderBy(
+                        'special_saving_transaction_id'
+                    )
+                    ->get();
 
-            /*
+                /*
             |--------------------------------------------------------------------------
             | Opening balances
             |--------------------------------------------------------------------------
             */
-            $openingPrincipal = $openingTxn
-                ? (float) $openingTxn
-                    ->special_saving_transaction_principal_balance_after
-                : 0.0;
+                $openingPrincipal = $openingTxn
+                    ? (float) $openingTxn
+                        ->special_saving_transaction_principal_balance_after
+                    : 0.0;
 
-            $openingAccruedInterest = $openingTxn
-                ? (float) $openingTxn
-                    ->special_saving_transaction_accrued_interest_after
-                : 0.0;
+                $openingAccruedInterest = $openingTxn
+                    ? (float) $openingTxn
+                        ->special_saving_transaction_accrued_interest_after
+                    : 0.0;
 
-            $openingAvailableInterest = $openingTxn
-                ? (float) $openingTxn
-                    ->special_saving_transaction_available_interest_after
-                : 0.0;
+                $openingAvailableInterest = $openingTxn
+                    ? (float) $openingTxn
+                        ->special_saving_transaction_available_interest_after
+                    : 0.0;
 
-            $openingTotal = $openingTxn
-                ? (float) $openingTxn
-                    ->special_saving_transaction_total_balance_after
-                : 0.0;
+                $openingTotal = $openingTxn
+                    ? (float) $openingTxn
+                        ->special_saving_transaction_total_balance_after
+                    : 0.0;
 
-            /*
+                /*
             |--------------------------------------------------------------------------
             | Historical closing balances
             |--------------------------------------------------------------------------
@@ -631,89 +821,89 @@ class MemberDashboardController extends Controller
             | inside the requested period.
             |--------------------------------------------------------------------------
             */
-            $closingTxn = $transactions->last();
+                $closingTxn = $transactions->last();
 
-            if ($closingTxn) {
-                $closingPrincipal = (float) $closingTxn
-                    ->special_saving_transaction_principal_balance_after;
+                if ($closingTxn) {
+                    $closingPrincipal = (float) $closingTxn
+                        ->special_saving_transaction_principal_balance_after;
 
-                $closingAccruedInterest = (float) $closingTxn
-                    ->special_saving_transaction_accrued_interest_after;
+                    $closingAccruedInterest = (float) $closingTxn
+                        ->special_saving_transaction_accrued_interest_after;
 
-                $closingAvailableInterest = (float) $closingTxn
-                    ->special_saving_transaction_available_interest_after;
+                    $closingAvailableInterest = (float) $closingTxn
+                        ->special_saving_transaction_available_interest_after;
 
-                $closingTotal = (float) $closingTxn
-                    ->special_saving_transaction_total_balance_after;
-            } else {
-                /*
+                    $closingTotal = (float) $closingTxn
+                        ->special_saving_transaction_total_balance_after;
+                } else {
+                    /*
                  * No movement during the requested period.
                  * Closing position therefore equals opening position.
                  */
-                $closingPrincipal = $openingPrincipal;
-                $closingAccruedInterest = $openingAccruedInterest;
-                $closingAvailableInterest = $openingAvailableInterest;
-                $closingTotal = $openingTotal;
-            }
+                    $closingPrincipal = $openingPrincipal;
+                    $closingAccruedInterest = $openingAccruedInterest;
+                    $closingAvailableInterest = $openingAvailableInterest;
+                    $closingTotal = $openingTotal;
+                }
 
-            return (object) [
-                'account' => $account,
+                return (object) [
+                    'account' => $account,
 
-                'opening_principal' =>
+                    'opening_principal' =>
                     $openingPrincipal,
 
-                'opening_accrued_interest' =>
+                    'opening_accrued_interest' =>
                     $openingAccruedInterest,
 
-                'opening_available_interest' =>
+                    'opening_available_interest' =>
                     $openingAvailableInterest,
 
-                'opening_total' =>
+                    'opening_total' =>
                     $openingTotal,
 
-                'closing_principal' =>
+                    'closing_principal' =>
                     $closingPrincipal,
 
-                'closing_accrued_interest' =>
+                    'closing_accrued_interest' =>
                     $closingAccruedInterest,
 
-                'closing_available_interest' =>
+                    'closing_available_interest' =>
                     $closingAvailableInterest,
 
-                'closing_total' =>
+                    'closing_total' =>
                     $closingTotal,
 
-                'transactions' =>
+                    'transactions' =>
                     $transactions,
-            ];
-        }
-    )->values();
+                ];
+            }
+        )->values();
 
-    /*
+        /*
     |--------------------------------------------------------------------------
     | Blade payload
     |--------------------------------------------------------------------------
     */
-    $data = [
-        'member' => $member,
+        $data = [
+            'member' => $member,
 
-        'specialSavings' => $specialSavings,
+            'specialSavings' => $specialSavings,
 
-        'period_from' => $periodFrom,
-        'period_to' => $periodTo,
-    ];
+            'period_from' => $periodFrom,
+            'period_to' => $periodTo,
+        ];
 
-    /*
+        /*
      * Preserve the existing secure junior-account context.
      */
-    $data = array_merge(
-        $data,
-        $this->buildJuniorViewContext($memberId)
-    );
+        $data = array_merge(
+            $data,
+            $this->buildJuniorViewContext($memberId)
+        );
 
-    return view(
-        'members.special_savings_listings',
-        compact('data')
-    );
-}
+        return view(
+            'members.special_savings_listings',
+            compact('data')
+        );
+    }
 }
